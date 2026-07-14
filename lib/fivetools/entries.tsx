@@ -69,6 +69,37 @@ function EntryBlock({ entry }: { entry: FiveEntry }) {
   }
 }
 
+/** Appiattisce le entries in blocchi di testo semplice, usato per la traduzione automatica. */
+export function flattenEntries(entries: FiveEntry[] | undefined): string[] {
+  if (!entries) return [];
+  const blocks: string[] = [];
+  for (const entry of entries) {
+    if (typeof entry === "string") {
+      blocks.push(stripTags(entry));
+      continue;
+    }
+    switch (entry.type) {
+      case "list":
+        for (const item of entry.items ?? []) blocks.push(listItemText(item));
+        break;
+      case "entries":
+      case "section":
+        if (entry.name) blocks.push(stripTags(entry.name));
+        blocks.push(...flattenEntries(entry.entries));
+        break;
+      case "item":
+        blocks.push(listItemText(entry));
+        break;
+      case "quote":
+        blocks.push(...flattenEntries(entry.entries));
+        break;
+      default:
+        break;
+    }
+  }
+  return blocks;
+}
+
 export function RenderEntries({ entries }: { entries: FiveEntry[] | undefined }) {
   if (!entries || entries.length === 0) return null;
   return (

@@ -23,7 +23,8 @@ import {
   type RawSpell,
   type RawSubclass,
 } from "@/lib/fivetools/data";
-import { RenderEntries } from "@/lib/fivetools/entries";
+import { flattenEntries, RenderEntries, type FiveEntry } from "@/lib/fivetools/entries";
+import { translateBatch, translateText, useTranslatedText } from "@/lib/fivetools/translate";
 import {
   formatAC,
   formatAbilityIncrease,
@@ -65,6 +66,8 @@ const EDITIONS: { value: EditionFilter; label: string }[] = [
 
 type Entry = RawSpell | RawCreature | RawItem | RawRace | RawFeat | RawBackground | RawCondition | RawClass;
 
+const PAGE_SIZE = 30;
+
 const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
   incantesimi: loadSpells,
   mostri: loadCreatures,
@@ -80,14 +83,33 @@ export default function CompendiumPage() {
   const [kind, setKind] = useState<CompendiumKind>("incantesimi");
   const [edition, setEdition] = useState<EditionFilter>("entrambe");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Entry | null>(null);
 
   const [books, setBooks] = useState<Map<string, BookMeta> | null>(null);
   const [dataByKind, setDataByKind] = useState<Partial<Record<CompendiumKind, Entry[]>>>({});
+  const [translatedQuery, setTranslatedQuery] = useState<{ query: string; english: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     loadBooks().then(setBooks);
   }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) return;
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      translateText(q, "it", "en").then((english) => {
+        if (!cancelled && english) setTranslatedQuery({ query: q, english });
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [query]);
 
   useEffect(() => {
     if (dataByKind[kind]) return;
@@ -104,19 +126,30 @@ export default function CompendiumPage() {
   const categoryData = dataByKind[kind] ?? null;
   const loadingCategory = categoryData === null;
 
-  const results = useMemo(() => {
+  const filtered = useMemo(() => {
     if (!categoryData || !books) return [];
     const q = query.trim().toLowerCase();
-    if (!q) return [];
+    const englishQuery =
+      translatedQuery && translatedQuery.query === query.trim()
+        ? translatedQuery.english.toLowerCase()
+        : null;
     return categoryData
-      .filter((entry) => entry.name.toLowerCase().includes(q))
+      .filter(
+        (entry) =>
+          !q ||
+          entry.name.toLowerCase().includes(q) ||
+          (englishQuery && entry.name.toLowerCase().includes(englishQuery)),
+      )
       .filter((entry) => {
         if (edition === "entrambe") return true;
         return books.get(entry.source)?.edition === edition;
       })
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, 60);
-  }, [categoryData, books, query, edition]);
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [categoryData, books, query, edition, translatedQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const results = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -145,6 +178,7 @@ export default function CompendiumPage() {
               setKind(tab.kind);
               setQuery("");
               setSelected(null);
+              setPage(0);
             }}
             className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
               kind === tab.kind
@@ -167,6 +201,7 @@ export default function CompendiumPage() {
               onClick={() => {
                 setEdition(option.value);
                 setSelected(null);
+                setPage(0);
               }}
               className={`rounded-lg border py-1.5 text-xs font-bold transition-colors ${
                 edition === option.value
@@ -185,8 +220,9 @@ export default function CompendiumPage() {
         onChange={(event) => {
           setQuery(event.target.value);
           setSelected(null);
+          setPage(0);
         }}
-        placeholder="Cerca (in inglese)…"
+        placeholder="Cerca (in inglese o italiano)…"
         className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
       />
 
@@ -203,9 +239,7 @@ export default function CompendiumPage() {
             </p>
           )}
           {!loadingCategory && categoryData && categoryData.length > 0 && results.length === 0 && (
-            <p className="text-sm text-muted text-center py-6">
-              {query.trim() ? "Nessun risultato." : "Digita qualcosa per iniziare a cercare."}
-            </p>
+            <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
           )}
           <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface">
             {results.map((entry) => (
@@ -214,7 +248,10 @@ export default function CompendiumPage() {
                   onClick={() => setSelected(entry)}
                   className="w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3"
                 >
-                  <span className="font-bold text-foreground">{entry.name}</span>
+                  <span className="font-bold text-foreground">
+                    {entry.name}
+                    <ItalianName text={entry.name} />
+                  </span>
                   <div className="flex items-center gap-2 shrink-0">
                     <EntrySubtitle kind={kind} entry={entry} />
                     <SourceBadge source={entry.source} books={books} />
@@ -223,7 +260,67 @@ export default function CompendiumPage() {
               </li>
             ))}
           </ul>
+          {results.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between text-sm">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+                className="rounded-lg border border-edge px-3 py-1.5 text-muted disabled:opacity-30 hover:enabled:text-foreground"
+              >
+                ← Precedente
+              </button>
+              <span className="text-muted">
+                Pagina {currentPage + 1} di {totalPages} ({filtered.length} risultati)
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={currentPage >= totalPages - 1}
+                className="rounded-lg border border-edge px-3 py-1.5 text-muted disabled:opacity-30 hover:enabled:text-foreground"
+              >
+                Successiva →
+              </button>
+            </div>
+          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ItalianName({ text }: { text: string }) {
+  const translated = useTranslatedText(text, "en", "it");
+  if (!translated || translated.toLowerCase() === text.toLowerCase()) return null;
+  return <span className="block text-xs font-normal text-muted">{translated}</span>;
+}
+
+function TranslatedBlock({ entries }: { entries: FiveEntry[] | undefined }) {
+  const blocks = useMemo(() => flattenEntries(entries), [entries]);
+  const [translated, setTranslated] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (blocks.length === 0) return;
+    let cancelled = false;
+    translateBatch(blocks, "en", "it").then((result) => {
+      if (cancelled) return;
+      setTranslated(result.map((text, index) => text ?? blocks[index]));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [blocks]);
+
+  if (blocks.length === 0) return null;
+  return (
+    <div className="space-y-1.5 border-t border-edge pt-3">
+      <p className="text-[10px] uppercase tracking-widest text-muted">🇮🇹 Traduzione automatica</p>
+      {translated ? (
+        translated.map((text, index) => (
+          <p key={index} className="text-sm text-foreground leading-relaxed">
+            {text}
+          </p>
+        ))
+      ) : (
+        <p className="text-sm text-muted">Traduzione in corso…</p>
       )}
     </div>
   );
@@ -294,7 +391,10 @@ function EntryDetail({
         ← Risultati
       </button>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-2xl font-display font-bold text-accent-strong">{entry.name}</h2>
+        <div>
+          <h2 className="text-2xl font-display font-bold text-accent-strong">{entry.name}</h2>
+          <ItalianName text={entry.name} />
+        </div>
         <SourceBadge source={entry.source} books={books} />
       </div>
       {meta && <p className="text-xs text-muted -mt-2">{meta.name}</p>}
@@ -305,7 +405,10 @@ function EntryDetail({
       {kind === "razze" && <RaceDetail race={entry as RawRace} />}
       {kind === "talenti" && <FeatDetail feat={entry as RawFeat} />}
       {(kind === "background" || kind === "condizioni") && (
-        <RenderEntries entries={(entry as RawBackground | RawCondition).entries} />
+        <>
+          <RenderEntries entries={(entry as RawBackground | RawCondition).entries} />
+          <TranslatedBlock entries={(entry as RawBackground | RawCondition).entries} />
+        </>
       )}
       {kind === "classi" && <ClassDetail cls={entry as RawClass} />}
     </div>
@@ -343,6 +446,7 @@ function SpellDetail({ spell }: { spell: RawSpell }) {
           <RenderEntries entries={spell.entriesHigherLevel} />
         </div>
       )}
+      <TranslatedBlock entries={[...spell.entries, ...(spell.entriesHigherLevel ?? [])]} />
     </>
   );
 }
@@ -403,6 +507,7 @@ function CreatureDetail({ creature }: { creature: RawCreature }) {
               <div key={`${item.name}-${index}`}>
                 <p className="text-sm font-bold text-foreground">{item.name}</p>
                 <RenderEntries entries={item.entries} />
+                <TranslatedBlock entries={item.entries} />
               </div>
             ))}
           </div>
@@ -444,6 +549,7 @@ function ItemDetail({ item }: { item: RawItem }) {
         {[typeName, item.rarity, attunement].filter(Boolean).join(" · ")}
       </p>
       <RenderEntries entries={item.entries} />
+      <TranslatedBlock entries={item.entries} />
     </>
   );
 }
@@ -458,6 +564,7 @@ function RaceDetail({ race }: { race: RawRace }) {
         <Stat label="Scurovisione" value={race.darkvision ? `${race.darkvision} piedi` : undefined} />
       </div>
       <RenderEntries entries={race.entries} />
+      <TranslatedBlock entries={race.entries} />
     </>
   );
 }
@@ -471,6 +578,7 @@ function FeatDetail({ feat }: { feat: RawFeat }) {
         {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
       </div>
       <RenderEntries entries={feat.entries} />
+      <TranslatedBlock entries={feat.entries} />
     </>
   );
 }
