@@ -301,7 +301,7 @@ export default function CompendiumPage() {
         className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
       />
 
-      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[440px_1fr] lg:gap-6 lg:items-start">
+      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] lg:gap-6 lg:items-start">
         <div className={selected ? "hidden lg:block space-y-2" : "space-y-2"}>
           {loadingCategory && (
             <p className="text-sm text-muted text-center py-6">Caricamento contenuti in corso…</p>
