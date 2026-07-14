@@ -30,6 +30,30 @@ import { flattenEntries, RenderEntries, type FiveEntry } from "@/lib/fivetools/e
 import { translateBatch, translateText, useTranslatedText } from "@/lib/fivetools/translate";
 import { stripTags } from "@/lib/fivetools/tags";
 import { FlagIcon } from "@/components/flag-icon";
+import { getIncantesimiIta, getMostriIta } from "@/app/actions/compendio-ita";
+
+// cache in memoria per la durata della pagina: i due elenchi (332 + ~235 righe) sono piccoli,
+// non serve rifetcharli ogni volta che si seleziona un'altra scheda
+let itaSpellsPromise: ReturnType<typeof getIncantesimiIta> | null = null;
+function loadIncantesimiIta() {
+  if (!itaSpellsPromise) itaSpellsPromise = getIncantesimiIta();
+  return itaSpellsPromise;
+}
+let itaMostriPromise: ReturnType<typeof getMostriIta> | null = null;
+function loadMostriIta() {
+  if (!itaMostriPromise) itaMostriPromise = getMostriIta();
+  return itaMostriPromise;
+}
+
+// confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
+// italiano ufficiale con la traduzione automatica del nome inglese di 5etools
+function normalizeItaName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
 
 type Language = "en" | "it";
 import {
@@ -501,8 +525,60 @@ function Stat({ label, value }: { label: string; value: string | number | undefi
   );
 }
 
+const ITA_SOURCE_NAMES: Record<string, string> = {
+  phb: "Manuale del Giocatore",
+  mm: "Manuale dei Mostri",
+};
+
 function SpellDetail({ spell, language }: { spell: RawSpell; language: Language }) {
   const material = formatMaterial(spell.components);
+  const translatedName = useTranslatedText(spell.name, "en", "it");
+  const [itaSpells, setItaSpells] = useState<Awaited<ReturnType<typeof getIncantesimiIta>> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (language !== "it") return;
+    let cancelled = false;
+    loadIncantesimiIta().then((data) => {
+      if (!cancelled) setItaSpells(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  const ufficiale = useMemo(() => {
+    if (language !== "it" || !itaSpells || !translatedName) return null;
+    const target = normalizeItaName(translatedName);
+    return itaSpells.find((s) => normalizeItaName(s.nome) === target) ?? null;
+  }, [language, itaSpells, translatedName]);
+
+  if (ufficiale) {
+    return (
+      <>
+        <p className="text-xs font-bold text-accent-strong">
+          📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Stat label="Scuola" value={ufficiale.scuola} />
+          <Stat label="Livello" value={ufficiale.livello === 0 ? "Trucchetto" : ufficiale.livello} />
+          <Stat label="Tempo di lancio" value={ufficiale.tempoDiLancio} />
+          <Stat label="Gittata" value={ufficiale.gittata} />
+          <Stat label="Componenti" value={ufficiale.componenti} />
+          <Stat label="Durata" value={ufficiale.durata} />
+        </div>
+        <div className="border-t border-edge pt-3 space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
+          {ufficiale.descrizione.split("\n\n").map((paragrafo, index) => (
+            <p key={index} className="text-sm text-foreground leading-relaxed">
+              {paragrafo}
+            </p>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -537,6 +613,13 @@ const ACTION_GROUPS: { key: keyof RawCreature; label: string }[] = [
   { key: "legendary", label: "Azioni leggendarie" },
 ];
 
+const ITA_MONSTER_SECTIONS: { key: "tratti" | "azioni" | "azioniLeggendarie" | "reazioni"; label: string }[] = [
+  { key: "tratti", label: "Tratti" },
+  { key: "azioni", label: "Azioni" },
+  { key: "azioniLeggendarie", label: "Azioni leggendarie" },
+  { key: "reazioni", label: "Reazioni" },
+];
+
 function CreatureDetail({ creature, language }: { creature: RawCreature; language: Language }) {
   const abilities: [string, number][] = [
     ["FOR", creature.str],
@@ -546,6 +629,94 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
     ["SAG", creature.wis],
     ["CAR", creature.cha],
   ];
+
+  const translatedName = useTranslatedText(creature.name, "en", "it");
+  const [itaMostri, setItaMostri] = useState<Awaited<ReturnType<typeof getMostriIta>> | null>(null);
+
+  useEffect(() => {
+    if (language !== "it") return;
+    let cancelled = false;
+    loadMostriIta().then((data) => {
+      if (!cancelled) setItaMostri(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  const ufficiale = useMemo(() => {
+    if (language !== "it" || !itaMostri || !translatedName) return null;
+    const target = normalizeItaName(translatedName);
+    return itaMostri.find((m) => normalizeItaName(m.nome) === target) ?? null;
+  }, [language, itaMostri, translatedName]);
+
+  if (ufficiale) {
+    const itaAbilities: [string, { score: number; mod: string } | null][] = [
+      ["FOR", ufficiale.caratteristiche?.FOR ?? null],
+      ["DES", ufficiale.caratteristiche?.DES ?? null],
+      ["COS", ufficiale.caratteristiche?.COS ?? null],
+      ["INT", ufficiale.caratteristiche?.INT ?? null],
+      ["SAG", ufficiale.caratteristiche?.SAG ?? null],
+      ["CAR", ufficiale.caratteristiche?.CAR ?? null],
+    ];
+    return (
+      <>
+        <p className="text-xs font-bold text-accent-strong">
+          📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
+        </p>
+        {ufficiale.numericSuspect && (
+          <p className="text-xs text-danger">
+            ⚠️ Alcuni valori numerici di questa scheda potrebbero contenere refusi di estrazione dal PDF.
+          </p>
+        )}
+        <p className="text-sm text-muted italic">
+          {[ufficiale.taglia, ufficiale.tipo].filter(Boolean).join(" ")}
+          {ufficiale.allineamento ? `, ${ufficiale.allineamento}` : ""}
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Stat label="CA" value={ufficiale.classeArmatura} />
+          <Stat label="PF" value={ufficiale.puntiFerita} />
+          <Stat label="Velocità" value={ufficiale.velocita} />
+          <Stat label="Sfida" value={ufficiale.sfida ? `${ufficiale.sfida} (${ufficiale.pe} PE)` : null} />
+        </div>
+        <div className="grid grid-cols-6 gap-2 text-center">
+          {itaAbilities.map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-edge bg-surface-raised py-2">
+              <p className="text-[10px] uppercase tracking-widest text-muted">{label}</p>
+              <p className="text-sm font-bold text-foreground">
+                {value ? `${value.score} (${value.mod})` : "—"}
+              </p>
+            </div>
+          ))}
+        </div>
+        <Stat label="Tiri salvezza" value={ufficiale.tiriSalvezza} />
+        <Stat label="Abilità" value={ufficiale.abilita} />
+        <Stat label="Vulnerabilità ai danni" value={ufficiale.vulnerabilitaDanni} />
+        <Stat label="Resistenza ai danni" value={ufficiale.resistenzaDanni} />
+        <Stat label="Immunità ai danni" value={ufficiale.immunitaDanni} />
+        <Stat label="Immunità alle condizioni" value={ufficiale.immunitaCondizioni} />
+        <Stat label="Sensi" value={ufficiale.sensi} />
+        <Stat label="Linguaggi" value={ufficiale.linguaggi} />
+
+        {ITA_MONSTER_SECTIONS.map((section) => {
+          const text = ufficiale[section.key];
+          if (!text) return null;
+          return (
+            <div key={section.key} className="space-y-2">
+              <p className="text-xs uppercase tracking-widest text-muted">{section.label}</p>
+              {text.split("\n\n").map((paragrafo, index) => (
+                <div key={index} className="rounded-lg border border-edge bg-surface-raised p-3">
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
+                    {paragrafo}
+                  </p>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </>
+    );
+  }
 
   return (
     <>

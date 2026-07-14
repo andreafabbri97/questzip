@@ -1,0 +1,38 @@
+{
+  "phb": {
+    "nome": "Manuale del Giocatore",
+    "file": "1. D&D_5e_Player's_Handbook_Manuale_del_Giocatore_HQ_09_2021.pdf"
+  },
+  "mm": {
+    "nome": "Manuale dei Mostri",
+    "file": "Manuali DM/D&D 5e - Manuale dei Mostri.pdf"
+  },
+  "tasha": {
+    "nome": "Calderone Omnicomprensivo di Tasha",
+    "file": "1.D&D 5e - Calderone Omnicomprensivo di Tasha.pdf"
+  },
+  "xanathar": {
+    "nome": "Guida Omnicomprensiva di Xanathar",
+    "file": "1.Guida Omnicomprensiva di Xanathar_ITA-Delux.pdf"
+  },
+  "ravenloft": {
+    "nome": "Guida di Van Richten a Ravenloft",
+    "file": "D&D 5e - Guida di Van Richten a Ravenloft [HQ] [06-2022].pdf"
+  },
+  "fizban": {
+    "nome": "Il Tesoro dei Draghi di Fizban",
+    "file": "D&D 5e - Il Tesoro dei Draghi di Fizban [HQ][05-2023].pdf"
+  },
+  "bigby": {
+    "nome": "Bigby presenta La Gloria dei Giganti",
+    "file": "D&D_5e_Bigby_presenta_La_Gloria_dei_Giganti_CHQ_06_2024.pdf"
+  },
+  "dragonlance": {
+    "nome": "Dragonlance: L'ombra della Regina dei Draghi",
+    "file": "D&D_5e_Dragonlance_L_ombra_della_Regina_dei_Draghi_HQ_11_2023.pdf"
+  },
+  "multiverso": {
+    "nome": "Mordenkainen presenta Mostri del Multiverso",
+    "file": "Manuali DM/(Razze mostruose) Mordenkainen_presenta_Mostri_del_Multiverso.pdf"
+  }
+}

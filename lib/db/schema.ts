@@ -226,3 +226,50 @@ export const campaignMembersRelations = relations(campaignMembers, ({ one }) => 
   }),
   user: one(users, { fields: [campaignMembers.userId], references: [users.id] }),
 }));
+
+// --- Compendio in italiano, estratto dai manuali ufficiali (vedi scripts/ita-compendio/) ---
+// Contenuto proprietario: mai esposto senza login (l'intero sito lo richiede, vedi proxy.ts).
+
+export const compendioItaIncantesimi = pgTable("compendio_ita_incantesimo", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nome: text("nome").notNull(),
+  livello: integer("livello").notNull(),
+  scuola: text("scuola").notNull(),
+  rituale: boolean("rituale").notNull().default(false),
+  tempoDiLancio: text("tempo_di_lancio").notNull(),
+  gittata: text("gittata").notNull(),
+  componenti: text("componenti").notNull(),
+  durata: text("durata").notNull(),
+  descrizione: text("descrizione").notNull(),
+  fonte: text("fonte").notNull(),
+});
+
+export const compendioItaMostri = pgTable("compendio_ita_mostro", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nome: text("nome").notNull(),
+  tipo: text("tipo"),
+  taglia: text("taglia"),
+  allineamento: text("allineamento"),
+  classeArmatura: text("classe_armatura"),
+  puntiFerita: text("punti_ferita"),
+  velocita: text("velocita"),
+  caratteristiche: jsonb("caratteristiche").$type<
+    Record<string, { score: number; mod: string } | null>
+  >(),
+  tiriSalvezza: text("tiri_salvezza"),
+  abilita: text("abilita"),
+  vulnerabilitaDanni: text("vulnerabilita_danni"),
+  resistenzaDanni: text("resistenza_danni"),
+  immunitaDanni: text("immunita_danni"),
+  immunitaCondizioni: text("immunita_condizioni"),
+  sensi: text("sensi"),
+  linguaggi: text("linguaggi"),
+  sfida: text("sfida"),
+  pe: text("pe"),
+  tratti: text("tratti").notNull().default(""),
+  azioni: text("azioni").notNull().default(""),
+  azioniLeggendarie: text("azioni_leggendarie").notNull().default(""),
+  reazioni: text("reazioni").notNull().default(""),
+  numericSuspect: boolean("numeric_suspect").notNull().default(false),
+  fonte: text("fonte").notNull(),
+});

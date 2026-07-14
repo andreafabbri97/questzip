@@ -40,6 +40,7 @@ yarn-error.log*
 /Manuali DND 5E giocatore e DM/
 /scripts/ita-compendio/extracted/
 /scripts/ita-compendio/parsed/
+/scripts/ita-compendio/translate-cache.json
 
 # typescript
 *.tsbuildinfo
