@@ -6,7 +6,7 @@ Gestore di campagne **D&D 5e** per master e giocatori. PWA installabile su telef
 
 - **🎲 Tira dadi** — da d4 a d100, quantità multiple, modificatori, vantaggio/svantaggio sul d20, cronologia dei tiri, critici e fallimenti evidenziati.
 - **🛡️ Personaggi** — razza/classe con autocompletamento dal Compendio, multiclasse (più classi, con sottoclasse e descrizione "come funziona" per ciascuna), generatore caratteristiche (manuale, array standard, acquisto punti, tiro dadi), calcolatore PF multiclasse (1° livello della classe di origine massimizzato, il resto in media), punti ferita (contatore rapido +/−), CA, velocità, bonus di competenza, note libere. Se sei loggato puoi portare il personaggio in una campagna condivisa (snapshot aggiornabile a mano, non sync live).
-- **🗺️ Campagne** — condivise: accedi con Google, crea una campagna (diventi master), invita amici con un link/codice, assegna il ruolo master/giocatore a ciascun membro, diario delle sessioni condiviso, party con le schede dei personaggi di tutti i membri. Dati su database (Postgres/Neon), non più solo sul dispositivo.
+- **🗺️ Campagne** — condivise: accedi con Google, crea una campagna (diventi master), invita amici con un link/codice, assegna il ruolo master/giocatore a ciascun membro, diario delle sessioni condiviso, party con le schede dei personaggi di tutti i membri. Tracker di iniziativa: il master avvia un combattimento, aggiunge il party e mostri (cercabili dal Compendio, PF precompilati), gestisce turni/round/PF; i giocatori vedono ordine e PF di tutti (non è live: bisogna riaprire/ricaricare la pagina campagna per vedere gli aggiornamenti del master). Dati su database (Postgres/Neon), non più solo sul dispositivo.
 - **📖 Compendio** — incantesimi, mostri (bestiario completo, 107 libri), oggetti magici, razze, talenti, background, condizioni e classi. Contenuto completo (non solo SRD) sia edizione 2014 che 2024/25, con badge/filtro per edizione e libro di provenienza. Elenco sfogliabile in pagine anche senza cercare. Switch di lingua 🇬🇧/🇮🇹 (default inglese): mostra o tutto originale o tutto tradotto, mai mischiato, per non confondere visto che la traduzione è automatica. Ricerca funziona in entrambe le lingue. Dati dal mirror [5e.tools](https://5e.tools).
 - **📱 PWA** — installabile da Chrome/Safari ("Aggiungi a schermata Home"), tema scuro da taverna.
 
@@ -24,9 +24,9 @@ Dopo aver modificato lo schema in `lib/db/schema.ts`, sincronizzalo col database
 
 ## Roadmap
 
-- [ ] 🐉 Strumenti master: aggiungere mostri alla campagna, generatore dungeon/incontri
-- [ ] 🖍️ Lavagna/mappa condivisa in tempo reale per i dungeon
-- [ ] ⚔️ Tracker di iniziativa per i combattimenti
+- [ ] 🖍️ Lavagna/mappa condivisa in tempo reale per i dungeon (richiede scegliere un'infrastruttura realtime, Neon non ce l'ha nativa)
+- [ ] 🔄 Aggiornamenti live per party/combattimento (oggi serve ricaricare la pagina)
+- [ ] 🐉 Generatore dungeon/incontri per il master
 - [ ] 🧙 Scheda personaggio completa (tiri salvezza, abilità, slot incantesimi)
 - [ ] 📤 Export/import dei dati in JSON
 - [ ] 🇮🇹 Compendio in italiano dai manuali ufficiali (richiede pipeline OCR/estrazione testo dai PDF, tipo il Mastrino)

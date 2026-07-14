@@ -150,10 +150,52 @@ export const campaignCharacters = pgTable(
   (table) => [unique().on(table.campaignId, table.userId)],
 );
 
+// Un solo combattimento attivo per campagna alla volta (campaignId unique): il master lo avvia,
+// aggiunge combattenti (party + mostri, anche presi dal Compendio), avanza i turni.
+export const campaignEncounters = pgTable("campaign_encounter", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .unique()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  round: integer("round").notNull().default(1),
+  currentTurn: integer("current_turn").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const encounterCombatants = pgTable("encounter_combatant", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  encounterId: uuid("encounter_id")
+    .notNull()
+    .references(() => campaignEncounters.id, { onDelete: "cascade" }),
+  nome: text("nome").notNull(),
+  iniziativa: integer("iniziativa").notNull().default(0),
+  hpMax: integer("hp_max").notNull(),
+  hpAttuali: integer("hp_attuali").notNull(),
+  isPg: boolean("is_pg").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const campaignEncountersRelations = relations(campaignEncounters, ({ many, one }) => ({
+  combatants: many(encounterCombatants),
+  campaign: one(campaigns, {
+    fields: [campaignEncounters.campaignId],
+    references: [campaigns.id],
+  }),
+}));
+
+export const encounterCombatantsRelations = relations(encounterCombatants, ({ one }) => ({
+  encounter: one(campaignEncounters, {
+    fields: [encounterCombatants.encounterId],
+    references: [campaignEncounters.id],
+  }),
+}));
+
 export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   members: many(campaignMembers),
   sessionNotes: many(campaignSessionNotes),
   characters: many(campaignCharacters),
+  encounter: many(campaignEncounters),
   owner: one(users, { fields: [campaigns.ownerId], references: [users.id] }),
 }));
 

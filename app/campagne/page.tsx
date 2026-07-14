@@ -17,6 +17,17 @@ import {
   setMemberRole,
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign } from "@/app/actions/characters";
+import {
+  addCombatant,
+  addPartyToEncounter,
+  endEncounter,
+  getActiveEncounter,
+  nextTurn,
+  removeCombatant,
+  startEncounter,
+  updateCombatant,
+} from "@/app/actions/encounters";
+import { loadCreatures, type RawCreature } from "@/lib/fivetools/data";
 import { abilityModifier, formatModifier, totalLevel, type Ability } from "@/lib/dnd";
 
 type CampaignSummary = Awaited<ReturnType<typeof getMyCampaigns>>[number];
@@ -449,6 +460,8 @@ function CampaignDetailView({
         )}
       </section>
 
+      <EncounterTracker campaignId={campaignId} isDm={isDm} />
+
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
         <h2 className="text-sm uppercase tracking-widest text-muted">Diario delle sessioni</h2>
         <div className="space-y-2">
@@ -503,6 +516,284 @@ function CampaignDetailView({
           </ul>
         )}
       </section>
+    </div>
+  );
+}
+
+function EncounterTracker({ campaignId, isDm }: { campaignId: string; isDm: boolean }) {
+  const [data, setData] = useState<Awaited<ReturnType<typeof getActiveEncounter>>>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => {
+    getActiveEncounter(campaignId)
+      .then(setData)
+      .catch((err) => setError(err.message));
+  };
+
+  useEffect(refresh, [campaignId]);
+
+  if (!data) {
+    if (!isDm) return null;
+    return (
+      <section className="rounded-xl border border-dashed border-edge bg-surface/50 p-4">
+        <button
+          onClick={async () => {
+            await startEncounter(campaignId);
+            refresh();
+          }}
+          className="text-sm font-bold text-accent-strong hover:underline"
+        >
+          ⚔️ Inizia combattimento
+        </button>
+        {error && <p className="text-xs text-danger mt-1">{error}</p>}
+      </section>
+    );
+  }
+
+  const { encounter, combatants } = data;
+
+  return (
+    <section className="rounded-xl border border-accent/40 bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-accent-strong">
+          ⚔️ Combattimento — Round {encounter.round}
+        </h2>
+        {isDm && (
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                await nextTurn(encounter.id);
+                refresh();
+              }}
+              className="text-xs font-bold rounded-lg border border-edge px-2 py-1 text-foreground hover:border-accent transition-colors"
+            >
+              Prossimo turno →
+            </button>
+            <button
+              onClick={async () => {
+                if (window.confirm("Terminare il combattimento?")) {
+                  await endEncounter(campaignId);
+                  refresh();
+                }
+              }}
+              className="text-xs text-danger hover:underline"
+            >
+              Termina
+            </button>
+          </div>
+        )}
+      </div>
+
+      {combatants.length === 0 ? (
+        <p className="text-sm text-muted">Nessun combattente ancora.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {combatants.map((c, index) => (
+            <li
+              key={c.id}
+              className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${
+                index === encounter.currentTurn
+                  ? "border-accent bg-accent/10"
+                  : "border-edge bg-surface-raised"
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-bold text-muted w-6 shrink-0">{c.iniziativa}</span>
+                <span
+                  className={`text-sm truncate ${c.isPg ? "text-accent-strong font-bold" : "text-foreground"}`}
+                >
+                  {c.nome}
+                </span>
+              </div>
+              {isDm ? (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={async () => {
+                      await updateCombatant(c.id, { hpAttuali: Math.max(0, c.hpAttuali - 1) });
+                      refresh();
+                    }}
+                    className="size-6 rounded border border-edge text-danger text-xs"
+                    aria-label="Togli un punto ferita"
+                  >
+                    −
+                  </button>
+                  <span className="text-xs text-foreground w-14 text-center">
+                    {c.hpAttuali}/{c.hpMax}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      await updateCombatant(c.id, {
+                        hpAttuali: Math.min(c.hpMax, c.hpAttuali + 1),
+                      });
+                      refresh();
+                    }}
+                    className="size-6 rounded border border-edge text-accent-strong text-xs"
+                    aria-label="Aggiungi un punto ferita"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await removeCombatant(c.id);
+                      refresh();
+                    }}
+                    className="text-muted hover:text-danger text-xs ml-1"
+                    aria-label={`Rimuovi ${c.nome}`}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-muted shrink-0">
+                  {c.hpAttuali}/{c.hpMax} PF
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {isDm && (
+        <EncounterDmControls encounter={encounter} campaignId={campaignId} onChange={refresh} />
+      )}
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </section>
+  );
+}
+
+function EncounterDmControls({
+  encounter,
+  campaignId,
+  onChange,
+}: {
+  encounter: { id: string };
+  campaignId: string;
+  onChange: () => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [iniziativa, setIniziativa] = useState(10);
+  const [hpMax, setHpMax] = useState(10);
+
+  const add = async () => {
+    if (!nome.trim() || hpMax < 1) return;
+    await addCombatant(encounter.id, { nome: nome.trim(), iniziativa, hpMax });
+    setNome("");
+    onChange();
+  };
+
+  return (
+    <div className="border-t border-edge pt-3 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={async () => {
+            await addPartyToEncounter(encounter.id, campaignId);
+            onChange();
+          }}
+          className="text-xs font-bold rounded-lg border border-edge px-2 py-1.5 text-foreground hover:border-accent transition-colors"
+        >
+          + Aggiungi il party
+        </button>
+        <MonsterQuickAdd
+          onPick={(name, hp) => {
+            setNome(name);
+            setHpMax(hp);
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={nome}
+          onChange={(event) => setNome(event.target.value)}
+          placeholder="Nome combattente"
+          className="flex-1 min-w-[140px] rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+        />
+        <label className="flex items-center gap-1 text-xs text-muted">
+          Iniz.
+          <input
+            type="number"
+            value={iniziativa}
+            onChange={(event) => setIniziativa(Number(event.target.value) || 0)}
+            className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted">
+          PF
+          <input
+            type="number"
+            min={1}
+            value={hpMax}
+            onChange={(event) => setHpMax(Math.max(1, Number(event.target.value) || 1))}
+            className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <button
+          onClick={add}
+          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+        >
+          Aggiungi
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function combatantHp(creature: RawCreature): number {
+  if (!creature.hp) return 10;
+  if (typeof creature.hp === "number") return creature.hp;
+  return creature.hp.average ?? 10;
+}
+
+function MonsterQuickAdd({ onPick }: { onPick: (name: string, hp: number) => void }) {
+  const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open || creatures) return;
+    loadCreatures().then(setCreatures);
+  }, [open, creatures]);
+
+  const q = query.trim().toLowerCase();
+  const suggestions =
+    creatures && q.length >= 2
+      ? creatures.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 6)
+      : [];
+
+  return (
+    <div className="relative">
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Cerca mostro dal Compendio…"
+        className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-xs text-foreground w-52"
+      />
+      {open && creatures === null && (
+        <div className="absolute z-10 mt-1 w-56 rounded-lg border border-edge bg-surface-raised px-3 py-2 text-xs text-muted shadow-lg">
+          Caricamento bestiario…
+        </div>
+      )}
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-56 max-h-48 overflow-auto rounded-lg border border-edge bg-surface-raised shadow-lg">
+          {suggestions.map((c, index) => (
+            <li key={`${c.source}-${c.name}-${index}`}>
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onPick(c.name, combatantHp(c));
+                  setQuery("");
+                  setOpen(false);
+                }}
+                className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-surface transition-colors"
+              >
+                {c.name} <span className="text-muted">({combatantHp(c)} PF)</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
