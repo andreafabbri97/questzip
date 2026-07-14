@@ -1045,24 +1045,24 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-widest text-muted">Progressione</p>
           <div className="overflow-x-auto rounded-lg border border-edge">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm 2xl:text-xs">
               <thead>
                 <tr className="bg-surface-raised">
-                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted">
+                  <th className="px-3 py-2 2xl:px-2 2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted">
                     Liv.
                   </th>
-                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">
+                  <th className="px-3 py-2 2xl:px-2 2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">
                     Bonus comp.
                   </th>
                   {columns.labels.map((label, index) => (
                     <th
                       key={`${label}-${index}`}
-                      className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap"
+                      className="px-3 py-2 2xl:px-2 2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap"
                     >
                       {label}
                     </th>
                   ))}
-                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted">
+                  <th className="px-3 py-2 2xl:px-2 2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted">
                     Caratteristiche
                   </th>
                 </tr>
@@ -1073,16 +1073,16 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
                     key={level}
                     className={level % 2 === 0 ? "bg-surface" : "bg-surface-raised/40"}
                   >
-                    <td className="px-3 py-2 font-bold text-foreground">{level}</td>
-                    <td className="px-3 py-2 text-muted">
+                    <td className="px-3 py-2 2xl:px-2 2xl:py-1.5 font-bold text-foreground">{level}</td>
+                    <td className="px-3 py-2 2xl:px-2 2xl:py-1.5 text-muted">
                       {formatModifier(proficiencyBonus(level))}
                     </td>
                     {columns.getCells(level - 1).map((cell, index) => (
-                      <td key={index} className="px-3 py-2 text-foreground whitespace-nowrap">
+                      <td key={index} className="px-3 py-2 2xl:px-2 2xl:py-1.5 text-foreground whitespace-nowrap">
                         {formatTableCell(cell)}
                       </td>
                     ))}
-                    <td className="px-3 py-2 text-foreground">
+                    <td className="px-3 py-2 2xl:px-2 2xl:py-1.5 text-foreground">
                       {(featuresByLevel.get(level) ?? []).join(", ") || "—"}
                     </td>
                   </tr>
