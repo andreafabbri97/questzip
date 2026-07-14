@@ -7,21 +7,36 @@ import {
   POINT_BUY_BUDGET,
   STANDARD_ARRAY,
   abilityModifier,
-  calculateHitPoints,
+  calculateMulticlassHitPoints,
   characterSchema,
   formatModifier,
   newCharacter,
   pointBuyCost,
   proficiencyBonus,
   roll4d6DropLowest,
+  totalLevel,
   type Ability,
   type Character,
+  type ClassEntry,
 } from "@/lib/dnd";
 import { useLocalCollection } from "@/lib/storage";
-import { loadClassData, loadRaces } from "@/lib/fivetools/data";
+import {
+  loadClassData,
+  loadRaces,
+  resolveSubclassFeatures,
+  type RawSubclass,
+} from "@/lib/fivetools/data";
+import { RenderEntries } from "@/lib/fivetools/entries";
 import { useTranslatedText } from "@/lib/fivetools/translate";
 
 const loadClassNames = () => loadClassData().then((data) => data.classes);
+
+function formatClassSummary(classi: ClassEntry[]): string {
+  return classi
+    .filter((entry) => entry.nome.trim())
+    .map((entry) => `${entry.nome} ${entry.livello}`)
+    .join(" / ");
+}
 
 export default function CharactersPage() {
   const { items, persist, loaded } = useLocalCollection("questzip:personaggi", characterSchema);
@@ -99,9 +114,10 @@ export default function CharactersPage() {
                   </span>
                 </div>
                 <p className="text-sm text-muted mt-0.5">
-                  {[character.razza, character.classe].filter(Boolean).join(" ") ||
-                    "—"}{" "}
-                  · Livello {character.livello}
+                  {[character.razza, formatClassSummary(character.classi)]
+                    .filter(Boolean)
+                    .join(" ") || "—"}{" "}
+                  · Livello {totalLevel(character.classi)}
                 </p>
               </button>
             </li>
@@ -170,45 +186,56 @@ function CharacterSheet({
             className={`${inputClass} text-lg font-bold`}
           />
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <label className="block">
-            <span className={labelClass}>Razza</span>
-            <Autocomplete
-              value={character.razza}
-              onChange={(value) => set("razza", value)}
-              loader={loadRaces}
-              placeholder="Elf, Dwarf, Halfling…"
-              inputClassName={inputClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Classe</span>
-            <Autocomplete
-              value={character.classe}
-              onChange={(value) => set("classe", value)}
-              loader={loadClassNames}
-              placeholder="Fighter, Wizard, Rogue…"
-              inputClassName={inputClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Livello</span>
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={character.livello}
-              onChange={(event) =>
-                set("livello", clampInt(event.target.value, 1, 20, character.livello))
-              }
-              className={inputClass}
-            />
-          </label>
+        <label className="block">
+          <span className={labelClass}>Razza</span>
+          <Autocomplete
+            value={character.razza}
+            onChange={(value) => set("razza", value)}
+            loader={loadRaces}
+            placeholder="Elf, Dwarf, Halfling…"
+            inputClassName={inputClass}
+          />
+        </label>
+      </section>
+
+      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm uppercase tracking-widest text-muted">
+            Classi {character.classi.length > 1 && "(multiclasse)"}
+          </h2>
+          <button
+            onClick={() =>
+              set("classi", [...character.classi, { nome: "", livello: 1 }])
+            }
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            + Aggiungi classe
+          </button>
         </div>
+        {character.classi.map((entry, index) => (
+          <ClassRow
+            key={index}
+            entry={entry}
+            isPrimary={index === 0}
+            onChange={(next) =>
+              set(
+                "classi",
+                character.classi.map((c, i) => (i === index ? next : c)),
+              )
+            }
+            onRemove={() =>
+              set(
+                "classi",
+                character.classi.filter((_, i) => i !== index),
+              )
+            }
+            canRemove={character.classi.length > 1}
+          />
+        ))}
         <p className="text-sm text-muted">
-          Bonus di competenza:{" "}
+          Livello totale {totalLevel(character.classi)} · Bonus di competenza:{" "}
           <span className="font-bold text-accent-strong">
-            {formatModifier(proficiencyBonus(character.livello))}
+            {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
           </span>
         </p>
       </section>
@@ -390,6 +417,181 @@ function ItalianHint({ text }: { text: string }) {
   return <span className="ml-2 text-xs text-muted">({translated})</span>;
 }
 
+function ClassRow({
+  entry,
+  isPrimary,
+  onChange,
+  onRemove,
+  canRemove,
+}: {
+  entry: ClassEntry;
+  isPrimary: boolean;
+  onChange: (entry: ClassEntry) => void;
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  const rowInputClass =
+    "mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground";
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <span className="text-[10px] uppercase tracking-widest text-muted">
+            {isPrimary ? "Classe di origine" : "Classe"}
+          </span>
+          <Autocomplete
+            value={entry.nome}
+            onChange={(nome) => onChange({ ...entry, nome, sottoclasse: undefined })}
+            loader={loadClassNames}
+            placeholder="Fighter, Wizard…"
+            inputClassName={rowInputClass}
+          />
+        </div>
+        <label className="block w-16 shrink-0">
+          <span className="text-[10px] uppercase tracking-widest text-muted">Livello</span>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={entry.livello}
+            onChange={(event) =>
+              onChange({
+                ...entry,
+                livello: Math.min(20, Math.max(1, Number(event.target.value) || 1)),
+              })
+            }
+            className={`${rowInputClass} text-center`}
+          />
+        </label>
+        {canRemove && (
+          <button
+            onClick={onRemove}
+            className="text-muted hover:text-danger text-lg pb-1.5 shrink-0"
+            aria-label="Rimuovi classe"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {entry.nome.trim() && (
+        <ClassSubclassPicker
+          key={entry.nome.trim().toLowerCase()}
+          className={entry.nome}
+          value={entry.sottoclasse}
+          onChange={(sottoclasse) => onChange({ ...entry, sottoclasse })}
+          inputClassName={rowInputClass}
+        />
+      )}
+
+      {entry.sottoclasse && (
+        <SubclassFeaturesToggle key={entry.sottoclasse} subclassName={entry.sottoclasse} />
+      )}
+    </div>
+  );
+}
+
+function ClassSubclassPicker({
+  className,
+  value,
+  onChange,
+  inputClassName,
+}: {
+  className: string;
+  value: string | undefined;
+  onChange: (subclass: string | undefined) => void;
+  inputClassName: string;
+}) {
+  const [subclasses, setSubclasses] = useState<RawSubclass[] | null>(null);
+  const [title, setTitle] = useState("Sottoclasse");
+
+  useEffect(() => {
+    const name = className.trim().toLowerCase();
+    if (!name) return;
+    let cancelled = false;
+    loadClassData().then((data) => {
+      if (cancelled) return;
+      const cls = data.classes.find((c) => c.name.toLowerCase() === name);
+      if (!cls) return;
+      setTitle(cls.subclassTitle ?? "Sottoclasse");
+      const names = new Set<string>();
+      const matches = data.subclasses.filter(
+        (s) => s.className === cls.name && s.classSource === cls.source,
+      );
+      setSubclasses(matches.filter((s) => (names.has(s.name) ? false : (names.add(s.name), true))));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [className]);
+
+  if (!subclasses || subclasses.length === 0) return null;
+
+  return (
+    <label className="block">
+      <span className="text-[10px] uppercase tracking-widest text-muted">{title}</span>
+      <select
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value || undefined)}
+        className={inputClassName}
+      >
+        <option value="">— nessuna —</option>
+        {subclasses.map((s) => (
+          <option key={s.name} value={s.name}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SubclassFeaturesToggle({ subclassName }: { subclassName: string }) {
+  const [showFeatures, setShowFeatures] = useState(false);
+  const [features, setFeatures] = useState<
+    { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
+  >(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadClassData().then((data) => {
+      if (cancelled) return;
+      const subclass = data.subclasses.find((s) => s.name === subclassName);
+      if (!subclass) return;
+      setFeatures(resolveSubclassFeatures(data, subclass));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [subclassName]);
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowFeatures((prev) => !prev)}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        {showFeatures ? "Nascondi" : "Come funziona"} {subclassName}
+      </button>
+      {showFeatures && (
+        <div className="mt-2 space-y-3 border-t border-edge pt-2">
+          {!features && <p className="text-sm text-muted">Caricamento…</p>}
+          {features?.map((feature) => (
+            <div key={`${feature.name}-${feature.level}`}>
+              <p className="text-sm font-bold text-foreground">
+                {feature.name}{" "}
+                <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+              </p>
+              <RenderEntries entries={feature.entries} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HitPointCalculator({
   character,
   onApply,
@@ -397,30 +599,50 @@ function HitPointCalculator({
   character: Character;
   onApply: (hpMax: number) => void;
 }) {
-  const [hitDie, setHitDie] = useState(8);
+  const [hitDice, setHitDice] = useState<number[]>([]);
   const conModifier = abilityModifier(character.caratteristiche.costituzione);
-  const suggested = calculateHitPoints(hitDie, character.livello, conModifier);
+
+  const suggested = calculateMulticlassHitPoints(
+    character.classi.map((entry, index) => ({
+      hitDieFaces: hitDice[index] ?? 8,
+      livello: entry.livello,
+    })),
+    conModifier,
+  );
 
   return (
-    <div className="mt-4 pt-4 border-t border-edge flex flex-wrap items-end gap-3">
-      <label className="block">
-        <span className="text-[10px] uppercase tracking-widest text-muted">Dado vita</span>
-        <select
-          value={hitDie}
-          onChange={(event) => setHitDie(Number(event.target.value))}
-          className="mt-1 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
-        >
-          {[6, 8, 10, 12].map((faces) => (
-            <option key={faces} value={faces}>
-              d{faces}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div className="mt-4 pt-4 border-t border-edge space-y-3">
+      <p className="text-[10px] uppercase tracking-widest text-muted">Calcolatore PF</p>
+      {character.classi.map((entry, index) => (
+        <div key={index} className="flex items-center gap-3 text-sm">
+          <span className="text-muted w-40 truncate">
+            {entry.nome || `Classe ${index + 1}`} {entry.livello}
+            {index === 0 && " (origine)"}
+          </span>
+          <select
+            value={hitDice[index] ?? 8}
+            onChange={(event) =>
+              setHitDice((prev) => {
+                const next = [...prev];
+                while (next.length <= index) next.push(8);
+                next[index] = Number(event.target.value);
+                return next;
+              })
+            }
+            className="rounded-md border border-edge bg-surface-raised px-2 py-1 text-sm text-foreground"
+          >
+            {[6, 8, 10, 12].map((faces) => (
+              <option key={faces} value={faces}>
+                d{faces}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
       <p className="text-sm text-muted">
-        Con mod. COS {formatModifier(conModifier)} al livello {character.livello}:{" "}
-        <span className="font-bold text-accent-strong">{suggested} PF</span> (1° liv. max, poi
-        media)
+        Con mod. COS {formatModifier(conModifier)} (1° livello della classe di origine
+        massimizzato, il resto in media):{" "}
+        <span className="font-bold text-accent-strong">{suggested} PF</span>
       </p>
       <button
         onClick={() => onApply(suggested)}

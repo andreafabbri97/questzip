@@ -5,7 +5,7 @@ Gestore di campagne **D&D 5e** per master e giocatori. PWA installabile su telef
 ## Funzionalità (v0.1)
 
 - **🎲 Tira dadi** — da d4 a d100, quantità multiple, modificatori, vantaggio/svantaggio sul d20, cronologia dei tiri, critici e fallimenti evidenziati.
-- **🛡️ Personaggi** — razza/classe con autocompletamento dal Compendio, generatore caratteristiche (manuale, array standard, acquisto punti, tiro dadi), calcolatore PF per dado vita/livello/COS, punti ferita (contatore rapido +/−), CA, velocità, bonus di competenza, note libere.
+- **🛡️ Personaggi** — razza/classe con autocompletamento dal Compendio, multiclasse (più classi, con sottoclasse e descrizione "come funziona" per ciascuna), generatore caratteristiche (manuale, array standard, acquisto punti, tiro dadi), calcolatore PF multiclasse (1° livello della classe di origine massimizzato, il resto in media), punti ferita (contatore rapido +/−), CA, velocità, bonus di competenza, note libere.
 - **🗺️ Campagne** — descrizione, master, lista giocatori e diario delle sessioni.
 - **📖 Compendio** — incantesimi, mostri (bestiario completo, 107 libri), oggetti magici, razze, talenti, background, condizioni e classi. Contenuto completo (non solo SRD) sia edizione 2014 che 2024/25, con badge/filtro per edizione e libro di provenienza. Elenco sfogliabile in pagine anche senza cercare. Ricerca e nomi anche in italiano (traduzione automatica, qualità non garantita). Dati dal mirror [5e.tools](https://5e.tools).
 - **📱 PWA** — installabile da Chrome/Safari ("Aggiungi a schermata Home"), tema scuro da taverna.

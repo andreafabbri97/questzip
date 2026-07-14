@@ -29,12 +29,19 @@ export const abilityScoresSchema = z.object({
   carisma: z.number().int().min(1).max(30),
 });
 
+export const classEntrySchema = z.object({
+  nome: z.string(),
+  livello: z.number().int().min(1).max(20),
+  sottoclasse: z.string().optional(),
+});
+
+export type ClassEntry = z.infer<typeof classEntrySchema>;
+
 export const characterSchema = z.object({
   id: z.string(),
   nome: z.string().min(1),
-  classe: z.string(),
+  classi: z.array(classEntrySchema).min(1),
   razza: z.string(),
-  livello: z.number().int().min(1).max(20),
   hpMax: z.number().int().min(1),
   hpAttuali: z.number().int(),
   classeArmatura: z.number().int().min(1),
@@ -44,6 +51,10 @@ export const characterSchema = z.object({
 });
 
 export type Character = z.infer<typeof characterSchema>;
+
+export function totalLevel(classi: ClassEntry[]): number {
+  return classi.reduce((sum, entry) => sum + entry.livello, 0);
+}
 
 export const sessionNoteSchema = z.object({
   id: z.string(),
@@ -81,9 +92,8 @@ export function newCharacter(): Character {
   return {
     id: crypto.randomUUID(),
     nome: "",
-    classe: "",
+    classi: [{ nome: "", livello: 1 }],
     razza: "",
-    livello: 1,
     hpMax: 10,
     hpAttuali: 10,
     classeArmatura: 10,
@@ -134,6 +144,28 @@ export function calculateHitPoints(hitDieFaces: number, level: number, conModifi
   const average = Math.floor(hitDieFaces / 2) + 1;
   const restLevels = Math.max(0, level - 1) * (average + conModifier);
   return Math.max(1, firstLevel + restLevels);
+}
+
+/**
+ * PF multiclasse: solo il livello 1 della PRIMA classe scelta (la classe di origine, il primo
+ * elemento dell'array) è massimizzato; ogni altro livello — sia della classe di origine sia
+ * delle classi aggiunte dopo — usa la media del dado vita.
+ */
+export function calculateMulticlassHitPoints(
+  classes: { hitDieFaces: number; livello: number }[],
+  conModifier: number,
+): number {
+  let total = 0;
+  classes.forEach(({ hitDieFaces, livello }, index) => {
+    const average = Math.floor(hitDieFaces / 2) + 1;
+    if (index === 0) {
+      total += hitDieFaces + conModifier;
+      total += Math.max(0, livello - 1) * (average + conModifier);
+    } else {
+      total += livello * (average + conModifier);
+    }
+  });
+  return Math.max(1, total);
 }
 
 export function newCampaign(): Campaign {

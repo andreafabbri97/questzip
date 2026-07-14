@@ -132,6 +132,14 @@ export interface RawSubclass {
   source: string;
 }
 
+export interface RawSubclassFeature {
+  name: string;
+  className: string;
+  subclassShortName: string;
+  level: number;
+  entries: FiveEntry[];
+}
+
 interface SpellFile {
   spell: RawSpell[];
 }
@@ -157,6 +165,7 @@ interface ConditionsFile {
 interface ClassFile {
   class: RawClass[];
   subclass?: RawSubclass[];
+  subclassFeature?: RawSubclassFeature[];
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -243,6 +252,7 @@ export function loadConditions(): Promise<RawCondition[]> {
 interface ClassData {
   classes: RawClass[];
   subclasses: RawSubclass[];
+  subclassFeatures: RawSubclassFeature[];
 }
 
 let classDataPromise: Promise<ClassData> | null = null;
@@ -253,7 +263,22 @@ export function loadClassData(): Promise<ClassData> {
     ).then((files) => ({
       classes: files.flatMap((file) => file?.class ?? []),
       subclasses: files.flatMap((file) => file?.subclass ?? []),
+      subclassFeatures: files.flatMap((file) => file?.subclassFeature ?? []),
     }));
   }
   return classDataPromise;
+}
+
+/** Risolve le feature (testo "come funziona") di una sottoclasse, ordinate per livello. */
+export function resolveSubclassFeatures(
+  data: ClassData,
+  subclass: RawSubclass,
+): RawSubclassFeature[] {
+  const shortName = subclass.shortName ?? subclass.name;
+  return data.subclassFeatures
+    .filter(
+      (feature) =>
+        feature.className === subclass.className && feature.subclassShortName === shortName,
+    )
+    .sort((a, b) => a.level - b.level);
 }
