@@ -25,6 +25,9 @@ import {
 } from "@/lib/fivetools/data";
 import { flattenEntries, RenderEntries, type FiveEntry } from "@/lib/fivetools/entries";
 import { translateBatch, translateText, useTranslatedText } from "@/lib/fivetools/translate";
+import { FlagIcon } from "@/components/flag-icon";
+
+type Language = "en" | "it";
 import {
   formatAC,
   formatAbilityIncrease,
@@ -82,6 +85,7 @@ const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
 export default function CompendiumPage() {
   const [kind, setKind] = useState<CompendiumKind>("incantesimi");
   const [edition, setEdition] = useState<EditionFilter>("entrambe");
+  const [language, setLanguage] = useState<Language>("en");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Entry | null>(null);
@@ -192,28 +196,55 @@ export default function CompendiumPage() {
         ))}
       </div>
 
-      <div>
-        <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">Edizione</p>
-        <div className="grid grid-cols-3 gap-2">
-          {EDITIONS.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => {
-                setEdition(option.value);
-                setSelected(null);
-                setPage(0);
-              }}
-              className={`rounded-lg border py-1.5 text-xs font-bold transition-colors ${
-                edition === option.value
-                  ? "border-accent bg-accent/15 text-accent-strong"
-                  : "border-edge bg-surface-raised text-muted hover:text-foreground"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">Edizione</p>
+          <div className="grid grid-cols-3 gap-2">
+            {EDITIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  setEdition(option.value);
+                  setSelected(null);
+                  setPage(0);
+                }}
+                className={`rounded-lg border py-1.5 text-xs font-bold transition-colors ${
+                  edition === option.value
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : "border-edge bg-surface-raised text-muted hover:text-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">Lingua</p>
+          <div className="flex gap-2">
+            {(["en", "it"] as Language[]).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                title={lang === "en" ? "Inglese (originale)" : "Italiano (traduzione automatica)"}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors ${
+                  language === lang
+                    ? "border-accent bg-accent/15"
+                    : "border-edge bg-surface-raised hover:border-accent/50"
+                }`}
+              >
+                <FlagIcon lang={lang} className="w-5 h-auto rounded-sm" />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+      {language === "it" && (
+        <p className="text-xs text-muted -mt-2">
+          🇮🇹 Traduzione automatica (qualità non garantita) — il testo originale è in inglese.
+        </p>
+      )}
 
       <input
         value={query}
@@ -227,7 +258,13 @@ export default function CompendiumPage() {
       />
 
       {selected ? (
-        <EntryDetail kind={kind} entry={selected} books={books} onBack={() => setSelected(null)} />
+        <EntryDetail
+          kind={kind}
+          entry={selected}
+          books={books}
+          language={language}
+          onBack={() => setSelected(null)}
+        />
       ) : (
         <div className="space-y-2">
           {loadingCategory && (
@@ -249,8 +286,7 @@ export default function CompendiumPage() {
                   className="w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3"
                 >
                   <span className="font-bold text-foreground">
-                    {entry.name}
-                    <ItalianName text={entry.name} />
+                    <LocalizedName text={entry.name} language={language} />
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
                     <EntrySubtitle kind={kind} entry={entry} />
@@ -287,18 +323,20 @@ export default function CompendiumPage() {
   );
 }
 
-function ItalianName({ text }: { text: string }) {
-  const translated = useTranslatedText(text, "en", "it");
-  if (!translated || translated.toLowerCase() === text.toLowerCase()) return null;
-  return <span className="block text-xs font-normal text-muted">{translated}</span>;
+/** Nome nella lingua scelta: in inglese è quello originale, in italiano è tradotto al volo. */
+function LocalizedName({ text, language }: { text: string; language: Language }) {
+  const translated = useTranslatedText(language === "it" ? text : undefined, "en", "it");
+  if (language === "en") return <>{text}</>;
+  return <>{translated ?? text}</>;
 }
 
-function TranslatedBlock({ entries }: { entries: FiveEntry[] | undefined }) {
+/** Corpo del testo (entries) nella lingua scelta: inglese formattato ricco, oppure italiano tradotto in blocchi semplici. */
+function EntriesBlock({ entries, language }: { entries: FiveEntry[] | undefined; language: Language }) {
   const blocks = useMemo(() => flattenEntries(entries), [entries]);
   const [translated, setTranslated] = useState<string[] | null>(null);
 
   useEffect(() => {
-    if (blocks.length === 0) return;
+    if (language !== "it" || blocks.length === 0) return;
     let cancelled = false;
     translateBatch(blocks, "en", "it").then((result) => {
       if (cancelled) return;
@@ -307,12 +345,16 @@ function TranslatedBlock({ entries }: { entries: FiveEntry[] | undefined }) {
     return () => {
       cancelled = true;
     };
-  }, [blocks]);
+  }, [blocks, language]);
 
-  if (blocks.length === 0) return null;
+  if (!entries || entries.length === 0) return null;
+
+  if (language === "en") {
+    return <RenderEntries entries={entries} />;
+  }
+
   return (
-    <div className="space-y-1.5 border-t border-edge pt-3">
-      <p className="text-[10px] uppercase tracking-widest text-muted">🇮🇹 Traduzione automatica</p>
+    <div className="space-y-2">
       {translated ? (
         translated.map((text, index) => (
           <p key={index} className="text-sm text-foreground leading-relaxed">
@@ -377,11 +419,13 @@ function EntryDetail({
   kind,
   entry,
   books,
+  language,
   onBack,
 }: {
   kind: CompendiumKind;
   entry: Entry;
   books: Map<string, BookMeta> | null;
+  language: Language;
   onBack: () => void;
 }) {
   const meta = books?.get(entry.source);
@@ -391,26 +435,25 @@ function EntryDetail({
         ← Risultati
       </button>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-display font-bold text-accent-strong">{entry.name}</h2>
-          <ItalianName text={entry.name} />
-        </div>
+        <h2 className="text-2xl font-display font-bold text-accent-strong">
+          <LocalizedName text={entry.name} language={language} />
+        </h2>
         <SourceBadge source={entry.source} books={books} />
       </div>
       {meta && <p className="text-xs text-muted -mt-2">{meta.name}</p>}
 
-      {kind === "incantesimi" && <SpellDetail spell={entry as RawSpell} />}
-      {kind === "mostri" && <CreatureDetail creature={entry as RawCreature} />}
-      {kind === "oggetti" && <ItemDetail item={entry as RawItem} />}
-      {kind === "razze" && <RaceDetail race={entry as RawRace} />}
-      {kind === "talenti" && <FeatDetail feat={entry as RawFeat} />}
+      {kind === "incantesimi" && <SpellDetail spell={entry as RawSpell} language={language} />}
+      {kind === "mostri" && <CreatureDetail creature={entry as RawCreature} language={language} />}
+      {kind === "oggetti" && <ItemDetail item={entry as RawItem} language={language} />}
+      {kind === "razze" && <RaceDetail race={entry as RawRace} language={language} />}
+      {kind === "talenti" && <FeatDetail feat={entry as RawFeat} language={language} />}
       {(kind === "background" || kind === "condizioni") && (
-        <>
-          <RenderEntries entries={(entry as RawBackground | RawCondition).entries} />
-          <TranslatedBlock entries={(entry as RawBackground | RawCondition).entries} />
-        </>
+        <EntriesBlock
+          entries={(entry as RawBackground | RawCondition).entries}
+          language={language}
+        />
       )}
-      {kind === "classi" && <ClassDetail cls={entry as RawClass} />}
+      {kind === "classi" && <ClassDetail cls={entry as RawClass} language={language} />}
     </div>
   );
 }
@@ -425,7 +468,7 @@ function Stat({ label, value }: { label: string; value: string | number | undefi
   );
 }
 
-function SpellDetail({ spell }: { spell: RawSpell }) {
+function SpellDetail({ spell, language }: { spell: RawSpell; language: Language }) {
   const material = formatMaterial(spell.components);
 
   return (
@@ -439,14 +482,13 @@ function SpellDetail({ spell }: { spell: RawSpell }) {
         <Stat label="Durata" value={formatDuration(spell.duration)} />
       </div>
       {material && <p className="text-sm text-muted italic">Materiali: {material}</p>}
-      <RenderEntries entries={spell.entries} />
+      <EntriesBlock entries={spell.entries} language={language} />
       {spell.entriesHigherLevel && (
         <div>
           <p className="text-xs uppercase tracking-widest text-muted mb-1">A livelli superiori</p>
-          <RenderEntries entries={spell.entriesHigherLevel} />
+          <EntriesBlock entries={spell.entriesHigherLevel} language={language} />
         </div>
       )}
-      <TranslatedBlock entries={[...spell.entries, ...(spell.entriesHigherLevel ?? [])]} />
     </>
   );
 }
@@ -459,7 +501,7 @@ const ACTION_GROUPS: { key: keyof RawCreature; label: string }[] = [
   { key: "legendary", label: "Azioni leggendarie" },
 ];
 
-function CreatureDetail({ creature }: { creature: RawCreature }) {
+function CreatureDetail({ creature, language }: { creature: RawCreature; language: Language }) {
   const abilities: [string, number][] = [
     ["FOR", creature.str],
     ["DES", creature.dex],
@@ -505,9 +547,10 @@ function CreatureDetail({ creature }: { creature: RawCreature }) {
             <p className="text-xs uppercase tracking-widest text-muted">{group.label}</p>
             {list.map((item, index) => (
               <div key={`${item.name}-${index}`}>
-                <p className="text-sm font-bold text-foreground">{item.name}</p>
-                <RenderEntries entries={item.entries} />
-                <TranslatedBlock entries={item.entries} />
+                <p className="text-sm font-bold text-foreground">
+                  <LocalizedName text={item.name} language={language} />
+                </p>
+                <EntriesBlock entries={item.entries} language={language} />
               </div>
             ))}
           </div>
@@ -533,7 +576,7 @@ const ITEM_TYPE_NAMES: Record<string, string> = {
   INS: "Strumento",
 };
 
-function ItemDetail({ item }: { item: RawItem }) {
+function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
   const typeName =
     (item.type && ITEM_TYPE_NAMES[item.type]) || (item.wondrous ? "Oggetto meraviglioso" : item.type);
   const attunement =
@@ -548,13 +591,12 @@ function ItemDetail({ item }: { item: RawItem }) {
       <p className="text-sm text-muted italic capitalize">
         {[typeName, item.rarity, attunement].filter(Boolean).join(" · ")}
       </p>
-      <RenderEntries entries={item.entries} />
-      <TranslatedBlock entries={item.entries} />
+      <EntriesBlock entries={item.entries} language={language} />
     </>
   );
 }
 
-function RaceDetail({ race }: { race: RawRace }) {
+function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
   return (
     <>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -563,13 +605,12 @@ function RaceDetail({ race }: { race: RawRace }) {
         <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(race.ability)} />
         <Stat label="Scurovisione" value={race.darkvision ? `${race.darkvision} piedi` : undefined} />
       </div>
-      <RenderEntries entries={race.entries} />
-      <TranslatedBlock entries={race.entries} />
+      <EntriesBlock entries={race.entries} language={language} />
     </>
   );
 }
 
-function FeatDetail({ feat }: { feat: RawFeat }) {
+function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
   const prerequisite = formatPrerequisite(feat.prerequisite);
   return (
     <>
@@ -577,8 +618,7 @@ function FeatDetail({ feat }: { feat: RawFeat }) {
         {prerequisite && <Stat label="Prerequisiti" value={prerequisite} />}
         {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
       </div>
-      <RenderEntries entries={feat.entries} />
-      <TranslatedBlock entries={feat.entries} />
+      <EntriesBlock entries={feat.entries} language={language} />
     </>
   );
 }
@@ -592,7 +632,7 @@ const CLASS_ABILITY_NAMES: Record<string, string> = {
   cha: "Carisma",
 };
 
-function ClassDetail({ cls }: { cls: RawClass }) {
+function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   const [subclasses, setSubclasses] = useState<RawSubclass[] | null>(null);
 
   useEffect(() => {
@@ -641,7 +681,7 @@ function ClassDetail({ cls }: { cls: RawClass }) {
                 key={sub.name}
                 className="rounded-full border border-edge bg-surface-raised px-3 py-1 text-sm text-foreground"
               >
-                {sub.name}
+                <LocalizedName text={sub.name} language={language} />
               </li>
             ))}
           </ul>

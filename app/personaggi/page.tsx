@@ -410,34 +410,40 @@ function CampaignSync({ character }: { character: Character }) {
   };
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-4 flex flex-wrap items-center gap-3">
-      <span className="text-xs uppercase tracking-widest text-muted shrink-0">
-        Porta in campagna
-      </span>
-      <select
-        value={selected}
-        onChange={(event) => setSelected(event.target.value)}
-        className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
-      >
-        {campaigns.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.nome}
-          </option>
-        ))}
-      </select>
-      <button
-        onClick={sync}
-        disabled={syncing}
-        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
-      >
-        {syncing ? "…" : "Sincronizza"}
-      </button>
-      {syncedAt && (
-        <span className="text-xs text-muted">
-          Aggiornato alle {syncedAt.toLocaleTimeString("it-IT")}
+    <section className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs uppercase tracking-widest text-muted shrink-0">
+          Porta in campagna
         </span>
-      )}
-      {error && <span className="text-xs text-danger">{error}</span>}
+        <select
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+          className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+        >
+          {campaigns.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nome}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={sync}
+          disabled={syncing}
+          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
+        >
+          {syncing ? "…" : "Sincronizza"}
+        </button>
+        {syncedAt && (
+          <span className="text-xs text-accent-strong">
+            ✓ Inviato alle {syncedAt.toLocaleTimeString("it-IT")}
+          </span>
+        )}
+        {error && <span className="text-xs text-danger">{error}</span>}
+      </div>
+      <p className="text-xs text-muted">
+        ⚠️ Non è automatico: il gruppo vede uno scatto del personaggio al momento della
+        sincronizzazione. Se lo modifichi dopo, premi di nuovo &ldquo;Sincronizza&rdquo; per aggiornarlo.
+      </p>
     </section>
   );
 }
