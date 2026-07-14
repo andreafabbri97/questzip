@@ -11,6 +11,10 @@ export function useLocalCollection<T>(key: string, schema: z.ZodType<T>) {
   const [items, setItems] = useState<T[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Lettura rimandata al post-mount (non in un lazy initializer) apposta: queste pagine
+  // sono prerenderizzate staticamente, e leggere localStorage durante il render darebbe
+  // un hydration mismatch tra HTML del server e primo render del client.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(key);
@@ -25,6 +29,7 @@ export function useLocalCollection<T>(key: string, schema: z.ZodType<T>) {
     }
     setLoaded(true);
   }, [key, schema]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const persist = (next: T[]) => {
     setItems(next);
