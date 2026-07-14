@@ -42,7 +42,9 @@ const ABILITY_KEYS = ["FOR", "DES", "COS", "INT", "SAG", "CAR"];
 // il modificatore fra parentesi ha spesso un artefatto 0/1 scambiato per O/l/I, a volte con
 // uno spazio spurio dopo il segno (es. "+ l" invece di "+1")
 const MOD_RE = `[+\\-]?\\s*[\\dOolLI]+`;
-const ABILITY_PAIR_RE = new RegExp(`(FOR|DES|COS|INT|SAG|CAR)\\s+(\\d+)\\s*[\\({]\\s*(${MOD_RE})\\s*[\\)}]`, "gi");
+// il punteggio stesso a volte ha uno spazio spurio in mezzo alle cifre (es. "1 6" invece di "16")
+const SCORE_RE = `\\d(?:\\s?\\d)?`;
+const ABILITY_PAIR_RE = new RegExp(`(FOR|DES|COS|INT|SAG|CAR)\\s+(${SCORE_RE})\\s*[\\({]\\s*(${MOD_RE})\\s*[\\)}]`, "gi");
 
 function normalizeModifier(raw) {
   const cleaned = raw.replace(/\s+/g, "").replace(/[Oo]/g, "0").replace(/[lLI]/g, "1");
@@ -153,7 +155,7 @@ function parseAbilities(lines, start) {
   let lastEndOffset = 0;
   for (const match of blob.matchAll(ABILITY_PAIR_RE)) {
     const key = match[1].toUpperCase();
-    const score = Number(match[2]);
+    const score = Number(match[2].replace(/\s+/g, ""));
     abilities[key] = { score, mod: normalizeModifier(match[3]) };
     lastEndOffset = Math.max(lastEndOffset, match.index + match[0].length);
   }
@@ -233,14 +235,14 @@ function parseBook(bookKey) {
     // certe pagine hanno un layout a colonna laterale che fa finire una caratteristica (quasi
     // sempre CAR, l'ultima delle sei) fuori ordine, letta DOPO la riga "Sfida" invece che nel
     // blocco iniziale: la recuperiamo cercandola nel corpo e la togliamo da lì
-    const displacedValueRe = new RegExp(`^(\\d+)\\s*[\\({]\\s*(${MOD_RE})\\s*[\\)}]`);
+    const displacedValueRe = new RegExp(`^(${SCORE_RE})\\s*[\\({]\\s*(${MOD_RE})\\s*[\\)}]`);
     for (const key of ABILITY_KEYS) {
       if (abilities[key]) continue;
       for (let i = 0; i < bodyLines.length - 1; i++) {
         if (bodyLines[i].toUpperCase() !== key) continue;
         const valueMatch = bodyLines[i + 1].match(displacedValueRe);
         if (!valueMatch) continue;
-        abilities[key] = { score: Number(valueMatch[1]), mod: normalizeModifier(valueMatch[2]) };
+        abilities[key] = { score: Number(valueMatch[1].replace(/\s+/g, "")), mod: normalizeModifier(valueMatch[2]) };
         bodyLines = [...bodyLines.slice(0, i), ...bodyLines.slice(i + 2)];
         break;
       }

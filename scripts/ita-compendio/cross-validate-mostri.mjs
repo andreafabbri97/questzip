@@ -78,16 +78,20 @@ function parseItalianCrToNumber(cr) {
   return Number(cr);
 }
 
+// i numeri multi-cifra a volte hanno uno spazio spurio in mezzo (es. "1 6" invece di "16"),
+// stesso artefatto di estrazione visto ovunque: i due gruppi di cifre vanno ricongiunti
+function parseLeadingNumber(text) {
+  if (!text) return null;
+  const m = text.match(/^(\d(?:\s?\d)*)/);
+  return m ? Number(m[1].replace(/\s+/g, "")) : null;
+}
+
 function parseItalianHpAverage(puntiFerita) {
-  if (!puntiFerita) return null;
-  const m = puntiFerita.match(/^(\d+)/);
-  return m ? Number(m[1]) : null;
+  return parseLeadingNumber(puntiFerita);
 }
 
 function parseItalianAc(classeArmatura) {
-  if (!classeArmatura) return null;
-  const m = classeArmatura.match(/^(\d+)/);
-  return m ? Number(m[1]) : null;
+  return parseLeadingNumber(classeArmatura);
 }
 
 async function main() {

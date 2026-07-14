@@ -57,9 +57,14 @@ function isPlausibleMonsterName(nome) {
 async function seedMostri(bookKey) {
   const filePath = path.join(PARSED_DIR, `${bookKey}-mostri.json`);
   const all = JSON.parse(readFileSync(filePath, "utf-8"));
-  const monsters = all.filter((m) => isPlausibleMonsterName(m.nome));
+  // qualità per voce, non per libro intero: nome plausibile, dati numerici completi
+  // (non "sospetti"), e nessuna discrepanza trovata nell'incrocio con l'inglese quando c'è
+  // stato un confronto — un'entry senza confronto disponibile ma con dati completi passa comunque
+  const monsters = all.filter(
+    (m) => isPlausibleMonsterName(m.nome) && !m.numericSuspect && m.crossCheck?.status !== "discrepanza",
+  );
   if (monsters.length < all.length) {
-    console.log(`${all.length - monsters.length} voci scartate (nomi non plausibili).`);
+    console.log(`${bookKey}: ${all.length - monsters.length}/${all.length} voci scartate (nome non plausibile, dati incompleti o discrepanza con l'inglese).`);
   }
 
   await db.delete(compendioItaMostri).where(eq(compendioItaMostri.fonte, bookKey));
@@ -115,11 +120,10 @@ async function main() {
   await seedIncantesimi("phb");
   await seedIncantesimi("tasha");
   await seedIncantesimi("xanathar");
-  await seedMostri("mm");
+  for (const book of ["mm", "multiverso", "fizban", "bigby", "dragonlance", "ravenloft"]) {
+    await seedMostri(book);
+  }
   await seedRazze("phb");
-  // multiverso/fizban/bigby/dragonlance/ravenloft: NON caricati, l'incrocio con l'inglese ha
-  // rivelato tassi di errore troppo alti (formato del libro troppo diverso da quello del
-  // Manuale dei Mostri) — richiederebbero un lavoro di rifinitura dedicato per libro
   console.log("Fatto.");
 }
 
