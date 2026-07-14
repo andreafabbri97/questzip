@@ -1049,6 +1049,13 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
   );
 }
 
+const SHAPE_LABELS: Record<RoomShape, string> = {
+  rectangular: "Rettangolari",
+  organic: "Organiche",
+  circular: "Circolari",
+  polygonal: "Poligonali",
+};
+
 function NewDungeonForm({
   campaignId,
   onCreated,
@@ -1113,8 +1120,8 @@ function NewDungeonForm({
             className="w-14 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
-        <div className="flex gap-1.5">
-          {(["rectangular", "organic"] as RoomShape[]).map((option) => (
+        <div className="flex flex-wrap gap-1.5">
+          {(["rectangular", "organic", "circular", "polygonal"] as RoomShape[]).map((option) => (
             <button
               key={option}
               onClick={() => setShape(option)}
@@ -1124,7 +1131,7 @@ function NewDungeonForm({
                   : "border-edge bg-surface text-muted hover:text-foreground"
               }`}
             >
-              {option === "rectangular" ? "Rettangolari" : "Organiche"}
+              {SHAPE_LABELS[option]}
             </button>
           ))}
         </div>
@@ -1283,20 +1290,10 @@ function DungeonMap({
             );
           }),
         )}
-        {dungeon.rooms.map((room) => (
-          <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
-            {room.cells.map(([x, y], index) => (
-              <rect
-                key={index}
-                x={x * cellSize}
-                y={y * cellSize}
-                width={cellSize}
-                height={cellSize}
-                fill={activeRoomId === room.id ? "#e0a83e33" : "#241f1a"}
-                stroke={activeRoomId === room.id ? "#e0a83e" : "#3b322a"}
-                strokeWidth={0.5}
-              />
-            ))}
+        {dungeon.rooms.map((room) => {
+          const fill = activeRoomId === room.id ? "#e0a83e33" : "#241f1a";
+          const stroke = activeRoomId === room.id ? "#e0a83e" : "#3b322a";
+          const label = (
             <text
               x={room.centerX * cellSize + cellSize / 2}
               y={room.centerY * cellSize + cellSize / 2}
@@ -1308,8 +1305,55 @@ function DungeonMap({
             >
               {room.label}
             </text>
-          </g>
-        ))}
+          );
+
+          if (room.vectorShape?.type === "circle") {
+            const { cx, cy, r } = room.vectorShape;
+            return (
+              <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
+                <circle
+                  cx={cx * cellSize}
+                  cy={cy * cellSize}
+                  r={r * cellSize}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={1.5}
+                />
+                {label}
+              </g>
+            );
+          }
+
+          if (room.vectorShape?.type === "polygon") {
+            const points = room.vectorShape.points
+              .map(([x, y]) => `${x * cellSize},${y * cellSize}`)
+              .join(" ");
+            return (
+              <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
+                <polygon points={points} fill={fill} stroke={stroke} strokeWidth={1.5} />
+                {label}
+              </g>
+            );
+          }
+
+          return (
+            <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
+              {room.cells.map(([x, y], index) => (
+                <rect
+                  key={index}
+                  x={x * cellSize}
+                  y={y * cellSize}
+                  width={cellSize}
+                  height={cellSize}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={0.5}
+                />
+              ))}
+              {label}
+            </g>
+          );
+        })}
       </svg>
     </div>
   );

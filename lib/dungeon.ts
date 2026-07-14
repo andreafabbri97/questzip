@@ -1,10 +1,16 @@
 // Generatore procedurale di dungeon (ispirato a donjon.bin.sh/d20/dungeon/): stanze piazzate
 // su una griglia, connesse da corridoi via albero ricoprente minimo + qualche anello extra.
 // "Organiche" erode/fa crescere il bordo delle stanze rettangolari per un look meno geometrico
-// (stesso motore a griglia di donjon, non una geometria vettoriale separata).
+// (stesso motore a griglia di donjon). "Circolare"/"Poligonale" sono invece geometria vettoriale
+// vera (cerchio/poligono con lati dritti): la forma è rasterizzata su celle solo per riusare lo
+// stesso sistema di corridoi/porte/connettività già collaudato, ma il disegno usa la forma reale.
 
 export type CellType = "wall" | "floor" | "door" | "corridor";
-export type RoomShape = "rectangular" | "organic";
+export type RoomShape = "rectangular" | "organic" | "circular" | "polygonal";
+
+export type VectorShape =
+  | { type: "circle"; cx: number; cy: number; r: number }
+  | { type: "polygon"; points: [number, number][] };
 
 export interface DungeonRoom {
   id: number;
@@ -14,6 +20,7 @@ export interface DungeonRoom {
   centerY: number;
   encounter: string;
   reward: string;
+  vectorShape?: VectorShape;
 }
 
 export interface DungeonData {
@@ -125,6 +132,65 @@ function organicize(cells: [number, number][], width: number, height: number): [
   return largestConnectedComponent(shaped);
 }
 
+function circleCells(cx: number, cy: number, r: number, width: number, height: number): [number, number][] {
+  const cells: [number, number][] = [];
+  const minY = Math.max(0, Math.floor(cy - r));
+  const maxY = Math.min(height - 1, Math.ceil(cy + r));
+  const minX = Math.max(0, Math.floor(cx - r));
+  const maxX = Math.min(width - 1, Math.ceil(cx + r));
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      if (dx * dx + dy * dy <= r * r) cells.push([x, y]);
+    }
+  }
+  return cells;
+}
+
+/** Poligono semi-regolare (N lati, raggio con un po' di rumore) per un look meno geometrico. */
+function polygonPoints(cx: number, cy: number, avgRadius: number): [number, number][] {
+  const sides = randInt(5, 9);
+  const points: [number, number][] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (i / sides) * Math.PI * 2;
+    const r = avgRadius * (0.75 + Math.random() * 0.5);
+    points.push([cx + Math.cos(angle) * r, cy + Math.sin(angle) * r]);
+  }
+  return points;
+}
+
+function pointInPolygon(x: number, y: number, points: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i];
+    const [xj, yj] = points[j];
+    const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function polygonCells(
+  points: [number, number][],
+  width: number,
+  height: number,
+): [number, number][] {
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  const minX = Math.max(0, Math.floor(Math.min(...xs)));
+  const maxX = Math.min(width - 1, Math.ceil(Math.max(...xs)));
+  const minY = Math.max(0, Math.floor(Math.min(...ys)));
+  const maxY = Math.min(height - 1, Math.ceil(Math.max(...ys)));
+  const cells: [number, number][] = [];
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (pointInPolygon(x + 0.5, y + 0.5, points)) cells.push([x, y]);
+    }
+  }
+  return cells;
+}
+
 function closestCellToCentroid(cells: [number, number][]): [number, number] {
   const avgX = cells.reduce((sum, c) => sum + c[0], 0) / cells.length;
   const avgY = cells.reduce((sum, c) => sum + c[1], 0) / cells.length;
@@ -226,14 +292,35 @@ export function generateDungeon(config: DungeonConfig): DungeonData {
   }
 
   const rooms: DungeonRoom[] = placed.map((rect, index) => {
-    let roomCells = rectCells(rect);
-    if (config.shape === "organic") roomCells = organicize(roomCells, width, height);
+    let roomCells: [number, number][];
+    let vectorShape: VectorShape | undefined;
+
+    if (config.shape === "circular") {
+      const cx = rect.x + rect.w / 2;
+      const cy = rect.y + rect.h / 2;
+      const r = Math.min(rect.w, rect.h) / 2;
+      roomCells = circleCells(cx, cy, r, width, height);
+      vectorShape = { type: "circle", cx, cy, r };
+    } else if (config.shape === "polygonal") {
+      const cx = rect.x + rect.w / 2;
+      const cy = rect.y + rect.h / 2;
+      const avgRadius = Math.min(rect.w, rect.h) / 2;
+      const points = polygonPoints(cx, cy, avgRadius);
+      roomCells = polygonCells(points, width, height);
+      vectorShape = { type: "polygon", points };
+    } else {
+      roomCells = rectCells(rect);
+      if (config.shape === "organic") roomCells = organicize(roomCells, width, height);
+    }
+
+    // Sicurezza: forme piccole/rasterizzate ai bordi possono produrre celle scollegate
+    // (es. un cerchio minuscolo con angoli solo diagonali) — stesso principio delle organiche.
+    roomCells = largestConnectedComponent(roomCells);
     for (const [x, y] of roomCells) {
       if (cells[y]?.[x] !== undefined) cells[y][x] = "floor";
     }
-    // L'ancora per i corridoi dev'essere una cella REALMENTE nella stanza: dopo l'erosione
-    // organica il centro geometrico originale potrebbe non farne più parte (o essere fuori
-    // dalla forma, se non convessa), lasciando il corridoio scollegato dalla stanza.
+    // L'ancora per i corridoi dev'essere una cella REALMENTE nella stanza: il centro
+    // geometrico teorico potrebbe non farne più parte dopo rasterizzazione/erosione.
     const [anchorX, anchorY] = closestCellToCentroid(roomCells);
     return {
       id: index,
@@ -243,6 +330,7 @@ export function generateDungeon(config: DungeonConfig): DungeonData {
       centerY: anchorY,
       encounter: "",
       reward: "",
+      vectorShape,
     };
   });
 
