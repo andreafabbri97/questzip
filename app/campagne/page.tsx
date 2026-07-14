@@ -28,10 +28,14 @@ import {
   updateCombatant,
 } from "@/app/actions/encounters";
 import {
+  addMarker,
+  createBlankDungeon,
   createDungeon,
   deleteDungeon,
+  deleteMarker,
   getDungeon,
   getDungeonsForCampaign,
+  updateDungeonCells,
   updateRoomNotes,
 } from "@/app/actions/dungeons";
 import type { CellType, DungeonConfig, RoomShape } from "@/lib/dungeon";
@@ -970,7 +974,7 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
   const [dungeons, setDungeons] = useState<DungeonListItem[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [active, setActive] = useState<DungeonFull | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [formMode, setFormMode] = useState<"none" | "generate" | "blank">("none");
 
   const refreshList = () => {
     getDungeonsForCampaign(campaignId).then(setDungeons);
@@ -993,20 +997,39 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">🗺️ Dungeon</h2>
         {isDm && (
-          <button
-            onClick={() => setShowForm((prev) => !prev)}
-            className="text-xs font-bold text-accent-strong hover:underline"
-          >
-            {showForm ? "Annulla" : "+ Genera dungeon"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setFormMode((prev) => (prev === "generate" ? "none" : "generate"))}
+              className="text-xs font-bold text-accent-strong hover:underline"
+            >
+              {formMode === "generate" ? "Annulla" : "+ Genera dungeon"}
+            </button>
+            <button
+              onClick={() => setFormMode((prev) => (prev === "blank" ? "none" : "blank"))}
+              className="text-xs font-bold text-accent-strong hover:underline"
+            >
+              {formMode === "blank" ? "Annulla" : "+ Disegna da zero"}
+            </button>
+          </div>
         )}
       </div>
 
-      {showForm && isDm && (
+      {formMode === "generate" && isDm && (
         <NewDungeonForm
           campaignId={campaignId}
           onCreated={(dungeon) => {
-            setShowForm(false);
+            setFormMode("none");
+            refreshList();
+            openDungeon(dungeon.id);
+          }}
+        />
+      )}
+
+      {formMode === "blank" && isDm && (
+        <NewBlankDungeonForm
+          campaignId={campaignId}
+          onCreated={(dungeon) => {
+            setFormMode("none");
             refreshList();
             openDungeon(dungeon.id);
           }}
@@ -1035,6 +1058,7 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
 
       {active && (
         <DungeonViewer
+          key={active.id}
           dungeon={active}
           isDm={isDm}
           onDeleted={() => {
@@ -1148,6 +1172,87 @@ function NewDungeonForm({
   );
 }
 
+function NewBlankDungeonForm({
+  campaignId,
+  onCreated,
+}: {
+  campaignId: string;
+  onCreated: (dungeon: { id: string }) => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [width, setWidth] = useState(30);
+  const [height, setHeight] = useState(20);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const create = async () => {
+    setCreating(true);
+    setError(null);
+    try {
+      const dungeon = await createBlankDungeon(campaignId, nome.trim(), width, height);
+      setNome("");
+      onCreated(dungeon);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+      <input
+        value={nome}
+        onChange={(event) => setNome(event.target.value)}
+        placeholder="Nome (es. Cripta sotto la torre)"
+        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          Larghezza
+          <input
+            type="number"
+            min={8}
+            max={60}
+            value={width}
+            onChange={(event) => setWidth(Number(event.target.value) || 8)}
+            className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          Altezza
+          <input
+            type="number"
+            min={8}
+            max={60}
+            value={height}
+            onChange={(event) => setHeight(Number(event.target.value) || 8)}
+            className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <button
+          onClick={create}
+          disabled={creating}
+          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        >
+          {creating ? "Creo…" : "✏️ Crea tela vuota"}
+        </button>
+      </div>
+      <p className="text-xs text-muted">
+        Crea una griglia vuota da disegnare a mano (pennello muri/pavimento/porte + punti d&apos;interesse).
+      </p>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+const BRUSH_LABELS: Record<CellType, string> = {
+  floor: "Pavimento",
+  wall: "Muro",
+  door: "Porta",
+  corridor: "Pavimento",
+};
+
 function DungeonViewer({
   dungeon,
   isDm,
@@ -1160,7 +1265,41 @@ function DungeonViewer({
   onRoomUpdated: () => void;
 }) {
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [brush, setBrush] = useState<CellType>("floor");
+  const [markerMode, setMarkerMode] = useState(false);
+  const [cells, setCells] = useState<CellType[][]>(dungeon.cells);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
   const selectedRoom = dungeon.rooms.find((room) => room.id === selectedRoomId) ?? null;
+
+  const paintCell = (x: number, y: number) => {
+    setCells((prev) => {
+      if (prev[y]?.[x] === undefined || prev[y][x] === brush) return prev;
+      const next = prev.map((row) => [...row]);
+      next[y][x] = brush;
+      return next;
+    });
+    setDirty(true);
+  };
+
+  const saveCells = async () => {
+    setSaving(true);
+    try {
+      await updateDungeonCells(dungeon.id, cells);
+      setDirty(false);
+      onRoomUpdated();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const placeMarker = async (x: number, y: number) => {
+    const label = window.prompt("Nome del punto d'interesse", `Punto ${dungeon.rooms.length + 1}`);
+    if (label === null) return;
+    await addMarker(dungeon.id, x, y, label);
+    onRoomUpdated();
+  };
 
   return (
     <div className="space-y-3">
@@ -1182,17 +1321,87 @@ function DungeonViewer({
           </button>
         )}
       </div>
+
+      {isDm && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-edge bg-surface-raised p-2">
+          <button
+            onClick={() => {
+              setEditMode((prev) => !prev);
+              setMarkerMode(false);
+              setSelectedRoomId(null);
+            }}
+            className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+              editMode
+                ? "border-accent bg-accent/15 text-accent-strong"
+                : "border-edge bg-surface text-muted hover:text-foreground"
+            }`}
+          >
+            {editMode ? "Fine modifica" : "✏️ Modifica mappa"}
+          </button>
+          {editMode && (
+            <>
+              <div className="flex gap-1">
+                {(["floor", "wall", "door"] as CellType[]).map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => {
+                      setBrush(option);
+                      setMarkerMode(false);
+                    }}
+                    className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                      !markerMode && brush === option
+                        ? "border-accent bg-accent/15 text-accent-strong"
+                        : "border-edge bg-surface text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {BRUSH_LABELS[option]}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setMarkerMode((prev) => !prev)}
+                className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                  markerMode
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : "border-edge bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                📍 Punto d&apos;interesse
+              </button>
+              <button
+                onClick={saveCells}
+                disabled={!dirty || saving}
+                className="rounded-md bg-accent text-background font-bold px-2 py-1 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+              >
+                {saving ? "…" : dirty ? "💾 Salva mappa" : "Salvato"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <DungeonMap
-        dungeon={dungeon}
+        dungeon={{ ...dungeon, cells }}
         activeRoomId={selectedRoomId}
-        onRoomClick={(id) => setSelectedRoomId(id === selectedRoomId ? null : id)}
+        onRoomClick={(id) => {
+          if (editMode) return;
+          setSelectedRoomId(id === selectedRoomId ? null : id);
+        }}
+        editable={editMode}
+        markerMode={markerMode}
+        onPaintCell={paintCell}
+        onPlaceMarker={placeMarker}
       />
-      {selectedRoom && isDm && (
+      {selectedRoom && isDm && !editMode && (
         <RoomNotesEditor
           key={selectedRoom.id}
           dungeonId={dungeon.id}
           room={selectedRoom}
           onSaved={onRoomUpdated}
+          onDeleted={() => {
+            setSelectedRoomId(null);
+            onRoomUpdated();
+          }}
         />
       )}
       {selectedRoom && !isDm && (
@@ -1206,10 +1415,12 @@ function RoomNotesEditor({
   dungeonId,
   room,
   onSaved,
+  onDeleted,
 }: {
   dungeonId: string;
   room: DungeonFull["rooms"][number];
   onSaved: () => void;
+  onDeleted: () => void;
 }) {
   const [encounter, setEncounter] = useState(room.encounter);
   const [reward, setReward] = useState(room.reward);
@@ -1222,9 +1433,20 @@ function RoomNotesEditor({
     onSaved();
   };
 
+  const remove = async () => {
+    if (!window.confirm(`Eliminare "${room.label}" dalla mappa?`)) return;
+    await deleteMarker(dungeonId, room.id);
+    onDeleted();
+  };
+
   return (
     <div className="rounded-lg border border-accent/40 bg-surface-raised p-3 space-y-2">
-      <p className="text-xs uppercase tracking-widest text-muted">Stanza {room.label}</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-widest text-muted">Stanza {room.label}</p>
+        <button onClick={remove} className="text-xs text-danger hover:underline">
+          Elimina
+        </button>
+      </div>
       <label className="block">
         <span className="text-[10px] uppercase tracking-widest text-muted">Incontro</span>
         <textarea
@@ -1256,16 +1478,56 @@ function RoomNotesEditor({
   );
 }
 
+const CELL_FILL: Record<CellType, string | null> = {
+  wall: null,
+  floor: "#241f1a",
+  corridor: "#2a241e",
+  door: "#e0a83e",
+};
+
 function DungeonMap({
   dungeon,
   activeRoomId,
   onRoomClick,
+  editable = false,
+  markerMode = false,
+  onPaintCell,
+  onPlaceMarker,
 }: {
   dungeon: { width: number; height: number; cells: CellType[][]; rooms: DungeonFull["rooms"] };
   activeRoomId: number | null;
   onRoomClick: (id: number) => void;
+  editable?: boolean;
+  markerMode?: boolean;
+  onPaintCell?: (x: number, y: number) => void;
+  onPlaceMarker?: (x: number, y: number) => void;
 }) {
   const cellSize = 14;
+  const isPaintingRef = useRef(false);
+
+  useEffect(() => {
+    if (!editable) return;
+    const stop = () => {
+      isPaintingRef.current = false;
+    };
+    window.addEventListener("pointerup", stop);
+    return () => window.removeEventListener("pointerup", stop);
+  }, [editable]);
+
+  const handleCellDown = (x: number, y: number) => {
+    if (markerMode) {
+      onPlaceMarker?.(x, y);
+      return;
+    }
+    isPaintingRef.current = true;
+    onPaintCell?.(x, y);
+  };
+
+  const handleCellEnter = (x: number, y: number) => {
+    if (!editable || markerMode || !isPaintingRef.current) return;
+    onPaintCell?.(x, y);
+  };
+
   return (
     <div className="overflow-x-auto rounded-lg border border-edge bg-background p-2">
       <svg
@@ -1277,7 +1539,8 @@ function DungeonMap({
       >
         {dungeon.cells.map((row, y) =>
           row.map((cell, x) => {
-            if (cell === "wall" || cell === "floor") return null;
+            const fill = CELL_FILL[cell];
+            if (!fill) return null;
             return (
               <rect
                 key={`${x}-${y}`}
@@ -1285,7 +1548,7 @@ function DungeonMap({
                 y={y * cellSize}
                 width={cellSize}
                 height={cellSize}
-                fill={cell === "door" ? "#e0a83e" : "#2a241e"}
+                fill={fill}
               />
             );
           }),
@@ -1354,6 +1617,24 @@ function DungeonMap({
             </g>
           );
         })}
+        {editable &&
+          dungeon.cells.map((row, y) =>
+            row.map((_cell, x) => (
+              <rect
+                key={`hit-${x}-${y}`}
+                x={x * cellSize}
+                y={y * cellSize}
+                width={cellSize}
+                height={cellSize}
+                fill="transparent"
+                stroke="#3b322a33"
+                strokeWidth={0.5}
+                className={markerMode ? "cursor-crosshair" : "cursor-pointer"}
+                onPointerDown={() => handleCellDown(x, y)}
+                onPointerEnter={() => handleCellEnter(x, y)}
+              />
+            )),
+          )}
       </svg>
     </div>
   );
