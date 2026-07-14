@@ -7,8 +7,11 @@ import {
   integer,
   uuid,
   pgEnum,
+  jsonb,
+  unique,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
+import type { Ability, ClassEntry } from "@/lib/dnd";
 
 // --- Tabelle richieste dall'adapter Drizzle di Auth.js ---
 
@@ -120,9 +123,36 @@ export const campaignSessionNotes = pgTable("campaign_session_note", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
+// Snapshot del personaggio (di Personaggi, salvato in locale) portato in una campagna:
+// il giocatore lo aggiorna quando vuole con "Aggiorna nella campagna", non è sync live.
+export const campaignCharacters = pgTable(
+  "campaign_character",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    nome: text("nome").notNull(),
+    razza: text("razza").notNull().default(""),
+    classi: jsonb("classi").$type<ClassEntry[]>().notNull(),
+    hpMax: integer("hp_max").notNull(),
+    hpAttuali: integer("hp_attuali").notNull(),
+    classeArmatura: integer("classe_armatura").notNull(),
+    velocita: integer("velocita").notNull(),
+    caratteristiche: jsonb("caratteristiche").$type<Record<Ability, number>>().notNull(),
+    note: text("note").notNull().default(""),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.campaignId, table.userId)],
+);
+
 export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   members: many(campaignMembers),
   sessionNotes: many(campaignSessionNotes),
+  characters: many(campaignCharacters),
   owner: one(users, { fields: [campaigns.ownerId], references: [users.id] }),
 }));
 

@@ -16,6 +16,8 @@ import {
   removeMember,
   setMemberRole,
 } from "@/app/actions/campaigns";
+import { getPartyForCampaign } from "@/app/actions/characters";
+import { abilityModifier, formatModifier, totalLevel, type Ability } from "@/lib/dnd";
 
 type CampaignSummary = Awaited<ReturnType<typeof getMyCampaigns>>[number];
 type CampaignDetail = Awaited<ReturnType<typeof getCampaign>>;
@@ -241,6 +243,9 @@ function CampaignDetailView({
   onDeleted: () => void;
 }) {
   const [detail, setDetail] = useState<CampaignDetail | null>(null);
+  const [party, setParty] = useState<Awaited<ReturnType<typeof getPartyForCampaign>> | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
@@ -250,6 +255,7 @@ function CampaignDetailView({
     getCampaign(campaignId)
       .then(setDetail)
       .catch((err) => setError(err.message));
+    getPartyForCampaign(campaignId).then(setParty);
   };
 
   useEffect(refresh, [campaignId]);
@@ -389,6 +395,58 @@ function CampaignDetailView({
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Party</h2>
+        {!party || party.length === 0 ? (
+          <p className="text-sm text-muted">
+            Nessun personaggio ancora — portane uno qui da Personaggi.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {party.map((pc) => {
+              const abilities = pc.caratteristiche;
+              const classSummary = pc.classi
+                .map((c) => `${c.nome} ${c.livello}`)
+                .join(" / ");
+              return (
+                <li
+                  key={pc.userId}
+                  className="rounded-lg border border-edge bg-surface-raised p-3"
+                >
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="font-bold text-foreground">{pc.nome}</p>
+                      <p className="text-xs text-muted">
+                        {[pc.razza, classSummary].filter(Boolean).join(" · ")} · giocato da{" "}
+                        {pc.playerName}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted shrink-0">
+                      PF {pc.hpAttuali}/{pc.hpMax} · CA {pc.classeArmatura} · Liv.{" "}
+                      {totalLevel(pc.classi)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-6 gap-1.5 mt-2">
+                    {(["forza", "destrezza", "costituzione", "intelligenza", "saggezza", "carisma"] as Ability[]).map(
+                      (ability) => (
+                        <div key={ability} className="text-center">
+                          <p className="text-[9px] uppercase tracking-widest text-muted">
+                            {ability.slice(0, 3)}
+                          </p>
+                          <p className="text-xs font-bold text-foreground">
+                            {formatModifier(abilityModifier(abilities[ability]))}
+                          </p>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">

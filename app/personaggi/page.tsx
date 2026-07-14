@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession, signIn } from "next-auth/react";
+import { getMyCampaigns } from "@/app/actions/campaigns";
+import { syncCharacterToCampaign } from "@/app/actions/characters";
 import {
   ABILITIES,
   ABILITY_LABELS,
@@ -198,6 +201,8 @@ function CharacterSheet({
         </label>
       </section>
 
+      <CampaignSync character={character} />
+
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm uppercase tracking-widest text-muted">
@@ -344,6 +349,96 @@ function CharacterSheet({
         </label>
       </section>
     </div>
+  );
+}
+
+function CampaignSync({ character }: { character: Character }) {
+  const { status } = useSession();
+  const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
+    null,
+  );
+  const [selected, setSelected] = useState("");
+  const [syncedAt, setSyncedAt] = useState<Date | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    getMyCampaigns().then((list) => {
+      setCampaigns(list);
+      setSelected((prev) => prev || list[0]?.id || "");
+    });
+  }, [status]);
+
+  if (status !== "authenticated") {
+    return (
+      <section className="rounded-xl border border-dashed border-edge bg-surface/50 p-4 text-sm text-muted flex items-center justify-between gap-3 flex-wrap">
+        <span>Accedi per portare questo personaggio in una campagna condivisa.</span>
+        <button
+          onClick={() => signIn("google")}
+          className="shrink-0 rounded-lg border border-edge px-3 py-1.5 text-xs font-bold text-foreground hover:border-accent transition-colors"
+        >
+          Accedi con Google
+        </button>
+      </section>
+    );
+  }
+
+  if (campaigns === null) return null;
+
+  if (campaigns.length === 0) {
+    return (
+      <section className="rounded-xl border border-dashed border-edge bg-surface/50 p-4 text-sm text-muted">
+        Non fai parte di nessuna campagna condivisa ancora — creane una o unisciti da{" "}
+        <span className="text-accent-strong">Campagne</span>.
+      </section>
+    );
+  }
+
+  const sync = async () => {
+    if (!selected) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      await syncCharacterToCampaign(selected, character);
+      setSyncedAt(new Date());
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-4 flex flex-wrap items-center gap-3">
+      <span className="text-xs uppercase tracking-widest text-muted shrink-0">
+        Porta in campagna
+      </span>
+      <select
+        value={selected}
+        onChange={(event) => setSelected(event.target.value)}
+        className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+      >
+        {campaigns.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.nome}
+          </option>
+        ))}
+      </select>
+      <button
+        onClick={sync}
+        disabled={syncing}
+        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
+      >
+        {syncing ? "…" : "Sincronizza"}
+      </button>
+      {syncedAt && (
+        <span className="text-xs text-muted">
+          Aggiornato alle {syncedAt.toLocaleTimeString("it-IT")}
+        </span>
+      )}
+      {error && <span className="text-xs text-danger">{error}</span>}
+    </section>
   );
 }
 
