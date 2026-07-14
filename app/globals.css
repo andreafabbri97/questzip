@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0c0a09;
+  --surface: #1a1613;
+  --surface-raised: #241f1a;
+  --border: #3b322a;
+  --foreground: #ece5da;
+  --muted: #a89e90;
+  --accent: #e0a83e;
+  --accent-strong: #f2c14e;
+  --danger: #c0453e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-edge: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: var(--background);
+  background-image: radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      rgba(224, 168, 62, 0.08),
+      transparent
+    );
+  color: var(--foreground);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), serif;
+}
+
+@keyframes dice-shake {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(-12deg) scale(1.08);
+  }
+  50% {
+    transform: rotate(10deg) scale(1.12);
+  }
+  75% {
+    transform: rotate(-6deg) scale(1.05);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.animate-dice {
+  animation: dice-shake 0.45s ease-in-out;
+}
