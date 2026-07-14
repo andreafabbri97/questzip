@@ -587,7 +587,11 @@ function ClassRow({
       )}
 
       {entry.sottoclasse && (
-        <SubclassFeaturesToggle key={entry.sottoclasse} subclassName={entry.sottoclasse} />
+        <SubclassFeaturesToggle
+          key={entry.sottoclasse}
+          subclassName={entry.sottoclasse}
+          className={entry.nome}
+        />
       )}
     </div>
   );
@@ -648,7 +652,13 @@ function ClassSubclassPicker({
   );
 }
 
-function SubclassFeaturesToggle({ subclassName }: { subclassName: string }) {
+function SubclassFeaturesToggle({
+  subclassName,
+  className,
+}: {
+  subclassName: string;
+  className: string;
+}) {
   const [showFeatures, setShowFeatures] = useState(false);
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
@@ -658,14 +668,16 @@ function SubclassFeaturesToggle({ subclassName }: { subclassName: string }) {
     let cancelled = false;
     loadClassData().then((data) => {
       if (cancelled) return;
-      const subclass = data.subclasses.find((s) => s.name === subclassName);
+      const subclass = data.subclasses.find(
+        (s) => s.name === subclassName && s.className.toLowerCase() === className.trim().toLowerCase(),
+      );
       if (!subclass) return;
       setFeatures(resolveSubclassFeatures(data, subclass));
     });
     return () => {
       cancelled = true;
     };
-  }, [subclassName]);
+  }, [subclassName, className]);
 
   return (
     <div>
@@ -676,11 +688,14 @@ function SubclassFeaturesToggle({ subclassName }: { subclassName: string }) {
         {showFeatures ? "Nascondi" : "Come funziona"} {subclassName}
       </button>
       {showFeatures && (
-        <div className="mt-2 space-y-3 border-t border-edge pt-2">
+        <div className="mt-2 space-y-3 border-t border-edge pt-3">
           {!features && <p className="text-sm text-muted">Caricamento…</p>}
           {features?.map((feature) => (
-            <div key={`${feature.name}-${feature.level}`}>
-              <p className="text-sm font-bold text-foreground">
+            <div
+              key={`${feature.name}-${feature.level}`}
+              className="rounded-lg border border-edge bg-surface p-3"
+            >
+              <p className="text-sm font-bold text-foreground mb-1.5">
                 {feature.name}{" "}
                 <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
               </p>

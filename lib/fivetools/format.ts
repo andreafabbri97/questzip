@@ -1,5 +1,12 @@
-import type { RawCreature } from "@/lib/fivetools/data";
+import type { RawCreature, TableCell } from "@/lib/fivetools/data";
 import { stripTags } from "@/lib/fivetools/tags";
+
+export function formatTableCell(cell: TableCell | undefined): string {
+  if (cell === undefined || cell === "") return "—";
+  if (typeof cell === "string" || typeof cell === "number") return String(cell);
+  if (cell.type === "bonus") return cell.value !== undefined ? `+${cell.value}` : "—";
+  return cell.value !== undefined ? String(cell.value) : "—";
+}
 
 const SCHOOL_NAMES: Record<string, string> = {
   A: "Abiurazione",

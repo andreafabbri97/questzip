@@ -29,30 +29,37 @@ function entriesToText(entries: FiveEntry[] | undefined): string {
 
 function EntryBlock({ entry }: { entry: FiveEntry }) {
   if (typeof entry === "string") {
-    return <p className="text-sm text-foreground leading-relaxed">{stripTags(entry)}</p>;
+    return <p className="text-[0.925rem] text-foreground/90 leading-relaxed">{stripTags(entry)}</p>;
   }
 
   switch (entry.type) {
     case "list":
       return (
-        <ul className="list-disc list-inside text-sm text-foreground space-y-1">
+        <ul className="space-y-1.5 my-0.5">
           {(entry.items ?? []).map((item, index) => (
-            <li key={index}>{listItemText(item)}</li>
+            <li key={index} className="flex gap-2.5 text-[0.925rem] text-foreground/90 leading-relaxed">
+              <span className="mt-2 size-1.5 rounded-full bg-accent shrink-0" />
+              <span>{listItemText(item)}</span>
+            </li>
           ))}
         </ul>
       );
     case "entries":
     case "section":
       return (
-        <div className="space-y-1">
-          {entry.name && <p className="text-sm font-bold text-foreground">{stripTags(entry.name)}</p>}
+        <div className="space-y-1.5 pl-3 border-l-2 border-edge py-0.5">
+          {entry.name && (
+            <p className="text-xs font-bold uppercase tracking-wide text-accent-strong">
+              {stripTags(entry.name)}
+            </p>
+          )}
           <RenderEntries entries={entry.entries} />
         </div>
       );
     case "item":
       return (
-        <p className="text-sm text-foreground leading-relaxed">
-          {entry.name && <span className="font-bold">{stripTags(entry.name)}. </span>}
+        <p className="text-[0.925rem] text-foreground/90 leading-relaxed">
+          {entry.name && <span className="font-bold text-foreground">{stripTags(entry.name)}. </span>}
           {entry.entry ? stripTags(entry.entry) : entriesToText(entry.entries)}
         </p>
       );
@@ -103,7 +110,7 @@ export function flattenEntries(entries: FiveEntry[] | undefined): string[] {
 export function RenderEntries({ entries }: { entries: FiveEntry[] | undefined }) {
   if (!entries || entries.length === 0) return null;
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {entries.map((entry, index) => (
         <EntryBlock key={index} entry={entry} />
       ))}

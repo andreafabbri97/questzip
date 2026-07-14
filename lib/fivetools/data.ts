@@ -110,6 +110,14 @@ export interface RawCondition {
   entries: FiveEntry[];
 }
 
+export type TableCell = string | number | { type: string; value?: number };
+
+export interface ClassTableGroup {
+  title?: string;
+  colLabels: string[];
+  rows: TableCell[][];
+}
+
 export interface RawClass {
   name: string;
   source: string;
@@ -122,6 +130,7 @@ export interface RawClass {
     weapons?: (string | { proficiency: string })[];
     skills?: unknown;
   };
+  classTableGroups?: ClassTableGroup[];
 }
 
 export interface RawSubclass {
@@ -136,6 +145,15 @@ export interface RawSubclassFeature {
   name: string;
   className: string;
   subclassShortName: string;
+  subclassSource: string;
+  level: number;
+  entries: FiveEntry[];
+}
+
+export interface RawClassFeature {
+  name: string;
+  className: string;
+  classSource: string;
   level: number;
   entries: FiveEntry[];
 }
@@ -166,6 +184,7 @@ interface ClassFile {
   class: RawClass[];
   subclass?: RawSubclass[];
   subclassFeature?: RawSubclassFeature[];
+  classFeature?: RawClassFeature[];
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -249,10 +268,11 @@ export function loadConditions(): Promise<RawCondition[]> {
   return conditionsPromise;
 }
 
-interface ClassData {
+export interface ClassData {
   classes: RawClass[];
   subclasses: RawSubclass[];
   subclassFeatures: RawSubclassFeature[];
+  classFeatures: RawClassFeature[];
 }
 
 let classDataPromise: Promise<ClassData> | null = null;
@@ -264,6 +284,7 @@ export function loadClassData(): Promise<ClassData> {
       classes: files.flatMap((file) => file?.class ?? []),
       subclasses: files.flatMap((file) => file?.subclass ?? []),
       subclassFeatures: files.flatMap((file) => file?.subclassFeature ?? []),
+      classFeatures: files.flatMap((file) => file?.classFeature ?? []),
     }));
   }
   return classDataPromise;
@@ -278,7 +299,16 @@ export function resolveSubclassFeatures(
   return data.subclassFeatures
     .filter(
       (feature) =>
-        feature.className === subclass.className && feature.subclassShortName === shortName,
+        feature.className === subclass.className &&
+        feature.subclassShortName === shortName &&
+        feature.subclassSource === subclass.source,
     )
+    .sort((a, b) => a.level - b.level);
+}
+
+/** Risolve le feature di classe (non di sottoclasse), ordinate per livello. */
+export function resolveClassFeatures(data: ClassData, cls: RawClass): RawClassFeature[] {
+  return data.classFeatures
+    .filter((feature) => feature.className === cls.name && feature.classSource === cls.source)
     .sort((a, b) => a.level - b.level);
 }

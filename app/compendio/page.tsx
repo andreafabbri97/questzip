@@ -11,6 +11,9 @@ import {
   loadItems,
   loadRaces,
   loadSpells,
+  resolveClassFeatures,
+  resolveSubclassFeatures,
+  type ClassData,
   type CompendiumKind,
   type EditionFilter,
   type RawBackground,
@@ -46,9 +49,10 @@ import {
   formatSchool,
   formatSize,
   formatSpeed,
+  formatTableCell,
   formatTime,
 } from "@/lib/fivetools/format";
-import { abilityModifier, formatModifier } from "@/lib/dnd";
+import { abilityModifier, formatModifier, proficiencyBonus } from "@/lib/dnd";
 
 const TABS: { kind: CompendiumKind; label: string; icon: string }[] = [
   { kind: "incantesimi", label: "Incantesimi", icon: "✨" },
@@ -469,7 +473,7 @@ function EntryDetail({
           language={language}
         />
       )}
-      {kind === "classi" && <ClassDetail cls={entry as RawClass} />}
+      {kind === "classi" && <ClassDetail cls={entry as RawClass} language={language} />}
     </div>
   );
 }
@@ -477,9 +481,9 @@ function EntryDetail({
 function Stat({ label, value }: { label: string; value: string | number | undefined | null }) {
   if (!value && value !== 0) return null;
   return (
-    <div>
+    <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2">
       <p className="text-[10px] uppercase tracking-widest text-muted">{label}</p>
-      <p className="text-sm text-foreground">{value}</p>
+      <p className="text-sm font-bold text-foreground mt-0.5">{value}</p>
     </div>
   );
 }
@@ -498,10 +502,13 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
         <Stat label="Durata" value={formatDuration(spell.duration)} />
       </div>
       {material && <p className="text-sm text-muted italic">Materiali: {material}</p>}
-      <EntriesBlock entries={spell.entries} language={language} />
+      <div className="border-t border-edge pt-3 space-y-2">
+        <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
+        <EntriesBlock entries={spell.entries} language={language} />
+      </div>
       {spell.entriesHigherLevel && (
         <div>
-          <p className="text-xs uppercase tracking-widest text-muted mb-1">A livelli superiori</p>
+          <p className="text-xs uppercase tracking-widest text-muted mb-1.5">A livelli superiori</p>
           <EntriesBlock entries={spell.entriesHigherLevel} language={language} />
         </div>
       )}
@@ -562,8 +569,11 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
           <div key={group.key} className="space-y-2">
             <p className="text-xs uppercase tracking-widest text-muted">{group.label}</p>
             {list.map((item, index) => (
-              <div key={`${item.name}-${index}`}>
-                <p className="text-sm font-bold text-foreground">
+              <div
+                key={`${item.name}-${index}`}
+                className="rounded-lg border border-edge bg-surface-raised p-3"
+              >
+                <p className="text-sm font-bold text-foreground mb-1.5">
                   <DualName text={item.name} inline />
                 </p>
                 <EntriesBlock entries={item.entries} language={language} />
@@ -621,7 +631,9 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
         <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(race.ability)} />
         <Stat label="Scurovisione" value={race.darkvision ? `${race.darkvision} piedi` : undefined} />
       </div>
-      <EntriesBlock entries={race.entries} language={language} />
+      <div className="border-t border-edge pt-3">
+        <EntriesBlock entries={race.entries} language={language} />
+      </div>
     </>
   );
 }
@@ -634,7 +646,9 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
         {prerequisite && <Stat label="Prerequisiti" value={prerequisite} />}
         {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
       </div>
-      <EntriesBlock entries={feat.entries} language={language} />
+      <div className="border-t border-edge pt-3">
+        <EntriesBlock entries={feat.entries} language={language} />
+      </div>
     </>
   );
 }
@@ -648,28 +662,43 @@ const CLASS_ABILITY_NAMES: Record<string, string> = {
   cha: "Carisma",
 };
 
-function ClassDetail({ cls }: { cls: RawClass }) {
-  const [subclasses, setSubclasses] = useState<RawSubclass[] | null>(null);
+function buildTableColumns(cls: RawClass) {
+  const groups = cls.classTableGroups ?? [];
+  const labels = groups.flatMap((g) => g.colLabels);
+  const getCells = (levelIndex: number) => groups.flatMap((g) => g.rows[levelIndex] ?? []);
+  return { labels, getCells };
+}
+
+function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
+  const [classData, setClassData] = useState<ClassData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     loadClassData().then((data) => {
-      if (cancelled) return;
-      const names = new Set<string>();
-      const matching = data.subclasses.filter(
-        (sub) => sub.className === cls.name && sub.classSource === cls.source,
-      );
-      const deduped = matching.filter((sub) => {
-        if (names.has(sub.name)) return false;
-        names.add(sub.name);
-        return true;
-      });
-      setSubclasses(deduped);
+      if (!cancelled) setClassData(data);
     });
     return () => {
       cancelled = true;
     };
-  }, [cls.name, cls.source]);
+  }, []);
+
+  if (!classData) {
+    return <p className="text-sm text-muted">Caricamento…</p>;
+  }
+
+  const names = new Set<string>();
+  const subclasses = classData.subclasses
+    .filter((sub) => sub.className === cls.name && sub.classSource === cls.source)
+    .filter((sub) => (names.has(sub.name) ? false : (names.add(sub.name), true)));
+
+  const classFeatures = resolveClassFeatures(classData, cls);
+  const featuresByLevel = new Map<number, string[]>();
+  for (const feature of classFeatures) {
+    const list = featuresByLevel.get(feature.level) ?? [];
+    list.push(feature.name);
+    featuresByLevel.set(feature.level, list);
+  }
+  const columns = buildTableColumns(cls);
 
   return (
     <>
@@ -686,23 +715,138 @@ function ClassDetail({ cls }: { cls: RawClass }) {
         <Stat label="Armature" value={formatProficiencyList(cls.startingProficiencies?.armor)} />
         <Stat label="Armi" value={formatProficiencyList(cls.startingProficiencies?.weapons)} />
       </div>
-      {subclasses && subclasses.length > 0 && (
-        <div>
-          <p className="text-xs uppercase tracking-widest text-muted mb-2">
+
+      {classFeatures.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">Progressione</p>
+          <div className="overflow-x-auto rounded-lg border border-edge">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-surface-raised">
+                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted">
+                    Liv.
+                  </th>
+                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">
+                    Bonus comp.
+                  </th>
+                  {columns.labels.map((label, index) => (
+                    <th
+                      key={`${label}-${index}`}
+                      className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap"
+                    >
+                      {label}
+                    </th>
+                  ))}
+                  <th className="px-3 py-2 text-left text-[10px] uppercase tracking-widest text-muted">
+                    Caratteristiche
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 20 }, (_, index) => index + 1).map((level) => (
+                  <tr
+                    key={level}
+                    className={level % 2 === 0 ? "bg-surface" : "bg-surface-raised/40"}
+                  >
+                    <td className="px-3 py-2 font-bold text-foreground">{level}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {formatModifier(proficiencyBonus(level))}
+                    </td>
+                    {columns.getCells(level - 1).map((cell, index) => (
+                      <td key={index} className="px-3 py-2 text-foreground whitespace-nowrap">
+                        {formatTableCell(cell)}
+                      </td>
+                    ))}
+                    <td className="px-3 py-2 text-foreground">
+                      {(featuresByLevel.get(level) ?? []).join(", ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {classFeatures.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">Caratteristiche di classe</p>
+          {classFeatures.map((feature) => (
+            <div
+              key={`${feature.name}-${feature.level}`}
+              className="rounded-lg border border-edge bg-surface-raised p-3"
+            >
+              <p className="text-sm font-bold text-foreground mb-1.5">
+                <span className="text-accent-strong">Liv. {feature.level}</span> ·{" "}
+                <DualName text={feature.name} inline />
+              </p>
+              <EntriesBlock entries={feature.entries} language={language} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {subclasses.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">
             {cls.subclassTitle ?? "Sottoclassi"}
           </p>
-          <ul className="flex flex-wrap gap-2">
-            {subclasses.map((sub) => (
-              <li
-                key={sub.name}
-                className="rounded-full border border-edge bg-surface-raised px-3 py-1 text-sm text-foreground"
-              >
-                <DualName text={sub.name} inline />
-              </li>
-            ))}
-          </ul>
+          {subclasses.map((sub) => (
+            <SubclassAccordion
+              key={sub.name}
+              subclass={sub}
+              classData={classData}
+              language={language}
+            />
+          ))}
         </div>
       )}
     </>
+  );
+}
+
+function SubclassAccordion({
+  subclass,
+  classData,
+  language,
+}: {
+  subclass: RawSubclass;
+  classData: ClassData;
+  language: Language;
+}) {
+  const [open, setOpen] = useState(false);
+  const features = useMemo(
+    () => resolveSubclassFeatures(classData, subclass),
+    [classData, subclass],
+  );
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised overflow-hidden">
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-surface transition-colors"
+      >
+        <span className="text-sm font-bold text-foreground">
+          <DualName text={subclass.name} inline />
+        </span>
+        <span className="text-muted text-xs shrink-0">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-3 border-t border-edge pt-3">
+          {features.length === 0 && (
+            <p className="text-sm text-muted">Nessuna caratteristica trovata.</p>
+          )}
+          {features.map((feature) => (
+            <div key={`${feature.name}-${feature.level}`}>
+              <p className="text-sm font-bold text-foreground mb-1.5">
+                <span className="text-accent-strong">Liv. {feature.level}</span> ·{" "}
+                <DualName text={feature.name} inline />
+              </p>
+              <EntriesBlock entries={feature.entries} language={language} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

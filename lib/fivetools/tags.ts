@@ -33,6 +33,12 @@ function resolveTag(tag: string, content: string): string {
       return parts[0] ? `(Recharge ${parts[0]}-6)` : "(Recharge 6)";
     case "chance":
       return `${parts[0]}%`;
+    // Tag dove i segmenti dopo il primo sono metadati di collegamento (capitolo, filtri di
+    // ricerca...), non un testo alternativo da mostrare: qui va sempre mostrato il primo.
+    case "book":
+    case "filter":
+    case "link":
+      return parts[0];
     default:
       return parts.length >= 3 ? parts[parts.length - 1] : parts[0];
   }
