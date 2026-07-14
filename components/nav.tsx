@@ -9,6 +9,7 @@ const links = [
   { href: "/campagne", label: "Campagne", icon: "🗺️" },
   { href: "/personaggi", label: "Personaggi", icon: "🛡️" },
   { href: "/dadi", label: "Dadi", icon: "🎲" },
+  { href: "/compendio", label: "Compendio", icon: "📖" },
 ];
 
 export function Nav() {
@@ -46,7 +47,7 @@ export function Nav() {
       </header>
 
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-edge bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {links.map((link) => (
             <Link
               key={link.href}

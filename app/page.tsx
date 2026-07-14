@@ -26,12 +26,12 @@ const sections = [
     ready: true,
   },
   {
-    href: "/",
+    href: "/compendio",
     icon: "📖",
     title: "Compendio",
     description:
-      "Incantesimi, mostri e oggetti magici consultabili al volo. In arrivo!",
-    ready: false,
+      "Incantesimi, mostri e oggetti magici consultabili al volo, via Open5e.",
+    ready: true,
   },
 ];
 
