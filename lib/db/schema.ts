@@ -9,6 +9,7 @@ import {
   pgEnum,
   jsonb,
   unique,
+  boolean,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 import type { Ability, ClassEntry } from "@/lib/dnd";

@@ -286,7 +286,7 @@ export default function CompendiumPage() {
                   className="w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3"
                 >
                   <span className="font-bold text-foreground">
-                    <LocalizedName text={entry.name} language={language} />
+                    <DualName text={entry.name} />
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
                     <EntrySubtitle kind={kind} entry={entry} />
@@ -323,11 +323,27 @@ export default function CompendiumPage() {
   );
 }
 
-/** Nome nella lingua scelta: in inglese è quello originale, in italiano è tradotto al volo. */
-function LocalizedName({ text, language }: { text: string; language: Language }) {
-  const translated = useTranslatedText(language === "it" ? text : undefined, "en", "it");
-  if (language === "en") return <>{text}</>;
-  return <>{translated ?? text}</>;
+/**
+ * Nomi (a differenza delle descrizioni) sono corti: mostrarli in entrambe le lingue insieme
+ * non confonde, anzi aiuta a riconoscere il termine — a differenza dei paragrafi lunghi,
+ * dove inglese e italiano mischiati diventano illeggibili (da cui lo switch su EntriesBlock).
+ */
+function DualName({ text, inline = false }: { text: string; inline?: boolean }) {
+  const translated = useTranslatedText(text, "en", "it");
+  if (!translated || translated.toLowerCase() === text.toLowerCase()) return <>{text}</>;
+  if (inline) {
+    return (
+      <>
+        {text} <span className="text-muted font-normal">({translated})</span>
+      </>
+    );
+  }
+  return (
+    <>
+      {text}
+      <span className="block text-xs font-normal text-muted">{translated}</span>
+    </>
+  );
 }
 
 /** Corpo del testo (entries) nella lingua scelta: inglese formattato ricco, oppure italiano tradotto in blocchi semplici. */
@@ -436,7 +452,7 @@ function EntryDetail({
       </button>
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-2xl font-display font-bold text-accent-strong">
-          <LocalizedName text={entry.name} language={language} />
+          <DualName text={entry.name} />
         </h2>
         <SourceBadge source={entry.source} books={books} />
       </div>
@@ -453,7 +469,7 @@ function EntryDetail({
           language={language}
         />
       )}
-      {kind === "classi" && <ClassDetail cls={entry as RawClass} language={language} />}
+      {kind === "classi" && <ClassDetail cls={entry as RawClass} />}
     </div>
   );
 }
@@ -548,7 +564,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
             {list.map((item, index) => (
               <div key={`${item.name}-${index}`}>
                 <p className="text-sm font-bold text-foreground">
-                  <LocalizedName text={item.name} language={language} />
+                  <DualName text={item.name} inline />
                 </p>
                 <EntriesBlock entries={item.entries} language={language} />
               </div>
@@ -632,7 +648,7 @@ const CLASS_ABILITY_NAMES: Record<string, string> = {
   cha: "Carisma",
 };
 
-function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
+function ClassDetail({ cls }: { cls: RawClass }) {
   const [subclasses, setSubclasses] = useState<RawSubclass[] | null>(null);
 
   useEffect(() => {
@@ -681,7 +697,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
                 key={sub.name}
                 className="rounded-full border border-edge bg-surface-raised px-3 py-1 text-sm text-foreground"
               >
-                <LocalizedName text={sub.name} language={language} />
+                <DualName text={sub.name} inline />
               </li>
             ))}
           </ul>
