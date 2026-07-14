@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { signIn, signOut, useSession } from "next-auth/react";
 
 const links = [
   { href: "/", label: "Home", icon: "🏰" },
@@ -43,6 +44,9 @@ export function Nav() {
               </Link>
             ))}
           </nav>
+          <div className="ml-auto">
+            <AccountButton />
+          </div>
         </div>
       </header>
 
@@ -63,5 +67,41 @@ export function Nav() {
         </div>
       </nav>
     </>
+  );
+}
+
+function AccountButton() {
+  const { data: session, status } = useSession();
+
+  if (status === "loading") return null;
+
+  if (!session?.user) {
+    return (
+      <button
+        onClick={() => signIn("google")}
+        className="text-sm rounded-md border border-edge px-3 py-1.5 text-muted hover:text-foreground hover:border-accent/50 transition-colors"
+      >
+        Accedi con Google
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => signOut()}
+      className="flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
+      title="Esci"
+    >
+      {session.user.image && (
+        <Image
+          src={session.user.image}
+          alt=""
+          width={24}
+          height={24}
+          className="rounded-full"
+        />
+      )}
+      <span className="hidden md:inline">{session.user.name}</span>
+    </button>
   );
 }

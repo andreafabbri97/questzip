@@ -56,26 +56,6 @@ export function totalLevel(classi: ClassEntry[]): number {
   return classi.reduce((sum, entry) => sum + entry.livello, 0);
 }
 
-export const sessionNoteSchema = z.object({
-  id: z.string(),
-  data: z.string(),
-  titolo: z.string(),
-  testo: z.string(),
-});
-
-export type SessionNote = z.infer<typeof sessionNoteSchema>;
-
-export const campaignSchema = z.object({
-  id: z.string(),
-  nome: z.string().min(1),
-  descrizione: z.string(),
-  master: z.string(),
-  giocatori: z.array(z.string()),
-  sessioni: z.array(sessionNoteSchema),
-});
-
-export type Campaign = z.infer<typeof campaignSchema>;
-
 export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
@@ -168,13 +148,3 @@ export function calculateMulticlassHitPoints(
   return Math.max(1, total);
 }
 
-export function newCampaign(): Campaign {
-  return {
-    id: crypto.randomUUID(),
-    nome: "",
-    descrizione: "",
-    master: "",
-    giocatori: [],
-    sessioni: [],
-  };
-}
