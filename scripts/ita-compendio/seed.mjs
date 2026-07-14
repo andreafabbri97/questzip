@@ -95,7 +95,12 @@ async function seedMostri(bookKey) {
 
 async function main() {
   await seedIncantesimi("phb");
+  await seedIncantesimi("tasha");
+  await seedIncantesimi("xanathar");
   await seedMostri("mm");
+  // multiverso/fizban/bigby/dragonlance/ravenloft: NON caricati, l'incrocio con l'inglese ha
+  // rivelato tassi di errore troppo alti (formato del libro troppo diverso da quello del
+  // Manuale dei Mostri) — richiederebbero un lavoro di rifinitura dedicato per libro
   console.log("Fatto.");
 }
 

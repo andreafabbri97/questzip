@@ -63,6 +63,9 @@ const NAME_FIXES = new Map([
   ["c omunione con la natura", "Comunione con la Natura"],
   ["scrigno segreto d i leomund", "Scrigno Segreto di Leomund"],
   ["respirare sott'acq.ua", "Respirare Sott'Acqua"],
+  ["evocaa immondo", "Evoca Immondo"],
+  ["evoca non mortto", "Evoca Non Morto"],
+  ["parola del p otere d olore", "Parola del Potere Dolore"],
 ]);
 
 function titleCaseItalian(raw) {

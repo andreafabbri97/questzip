@@ -27,6 +27,11 @@ const SIZES = [
 const SIZE_TYPE_RE = new RegExp(
   `^([A-Za-zÀ-ÿ/][A-Za-zÀ-ÿ\\s/'\\-]*?)\\s+(${SIZES.join("|")})\\s*(\\([^)]*\\))?,\\s*(.+)$`,
 );
+// variante usata in alcuni libri: "Umanoide di taglia Media" (senza virgola/allineamento)
+const SIZE_TYPE_ALT_RE = new RegExp(
+  `^([A-Za-zÀ-ÿ/][A-Za-zÀ-ÿ\\s/'\\-]*?)\\s+di taglia\\s+(${SIZES.join("|")})\\s*(\\([^)]*\\))?,?\\s*(.*)$`,
+  "i",
+);
 const ALIGNMENT_HINT_RE = /(legale|caotic|neutral|bene|buon|malvagi|allineamento)/i;
 
 const ABILITY_KEYS = ["FOR", "DES", "COS", "INT", "SAG", "CAR"];
@@ -44,19 +49,21 @@ function normalizeModifier(raw) {
   return cleaned.startsWith("+") || cleaned.startsWith("-") ? cleaned : `+${cleaned}`;
 }
 
-const CHALLENGE_RE = /^Sfida\s+([\d/]+)\s*\(\s*([\d.,]+)\s*PE\)/i;
+// "Sfida -" (senza PE) è usata per PNG/creature senza minaccia in alcuni libri
+const CHALLENGE_RE = /^Sfida\s+([\d/]+|-)\s*(?:\(\s*([\d.,]+)\s*PE\))?/i;
 
+// alcuni libri usano "Lingue"/minuscole invece di "Linguaggi"/maiuscole: alias + case-insensitive
 const OPTIONAL_FIELD_LABELS = [
-  "Tiri Salvezza",
+  "Tiri Salvezza|Tiri salvezza",
   "Abilità",
   "Vulnerabilità ai Danni",
   "Resistenza ai Danni",
   "Immunità ai Danni",
   "Immunità alle Condizioni",
   "Sensi",
-  "Linguaggi",
+  "Linguaggi|Lingue",
 ];
-const OPTIONAL_FIELD_RE = new RegExp(`^(${OPTIONAL_FIELD_LABELS.join("|")})\\s+(.*)$`);
+const OPTIONAL_FIELD_RE = new RegExp(`^(${OPTIONAL_FIELD_LABELS.join("|")})\\s+(.*)$`, "i");
 
 const SECTION_HEADING_RE = /^(AZIONI LEGGENDARIE|AZIONI DA MITO|AZIONI|REAZIONI|TRATTI)$/;
 
@@ -78,10 +85,11 @@ function loadLines(bookKey) {
   return { lines, nome: raw.nome };
 }
 
-// confronta una riga con un'etichetta nota tollerando lo scambio l/1 e o/0 visto ovunque nel
-// testo estratto (es. "C1asse Armatura" invece di "Classe Armatura")
+// confronta una riga con un'etichetta nota tollerando lo scambio l/1 e o/0 (es. "C1asse
+// Armatura") e le maiuscole/minuscole (alcuni libri usano "Punti ferita" invece di "Punti Ferita")
 function lineStartsWithLabel(line, label) {
-  return line.replace(/1/g, "l").replace(/0/g, "o").startsWith(label);
+  const normalized = line.replace(/1/g, "l").replace(/0/g, "o").toLowerCase();
+  return normalized.startsWith(label.toLowerCase());
 }
 
 function findChallengeAnchors(lines) {
@@ -96,8 +104,13 @@ function findChallengeAnchors(lines) {
 /** Cerca all'indietro da un'ancora "Sfida" la riga taglia/tipo/allineamento e il nome sopra di essa. */
 function findHeaderStart(lines, challengeLineIndex) {
   for (let i = challengeLineIndex - 1; i >= 0 && i > challengeLineIndex - 40; i--) {
-    const m = lines[i].match(SIZE_TYPE_RE);
-    if (!m || !ALIGNMENT_HINT_RE.test(m[4])) continue;
+    const standard = lines[i].match(SIZE_TYPE_RE);
+    const alt = !standard ? lines[i].match(SIZE_TYPE_ALT_RE) : null;
+    const m = standard ?? alt;
+    if (!m) continue;
+    // la variante standard richiede una parola di allineamento plausibile; la variante "di
+    // taglia" (senza virgola) è già abbastanza specifica di per sé, l'allineamento è opzionale
+    if (standard && !ALIGNMENT_HINT_RE.test(m[4])) continue;
 
     // conferma che sia una vera scheda mostro e non una frase di testo narrativo che per
     // coincidenza combacia col pattern taglia/tipo/allineamento: dev'esserci "Classe Armatura"
@@ -198,7 +211,11 @@ function parseBook(bookKey) {
       const line = lines[cursor];
       const m = line.match(OPTIONAL_FIELD_RE);
       if (m) {
-        optional[m[1]] = m[2];
+        const canonical =
+          /^tiri salvezza/i.test(m[1]) ? "Tiri Salvezza"
+          : /^ling/i.test(m[1]) ? "Linguaggi"
+          : m[1];
+        optional[canonical] = m[2];
         cursor++;
       } else {
         // riga di continuazione del campo precedente (liste lunghe su più righe)
