@@ -46,7 +46,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AuthSessionProvider>
           <Nav />
-          <main className="flex-1 w-full max-w-5xl mx-auto px-4 pb-24 pt-6 sm:pb-10">
+          <main className="flex-1 w-full max-w-5xl 2xl:max-w-[1600px] mx-auto px-4 pb-24 pt-6 sm:pb-10">
             {children}
           </main>
         </AuthSessionProvider>

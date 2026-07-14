@@ -200,7 +200,7 @@ export default function CompendiumPage() {
   const results = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-6xl 2xl:max-w-[1500px] mx-auto">
       <div>
         <h1 className="text-3xl font-bold text-accent-strong">Compendio</h1>
         <p className="text-sm text-muted mt-1">

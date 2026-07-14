@@ -22,7 +22,7 @@ export function Nav() {
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-edge bg-background/85 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-6">
+        <div className="max-w-5xl 2xl:max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/icon.svg" alt="" width={28} height={28} />
             <span className="font-display text-lg font-bold tracking-wide text-accent-strong">

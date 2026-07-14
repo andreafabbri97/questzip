@@ -330,7 +330,7 @@ function CampaignDetailView({
   };
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
           ← Campagne

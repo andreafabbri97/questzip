@@ -48,7 +48,7 @@ export default function Home() {
         </p>
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4">
         {sections.map((section) =>
           section.ready ? (
             <Link
