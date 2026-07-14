@@ -301,7 +301,7 @@ export default function CompendiumPage() {
         className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
       />
 
-      <div className="lg:grid lg:grid-cols-[360px_1fr] lg:gap-6 lg:items-start">
+      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[440px_1fr] lg:gap-6 lg:items-start">
         <div className={selected ? "hidden lg:block space-y-2" : "space-y-2"}>
           {loadingCategory && (
             <p className="text-sm text-muted text-center py-6">Caricamento contenuti in corso…</p>
@@ -359,7 +359,7 @@ export default function CompendiumPage() {
           )}
         </div>
 
-        <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>
+        <div className={selected ? "min-w-0 2xl:max-w-3xl" : "hidden lg:block min-w-0 2xl:max-w-3xl"}>
           {selected ? (
             <EntryDetail
               kind={kind}
