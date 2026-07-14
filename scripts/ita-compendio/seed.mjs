@@ -10,6 +10,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq } from "drizzle-orm";
 import {
+  compendioItaClassi,
   compendioItaIncantesimi,
   compendioItaMostri,
   compendioItaRazze,
@@ -116,6 +117,30 @@ async function seedRazze(bookKey) {
   console.log(`${races.length} razze caricate da ${bookKey}.`);
 }
 
+async function seedClassi(bookKey) {
+  const filePath = path.join(PARSED_DIR, `${bookKey}-classi-merged.json`);
+  const classes = JSON.parse(readFileSync(filePath, "utf-8"));
+
+  await db.delete(compendioItaClassi).where(eq(compendioItaClassi.fonte, bookKey));
+  for (const c of classes) {
+    await db.insert(compendioItaClassi).values({
+      nome: c.nome,
+      dadoVita: c.dadoVita,
+      puntiFerita1Livello: c.puntiFerita1Livello,
+      puntiFeritaSuccessivi: c.puntiFeritaSuccessivi,
+      armature: c.armature,
+      armi: c.armi,
+      strumenti: c.strumenti,
+      tiriSalvezza: c.tiriSalvezza,
+      abilita: c.abilita,
+      equipaggiamento: c.equipaggiamento,
+      tabellaLivelli: c.tabellaLivelli,
+      fonte: c.fonte,
+    });
+  }
+  console.log(`${classes.length} classi caricate da ${bookKey}.`);
+}
+
 async function main() {
   await seedIncantesimi("phb");
   await seedIncantesimi("tasha");
@@ -124,6 +149,7 @@ async function main() {
     await seedMostri(book);
   }
   await seedRazze("phb");
+  await seedClassi("phb");
   console.log("Fatto.");
 }
 

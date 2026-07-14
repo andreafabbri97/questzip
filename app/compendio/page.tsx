@@ -30,7 +30,12 @@ import { flattenEntries, RenderEntries, type FiveEntry } from "@/lib/fivetools/e
 import { translateBatch, translateText, useTranslatedText } from "@/lib/fivetools/translate";
 import { stripTags } from "@/lib/fivetools/tags";
 import { FlagIcon } from "@/components/flag-icon";
-import { getIncantesimiIta, getMostriIta, getRazzeIta } from "@/app/actions/compendio-ita";
+import {
+  getClassiIta,
+  getIncantesimiIta,
+  getMostriIta,
+  getRazzeIta,
+} from "@/app/actions/compendio-ita";
 
 // cache in memoria per la durata della pagina: gli elenchi sono piccoli, non serve rifetcharli
 // ogni volta che si seleziona un'altra scheda
@@ -48,6 +53,11 @@ let itaRazzePromise: ReturnType<typeof getRazzeIta> | null = null;
 function loadRazzeIta() {
   if (!itaRazzePromise) itaRazzePromise = getRazzeIta();
   return itaRazzePromise;
+}
+let itaClassiPromise: ReturnType<typeof getClassiIta> | null = null;
+function loadClassiIta() {
+  if (!itaClassiPromise) itaClassiPromise = getClassiIta();
+  return itaClassiPromise;
 }
 
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
@@ -918,6 +928,10 @@ function buildTableColumns(cls: RawClass) {
 
 function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   const [classData, setClassData] = useState<ClassData | null>(null);
+  const translatedName = useTranslatedText(cls.name, "en", "it");
+  const [itaClassi, setItaClassi] = useState<Awaited<ReturnType<typeof getClassiIta>> | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -928,6 +942,70 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (language !== "it") return;
+    let cancelled = false;
+    loadClassiIta().then((data) => {
+      if (!cancelled) setItaClassi(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  const ufficiale = useMemo(() => {
+    if (language !== "it" || !itaClassi || !translatedName) return null;
+    const target = normalizeItaName(translatedName);
+    const match = itaClassi.find((c) => normalizeItaName(c.nome) === target);
+    if (!match || Object.keys(match.tabellaLivelli).length === 0) return null;
+    return match;
+  }, [language, itaClassi, translatedName]);
+
+  if (ufficiale) {
+    const livelli = Object.entries(ufficiale.tabellaLivelli)
+      .map(([livello, dati]) => ({ livello: Number(livello), ...dati }))
+      .sort((a, b) => a.livello - b.livello);
+    return (
+      <>
+        <p className="text-xs font-bold text-accent-strong">
+          📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Stat label="Dado vita" value={ufficiale.dadoVita} />
+          <Stat label="Armature" value={ufficiale.armature} />
+          <Stat label="Armi" value={ufficiale.armi} />
+          <Stat label="Strumenti" value={ufficiale.strumenti} />
+          <Stat label="Tiri salvezza" value={ufficiale.tiriSalvezza} />
+          <Stat label="Abilità" value={ufficiale.abilita} />
+        </div>
+        {ufficiale.equipaggiamento && (
+          <p className="text-sm text-muted">{ufficiale.equipaggiamento}</p>
+        )}
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">Progressione</p>
+          <p className="text-xs text-muted">
+            Tabella ricostruita dal PDF: alcuni livelli senza nuovi privilegi non sono mostrati.
+          </p>
+          <div className="space-y-1.5">
+            {livelli
+              .filter((l) => l.privilegi.length > 0)
+              .map((l) => (
+                <div
+                  key={l.livello}
+                  className="flex items-start gap-3 rounded-lg border border-edge bg-surface-raised px-3 py-2"
+                >
+                  <span className="text-sm font-bold text-accent-strong shrink-0 w-16">
+                    Liv. {l.livello}
+                  </span>
+                  <span className="text-sm text-foreground">{l.privilegi.join(", ")}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   if (!classData) {
     return <p className="text-sm text-muted">Caricamento…</p>;

@@ -289,3 +289,26 @@ export const compendioItaRazze = pgTable("compendio_ita_razza", {
     .notNull(),
   fonte: text("fonte").notNull(),
 });
+
+interface ClasseLivello {
+  bonusCompetenza: string;
+  privilegi: string[];
+}
+
+// tabellaLivelli è vuota per le classi con colonne extra (incantesimi) dove l'estrazione
+// geometrica della tabella non è affidabile (vedi scripts/ita-compendio/extract_class_table.py)
+export const compendioItaClassi = pgTable("compendio_ita_classe", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nome: text("nome").notNull(),
+  dadoVita: text("dado_vita"),
+  puntiFerita1Livello: text("punti_ferita_1_livello"),
+  puntiFeritaSuccessivi: text("punti_ferita_successivi"),
+  armature: text("armature"),
+  armi: text("armi"),
+  strumenti: text("strumenti"),
+  tiriSalvezza: text("tiri_salvezza"),
+  abilita: text("abilita"),
+  equipaggiamento: text("equipaggiamento"),
+  tabellaLivelli: jsonb("tabella_livelli").$type<Record<string, ClasseLivello>>().notNull(),
+  fonte: text("fonte").notNull(),
+});

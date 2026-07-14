@@ -41,6 +41,7 @@ yarn-error.log*
 /scripts/ita-compendio/extracted/
 /scripts/ita-compendio/parsed/
 /scripts/ita-compendio/translate-cache.json
+/scripts/ita-compendio/__pycache__/
 
 # typescript
 *.tsbuildinfo
