@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { compendioItaIncantesimi, compendioItaMostri } from "@/lib/db/schema";
+import { compendioItaIncantesimi, compendioItaMostri, compendioItaRazze } from "@/lib/db/schema";
 
 async function requireAuth() {
   const session = await auth();
@@ -17,4 +17,9 @@ export async function getIncantesimiIta() {
 export async function getMostriIta() {
   await requireAuth();
   return db.select().from(compendioItaMostri);
+}
+
+export async function getRazzeIta() {
+  await requireAuth();
+  return db.select().from(compendioItaRazze);
 }

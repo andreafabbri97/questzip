@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import {
   compendioItaIncantesimi,
   compendioItaMostri,
+  compendioItaRazze,
 } from "../../lib/db/schema.ts";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -93,11 +94,29 @@ async function seedMostri(bookKey) {
   console.log(`${monsters.length} mostri caricati da ${bookKey}.`);
 }
 
+async function seedRazze(bookKey) {
+  const filePath = path.join(PARSED_DIR, `${bookKey}-razze.json`);
+  const races = JSON.parse(readFileSync(filePath, "utf-8"));
+
+  await db.delete(compendioItaRazze).where(eq(compendioItaRazze.fonte, bookKey));
+  for (const r of races) {
+    await db.insert(compendioItaRazze).values({
+      nome: r.nome,
+      introduzione: r.introduzione,
+      tratti: r.tratti,
+      sottorazze: r.sottorazze,
+      fonte: r.fonte,
+    });
+  }
+  console.log(`${races.length} razze caricate da ${bookKey}.`);
+}
+
 async function main() {
   await seedIncantesimi("phb");
   await seedIncantesimi("tasha");
   await seedIncantesimi("xanathar");
   await seedMostri("mm");
+  await seedRazze("phb");
   // multiverso/fizban/bigby/dragonlance/ravenloft: NON caricati, l'incrocio con l'inglese ha
   // rivelato tassi di errore troppo alti (formato del libro troppo diverso da quello del
   // Manuale dei Mostri) — richiederebbero un lavoro di rifinitura dedicato per libro

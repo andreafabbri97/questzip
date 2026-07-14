@@ -30,10 +30,10 @@ import { flattenEntries, RenderEntries, type FiveEntry } from "@/lib/fivetools/e
 import { translateBatch, translateText, useTranslatedText } from "@/lib/fivetools/translate";
 import { stripTags } from "@/lib/fivetools/tags";
 import { FlagIcon } from "@/components/flag-icon";
-import { getIncantesimiIta, getMostriIta } from "@/app/actions/compendio-ita";
+import { getIncantesimiIta, getMostriIta, getRazzeIta } from "@/app/actions/compendio-ita";
 
-// cache in memoria per la durata della pagina: i due elenchi (332 + ~235 righe) sono piccoli,
-// non serve rifetcharli ogni volta che si seleziona un'altra scheda
+// cache in memoria per la durata della pagina: gli elenchi sono piccoli, non serve rifetcharli
+// ogni volta che si seleziona un'altra scheda
 let itaSpellsPromise: ReturnType<typeof getIncantesimiIta> | null = null;
 function loadIncantesimiIta() {
   if (!itaSpellsPromise) itaSpellsPromise = getIncantesimiIta();
@@ -43,6 +43,11 @@ let itaMostriPromise: ReturnType<typeof getMostriIta> | null = null;
 function loadMostriIta() {
   if (!itaMostriPromise) itaMostriPromise = getMostriIta();
   return itaMostriPromise;
+}
+let itaRazzePromise: ReturnType<typeof getRazzeIta> | null = null;
+function loadRazzeIta() {
+  if (!itaRazzePromise) itaRazzePromise = getRazzeIta();
+  return itaRazzePromise;
 }
 
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
@@ -807,6 +812,63 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
 }
 
 function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
+  const translatedName = useTranslatedText(race.name, "en", "it");
+  const [itaRazze, setItaRazze] = useState<Awaited<ReturnType<typeof getRazzeIta>> | null>(null);
+
+  useEffect(() => {
+    if (language !== "it") return;
+    let cancelled = false;
+    loadRazzeIta().then((data) => {
+      if (!cancelled) setItaRazze(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  const ufficiale = useMemo(() => {
+    if (language !== "it" || !itaRazze || !translatedName) return null;
+    const target = normalizeItaName(translatedName);
+    return itaRazze.find((r) => normalizeItaName(r.nome) === target) ?? null;
+  }, [language, itaRazze, translatedName]);
+
+  if (ufficiale) {
+    return (
+      <>
+        <p className="text-xs font-bold text-accent-strong">
+          📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
+        </p>
+        {ufficiale.introduzione && (
+          <p className="text-sm text-muted italic">{ufficiale.introduzione}</p>
+        )}
+        <div className="space-y-2">
+          {ufficiale.tratti.map((tratto, index) => (
+            <div key={index} className="rounded-lg border border-edge bg-surface-raised p-3">
+              <p className="text-sm font-bold text-foreground mb-1">{tratto.nome}</p>
+              <p className="text-sm text-foreground leading-relaxed">{tratto.testo}</p>
+            </div>
+          ))}
+        </div>
+        {ufficiale.sottorazze.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-widest text-muted">Sottorazze</p>
+            {ufficiale.sottorazze.map((sottorazza, sIndex) => (
+              <div key={sIndex} className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+                <p className="text-sm font-bold text-accent-strong">{sottorazza.nome}</p>
+                {sottorazza.tratti.map((tratto, tIndex) => (
+                  <div key={tIndex} className="rounded-lg border border-edge bg-surface-raised p-3">
+                    <p className="text-sm font-bold text-foreground mb-1">{tratto.nome}</p>
+                    <p className="text-sm text-foreground leading-relaxed">{tratto.testo}</p>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

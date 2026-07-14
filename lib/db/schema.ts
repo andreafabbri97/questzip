@@ -273,3 +273,19 @@ export const compendioItaMostri = pgTable("compendio_ita_mostro", {
   numericSuspect: boolean("numeric_suspect").notNull().default(false),
   fonte: text("fonte").notNull(),
 });
+
+interface RazzaTratto {
+  nome: string;
+  testo: string;
+}
+
+export const compendioItaRazze = pgTable("compendio_ita_razza", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nome: text("nome").notNull(),
+  introduzione: text("introduzione").notNull().default(""),
+  tratti: jsonb("tratti").$type<RazzaTratto[]>().notNull(),
+  sottorazze: jsonb("sottorazze")
+    .$type<{ nome: string; tratti: RazzaTratto[] }[]>()
+    .notNull(),
+  fonte: text("fonte").notNull(),
+});
