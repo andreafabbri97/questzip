@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 import type { Ability, ClassEntry } from "@/lib/dnd";
+import type { CellType, DungeonRoom } from "@/lib/dungeon";
 
 // --- Tabelle richieste dall'adapter Drizzle di Auth.js ---
 
@@ -109,6 +110,25 @@ export const campaignInvites = pgTable("campaign_invite", {
     .references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { mode: "date" }),
+});
+
+// Dungeon generato proceduralmente: griglia + stanze salvate come jsonb (piccolo, letto/scritto
+// per intero — niente bisogno di normalizzare). Pensato per poter diventare in futuro lo sfondo
+// della lavagna condivisa: coordinate a griglia riusabili per posizionare i token sopra.
+export const campaignDungeons = pgTable("campaign_dungeon", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  nome: text("nome").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  cells: jsonb("cells").$type<CellType[][]>().notNull(),
+  rooms: jsonb("rooms").$type<DungeonRoom[]>().notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 export const campaignSessionNotes = pgTable("campaign_session_note", {

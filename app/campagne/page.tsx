@@ -27,6 +27,14 @@ import {
   startEncounter,
   updateCombatant,
 } from "@/app/actions/encounters";
+import {
+  createDungeon,
+  deleteDungeon,
+  getDungeon,
+  getDungeonsForCampaign,
+  updateRoomNotes,
+} from "@/app/actions/dungeons";
+import type { CellType, DungeonConfig, RoomShape } from "@/lib/dungeon";
 import { loadCreatures, type RawCreature } from "@/lib/fivetools/data";
 import {
   abilityModifier,
@@ -43,6 +51,8 @@ import {
 
 type CampaignSummary = Awaited<ReturnType<typeof getMyCampaigns>>[number];
 type CampaignDetail = Awaited<ReturnType<typeof getCampaign>>;
+type DungeonListItem = Awaited<ReturnType<typeof getDungeonsForCampaign>>[number];
+type DungeonFull = Awaited<ReturnType<typeof getDungeon>>;
 
 export default function CampaignsPage() {
   return (
@@ -478,6 +488,8 @@ function CampaignDetailView({
         isDm={isDm}
         partyLevels={(party ?? []).map((pc) => totalLevel(pc.classi))}
       />
+
+      <DungeonSection campaignId={campaignId} isDm={isDm} />
 
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
         <h2 className="text-sm uppercase tracking-widest text-muted">Diario delle sessioni</h2>
@@ -950,6 +962,355 @@ function MonsterQuickAdd({ onPick }: { onPick: (name: string, hp: number) => voi
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolean }) {
+  const [dungeons, setDungeons] = useState<DungeonListItem[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [active, setActive] = useState<DungeonFull | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const refreshList = () => {
+    getDungeonsForCampaign(campaignId).then(setDungeons);
+  };
+  useEffect(refreshList, [campaignId]);
+
+  const openDungeon = (id: string) => {
+    setActiveId(id);
+    getDungeon(id).then(setActive);
+  };
+
+  const refreshActive = () => {
+    if (activeId) getDungeon(activeId).then(setActive);
+  };
+
+  if (dungeons === null) return null;
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">🗺️ Dungeon</h2>
+        {isDm && (
+          <button
+            onClick={() => setShowForm((prev) => !prev)}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            {showForm ? "Annulla" : "+ Genera dungeon"}
+          </button>
+        )}
+      </div>
+
+      {showForm && isDm && (
+        <NewDungeonForm
+          campaignId={campaignId}
+          onCreated={(dungeon) => {
+            setShowForm(false);
+            refreshList();
+            openDungeon(dungeon.id);
+          }}
+        />
+      )}
+
+      {dungeons.length === 0 ? (
+        <p className="text-sm text-muted">Nessun dungeon ancora.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {dungeons.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => openDungeon(d.id)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+                activeId === d.id
+                  ? "border-accent bg-accent/15 text-accent-strong"
+                  : "border-edge bg-surface-raised text-muted hover:text-foreground"
+              }`}
+            >
+              {d.nome}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {active && (
+        <DungeonViewer
+          dungeon={active}
+          isDm={isDm}
+          onDeleted={() => {
+            setActiveId(null);
+            setActive(null);
+            refreshList();
+          }}
+          onRoomUpdated={refreshActive}
+        />
+      )}
+    </section>
+  );
+}
+
+function NewDungeonForm({
+  campaignId,
+  onCreated,
+}: {
+  campaignId: string;
+  onCreated: (dungeon: { id: string }) => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [minRooms, setMinRooms] = useState(5);
+  const [maxRooms, setMaxRooms] = useState(10);
+  const [shape, setShape] = useState<RoomShape>("rectangular");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generate = async () => {
+    if (minRooms < 1 || maxRooms < minRooms) {
+      setError("Numero di stanze non valido.");
+      return;
+    }
+    setGenerating(true);
+    setError(null);
+    try {
+      const config: DungeonConfig = { minRooms, maxRooms, shape };
+      const dungeon = await createDungeon(campaignId, nome.trim(), config);
+      setNome("");
+      onCreated(dungeon);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+      <input
+        value={nome}
+        onChange={(event) => setNome(event.target.value)}
+        placeholder="Nome (es. Cripta sotto la torre)"
+        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          Stanze min
+          <input
+            type="number"
+            min={1}
+            max={40}
+            value={minRooms}
+            onChange={(event) => setMinRooms(Number(event.target.value) || 1)}
+            className="w-14 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          max
+          <input
+            type="number"
+            min={1}
+            max={40}
+            value={maxRooms}
+            onChange={(event) => setMaxRooms(Number(event.target.value) || 1)}
+            className="w-14 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <div className="flex gap-1.5">
+          {(["rectangular", "organic"] as RoomShape[]).map((option) => (
+            <button
+              key={option}
+              onClick={() => setShape(option)}
+              className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                shape === option
+                  ? "border-accent bg-accent/15 text-accent-strong"
+                  : "border-edge bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              {option === "rectangular" ? "Rettangolari" : "Organiche"}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={generate}
+          disabled={generating}
+          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        >
+          {generating ? "Genero…" : "🎲 Genera"}
+        </button>
+      </div>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+function DungeonViewer({
+  dungeon,
+  isDm,
+  onDeleted,
+  onRoomUpdated,
+}: {
+  dungeon: DungeonFull;
+  isDm: boolean;
+  onDeleted: () => void;
+  onRoomUpdated: () => void;
+}) {
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const selectedRoom = dungeon.rooms.find((room) => room.id === selectedRoomId) ?? null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted">
+          {dungeon.rooms.length} stanze · {dungeon.width}×{dungeon.height}
+        </p>
+        {isDm && (
+          <button
+            onClick={async () => {
+              if (window.confirm(`Eliminare "${dungeon.nome}"?`)) {
+                await deleteDungeon(dungeon.id);
+                onDeleted();
+              }
+            }}
+            className="text-xs text-danger hover:underline"
+          >
+            Elimina
+          </button>
+        )}
+      </div>
+      <DungeonMap
+        dungeon={dungeon}
+        activeRoomId={selectedRoomId}
+        onRoomClick={(id) => setSelectedRoomId(id === selectedRoomId ? null : id)}
+      />
+      {selectedRoom && isDm && (
+        <RoomNotesEditor
+          key={selectedRoom.id}
+          dungeonId={dungeon.id}
+          room={selectedRoom}
+          onSaved={onRoomUpdated}
+        />
+      )}
+      {selectedRoom && !isDm && (
+        <p className="text-sm text-muted">Stanza {selectedRoom.label}.</p>
+      )}
+    </div>
+  );
+}
+
+function RoomNotesEditor({
+  dungeonId,
+  room,
+  onSaved,
+}: {
+  dungeonId: string;
+  room: DungeonFull["rooms"][number];
+  onSaved: () => void;
+}) {
+  const [encounter, setEncounter] = useState(room.encounter);
+  const [reward, setReward] = useState(room.reward);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    await updateRoomNotes(dungeonId, room.id, { encounter, reward });
+    setSaving(false);
+    onSaved();
+  };
+
+  return (
+    <div className="rounded-lg border border-accent/40 bg-surface-raised p-3 space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">Stanza {room.label}</p>
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-widest text-muted">Incontro</span>
+        <textarea
+          value={encounter}
+          onChange={(event) => setEncounter(event.target.value)}
+          rows={2}
+          placeholder="Es. 2 goblin in agguato dietro le casse"
+          className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        />
+      </label>
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-widest text-muted">Ricompensa</span>
+        <textarea
+          value={reward}
+          onChange={(event) => setReward(event.target.value)}
+          rows={2}
+          placeholder="Es. Pozione di cura, 20 mo"
+          className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        />
+      </label>
+      <button
+        onClick={save}
+        disabled={saving}
+        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+      >
+        {saving ? "…" : "Salva"}
+      </button>
+    </div>
+  );
+}
+
+function DungeonMap({
+  dungeon,
+  activeRoomId,
+  onRoomClick,
+}: {
+  dungeon: { width: number; height: number; cells: CellType[][]; rooms: DungeonFull["rooms"] };
+  activeRoomId: number | null;
+  onRoomClick: (id: number) => void;
+}) {
+  const cellSize = 14;
+  return (
+    <div className="overflow-x-auto rounded-lg border border-edge bg-background p-2">
+      <svg
+        viewBox={`0 0 ${dungeon.width * cellSize} ${dungeon.height * cellSize}`}
+        width={dungeon.width * cellSize}
+        height={dungeon.height * cellSize}
+        className="max-w-full h-auto"
+        shapeRendering="crispEdges"
+      >
+        {dungeon.cells.map((row, y) =>
+          row.map((cell, x) => {
+            if (cell === "wall" || cell === "floor") return null;
+            return (
+              <rect
+                key={`${x}-${y}`}
+                x={x * cellSize}
+                y={y * cellSize}
+                width={cellSize}
+                height={cellSize}
+                fill={cell === "door" ? "#e0a83e" : "#2a241e"}
+              />
+            );
+          }),
+        )}
+        {dungeon.rooms.map((room) => (
+          <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
+            {room.cells.map(([x, y], index) => (
+              <rect
+                key={index}
+                x={x * cellSize}
+                y={y * cellSize}
+                width={cellSize}
+                height={cellSize}
+                fill={activeRoomId === room.id ? "#e0a83e33" : "#241f1a"}
+                stroke={activeRoomId === room.id ? "#e0a83e" : "#3b322a"}
+                strokeWidth={0.5}
+              />
+            ))}
+            <text
+              x={room.centerX * cellSize + cellSize / 2}
+              y={room.centerY * cellSize + cellSize / 2}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={cellSize * 0.75}
+              fill="#ece5da"
+              className="pointer-events-none select-none font-bold"
+            >
+              {room.label}
+            </text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 }
