@@ -139,7 +139,7 @@ export default function CharactersPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-accent-strong">Personaggi</h1>
         <button
@@ -161,12 +161,12 @@ export default function CharactersPage() {
           <p>Nessun personaggio ancora. Crea il tuo primo eroe!</p>
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {items.map((character) => (
             <li key={character.id}>
               <button
                 onClick={() => setEditingId(character.id)}
-                className="w-full text-left rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
+                className="w-full h-full text-left rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-foreground">
@@ -223,7 +223,7 @@ function CharacterSheet({
   const labelClass = "text-xs uppercase tracking-widest text-muted";
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
           ← Personaggi
@@ -240,72 +240,75 @@ function CharacterSheet({
         </button>
       </div>
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
-        <label className="block">
-          <span className={labelClass}>Nome</span>
-          <input
-            value={character.nome}
-            onChange={(event) => set("nome", event.target.value)}
-            placeholder="Es. Thorin Scudodiquercia"
-            className={`${inputClass} text-lg font-bold`}
-          />
-        </label>
-        <label className="block">
-          <span className={labelClass}>Razza</span>
-          <Autocomplete
-            value={character.razza}
-            onChange={(value) => set("razza", value)}
-            loader={loadRaces}
-            placeholder="Elf, Dwarf, Halfling…"
-            inputClassName={inputClass}
-          />
-        </label>
-      </section>
+      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+        <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+          <label className="block">
+            <span className={labelClass}>Nome</span>
+            <input
+              value={character.nome}
+              onChange={(event) => set("nome", event.target.value)}
+              placeholder="Es. Thorin Scudodiquercia"
+              className={`${inputClass} text-lg font-bold`}
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Razza</span>
+            <Autocomplete
+              value={character.razza}
+              onChange={(value) => set("razza", value)}
+              loader={loadRaces}
+              placeholder="Elf, Dwarf, Halfling…"
+              inputClassName={inputClass}
+            />
+          </label>
+        </section>
+
+        <section className="rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm uppercase tracking-widest text-muted">
+              Classi {character.classi.length > 1 && "(multiclasse)"}
+            </h2>
+            <button
+              onClick={() =>
+                set("classi", [...character.classi, { nome: "", livello: 1 }])
+              }
+              className="text-xs font-bold text-accent-strong hover:underline"
+            >
+              + Aggiungi classe
+            </button>
+          </div>
+          {character.classi.map((entry, index) => (
+            <ClassRow
+              key={index}
+              entry={entry}
+              isPrimary={index === 0}
+              onChange={(next) =>
+                set(
+                  "classi",
+                  character.classi.map((c, i) => (i === index ? next : c)),
+                )
+              }
+              onRemove={() =>
+                set(
+                  "classi",
+                  character.classi.filter((_, i) => i !== index),
+                )
+              }
+              canRemove={character.classi.length > 1}
+            />
+          ))}
+          <p className="text-sm text-muted">
+            Livello totale {totalLevel(character.classi)} · Bonus di competenza:{" "}
+            <span className="font-bold text-accent-strong">
+              {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
+            </span>
+          </p>
+        </section>
+      </div>
 
       <CampaignSync character={character} />
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm uppercase tracking-widest text-muted">
-            Classi {character.classi.length > 1 && "(multiclasse)"}
-          </h2>
-          <button
-            onClick={() =>
-              set("classi", [...character.classi, { nome: "", livello: 1 }])
-            }
-            className="text-xs font-bold text-accent-strong hover:underline"
-          >
-            + Aggiungi classe
-          </button>
-        </div>
-        {character.classi.map((entry, index) => (
-          <ClassRow
-            key={index}
-            entry={entry}
-            isPrimary={index === 0}
-            onChange={(next) =>
-              set(
-                "classi",
-                character.classi.map((c, i) => (i === index ? next : c)),
-              )
-            }
-            onRemove={() =>
-              set(
-                "classi",
-                character.classi.filter((_, i) => i !== index),
-              )
-            }
-            canRemove={character.classi.length > 1}
-          />
-        ))}
-        <p className="text-sm text-muted">
-          Livello totale {totalLevel(character.classi)} · Bonus di competenza:{" "}
-          <span className="font-bold text-accent-strong">
-            {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
-          </span>
-        </p>
-      </section>
-
+      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="rounded-xl border border-edge bg-surface p-5">
         <h2 className="text-sm uppercase tracking-widest text-muted mb-4">
           Punti ferita e difesa
@@ -395,7 +398,10 @@ function CharacterSheet({
         <HitPointCalculator character={character} onApply={(hpMax) => onChange({ ...character, hpMax, hpAttuali: hpMax })} />
       </section>
 
-      <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} clampInt={clampInt} />
+      <div className="mt-6 lg:mt-0">
+        <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} clampInt={clampInt} />
+      </div>
+      </div>
 
       <section className="rounded-xl border border-edge bg-surface p-5">
         <label className="block">

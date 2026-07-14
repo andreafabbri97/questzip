@@ -28,7 +28,18 @@ import {
   updateCombatant,
 } from "@/app/actions/encounters";
 import { loadCreatures, type RawCreature } from "@/lib/fivetools/data";
-import { abilityModifier, formatModifier, totalLevel, type Ability } from "@/lib/dnd";
+import {
+  abilityModifier,
+  adjustedEncounterXp,
+  DIFFICULTY_LABELS,
+  encounterMultiplier,
+  formatModifier,
+  totalLevel,
+  xpBudget,
+  XP_BY_CR,
+  type Ability,
+  type EncounterDifficulty,
+} from "@/lib/dnd";
 
 type CampaignSummary = Awaited<ReturnType<typeof getMyCampaigns>>[number];
 type CampaignDetail = Awaited<ReturnType<typeof getCampaign>>;
@@ -112,7 +123,7 @@ function CampaignsPageInner() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold text-accent-strong">Campagne</h1>
 
       {error && <p className="text-sm text-danger">{error}</p>}
@@ -137,12 +148,12 @@ function CampaignsPageInner() {
           <p>Nessuna campagna ancora. L&apos;avventura ti aspetta!</p>
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {campaigns.map((campaign) => (
             <li key={campaign.id}>
               <button
                 onClick={() => setOpenId(campaign.id)}
-                className="w-full text-left rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
+                className="w-full h-full text-left rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-foreground">{campaign.nome}</span>
@@ -273,7 +284,7 @@ function CampaignDetailView({
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-2xl lg:max-w-3xl mx-auto space-y-4">
         <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
           ← Campagne
         </button>
@@ -305,7 +316,7 @@ function CampaignDetailView({
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
           ← Campagne
@@ -346,6 +357,7 @@ function CampaignDetailView({
         )}
       </section>
 
+      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm uppercase tracking-widest text-muted">Membri</h2>
@@ -408,7 +420,7 @@ function CampaignDetailView({
         </ul>
       </section>
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
         <h2 className="text-sm uppercase tracking-widest text-muted">Party</h2>
         {!party || party.length === 0 ? (
           <p className="text-sm text-muted">
@@ -459,8 +471,13 @@ function CampaignDetailView({
           </ul>
         )}
       </section>
+      </div>
 
-      <EncounterTracker campaignId={campaignId} isDm={isDm} />
+      <EncounterTracker
+        campaignId={campaignId}
+        isDm={isDm}
+        partyLevels={(party ?? []).map((pc) => totalLevel(pc.classi))}
+      />
 
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
         <h2 className="text-sm uppercase tracking-widest text-muted">Diario delle sessioni</h2>
@@ -520,7 +537,15 @@ function CampaignDetailView({
   );
 }
 
-function EncounterTracker({ campaignId, isDm }: { campaignId: string; isDm: boolean }) {
+function EncounterTracker({
+  campaignId,
+  isDm,
+  partyLevels,
+}: {
+  campaignId: string;
+  isDm: boolean;
+  partyLevels: number[];
+}) {
   const [data, setData] = useState<Awaited<ReturnType<typeof getActiveEncounter>>>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -654,7 +679,12 @@ function EncounterTracker({ campaignId, isDm }: { campaignId: string; isDm: bool
       )}
 
       {isDm && (
-        <EncounterDmControls encounter={encounter} campaignId={campaignId} onChange={refresh} />
+        <EncounterDmControls
+          encounter={encounter}
+          campaignId={campaignId}
+          partyLevels={partyLevels}
+          onChange={refresh}
+        />
       )}
       {error && <p className="text-xs text-danger">{error}</p>}
     </section>
@@ -664,10 +694,12 @@ function EncounterTracker({ campaignId, isDm }: { campaignId: string; isDm: bool
 function EncounterDmControls({
   encounter,
   campaignId,
+  partyLevels,
   onChange,
 }: {
   encounter: { id: string };
   campaignId: string;
+  partyLevels: number[];
   onChange: () => void;
 }) {
   const [nome, setNome] = useState("");
@@ -682,7 +714,7 @@ function EncounterDmControls({
   };
 
   return (
-    <div className="border-t border-edge pt-3 space-y-2">
+    <div className="border-t border-edge pt-3 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={async () => {
@@ -700,6 +732,14 @@ function EncounterDmControls({
           }}
         />
       </div>
+
+      {partyLevels.length > 0 && (
+        <EncounterGenerator
+          encounterId={encounter.id}
+          partyLevels={partyLevels}
+          onAdded={onChange}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={nome}
@@ -733,6 +773,122 @@ function EncounterDmControls({
           Aggiungi
         </button>
       </div>
+    </div>
+  );
+}
+
+function EncounterGenerator({
+  encounterId,
+  partyLevels,
+  onAdded,
+}: {
+  encounterId: string;
+  partyLevels: number[];
+  onAdded: () => void;
+}) {
+  const [difficulty, setDifficulty] = useState<EncounterDifficulty>("medio");
+  const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
+  const [suggestion, setSuggestion] = useState<{
+    creature: RawCreature;
+    count: number;
+    totalXp: number;
+  } | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const budget = xpBudget(partyLevels, difficulty);
+
+  const generate = async () => {
+    const pool = creatures ?? (await loadCreatures());
+    if (!creatures) setCreatures(pool);
+
+    const withXp = pool
+      .map((creature) => ({
+        creature,
+        xp: XP_BY_CR[typeof creature.cr === "string" ? creature.cr : (creature.cr?.cr ?? "")],
+      }))
+      .filter((entry): entry is { creature: RawCreature; xp: number } => Boolean(entry.xp));
+
+    if (withXp.length === 0) return;
+
+    const countOptions = [1, 1, 2, 2, 3, 4];
+    const count = countOptions[Math.floor(Math.random() * countOptions.length)];
+    const perMonsterTarget = budget / (count * encounterMultiplier(count));
+
+    let candidates = withXp.filter(
+      (entry) => entry.xp >= perMonsterTarget * 0.4 && entry.xp <= perMonsterTarget * 1.6,
+    );
+    if (candidates.length === 0) {
+      candidates = [...withXp]
+        .sort((a, b) => Math.abs(a.xp - perMonsterTarget) - Math.abs(b.xp - perMonsterTarget))
+        .slice(0, 20);
+    }
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    setSuggestion({ creature: pick.creature, count, totalXp: adjustedEncounterXp(pick.xp, count) });
+  };
+
+  const addToEncounter = async () => {
+    if (!suggestion) return;
+    setAdding(true);
+    const hp = combatantHp(suggestion.creature);
+    for (let i = 0; i < suggestion.count; i++) {
+      await addCombatant(encounterId, {
+        nome:
+          suggestion.count > 1 ? `${suggestion.creature.name} ${i + 1}` : suggestion.creature.name,
+        iniziativa: 10,
+        hpMax: hp,
+      });
+    }
+    setAdding(false);
+    setSuggestion(null);
+    onAdded();
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">Genera incontro casuale</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={difficulty}
+          onChange={(event) => setDifficulty(event.target.value as EncounterDifficulty)}
+          className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+        >
+          {(Object.keys(DIFFICULTY_LABELS) as EncounterDifficulty[]).map((d) => (
+            <option key={d} value={d}>
+              {DIFFICULTY_LABELS[d]}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-muted">
+          Budget: {budget} XP ({partyLevels.length} PG)
+        </span>
+        <button
+          onClick={generate}
+          className="text-xs font-bold rounded-lg border border-edge px-2 py-1.5 text-foreground hover:border-accent transition-colors"
+        >
+          🎲 Genera
+        </button>
+      </div>
+      {suggestion && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-accent/40 bg-surface-raised px-3 py-2">
+          <span className="text-sm text-foreground">
+            {suggestion.count}× <span className="font-bold">{suggestion.creature.name}</span>{" "}
+            <span className="text-xs text-muted">
+              (CR{" "}
+              {typeof suggestion.creature.cr === "string"
+                ? suggestion.creature.cr
+                : suggestion.creature.cr?.cr}{" "}
+              · {suggestion.totalXp} XP)
+            </span>
+          </span>
+          <button
+            onClick={addToEncounter}
+            disabled={adding}
+            className="text-xs font-bold rounded-lg bg-accent text-background px-2 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+          >
+            {adding ? "…" : "+ Aggiungi al combattimento"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

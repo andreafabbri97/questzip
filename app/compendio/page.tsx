@@ -161,7 +161,7 @@ export default function CompendiumPage() {
   const results = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-6xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold text-accent-strong">Compendio</h1>
         <p className="text-sm text-muted mt-1">
@@ -262,16 +262,8 @@ export default function CompendiumPage() {
         className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
       />
 
-      {selected ? (
-        <EntryDetail
-          kind={kind}
-          entry={selected}
-          books={books}
-          language={language}
-          onBack={() => setSelected(null)}
-        />
-      ) : (
-        <div className="space-y-2">
+      <div className="lg:grid lg:grid-cols-[360px_1fr] lg:gap-6 lg:items-start">
+        <div className={selected ? "hidden lg:block space-y-2" : "space-y-2"}>
           {loadingCategory && (
             <p className="text-sm text-muted text-center py-6">Caricamento contenuti in corso…</p>
           )}
@@ -283,12 +275,16 @@ export default function CompendiumPage() {
           {!loadingCategory && categoryData && categoryData.length > 0 && results.length === 0 && (
             <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
           )}
-          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface">
+          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface lg:max-h-[70vh] lg:overflow-y-auto">
             {results.map((entry) => (
               <li key={`${entry.source}-${entry.name}`}>
                 <button
                   onClick={() => setSelected(entry)}
-                  className="w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3"
+                  className={`w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3 ${
+                    selected && selected.source === entry.source && selected.name === entry.name
+                      ? "lg:bg-surface-raised lg:border-l-2 lg:border-accent"
+                      : ""
+                  }`}
                 >
                   <span className="font-bold text-foreground">
                     <DualName text={entry.name} />
@@ -311,7 +307,7 @@ export default function CompendiumPage() {
                 ← Precedente
               </button>
               <span className="text-muted">
-                Pagina {currentPage + 1} di {totalPages} ({filtered.length} risultati)
+                Pag. {currentPage + 1} di {totalPages} ({filtered.length})
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
@@ -323,7 +319,23 @@ export default function CompendiumPage() {
             </div>
           )}
         </div>
-      )}
+
+        <div className={selected ? "" : "hidden lg:block"}>
+          {selected ? (
+            <EntryDetail
+              kind={kind}
+              entry={selected}
+              books={books}
+              language={language}
+              onBack={() => setSelected(null)}
+            />
+          ) : (
+            <div className="flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">
+              <p>Seleziona un elemento dall&apos;elenco per vedere i dettagli.</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -452,7 +464,7 @@ function EntryDetail({
   const meta = books?.get(entry.source);
   return (
     <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
-      <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
+      <button onClick={onBack} className="text-sm text-muted hover:text-foreground lg:hidden">
         ← Risultati
       </button>
       <div className="flex items-start justify-between gap-3">

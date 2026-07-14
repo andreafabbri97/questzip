@@ -148,3 +148,56 @@ export function calculateMulticlassHitPoints(
   return Math.max(1, total);
 }
 
+// --- Costruzione incontri (regole standard 2014 DMG) ---
+
+export type EncounterDifficulty = "facile" | "medio" | "difficile" | "mortale";
+
+export const DIFFICULTY_LABELS: Record<EncounterDifficulty, string> = {
+  facile: "Facile",
+  medio: "Medio",
+  difficile: "Difficile",
+  mortale: "Mortale",
+};
+
+/** Soglie XP per personaggio, per livello (1-20) e difficoltà. */
+const XP_THRESHOLDS: Record<EncounterDifficulty, number[]> = {
+  facile: [25, 50, 75, 125, 250, 300, 350, 450, 550, 600, 800, 1000, 1100, 1250, 1400, 1600, 2000, 2100, 2400, 2800],
+  medio: [50, 100, 150, 250, 500, 600, 750, 900, 1100, 1200, 1600, 2000, 2200, 2500, 2800, 3200, 3900, 4200, 4900, 5700],
+  difficile: [75, 150, 225, 375, 750, 900, 1100, 1400, 1600, 1900, 2400, 3000, 3400, 3800, 4300, 4800, 5900, 6300, 7300, 8500],
+  mortale: [100, 200, 400, 500, 1100, 1400, 1700, 2100, 2400, 2800, 3600, 4500, 5100, 5700, 6400, 7200, 8800, 9500, 10900, 12700],
+};
+
+/** XP per grado sfida (CR), regole standard. */
+export const XP_BY_CR: Record<string, number> = {
+  "0": 10, "1/8": 25, "1/4": 50, "1/2": 100,
+  "1": 200, "2": 450, "3": 700, "4": 1100, "5": 1800,
+  "6": 2300, "7": 2900, "8": 3900, "9": 5000, "10": 5900,
+  "11": 7200, "12": 8400, "13": 10000, "14": 11500, "15": 13000,
+  "16": 15000, "17": 18000, "18": 20000, "19": 22000, "20": 25000,
+  "21": 33000, "22": 41000, "23": 50000, "24": 62000, "25": 75000,
+  "26": 90000, "27": 105000, "28": 120000, "29": 135000, "30": 155000,
+};
+
+/** Moltiplicatore incontro in base al numero di mostri (regole standard). */
+export function encounterMultiplier(monsterCount: number): number {
+  if (monsterCount <= 1) return 1;
+  if (monsterCount === 2) return 1.5;
+  if (monsterCount <= 6) return 2;
+  if (monsterCount <= 10) return 2.5;
+  if (monsterCount <= 14) return 3;
+  return 4;
+}
+
+/** Budget XP totale del party per una data difficoltà (somma delle soglie individuali). */
+export function xpBudget(partyLevels: number[], difficulty: EncounterDifficulty): number {
+  return partyLevels.reduce((sum, level) => {
+    const index = Math.min(20, Math.max(1, level)) - 1;
+    return sum + XP_THRESHOLDS[difficulty][index];
+  }, 0);
+}
+
+/** XP "aggiustato" (con moltiplicatore) di un gruppo di mostri dello stesso CR. */
+export function adjustedEncounterXp(crXp: number, monsterCount: number): number {
+  return crXp * monsterCount * encounterMultiplier(monsterCount);
+}
+
