@@ -131,6 +131,27 @@ export const campaignDungeons = pgTable("campaign_dungeon", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
+// Posizione (in celle di griglia) del segnalino di ogni giocatore sulla lavagna condivisa
+// di un dungeon. Un solo token per utente per dungeon (PK composita). Aggiornata dalla
+// server action upsertMyToken al rilascio del trascinamento; il movimento durante il
+// trascinamento è invece solo un relay realtime (vedi party/campaign-room.ts), non tocca
+// il database a ogni frame.
+export const dungeonTokens = pgTable(
+  "dungeon_token",
+  {
+    dungeonId: uuid("dungeon_id")
+      .notNull()
+      .references(() => campaignDungeons.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.dungeonId, table.userId] })],
+);
+
 export const campaignSessionNotes = pgTable("campaign_session_note", {
   id: uuid("id").primaryKey().defaultRandom(),
   campaignId: uuid("campaign_id")

@@ -1,32 +1,10 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { campaignDungeons, campaignMembers } from "@/lib/db/schema";
+import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
+import { campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
 import { generateDungeon, type CellType, type DungeonConfig, type DungeonRoom } from "@/lib/dungeon";
-
-async function requireUserId(): Promise<string> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Devi accedere per continuare.");
-  return session.user.id;
-}
-
-async function requireDm(campaignId: string, userId: string) {
-  const [member] = await db
-    .select()
-    .from(campaignMembers)
-    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
-  if (!member || member.role !== "dm") throw new Error("Solo il master può farlo.");
-}
-
-async function requireMember(campaignId: string, userId: string) {
-  const [member] = await db
-    .select()
-    .from(campaignMembers)
-    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
-  if (!member) throw new Error("Non fai parte di questa campagna.");
-}
 
 export async function createDungeon(campaignId: string, nome: string, config: DungeonConfig) {
   const userId = await requireUserId();
@@ -179,4 +157,55 @@ export async function deleteDungeon(dungeonId: string) {
   if (!dungeon) return;
   await requireDm(dungeon.campaignId, userId);
   await db.delete(campaignDungeons).where(eq(campaignDungeons.id, dungeonId));
+}
+
+// --- Token della lavagna condivisa: posizione persistita, movimento live via PartyKit ---
+
+export async function getDungeonTokens(dungeonId: string) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select({ campaignId: campaignDungeons.campaignId })
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireMember(dungeon.campaignId, userId);
+
+  return db
+    .select({
+      userId: dungeonTokens.userId,
+      x: dungeonTokens.x,
+      y: dungeonTokens.y,
+      name: users.name,
+      image: users.image,
+    })
+    .from(dungeonTokens)
+    .innerJoin(users, eq(dungeonTokens.userId, users.id))
+    .where(eq(dungeonTokens.dungeonId, dungeonId));
+}
+
+export async function upsertMyToken(dungeonId: string, x: number, y: number) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select()
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireMember(dungeon.campaignId, userId);
+
+  const cx = Math.min(dungeon.width - 1, Math.max(0, Math.round(x)));
+  const cy = Math.min(dungeon.height - 1, Math.max(0, Math.round(y)));
+  await db
+    .insert(dungeonTokens)
+    .values({ dungeonId, userId, x: cx, y: cy })
+    .onConflictDoUpdate({
+      target: [dungeonTokens.dungeonId, dungeonTokens.userId],
+      set: { x: cx, y: cy, updatedAt: new Date() },
+    });
+}
+
+export async function removeMyToken(dungeonId: string) {
+  const userId = await requireUserId();
+  await db
+    .delete(dungeonTokens)
+    .where(and(eq(dungeonTokens.dungeonId, dungeonId), eq(dungeonTokens.userId, userId)));
 }

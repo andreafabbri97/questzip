@@ -1,0 +1,16 @@
+name = "questzip-party"
+main = "party/campaign-room.ts"
+compatibility_date = "2026-07-01"
+
+[durable_objects]
+bindings = [
+  { name = "Main", class_name = "CampaignRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CampaignRoom"]
+
+[vars]
+# PARTYKIT_AUTH_SECRET va impostato come secret, non qui:
+#   npx wrangler secret put PARTYKIT_AUTH_SECRET

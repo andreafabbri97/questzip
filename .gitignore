@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# wrangler (deploy del Worker realtime, party/)
+.wrangler
+.dev.vars
+
 # manuali PDF sorgente e testo estratto per la pipeline compendio ITA (mai da committare/pubblicare)
 /Manuali DND 5E giocatore e DM/
 /scripts/ita-compendio/extracted/

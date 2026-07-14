@@ -1,36 +1,14 @@
 "use server";
 
-import { and, asc, desc, eq } from "drizzle-orm";
-import { auth } from "@/auth";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
+import { broadcastEncounterChanged } from "@/lib/party";
 import {
   campaignCharacters,
   campaignEncounters,
-  campaignMembers,
   encounterCombatants,
 } from "@/lib/db/schema";
-
-async function requireUserId(): Promise<string> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Devi accedere per continuare.");
-  return session.user.id;
-}
-
-async function requireDm(campaignId: string, userId: string) {
-  const [member] = await db
-    .select()
-    .from(campaignMembers)
-    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
-  if (!member || member.role !== "dm") throw new Error("Solo il master può farlo.");
-}
-
-async function requireMember(campaignId: string, userId: string) {
-  const [member] = await db
-    .select()
-    .from(campaignMembers)
-    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
-  if (!member) throw new Error("Non fai parte di questa campagna.");
-}
 
 async function requireDmForEncounter(encounterId: string, userId: string) {
   const [encounter] = await db
@@ -72,6 +50,7 @@ export async function startEncounter(campaignId: string) {
   if (existing) return existing;
 
   const [encounter] = await db.insert(campaignEncounters).values({ campaignId }).returning();
+  await broadcastEncounterChanged(campaignId);
   return encounter;
 }
 
@@ -79,6 +58,7 @@ export async function endEncounter(campaignId: string) {
   const userId = await requireUserId();
   await requireDm(campaignId, userId);
   await db.delete(campaignEncounters).where(eq(campaignEncounters.campaignId, campaignId));
+  await broadcastEncounterChanged(campaignId);
 }
 
 export async function addCombatant(
@@ -86,7 +66,7 @@ export async function addCombatant(
   combatant: { nome: string; iniziativa: number; hpMax: number; isPg?: boolean },
 ) {
   const userId = await requireUserId();
-  await requireDmForEncounter(encounterId, userId);
+  const encounter = await requireDmForEncounter(encounterId, userId);
   await db.insert(encounterCombatants).values({
     encounterId,
     nome: combatant.nome,
@@ -95,6 +75,7 @@ export async function addCombatant(
     hpAttuali: combatant.hpMax,
     isPg: combatant.isPg ?? false,
   });
+  await broadcastEncounterChanged(encounter.campaignId);
 }
 
 export async function addPartyToEncounter(encounterId: string, campaignId: string) {
@@ -122,6 +103,7 @@ export async function addPartyToEncounter(encounterId: string, campaignId: strin
       isPg: true,
     })),
   );
+  await broadcastEncounterChanged(campaignId);
 }
 
 export async function updateCombatant(
@@ -134,8 +116,9 @@ export async function updateCombatant(
     .from(encounterCombatants)
     .where(eq(encounterCombatants.id, combatantId));
   if (!combatant) throw new Error("Combattente non trovato.");
-  await requireDmForEncounter(combatant.encounterId, userId);
+  const encounter = await requireDmForEncounter(combatant.encounterId, userId);
   await db.update(encounterCombatants).set(values).where(eq(encounterCombatants.id, combatantId));
+  await broadcastEncounterChanged(encounter.campaignId);
 }
 
 export async function removeCombatant(combatantId: string) {
@@ -145,8 +128,9 @@ export async function removeCombatant(combatantId: string) {
     .from(encounterCombatants)
     .where(eq(encounterCombatants.id, combatantId));
   if (!combatant) return;
-  await requireDmForEncounter(combatant.encounterId, userId);
+  const encounter = await requireDmForEncounter(combatant.encounterId, userId);
   await db.delete(encounterCombatants).where(eq(encounterCombatants.id, combatantId));
+  await broadcastEncounterChanged(encounter.campaignId);
 }
 
 export async function nextTurn(encounterId: string) {
@@ -168,4 +152,5 @@ export async function nextTurn(encounterId: string) {
       round: wrapped ? encounter.round + 1 : encounter.round,
     })
     .where(eq(campaignEncounters.id, encounterId));
+  await broadcastEncounterChanged(encounter.campaignId);
 }

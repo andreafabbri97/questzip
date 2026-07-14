@@ -35,11 +35,15 @@ import {
   deleteMarker,
   getDungeon,
   getDungeonsForCampaign,
+  getDungeonTokens,
+  removeMyToken,
   updateDungeonCells,
   updateRoomNotes,
+  upsertMyToken,
 } from "@/app/actions/dungeons";
 import type { CellType, DungeonConfig, RoomShape } from "@/lib/dungeon";
 import { loadCreatures, type RawCreature } from "@/lib/fivetools/data";
+import { usePartyRoom } from "@/lib/use-party-room";
 import {
   abilityModifier,
   adjustedEncounterXp,
@@ -572,6 +576,10 @@ function EncounterTracker({
   };
 
   useEffect(refresh, [campaignId]);
+
+  usePartyRoom({ kind: "combat", campaignId }, (message) => {
+    if ((message as { type?: string } | null)?.type === "encounter-changed") refresh();
+  });
 
   if (!data) {
     if (!isDm) return null;
@@ -1264,6 +1272,9 @@ function DungeonViewer({
   onDeleted: () => void;
   onRoomUpdated: () => void;
 }) {
+  const { data: session } = useSession();
+  const myUserId = session?.user?.id ?? null;
+
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [brush, setBrush] = useState<CellType>("floor");
@@ -1271,7 +1282,60 @@ function DungeonViewer({
   const [cells, setCells] = useState<CellType[][]>(dungeon.cells);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rawTokens, setRawTokens] = useState<
+    { userId: string; x: number; y: number; name: string | null }[]
+  >([]);
   const selectedRoom = dungeon.rooms.find((room) => room.id === selectedRoomId) ?? null;
+
+  useEffect(() => {
+    getDungeonTokens(dungeon.id).then(setRawTokens);
+  }, [dungeon.id]);
+
+  const { send } = usePartyRoom({ kind: "dungeon", dungeonId: dungeon.id }, (message) => {
+    const msg = message as { type?: string; userId?: string; x?: number; y?: number } | null;
+    if (msg?.type !== "move" || !msg.userId || typeof msg.x !== "number" || typeof msg.y !== "number") return;
+    setRawTokens((prev) =>
+      prev.some((t) => t.userId === msg.userId)
+        ? prev.map((t) => (t.userId === msg.userId ? { ...t, x: msg.x!, y: msg.y! } : t))
+        : prev,
+    );
+  });
+
+  const myToken = rawTokens.find((t) => t.userId === myUserId) ?? null;
+  const tokens: DungeonToken[] = rawTokens.map((t) => ({
+    userId: t.userId,
+    x: t.x,
+    y: t.y,
+    label: tokenInitials(t.name),
+    color: tokenColor(t.userId),
+    isMe: t.userId === myUserId,
+  }));
+
+  const handleTokenDrag = (x: number, y: number) => {
+    send({ type: "move", x, y });
+  };
+
+  const handleTokenDragEnd = async (x: number, y: number) => {
+    setRawTokens((prev) =>
+      myUserId && prev.some((t) => t.userId === myUserId)
+        ? prev.map((t) => (t.userId === myUserId ? { ...t, x, y } : t))
+        : prev,
+    );
+    send({ type: "move", x, y });
+    await upsertMyToken(dungeon.id, x, y);
+  };
+
+  const placeMyToken = async () => {
+    if (!myUserId) return;
+    await upsertMyToken(dungeon.id, Math.floor(dungeon.width / 2), Math.floor(dungeon.height / 2));
+    const fresh = await getDungeonTokens(dungeon.id);
+    setRawTokens(fresh);
+  };
+
+  const removeMyTokenFromMap = async () => {
+    await removeMyToken(dungeon.id);
+    setRawTokens((prev) => prev.filter((t) => t.userId !== myUserId));
+  };
 
   const paintCell = (x: number, y: number) => {
     setCells((prev) => {
@@ -1321,6 +1385,20 @@ function DungeonViewer({
           </button>
         )}
       </div>
+
+      {myUserId && (
+        <div className="flex items-center gap-2 text-xs">
+          {myToken ? (
+            <button onClick={removeMyTokenFromMap} className="font-bold text-danger hover:underline">
+              🧭 Rimuovi il mio token
+            </button>
+          ) : (
+            <button onClick={placeMyToken} className="font-bold text-accent-strong hover:underline">
+              🧭 Metti il mio token in mappa
+            </button>
+          )}
+        </div>
+      )}
 
       {isDm && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-edge bg-surface-raised p-2">
@@ -1391,6 +1469,9 @@ function DungeonViewer({
         markerMode={markerMode}
         onPaintCell={paintCell}
         onPlaceMarker={placeMarker}
+        tokens={tokens}
+        onTokenDrag={handleTokenDrag}
+        onTokenDragEnd={handleTokenDragEnd}
       />
       {selectedRoom && isDm && !editMode && (
         <RoomNotesEditor
@@ -1485,6 +1566,27 @@ const CELL_FILL: Record<CellType, string | null> = {
   door: "#e0a83e",
 };
 
+interface DungeonToken {
+  userId: string;
+  x: number;
+  y: number;
+  label: string;
+  color: string;
+  isMe: boolean;
+}
+
+function tokenColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) hash = (hash * 31 + userId.charCodeAt(i)) >>> 0;
+  return `hsl(${hash % 360} 70% 55%)`;
+}
+
+function tokenInitials(name: string | null): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : name.slice(0, 2).toUpperCase();
+}
+
 function DungeonMap({
   dungeon,
   activeRoomId,
@@ -1493,6 +1595,9 @@ function DungeonMap({
   markerMode = false,
   onPaintCell,
   onPlaceMarker,
+  tokens,
+  onTokenDrag,
+  onTokenDragEnd,
 }: {
   dungeon: { width: number; height: number; cells: CellType[][]; rooms: DungeonFull["rooms"] };
   activeRoomId: number | null;
@@ -1501,9 +1606,17 @@ function DungeonMap({
   markerMode?: boolean;
   onPaintCell?: (x: number, y: number) => void;
   onPlaceMarker?: (x: number, y: number) => void;
+  tokens?: DungeonToken[];
+  onTokenDrag?: (x: number, y: number) => void;
+  onTokenDragEnd?: (x: number, y: number) => void;
 }) {
   const cellSize = 14;
   const isPaintingRef = useRef(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const draggingTokenRef = useRef<string | null>(null);
+  const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const lastSentRef = useRef(0);
 
   useEffect(() => {
     if (!editable) return;
@@ -1513,6 +1626,43 @@ function DungeonMap({
     window.addEventListener("pointerup", stop);
     return () => window.removeEventListener("pointerup", stop);
   }, [editable]);
+
+  useEffect(() => {
+    if (!tokens) return;
+    const clientToCell = (clientX: number, clientY: number) => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const x = Math.min(dungeon.width - 1, Math.max(0, ((clientX - rect.left) / rect.width) * dungeon.width));
+      const y = Math.min(dungeon.height - 1, Math.max(0, ((clientY - rect.top) / rect.height) * dungeon.height));
+      return { x, y };
+    };
+    const move = (event: PointerEvent) => {
+      if (!draggingTokenRef.current) return;
+      const pos = clientToCell(event.clientX, event.clientY);
+      if (!pos) return;
+      setDragPos(pos);
+      const now = Date.now();
+      if (now - lastSentRef.current > 60) {
+        lastSentRef.current = now;
+        onTokenDrag?.(pos.x, pos.y);
+      }
+    };
+    const up = () => {
+      if (!draggingTokenRef.current) return;
+      draggingTokenRef.current = null;
+      setDraggingTokenId(null);
+      setDragPos((pos) => {
+        if (pos) onTokenDragEnd?.(Math.round(pos.x), Math.round(pos.y));
+        return null;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [tokens, dungeon.width, dungeon.height, onTokenDrag, onTokenDragEnd]);
 
   const handleCellDown = (x: number, y: number) => {
     if (markerMode) {
@@ -1531,6 +1681,7 @@ function DungeonMap({
   return (
     <div className="overflow-x-auto rounded-lg border border-edge bg-background p-2">
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${dungeon.width * cellSize} ${dungeon.height * cellSize}`}
         width={dungeon.width * cellSize}
         height={dungeon.height * cellSize}
@@ -1635,6 +1786,44 @@ function DungeonMap({
               />
             )),
           )}
+        {tokens?.map((token) => {
+          const dragging = draggingTokenId === token.userId && dragPos;
+          const cx = ((dragging ? dragPos!.x : token.x) + 0.5) * cellSize;
+          const cy = ((dragging ? dragPos!.y : token.y) + 0.5) * cellSize;
+          return (
+            <g
+              key={token.userId}
+              onPointerDown={(event) => {
+                if (!token.isMe) return;
+                event.stopPropagation();
+                draggingTokenRef.current = token.userId;
+                setDraggingTokenId(token.userId);
+                setDragPos({ x: token.x, y: token.y });
+              }}
+              className={token.isMe ? "cursor-grab" : undefined}
+            >
+              <circle
+                cx={cx}
+                cy={cy}
+                r={cellSize * 0.42}
+                fill={token.color}
+                stroke={token.isMe ? "#ece5da" : "#0c0a09"}
+                strokeWidth={1.5}
+              />
+              <text
+                x={cx}
+                y={cy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={cellSize * 0.5}
+                fill="#0c0a09"
+                className="pointer-events-none select-none font-bold"
+              >
+                {token.label}
+              </text>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );

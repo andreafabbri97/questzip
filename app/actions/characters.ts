@@ -1,24 +1,10 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { campaignCharacters, campaignMembers, users } from "@/lib/db/schema";
+import { requireMember, requireUserId } from "@/lib/campaign-auth";
+import { campaignCharacters, users } from "@/lib/db/schema";
 import type { Character } from "@/lib/dnd";
-
-async function requireUserId(): Promise<string> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Devi accedere per continuare.");
-  return session.user.id;
-}
-
-async function requireMember(campaignId: string, userId: string) {
-  const [member] = await db
-    .select()
-    .from(campaignMembers)
-    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
-  if (!member) throw new Error("Non fai parte di questa campagna.");
-}
 
 export async function syncCharacterToCampaign(campaignId: string, character: Character) {
   const userId = await requireUserId();

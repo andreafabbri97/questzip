@@ -1,8 +1,8 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { requireDm, requireUserId } from "@/lib/campaign-auth";
 import {
   campaignInvites,
   campaignMembers,
@@ -10,20 +10,6 @@ import {
   campaigns,
   users,
 } from "@/lib/db/schema";
-
-async function requireUserId(): Promise<string> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Devi accedere per continuare.");
-  return session.user.id;
-}
-
-async function requireDm(campaignId: string, userId: string) {
-  const [member] = await db
-    .select()
-    .from(campaignMembers)
-    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
-  if (!member || member.role !== "dm") throw new Error("Solo il master può farlo.");
-}
 
 export async function createCampaign(nome: string, descrizione: string) {
   const userId = await requireUserId();
