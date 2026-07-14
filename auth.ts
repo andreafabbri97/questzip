@@ -20,5 +20,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = user.id;
       return session;
     },
+    authorized({ auth, request: { nextUrl } }) {
+      // /campagne resta raggiungibile anche senza login: è lei stessa a mostrare il
+      // prompt "Accedi con Google" (è anche la pagina di signIn configurata sotto).
+      if (nextUrl.pathname === "/campagne") return true;
+      return Boolean(auth?.user);
+    },
   },
 });

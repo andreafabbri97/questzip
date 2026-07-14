@@ -2,6 +2,8 @@
 
 Gestore di campagne **D&D 5e** per master e giocatori. PWA installabile su telefono, pensata per essere usata al tavolo.
 
+**L'intero sito richiede il login con Google** — non è più possibile navigare nessuna pagina senza aver effettuato l'accesso (gate applicato a livello di `proxy.ts`, la nuova convenzione Next.js per il middleware). I personaggi restano comunque salvati solo su `localStorage`, il login serve solo a vedere il sito.
+
 ## Funzionalità (v0.1)
 
 - **🎲 Tira dadi** — da d4 a d100, quantità multiple, modificatori, vantaggio/svantaggio sul d20, cronologia dei tiri, critici e fallimenti evidenziati.
@@ -10,7 +12,7 @@ Gestore di campagne **D&D 5e** per master e giocatori. PWA installabile su telef
 - **📖 Compendio** — incantesimi, mostri (bestiario completo, 107 libri), oggetti magici, razze, talenti, background, condizioni e classi (tabella di progressione 1-20, tutte le caratteristiche di classe, sottoclassi espandibili con le loro caratteristiche — non solo l'elenco dei nomi). Contenuto completo (non solo SRD) sia edizione 2014 che 2024/25, con badge/filtro per edizione e libro di provenienza. Elenco sfogliabile in pagine anche senza cercare. Switch di lingua 🇬🇧/🇮🇹 (default inglese): mostra o tutto originale o tutto tradotto, mai mischiato, per non confondere visto che la traduzione è automatica; i nomi invece sono sempre mostrati in entrambe le lingue insieme. Ricerca funziona in entrambe le lingue. Dati dal mirror [5e.tools](https://5e.tools).
 - **📱 PWA** — installabile da Chrome/Safari ("Aggiungi a schermata Home"), tema scuro da taverna. Layout ottimizzato sia per mobile (colonna singola) che desktop (colonne affiancate: elenco+dettaglio nel Compendio, sezioni accoppiate in Personaggi/Campagne).
 
-I personaggi sono salvati in `localStorage` sul dispositivo (nessun account richiesto). Le campagne invece richiedono login (Google) e vivono su database condiviso, così master e giocatori vedono la stessa cosa. Il Compendio interroga il mirror dati di 5e.tools in tempo reale (richiede connessione; il primo caricamento di ogni scheda può richiedere qualche secondo). La traduzione italiana usa l'endpoint pubblico non ufficiale di Google Translate (gratuito, nessuna chiave, ma senza garanzie di continuità/qualità).
+I personaggi sono salvati in `localStorage` sul dispositivo, ma il login (Google) è comunque richiesto per usare il sito. Le campagne vivono su database condiviso, così master e giocatori vedono la stessa cosa. Il Compendio interroga il mirror dati di 5e.tools in tempo reale (richiede connessione; il primo caricamento di ogni scheda può richiedere qualche secondo). La traduzione italiana usa l'endpoint pubblico non ufficiale di Google Translate (gratuito, nessuna chiave, ma senza garanzie di continuità/qualità).
 
 ## Configurazione (variabili d'ambiente)
 

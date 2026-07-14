@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# manuali PDF sorgente e testo estratto per la pipeline compendio ITA (mai da committare/pubblicare)
+/Manuali DND 5E giocatore e DM/
+/scripts/ita-compendio/extracted/
+/scripts/ita-compendio/parsed/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
