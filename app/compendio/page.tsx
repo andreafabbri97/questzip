@@ -359,7 +359,7 @@ export default function CompendiumPage() {
           )}
         </div>
 
-        <div className={selected ? "min-w-0 2xl:max-w-3xl" : "hidden lg:block min-w-0 2xl:max-w-3xl"}>
+        <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>
           {selected ? (
             <EntryDetail
               kind={kind}
@@ -520,10 +520,12 @@ function EntryDetail({
       {kind === "razze" && <RaceDetail race={entry as RawRace} language={language} />}
       {kind === "talenti" && <FeatDetail feat={entry as RawFeat} language={language} />}
       {(kind === "background" || kind === "condizioni") && (
-        <EntriesBlock
-          entries={(entry as RawBackground | RawCondition).entries}
-          language={language}
-        />
+        <div className="2xl:max-w-3xl">
+          <EntriesBlock
+            entries={(entry as RawBackground | RawCondition).entries}
+            language={language}
+          />
+        </div>
       )}
       {kind === "classi" && <ClassDetail cls={entry as RawClass} language={language} />}
     </div>
@@ -575,7 +577,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
         <p className="text-xs font-bold text-accent-strong">
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
           <Stat label="Scuola" value={ufficiale.scuola} />
           <Stat label="Livello" value={ufficiale.livello === 0 ? "Trucchetto" : ufficiale.livello} />
           <Stat label="Tempo di lancio" value={ufficiale.tempoDiLancio} />
@@ -583,7 +585,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
           <Stat label="Componenti" value={ufficiale.componenti} />
           <Stat label="Durata" value={ufficiale.durata} />
         </div>
-        <div className="border-t border-edge pt-3 space-y-2">
+        <div className="border-t border-edge pt-3 space-y-2 2xl:max-w-3xl">
           <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
           {ufficiale.descrizione.split("\n\n").map((paragrafo, index) => (
             <p key={index} className="text-sm text-foreground leading-relaxed">
@@ -597,7 +599,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
         <Stat label="Scuola" value={formatSchool(spell.school)} />
         <Stat label="Livello" value={spell.level === 0 ? "Trucchetto" : spell.level} />
         <Stat label="Tempo di lancio" value={formatTime(spell.time)} />
@@ -606,12 +608,12 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
         <Stat label="Durata" value={formatDuration(spell.duration)} />
       </div>
       {material && <p className="text-sm text-muted italic">Materiali: {material}</p>}
-      <div className="border-t border-edge pt-3 space-y-2">
+      <div className="border-t border-edge pt-3 space-y-2 2xl:max-w-3xl">
         <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
         <EntriesBlock entries={spell.entries} language={language} />
       </div>
       {spell.entriesHigherLevel && (
-        <div>
+        <div className="2xl:max-w-3xl">
           <p className="text-xs uppercase tracking-widest text-muted mb-1.5">A livelli superiori</p>
           <EntriesBlock entries={spell.entriesHigherLevel} language={language} />
         </div>
@@ -688,7 +690,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
           {[ufficiale.taglia, ufficiale.tipo].filter(Boolean).join(" ")}
           {ufficiale.allineamento ? `, ${ufficiale.allineamento}` : ""}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
           <Stat label="CA" value={ufficiale.classeArmatura} />
           <Stat label="PF" value={ufficiale.puntiFerita} />
           <Stat label="Velocità" value={ufficiale.velocita} />
@@ -717,7 +719,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
           const text = ufficiale[section.key];
           if (!text) return null;
           return (
-            <div key={section.key} className="space-y-2">
+            <div key={section.key} className="space-y-2 2xl:max-w-3xl">
               <p className="text-xs uppercase tracking-widest text-muted">{section.label}</p>
               {text.split("\n\n").map((paragrafo, index) => (
                 <div key={index} className="rounded-lg border border-edge bg-surface-raised p-3">
@@ -739,7 +741,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
         {formatSize(creature.size)} {formatCreatureType(creature.type)} ·{" "}
         {formatAlignment(creature.alignment)}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
         <Stat label="CA" value={formatAC(creature.ac)} />
         <Stat label="PF" value={formatHP(creature.hp)} />
         <Stat label="Velocità" value={formatSpeed(creature.speed)} />
@@ -765,7 +767,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
           | undefined;
         if (!list || list.length === 0) return null;
         return (
-          <div key={group.key} className="space-y-2">
+          <div key={group.key} className="space-y-2 2xl:max-w-3xl">
             <p className="text-xs uppercase tracking-widest text-muted">{group.label}</p>
             {list.map((item, index) => (
               <div
@@ -816,7 +818,9 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
       <p className="text-sm text-muted italic capitalize">
         {[typeName, item.rarity, attunement].filter(Boolean).join(" · ")}
       </p>
-      <EntriesBlock entries={item.entries} language={language} />
+      <div className="2xl:max-w-3xl">
+        <EntriesBlock entries={item.entries} language={language} />
+      </div>
     </>
   );
 }
@@ -849,9 +853,9 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
         {ufficiale.introduzione && (
-          <p className="text-sm text-muted italic">{ufficiale.introduzione}</p>
+          <p className="text-sm text-muted italic 2xl:max-w-3xl">{ufficiale.introduzione}</p>
         )}
-        <div className="space-y-2">
+        <div className="space-y-2 2xl:max-w-3xl">
           {ufficiale.tratti.map((tratto, index) => (
             <div key={index} className="rounded-lg border border-edge bg-surface-raised p-3">
               <p className="text-sm font-bold text-foreground mb-1">{tratto.nome}</p>
@@ -860,7 +864,7 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
           ))}
         </div>
         {ufficiale.sottorazze.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 2xl:max-w-3xl">
             <p className="text-xs uppercase tracking-widest text-muted">Sottorazze</p>
             {ufficiale.sottorazze.map((sottorazza, sIndex) => (
               <div key={sIndex} className="rounded-lg border border-edge bg-surface p-3 space-y-2">
@@ -881,13 +885,13 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
         <Stat label="Taglia" value={formatSize(race.size)} />
         <Stat label="Velocità" value={formatRaceSpeed(race.speed)} />
         <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(race.ability)} />
         <Stat label="Scurovisione" value={race.darkvision ? `${race.darkvision} piedi` : undefined} />
       </div>
-      <div className="border-t border-edge pt-3">
+      <div className="border-t border-edge pt-3 2xl:max-w-3xl">
         <EntriesBlock entries={race.entries} language={language} />
       </div>
     </>
@@ -902,7 +906,7 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
         {prerequisite && <Stat label="Prerequisiti" value={prerequisite} />}
         {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
       </div>
-      <div className="border-t border-edge pt-3">
+      <div className="border-t border-edge pt-3 2xl:max-w-3xl">
         <EntriesBlock entries={feat.entries} language={language} />
       </div>
     </>
@@ -971,7 +975,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
         <p className="text-xs font-bold text-accent-strong">
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
           <Stat label="Dado vita" value={ufficiale.dadoVita} />
           <Stat label="Armature" value={ufficiale.armature} />
           <Stat label="Armi" value={ufficiale.armi} />
@@ -1027,7 +1031,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
         <Stat label="Dado vita" value={formatHitDie(cls.hd)} />
         <Stat
           label="Caratteristica incantatore"
