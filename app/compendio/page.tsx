@@ -28,6 +28,7 @@ import {
 } from "@/lib/fivetools/data";
 import { flattenEntries, RenderEntries, type FiveEntry } from "@/lib/fivetools/entries";
 import { translateBatch, translateText, useTranslatedText } from "@/lib/fivetools/translate";
+import { stripTags } from "@/lib/fivetools/tags";
 import { FlagIcon } from "@/components/flag-icon";
 
 type Language = "en" | "it";
@@ -664,8 +665,9 @@ const CLASS_ABILITY_NAMES: Record<string, string> = {
 
 function buildTableColumns(cls: RawClass) {
   const groups = cls.classTableGroups ?? [];
-  const labels = groups.flatMap((g) => g.colLabels);
-  const getCells = (levelIndex: number) => groups.flatMap((g) => g.rows[levelIndex] ?? []);
+  const labels = groups.flatMap((g) => g.colLabels.map((label) => stripTags(label)));
+  const getCells = (levelIndex: number) =>
+    groups.flatMap((g) => (g.rows ?? g.rowsSpellProgression ?? [])[levelIndex] ?? []);
   return { labels, getCells };
 }
 

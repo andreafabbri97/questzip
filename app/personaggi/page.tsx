@@ -41,6 +41,62 @@ function formatClassSummary(classi: ClassEntry[]): string {
     .join(" / ");
 }
 
+function ExportImport({
+  characters,
+  onImport,
+}: {
+  characters: Character[];
+  onImport: (imported: Character[]) => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+
+  const exportAll = () => {
+    const blob = new Blob([JSON.stringify(characters, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `questzip-personaggi-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError(null);
+    file
+      .text()
+      .then((text) => {
+        const parsed = characterSchema.array().safeParse(JSON.parse(text));
+        if (!parsed.success) {
+          setError("File non valido: non sembra un export di personaggi QuestZip.");
+          return;
+        }
+        onImport(parsed.data.map((character) => ({ ...character, id: crypto.randomUUID() })));
+      })
+      .catch(() => setError("Impossibile leggere il file."));
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      {characters.length > 0 && (
+        <button
+          onClick={exportAll}
+          className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-muted hover:text-foreground hover:border-accent/50 transition-colors"
+        >
+          ⬇ Esporta tutti (JSON)
+        </button>
+      )}
+      <label className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-muted hover:text-foreground hover:border-accent/50 transition-colors cursor-pointer">
+        ⬆ Importa
+        <input type="file" accept="application/json" onChange={importFile} className="hidden" />
+      </label>
+      {error && <span className="text-xs text-danger">{error}</span>}
+    </div>
+  );
+}
+
 export default function CharactersPage() {
   const { items, persist, loaded } = useLocalCollection("questzip:personaggi", characterSchema);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -93,6 +149,11 @@ export default function CharactersPage() {
           + Nuovo
         </button>
       </div>
+
+      <ExportImport
+        characters={items}
+        onImport={(imported) => persist([...items, ...imported])}
+      />
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-edge bg-surface/50 p-10 text-center text-muted">

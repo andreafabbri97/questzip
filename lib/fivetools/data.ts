@@ -115,7 +115,10 @@ export type TableCell = string | number | { type: string; value?: number };
 export interface ClassTableGroup {
   title?: string;
   colLabels: string[];
-  rows: TableCell[][];
+  // Le tabelle "Spell Slots per Spell Level" usano rowsSpellProgression invece di rows —
+  // stessa forma (array di celle per livello 1-20), chiave diversa.
+  rows?: TableCell[][];
+  rowsSpellProgression?: TableCell[][];
 }
 
 export interface RawClass {
