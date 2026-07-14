@@ -275,7 +275,7 @@ export default function CompendiumPage() {
           {!loadingCategory && categoryData && categoryData.length > 0 && results.length === 0 && (
             <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
           )}
-          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface lg:max-h-[70vh] lg:overflow-y-auto">
+          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
             {results.map((entry) => (
               <li key={`${entry.source}-${entry.name}`}>
                 <button
@@ -286,7 +286,7 @@ export default function CompendiumPage() {
                       : ""
                   }`}
                 >
-                  <span className="font-bold text-foreground">
+                  <span className="min-w-0 font-bold text-foreground">
                     <DualName text={entry.name} />
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
@@ -357,8 +357,8 @@ function DualName({ text, inline = false }: { text: string; inline?: boolean }) 
   }
   return (
     <>
-      {text}
-      <span className="block text-xs font-normal text-muted">{translated}</span>
+      <span className="block truncate">{text}</span>
+      <span className="block truncate text-xs font-normal text-muted">{translated}</span>
     </>
   );
 }
