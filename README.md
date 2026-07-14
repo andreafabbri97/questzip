@@ -7,7 +7,7 @@ Gestore di campagne **D&D 5e** per master e giocatori. PWA installabile su telef
 - **🎲 Tira dadi** — da d4 a d100, quantità multiple, modificatori, vantaggio/svantaggio sul d20, cronologia dei tiri, critici e fallimenti evidenziati.
 - **🛡️ Personaggi** — scheda base: razza, classe, livello, punti ferita (con contatore rapido +/−), CA, velocità, le sei caratteristiche con modificatori calcolati in automatico, bonus di competenza, note libere.
 - **🗺️ Campagne** — descrizione, master, lista giocatori e diario delle sessioni.
-- **📖 Compendio** — incantesimi, mostri e oggetti magici, contenuto completo (non solo SRD) sia edizione 2014 che 2024/25, con badge/filtro per edizione e libro di provenienza. Dati dal mirror [5e.tools](https://5e.tools).
+- **📖 Compendio** — incantesimi, mostri (bestiario completo, 107 libri), oggetti magici, razze, talenti, background, condizioni e classi. Contenuto completo (non solo SRD) sia edizione 2014 che 2024/25, con badge/filtro per edizione e libro di provenienza. Dati dal mirror [5e.tools](https://5e.tools).
 - **📱 PWA** — installabile da Chrome/Safari ("Aggiungi a schermata Home"), tema scuro da taverna.
 
 I dati di personaggi e campagne sono salvati in `localStorage` sul dispositivo: niente account, niente server. Il Compendio interroga il mirror dati di 5e.tools in tempo reale (richiede connessione, contenuto in inglese; il primo caricamento di ogni scheda può richiedere qualche secondo).

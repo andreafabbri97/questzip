@@ -3,25 +3,41 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadBooks, type BookMeta, type Edition } from "@/lib/fivetools/books";
 import {
+  loadBackgrounds,
+  loadClassData,
+  loadConditions,
   loadCreatures,
+  loadFeats,
   loadItems,
+  loadRaces,
   loadSpells,
   type CompendiumKind,
   type EditionFilter,
+  type RawBackground,
+  type RawClass,
+  type RawCondition,
   type RawCreature,
+  type RawFeat,
   type RawItem,
+  type RawRace,
   type RawSpell,
+  type RawSubclass,
 } from "@/lib/fivetools/data";
 import { RenderEntries } from "@/lib/fivetools/entries";
 import {
   formatAC,
+  formatAbilityIncrease,
   formatAlignment,
   formatChallengeRating,
   formatComponents,
   formatCreatureType,
   formatDuration,
   formatHP,
+  formatHitDie,
   formatMaterial,
+  formatPrerequisite,
+  formatProficiencyList,
+  formatRaceSpeed,
   formatRange,
   formatSchool,
   formatSize,
@@ -34,6 +50,11 @@ const TABS: { kind: CompendiumKind; label: string; icon: string }[] = [
   { kind: "incantesimi", label: "Incantesimi", icon: "✨" },
   { kind: "mostri", label: "Mostri", icon: "🐉" },
   { kind: "oggetti", label: "Oggetti magici", icon: "💍" },
+  { kind: "razze", label: "Razze", icon: "🧝" },
+  { kind: "talenti", label: "Talenti", icon: "🏅" },
+  { kind: "background", label: "Background", icon: "📜" },
+  { kind: "condizioni", label: "Condizioni", icon: "☠️" },
+  { kind: "classi", label: "Classi", icon: "⚔️" },
 ];
 
 const EDITIONS: { value: EditionFilter; label: string }[] = [
@@ -42,7 +63,18 @@ const EDITIONS: { value: EditionFilter; label: string }[] = [
   { value: "2024", label: "2024/25" },
 ];
 
-type Entry = RawSpell | RawCreature | RawItem;
+type Entry = RawSpell | RawCreature | RawItem | RawRace | RawFeat | RawBackground | RawCondition | RawClass;
+
+const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
+  incantesimi: loadSpells,
+  mostri: loadCreatures,
+  oggetti: loadItems,
+  razze: loadRaces,
+  talenti: loadFeats,
+  background: loadBackgrounds,
+  condizioni: loadConditions,
+  classi: () => loadClassData().then((data) => data.classes),
+};
 
 export default function CompendiumPage() {
   const [kind, setKind] = useState<CompendiumKind>("incantesimi");
@@ -51,37 +83,25 @@ export default function CompendiumPage() {
   const [selected, setSelected] = useState<Entry | null>(null);
 
   const [books, setBooks] = useState<Map<string, BookMeta> | null>(null);
-  const [spells, setSpells] = useState<RawSpell[] | null>(null);
-  const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
-  const [items, setItems] = useState<RawItem[] | null>(null);
+  const [dataByKind, setDataByKind] = useState<Partial<Record<CompendiumKind, Entry[]>>>({});
 
   useEffect(() => {
     loadBooks().then(setBooks);
   }, []);
 
   useEffect(() => {
-    const alreadyLoaded =
-      (kind === "incantesimi" && spells) ||
-      (kind === "mostri" && creatures) ||
-      (kind === "oggetti" && items);
-    if (alreadyLoaded) return;
-
+    if (dataByKind[kind]) return;
     let cancelled = false;
-    const loader =
-      kind === "incantesimi" ? loadSpells() : kind === "mostri" ? loadCreatures() : loadItems();
-    loader.then((data) => {
+    LOADERS[kind]().then((data) => {
       if (cancelled) return;
-      if (kind === "incantesimi") setSpells(data as RawSpell[]);
-      else if (kind === "mostri") setCreatures(data as RawCreature[]);
-      else setItems(data as RawItem[]);
+      setDataByKind((prev) => ({ ...prev, [kind]: data }));
     });
     return () => {
       cancelled = true;
     };
-  }, [kind, spells, creatures, items]);
+  }, [kind, dataByKind]);
 
-  const categoryData: Entry[] | null =
-    kind === "incantesimi" ? spells : kind === "mostri" ? creatures : items;
+  const categoryData = dataByKind[kind] ?? null;
   const loadingCategory = categoryData === null;
 
   const results = useMemo(() => {
@@ -117,7 +137,7 @@ export default function CompendiumPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex flex-wrap gap-2">
         {TABS.map((tab) => (
           <button
             key={tab.kind}
@@ -126,7 +146,7 @@ export default function CompendiumPage() {
               setQuery("");
               setSelected(null);
             }}
-            className={`rounded-lg border py-2 text-sm font-bold transition-colors ${
+            className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
               kind === tab.kind
                 ? "border-accent bg-accent/15 text-accent-strong"
                 : "border-edge bg-surface-raised text-muted hover:text-foreground"
@@ -171,18 +191,11 @@ export default function CompendiumPage() {
       />
 
       {selected ? (
-        <EntryDetail
-          kind={kind}
-          entry={selected}
-          books={books}
-          onBack={() => setSelected(null)}
-        />
+        <EntryDetail kind={kind} entry={selected} books={books} onBack={() => setSelected(null)} />
       ) : (
         <div className="space-y-2">
           {loadingCategory && (
-            <p className="text-sm text-muted text-center py-6">
-              Caricamento contenuti in corso…
-            </p>
+            <p className="text-sm text-muted text-center py-6">Caricamento contenuti in corso…</p>
           )}
           {!loadingCategory && categoryData && categoryData.length === 0 && (
             <p className="text-sm text-danger text-center py-6">
@@ -216,21 +229,13 @@ export default function CompendiumPage() {
   );
 }
 
-function SourceBadge({
-  source,
-  books,
-}: {
-  source: string;
-  books: Map<string, BookMeta> | null;
-}) {
+function SourceBadge({ source, books }: { source: string; books: Map<string, BookMeta> | null }) {
   const meta = books?.get(source);
   const edition: Edition = meta?.edition ?? "2014";
   return (
     <span
       className={`text-[10px] font-bold rounded-full px-2 py-0.5 border ${
-        edition === "2024"
-          ? "border-accent text-accent-strong"
-          : "border-edge text-muted"
+        edition === "2024" ? "border-accent text-accent-strong" : "border-edge text-muted"
       }`}
       title={meta?.name ?? source}
     >
@@ -256,8 +261,19 @@ function EntrySubtitle({ kind, entry }: { kind: CompendiumKind; entry: Entry }) 
       </span>
     );
   }
-  const item = entry as RawItem;
-  return <span className="text-xs text-muted capitalize">{item.rarity}</span>;
+  if (kind === "oggetti") {
+    const item = entry as RawItem;
+    return <span className="text-xs text-muted capitalize">{item.rarity}</span>;
+  }
+  if (kind === "razze") {
+    const race = entry as RawRace;
+    return <span className="text-xs text-muted">{formatSize(race.size)}</span>;
+  }
+  if (kind === "classi") {
+    const cls = entry as RawClass;
+    return <span className="text-xs text-muted">{formatHitDie(cls.hd)}</span>;
+  }
+  return null;
 }
 
 function EntryDetail({
@@ -286,6 +302,12 @@ function EntryDetail({
       {kind === "incantesimi" && <SpellDetail spell={entry as RawSpell} />}
       {kind === "mostri" && <CreatureDetail creature={entry as RawCreature} />}
       {kind === "oggetti" && <ItemDetail item={entry as RawItem} />}
+      {kind === "razze" && <RaceDetail race={entry as RawRace} />}
+      {kind === "talenti" && <FeatDetail feat={entry as RawFeat} />}
+      {(kind === "background" || kind === "condizioni") && (
+        <RenderEntries entries={(entry as RawBackground | RawCondition).entries} />
+      )}
+      {kind === "classi" && <ClassDetail cls={entry as RawClass} />}
     </div>
   );
 }
@@ -317,9 +339,7 @@ function SpellDetail({ spell }: { spell: RawSpell }) {
       <RenderEntries entries={spell.entries} />
       {spell.entriesHigherLevel && (
         <div>
-          <p className="text-xs uppercase tracking-widest text-muted mb-1">
-            A livelli superiori
-          </p>
+          <p className="text-xs uppercase tracking-widest text-muted mb-1">A livelli superiori</p>
           <RenderEntries entries={spell.entriesHigherLevel} />
         </div>
       )}
@@ -372,7 +392,9 @@ function CreatureDetail({ creature }: { creature: RawCreature }) {
       <Stat label="Linguaggi" value={creature.languages?.join(", ")} />
 
       {ACTION_GROUPS.map((group) => {
-        const list = creature[group.key] as { name: string; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | undefined;
+        const list = creature[group.key] as
+          | { name: string; entries: import("@/lib/fivetools/entries").FiveEntry[] }[]
+          | undefined;
         if (!list || list.length === 0) return null;
         return (
           <div key={group.key} className="space-y-2">
@@ -407,7 +429,8 @@ const ITEM_TYPE_NAMES: Record<string, string> = {
 };
 
 function ItemDetail({ item }: { item: RawItem }) {
-  const typeName = (item.type && ITEM_TYPE_NAMES[item.type]) || (item.wondrous ? "Oggetto meraviglioso" : item.type);
+  const typeName =
+    (item.type && ITEM_TYPE_NAMES[item.type]) || (item.wondrous ? "Oggetto meraviglioso" : item.type);
   const attunement =
     item.reqAttune === true
       ? "richiede sintonia"
@@ -421,6 +444,101 @@ function ItemDetail({ item }: { item: RawItem }) {
         {[typeName, item.rarity, attunement].filter(Boolean).join(" · ")}
       </p>
       <RenderEntries entries={item.entries} />
+    </>
+  );
+}
+
+function RaceDetail({ race }: { race: RawRace }) {
+  return (
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Stat label="Taglia" value={formatSize(race.size)} />
+        <Stat label="Velocità" value={formatRaceSpeed(race.speed)} />
+        <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(race.ability)} />
+        <Stat label="Scurovisione" value={race.darkvision ? `${race.darkvision} piedi` : undefined} />
+      </div>
+      <RenderEntries entries={race.entries} />
+    </>
+  );
+}
+
+function FeatDetail({ feat }: { feat: RawFeat }) {
+  const prerequisite = formatPrerequisite(feat.prerequisite);
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        {prerequisite && <Stat label="Prerequisiti" value={prerequisite} />}
+        {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
+      </div>
+      <RenderEntries entries={feat.entries} />
+    </>
+  );
+}
+
+const CLASS_ABILITY_NAMES: Record<string, string> = {
+  str: "Forza",
+  dex: "Destrezza",
+  con: "Costituzione",
+  int: "Intelligenza",
+  wis: "Saggezza",
+  cha: "Carisma",
+};
+
+function ClassDetail({ cls }: { cls: RawClass }) {
+  const [subclasses, setSubclasses] = useState<RawSubclass[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadClassData().then((data) => {
+      if (cancelled) return;
+      const names = new Set<string>();
+      const matching = data.subclasses.filter(
+        (sub) => sub.className === cls.name && sub.classSource === cls.source,
+      );
+      const deduped = matching.filter((sub) => {
+        if (names.has(sub.name)) return false;
+        names.add(sub.name);
+        return true;
+      });
+      setSubclasses(deduped);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cls.name, cls.source]);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <Stat label="Dado vita" value={formatHitDie(cls.hd)} />
+        <Stat
+          label="Caratteristica incantatore"
+          value={cls.spellcastingAbility ? CLASS_ABILITY_NAMES[cls.spellcastingAbility] : undefined}
+        />
+        <Stat
+          label="Tiri salvezza"
+          value={cls.proficiency?.map((code) => CLASS_ABILITY_NAMES[code] ?? code).join(", ")}
+        />
+        <Stat label="Armature" value={formatProficiencyList(cls.startingProficiencies?.armor)} />
+        <Stat label="Armi" value={formatProficiencyList(cls.startingProficiencies?.weapons)} />
+      </div>
+      {subclasses && subclasses.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-widest text-muted mb-2">
+            {cls.subclassTitle ?? "Sottoclassi"}
+          </p>
+          <ul className="flex flex-wrap gap-2">
+            {subclasses.map((sub) => (
+              <li
+                key={sub.name}
+                className="rounded-full border border-edge bg-surface-raised px-3 py-1 text-sm text-foreground"
+              >
+                {sub.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }

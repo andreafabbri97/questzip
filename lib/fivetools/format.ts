@@ -171,3 +171,78 @@ export function formatCreatureType(type: RawCreature["type"]): string {
   if (!type) return "—";
   return typeof type === "string" ? type : type.type;
 }
+
+const ABILITY_ABBR: Record<string, string> = {
+  str: "FOR",
+  dex: "DES",
+  con: "COS",
+  int: "INT",
+  wis: "SAG",
+  cha: "CAR",
+};
+
+export function formatAbilityIncrease(ability: Record<string, number>[] | undefined): string {
+  if (!ability || ability.length === 0) return "—";
+  return ability
+    .map((option) =>
+      Object.entries(option)
+        .filter(([key]) => key in ABILITY_ABBR)
+        .map(([key, value]) => `${ABILITY_ABBR[key]} +${value}`)
+        .join(", "),
+    )
+    .filter(Boolean)
+    .join(" oppure ") || "A scelta";
+}
+
+interface FeatPrerequisite {
+  ability?: Record<string, number>[];
+  race?: { name: string }[];
+  level?: number | { level: number };
+}
+
+export function formatPrerequisite(prereqs: FeatPrerequisite[] | undefined): string | null {
+  if (!prereqs || prereqs.length === 0) return null;
+  const parts = prereqs
+    .map((prereq) => {
+      const bits: string[] = [];
+      if (prereq.ability) {
+        for (const option of prereq.ability) {
+          for (const [key, value] of Object.entries(option)) {
+            if (key in ABILITY_ABBR) bits.push(`${ABILITY_ABBR[key]} ${value}+`);
+          }
+        }
+      }
+      if (prereq.race) bits.push(prereq.race.map((r) => r.name).join(" o "));
+      if (prereq.level) {
+        const level = typeof prereq.level === "number" ? prereq.level : prereq.level.level;
+        bits.push(`Livello ${level}+`);
+      }
+      return bits.join(", ");
+    })
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join(" oppure ") : null;
+}
+
+export function formatHitDie(hd: { number: number; faces: number } | undefined): string {
+  if (!hd) return "—";
+  return `${hd.number}d${hd.faces}`;
+}
+
+export function formatRaceSpeed(speed: number | Record<string, number> | undefined): string {
+  if (speed === undefined) return "—";
+  if (typeof speed === "number") return `${speed} piedi`;
+  return (
+    Object.entries(speed)
+      .map(([key, value]) => `${SPEED_LABELS[key] ? `${SPEED_LABELS[key]} ` : ""}${value} piedi`)
+      .join(", ") || "—"
+  );
+}
+
+export function formatProficiencyList(
+  list: (string | { proficiency: string })[] | undefined,
+): string {
+  if (!list || list.length === 0) return "—";
+  return list
+    .map((entry) => (typeof entry === "string" ? stripTags(entry) : stripTags(entry.proficiency)))
+    .join(", ");
+}

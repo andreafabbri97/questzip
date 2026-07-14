@@ -1,17 +1,27 @@
 import { RAW_BASE } from "@/lib/fivetools/books";
 import type { FiveEntry } from "@/lib/fivetools/entries";
 
-export type CompendiumKind = "incantesimi" | "mostri" | "oggetti";
+export type CompendiumKind =
+  | "incantesimi"
+  | "mostri"
+  | "oggetti"
+  | "razze"
+  | "talenti"
+  | "background"
+  | "condizioni"
+  | "classi";
 export type EditionFilter = "2014" | "2024" | "entrambe";
 
-// Libri con contenuto incantesimi/mostri: un sottoinsieme curato (per i mostri, altrimenti
-// il download supererebbe i 10 MB) che copre le regole base di entrambe le edizioni più i
-// manuali principali che il gruppo usa al tavolo.
+// Tutti i libri con contenuto incantesimi (17 file, ~1.5 MB totali).
 const SPELL_BOOKS = [
   "aag", "ai", "aitfr-avt", "bmt", "efa", "egw", "ftd", "frhof",
   "ggr", "idrotf", "llk", "phb", "sato", "scc", "tce", "xge", "xphb",
 ];
-const BESTIARY_BOOKS = ["mm", "xmm", "mpmm"];
+
+const CLASS_FILES = [
+  "artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk",
+  "mystic", "paladin", "ranger", "rogue", "sidekick", "sorcerer", "warlock", "wizard",
+];
 
 export interface RawSpell {
   name: string;
@@ -66,6 +76,62 @@ export interface RawItem {
   wondrous?: boolean;
 }
 
+export interface RawRace {
+  name: string;
+  source: string;
+  size?: string[];
+  speed?: number | Record<string, number>;
+  ability?: Record<string, number>[];
+  darkvision?: number;
+  entries: FiveEntry[];
+}
+
+export interface RawFeat {
+  name: string;
+  source: string;
+  ability?: Record<string, number>[];
+  prerequisite?: {
+    ability?: Record<string, number>[];
+    race?: { name: string }[];
+    level?: number | { level: number };
+  }[];
+  entries: FiveEntry[];
+}
+
+export interface RawBackground {
+  name: string;
+  source: string;
+  entries: FiveEntry[];
+}
+
+export interface RawCondition {
+  name: string;
+  source: string;
+  entries: FiveEntry[];
+}
+
+export interface RawClass {
+  name: string;
+  source: string;
+  hd?: { number: number; faces: number };
+  proficiency?: string[];
+  spellcastingAbility?: string;
+  subclassTitle?: string;
+  startingProficiencies?: {
+    armor?: (string | { proficiency: string })[];
+    weapons?: (string | { proficiency: string })[];
+    skills?: unknown;
+  };
+}
+
+export interface RawSubclass {
+  name: string;
+  shortName?: string;
+  className: string;
+  classSource: string;
+  source: string;
+}
+
 interface SpellFile {
   spell: RawSpell[];
 }
@@ -74,6 +140,23 @@ interface BestiaryFile {
 }
 interface ItemsFile {
   item: RawItem[];
+}
+interface RacesFile {
+  race: RawRace[];
+}
+interface FeatsFile {
+  feat: RawFeat[];
+}
+interface BackgroundsFile {
+  background: RawBackground[];
+}
+interface ConditionsFile {
+  condition: RawCondition[];
+  disease: RawCondition[];
+}
+interface ClassFile {
+  class: RawClass[];
+  subclass?: RawSubclass[];
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -90,9 +173,7 @@ let spellsPromise: Promise<RawSpell[]> | null = null;
 export function loadSpells(): Promise<RawSpell[]> {
   if (!spellsPromise) {
     spellsPromise = Promise.all(
-      SPELL_BOOKS.map((book) =>
-        fetchJson<SpellFile>(`${RAW_BASE}/spells/spells-${book}.json`),
-      ),
+      SPELL_BOOKS.map((book) => fetchJson<SpellFile>(`${RAW_BASE}/spells/spells-${book}.json`)),
     ).then((files) => files.flatMap((file) => file?.spell ?? []));
   }
   return spellsPromise;
@@ -101,11 +182,14 @@ export function loadSpells(): Promise<RawSpell[]> {
 let creaturesPromise: Promise<RawCreature[]> | null = null;
 export function loadCreatures(): Promise<RawCreature[]> {
   if (!creaturesPromise) {
-    creaturesPromise = Promise.all(
-      BESTIARY_BOOKS.map((book) =>
-        fetchJson<BestiaryFile>(`${RAW_BASE}/bestiary/bestiary-${book}.json`),
-      ),
-    ).then((files) => files.flatMap((file) => file?.monster ?? []));
+    creaturesPromise = fetchJson<Record<string, string>>(`${RAW_BASE}/bestiary/index.json`)
+      .then((index) => {
+        const files = index ? Array.from(new Set(Object.values(index))) : [];
+        return Promise.all(
+          files.map((file) => fetchJson<BestiaryFile>(`${RAW_BASE}/bestiary/${file}`)),
+        );
+      })
+      .then((files) => files.flatMap((file) => file?.monster ?? []));
   }
   return creaturesPromise;
 }
@@ -118,4 +202,58 @@ export function loadItems(): Promise<RawItem[]> {
     );
   }
   return itemsPromise;
+}
+
+let racesPromise: Promise<RawRace[]> | null = null;
+export function loadRaces(): Promise<RawRace[]> {
+  if (!racesPromise) {
+    racesPromise = fetchJson<RacesFile>(`${RAW_BASE}/races.json`).then((file) => file?.race ?? []);
+  }
+  return racesPromise;
+}
+
+let featsPromise: Promise<RawFeat[]> | null = null;
+export function loadFeats(): Promise<RawFeat[]> {
+  if (!featsPromise) {
+    featsPromise = fetchJson<FeatsFile>(`${RAW_BASE}/feats.json`).then((file) => file?.feat ?? []);
+  }
+  return featsPromise;
+}
+
+let backgroundsPromise: Promise<RawBackground[]> | null = null;
+export function loadBackgrounds(): Promise<RawBackground[]> {
+  if (!backgroundsPromise) {
+    backgroundsPromise = fetchJson<BackgroundsFile>(`${RAW_BASE}/backgrounds.json`).then(
+      (file) => file?.background ?? [],
+    );
+  }
+  return backgroundsPromise;
+}
+
+let conditionsPromise: Promise<RawCondition[]> | null = null;
+export function loadConditions(): Promise<RawCondition[]> {
+  if (!conditionsPromise) {
+    conditionsPromise = fetchJson<ConditionsFile>(`${RAW_BASE}/conditionsdiseases.json`).then(
+      (file) => [...(file?.condition ?? []), ...(file?.disease ?? [])],
+    );
+  }
+  return conditionsPromise;
+}
+
+interface ClassData {
+  classes: RawClass[];
+  subclasses: RawSubclass[];
+}
+
+let classDataPromise: Promise<ClassData> | null = null;
+export function loadClassData(): Promise<ClassData> {
+  if (!classDataPromise) {
+    classDataPromise = Promise.all(
+      CLASS_FILES.map((book) => fetchJson<ClassFile>(`${RAW_BASE}/class/class-${book}.json`)),
+    ).then((files) => ({
+      classes: files.flatMap((file) => file?.class ?? []),
+      subclasses: files.flatMap((file) => file?.subclass ?? []),
+    }));
+  }
+  return classDataPromise;
 }
