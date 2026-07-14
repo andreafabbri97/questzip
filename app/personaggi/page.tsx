@@ -6,18 +6,26 @@ import { getMyCampaigns } from "@/app/actions/campaigns";
 import { syncCharacterToCampaign } from "@/app/actions/characters";
 import {
   ABILITIES,
+  ABILITY_CODE_TO_KEY,
   ABILITY_LABELS,
   POINT_BUY_BUDGET,
+  SKILLS,
   STANDARD_ARRAY,
   abilityModifier,
   calculateMulticlassHitPoints,
   characterSchema,
   formatModifier,
+  multiclassCasterLevel,
   newCharacter,
+  pactMagicForLevel,
   pointBuyCost,
   proficiencyBonus,
   roll4d6DropLowest,
+  savingThrowModifier,
+  skillModifier,
+  spellSlotsForCasterLevel,
   totalLevel,
+  warlockLevel,
   type Ability,
   type Character,
   type ClassEntry,
@@ -402,6 +410,10 @@ function CharacterSheet({
         <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} clampInt={clampInt} />
       </div>
       </div>
+
+      <SavingThrowsAndSkills character={character} onChange={onChange} />
+
+      <SpellSlotsSection character={character} onChange={onChange} />
 
       <section className="rounded-xl border border-edge bg-surface p-5">
         <label className="block">
@@ -1006,6 +1018,265 @@ function AbilityScoreSection({
           );
         })}
       </div>
+    </section>
+  );
+}
+
+function SavingThrowsAndSkills({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const level = totalLevel(character.classi);
+
+  const toggleSave = (ability: Ability) => {
+    const has = character.trsCompetenti.includes(ability);
+    onChange({
+      ...character,
+      trsCompetenti: has
+        ? character.trsCompetenti.filter((a) => a !== ability)
+        : [...character.trsCompetenti, ability],
+    });
+  };
+
+  const cycleSkill = (skill: string) => {
+    const competente = character.abilitaCompetenti.includes(skill);
+    const esperto = character.abilitaEsperte.includes(skill);
+    if (!competente && !esperto) {
+      onChange({ ...character, abilitaCompetenti: [...character.abilitaCompetenti, skill] });
+    } else if (competente && !esperto) {
+      onChange({ ...character, abilitaEsperte: [...character.abilitaEsperte, skill] });
+    } else {
+      onChange({
+        ...character,
+        abilitaCompetenti: character.abilitaCompetenti.filter((s) => s !== skill),
+        abilitaEsperte: character.abilitaEsperte.filter((s) => s !== skill),
+      });
+    }
+  };
+
+  const suggestFromClass = async () => {
+    const primary = character.classi[0];
+    if (!primary?.nome.trim()) return;
+    const data = await loadClassData();
+    const cls = data.classes.find(
+      (c) => c.name.toLowerCase() === primary.nome.trim().toLowerCase(),
+    );
+    const abilities = (cls?.proficiency ?? [])
+      .map((code) => ABILITY_CODE_TO_KEY[code])
+      .filter((a): a is Ability => Boolean(a));
+    if (abilities.length > 0) onChange({ ...character, trsCompetenti: abilities });
+  };
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Tiri salvezza</h2>
+        <button
+          onClick={suggestFromClass}
+          className="text-xs font-bold text-accent-strong hover:underline"
+        >
+          Suggerisci dalla classe di origine
+        </button>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {ABILITIES.map((ability) => {
+          const proficient = character.trsCompetenti.includes(ability);
+          const mod = savingThrowModifier(character.caratteristiche[ability], proficient, level);
+          return (
+            <button
+              key={ability}
+              onClick={() => toggleSave(ability)}
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+                proficient
+                  ? "border-accent bg-accent/10 text-accent-strong"
+                  : "border-edge bg-surface-raised text-muted hover:text-foreground"
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <span className={`size-2 rounded-full ${proficient ? "bg-accent" : "bg-edge"}`} />
+                {ABILITY_LABELS[ability]}
+              </span>
+              <span className="font-bold">{formatModifier(mod)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div>
+        <h2 className="text-sm uppercase tracking-widest text-muted">Abilità</h2>
+        <p className="text-xs text-muted mt-0.5">
+          Click per alternare: nessuna → competente → esperto (bonus raddoppiato) → nessuna.
+        </p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-1.5">
+        {SKILLS.map((skill) => {
+          const competente = character.abilitaCompetenti.includes(skill.nome);
+          const esperto = character.abilitaEsperte.includes(skill.nome);
+          const mod = skillModifier(
+            character.caratteristiche[skill.abilita],
+            competente,
+            esperto,
+            level,
+          );
+          return (
+            <button
+              key={skill.nome}
+              onClick={() => cycleSkill(skill.nome)}
+              className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                esperto
+                  ? "border-accent bg-accent/15 text-accent-strong"
+                  : competente
+                    ? "border-accent/50 bg-accent/5 text-foreground"
+                    : "border-edge bg-surface-raised text-muted hover:text-foreground"
+              }`}
+            >
+              <span className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className={`size-2 rounded-full shrink-0 ${
+                    esperto ? "bg-accent" : competente ? "bg-accent/60" : "bg-edge"
+                  }`}
+                />
+                <span className="truncate">{skill.nome}</span>
+                <span className="text-[10px] text-muted shrink-0">
+                  ({ABILITY_LABELS[skill.abilita].slice(0, 3)})
+                </span>
+              </span>
+              <span className="font-bold shrink-0">{formatModifier(mod)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SlotCounter({
+  label,
+  max,
+  used,
+  onChange,
+}: {
+  label: string;
+  max: number;
+  used: number;
+  onChange: (used: number) => void;
+}) {
+  const available = max - used;
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-2 text-center">
+      <p className="text-[10px] uppercase tracking-widest text-muted">{label}</p>
+      <div className="flex items-center justify-center gap-1 mt-1">
+        <button
+          onClick={() => onChange(used + 1)}
+          disabled={available <= 0}
+          className="size-6 rounded-full border border-edge text-danger disabled:opacity-30"
+          aria-label="Usa slot"
+        >
+          −
+        </button>
+        <span className="w-10 text-sm font-bold text-foreground">
+          {available}/{max}
+        </span>
+        <button
+          onClick={() => onChange(used - 1)}
+          disabled={used <= 0}
+          className="size-6 rounded-full border border-edge text-accent-strong disabled:opacity-30"
+          aria-label="Recupera slot"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SpellSlotsSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const casterLevel = multiclassCasterLevel(character.classi);
+  const wlLevel = warlockLevel(character.classi);
+  const maxSlots = spellSlotsForCasterLevel(casterLevel);
+  const pact = pactMagicForLevel(wlLevel);
+
+  if (casterLevel === 0 && wlLevel === 0) return null;
+
+  const setUsed = (index: number, used: number) => {
+    const max = maxSlots[index];
+    const next = Math.min(max, Math.max(0, used));
+    onChange({
+      ...character,
+      slotUsati: character.slotUsati.map((v, i) => (i === index ? next : v)),
+    });
+  };
+
+  const setPactUsed = (used: number) => {
+    onChange({ ...character, slotPattoUsati: Math.min(pact.slots, Math.max(0, used)) });
+  };
+
+  const longRest = () =>
+    onChange({ ...character, slotUsati: [0, 0, 0, 0, 0, 0, 0, 0, 0], slotPattoUsati: 0 });
+  const shortRest = () => onChange({ ...character, slotPattoUsati: 0 });
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Slot incantesimi</h2>
+        <div className="flex gap-3">
+          {wlLevel > 0 && (
+            <button
+              onClick={shortRest}
+              className="text-xs font-bold text-accent-strong hover:underline"
+            >
+              Riposo breve
+            </button>
+          )}
+          <button
+            onClick={longRest}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            Riposo lungo
+          </button>
+        </div>
+      </div>
+
+      {casterLevel > 0 && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {maxSlots.map((max, index) =>
+            max > 0 ? (
+              <SlotCounter
+                key={index}
+                label={`Liv. ${index + 1}`}
+                max={max}
+                used={character.slotUsati[index] ?? 0}
+                onChange={(used) => setUsed(index, used)}
+              />
+            ) : null,
+          )}
+        </div>
+      )}
+
+      {wlLevel > 0 && (
+        <div className="pt-2 border-t border-edge space-y-2">
+          <p className="text-xs text-muted">
+            Patto Magico (Warlock, liv. {wlLevel}) — recupera con un riposo breve
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <SlotCounter
+              label={`Liv. ${pact.slotLevel}`}
+              max={pact.slots}
+              used={character.slotPattoUsati}
+              onChange={setPactUsed}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

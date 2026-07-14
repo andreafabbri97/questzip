@@ -20,6 +20,37 @@ export const ABILITY_LABELS: Record<Ability, string> = {
   carisma: "Carisma",
 };
 
+/** Mappa i codici a 3 lettere di 5etools (str/dex/con/int/wis/cha) alle nostre chiavi in italiano. */
+export const ABILITY_CODE_TO_KEY: Record<string, Ability> = {
+  str: "forza",
+  dex: "destrezza",
+  con: "costituzione",
+  int: "intelligenza",
+  wis: "saggezza",
+  cha: "carisma",
+};
+
+export const SKILLS: { nome: string; abilita: Ability }[] = [
+  { nome: "Acrobazia", abilita: "destrezza" },
+  { nome: "Addestrare Animali", abilita: "saggezza" },
+  { nome: "Arcano", abilita: "intelligenza" },
+  { nome: "Atletica", abilita: "forza" },
+  { nome: "Furtività", abilita: "destrezza" },
+  { nome: "Indagare", abilita: "intelligenza" },
+  { nome: "Inganno", abilita: "carisma" },
+  { nome: "Intimidire", abilita: "carisma" },
+  { nome: "Intrattenere", abilita: "carisma" },
+  { nome: "Intuizione", abilita: "saggezza" },
+  { nome: "Medicina", abilita: "saggezza" },
+  { nome: "Natura", abilita: "intelligenza" },
+  { nome: "Percezione", abilita: "saggezza" },
+  { nome: "Persuasione", abilita: "carisma" },
+  { nome: "Rapidità di Mano", abilita: "destrezza" },
+  { nome: "Religione", abilita: "intelligenza" },
+  { nome: "Sopravvivenza", abilita: "saggezza" },
+  { nome: "Storia", abilita: "intelligenza" },
+];
+
 export const abilityScoresSchema = z.object({
   forza: z.number().int().min(1).max(30),
   destrezza: z.number().int().min(1).max(30),
@@ -47,6 +78,11 @@ export const characterSchema = z.object({
   classeArmatura: z.number().int().min(1),
   velocita: z.number().int().min(0),
   caratteristiche: abilityScoresSchema,
+  trsCompetenti: z.array(z.enum(ABILITIES)).default([]),
+  abilitaCompetenti: z.array(z.string()).default([]),
+  abilitaEsperte: z.array(z.string()).default([]),
+  slotUsati: z.array(z.number().int().min(0)).length(9).default([0, 0, 0, 0, 0, 0, 0, 0, 0]),
+  slotPattoUsati: z.number().int().min(0).default(0),
   note: z.string(),
 });
 
@@ -86,8 +122,29 @@ export function newCharacter(): Character {
       saggezza: 10,
       carisma: 10,
     },
+    trsCompetenti: [],
+    abilitaCompetenti: [],
+    abilitaEsperte: [],
+    slotUsati: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    slotPattoUsati: 0,
     note: "",
   };
+}
+
+/** Bonus di un tiro salvezza: mod. caratteristica + bonus competenza se competente. */
+export function savingThrowModifier(score: number, proficient: boolean, level: number): number {
+  return abilityModifier(score) + (proficient ? proficiencyBonus(level) : 0);
+}
+
+/** Bonus di un'abilità: mod. caratteristica, +bonus competenza se competente, doppio se esperto. */
+export function skillModifier(
+  score: number,
+  proficient: boolean,
+  expert: boolean,
+  level: number,
+): number {
+  const bonus = proficiencyBonus(level);
+  return abilityModifier(score) + (expert ? bonus * 2 : proficient ? bonus : 0);
 }
 
 export const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const;
@@ -199,5 +256,80 @@ export function xpBudget(partyLevels: number[], difficulty: EncounterDifficulty)
 /** XP "aggiustato" (con moltiplicatore) di un gruppo di mostri dello stesso CR. */
 export function adjustedEncounterXp(crXp: number, monsterCount: number): number {
   return crXp * monsterCount * encounterMultiplier(monsterCount);
+}
+
+// --- Slot incantesimi (regole standard PHB) ---
+
+/** Slot per livello incantesimo (1°-9°), indicizzata per livello personaggio 1-20. Tabella standard
+ * dei "full caster" (Bardo/Chierico/Druido/Stregone/Mago), usata anche per il livello incantatore
+ * effettivo in multiclasse. */
+const FULL_CASTER_SLOTS: number[][] = [
+  [2, 0, 0, 0, 0, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 2, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 1, 0, 0, 0, 0, 0],
+  [4, 3, 3, 2, 0, 0, 0, 0, 0],
+  [4, 3, 3, 3, 1, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 2, 1, 1],
+];
+
+const FULL_CASTERS = new Set(["bard", "cleric", "druid", "sorcerer", "wizard"]);
+const HALF_CASTERS = new Set(["paladin", "ranger"]);
+
+/** Livello incantatore effettivo in multiclasse: full=intero, mezzo=metà arrotondato per
+ * difetto, artefice=metà arrotondato per eccesso. Lo Stregone (Warlock) NON entra qui: usa
+ * il Patto Magico, un pool di slot separato. */
+export function multiclassCasterLevel(classi: { nome: string; livello: number }[]): number {
+  let total = 0;
+  for (const { nome, livello } of classi) {
+    const key = nome.trim().toLowerCase();
+    if (FULL_CASTERS.has(key)) total += livello;
+    else if (HALF_CASTERS.has(key)) total += Math.floor(livello / 2);
+    else if (key === "artificer") total += Math.ceil(livello / 2);
+  }
+  return total;
+}
+
+export function spellSlotsForCasterLevel(casterLevel: number): number[] {
+  if (casterLevel <= 0) return [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  return FULL_CASTER_SLOTS[Math.min(20, casterLevel) - 1];
+}
+
+/** Patto Magico del Warlock (livello slot, numero slot), per livello di classe Warlock 1-20. */
+const PACT_MAGIC: { slotLevel: number; slots: number }[] = [
+  { slotLevel: 1, slots: 1 }, { slotLevel: 1, slots: 2 },
+  { slotLevel: 2, slots: 2 }, { slotLevel: 2, slots: 2 },
+  { slotLevel: 3, slots: 2 }, { slotLevel: 3, slots: 2 },
+  { slotLevel: 4, slots: 2 }, { slotLevel: 4, slots: 2 },
+  { slotLevel: 5, slots: 2 }, { slotLevel: 5, slots: 2 },
+  { slotLevel: 5, slots: 3 }, { slotLevel: 5, slots: 3 },
+  { slotLevel: 5, slots: 3 }, { slotLevel: 5, slots: 3 },
+  { slotLevel: 5, slots: 3 }, { slotLevel: 5, slots: 3 },
+  { slotLevel: 5, slots: 4 }, { slotLevel: 5, slots: 4 },
+  { slotLevel: 5, slots: 4 }, { slotLevel: 5, slots: 4 },
+];
+
+export function warlockLevel(classi: { nome: string; livello: number }[]): number {
+  return classi
+    .filter((c) => c.nome.trim().toLowerCase() === "warlock")
+    .reduce((sum, c) => sum + c.livello, 0);
+}
+
+export function pactMagicForLevel(level: number): { slotLevel: number; slots: number } {
+  if (level <= 0) return { slotLevel: 0, slots: 0 };
+  return PACT_MAGIC[Math.min(20, level) - 1];
 }
 

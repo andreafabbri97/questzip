@@ -320,7 +320,7 @@ export default function CompendiumPage() {
           )}
         </div>
 
-        <div className={selected ? "" : "hidden lg:block"}>
+        <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>
           {selected ? (
             <EntryDetail
               kind={kind}
