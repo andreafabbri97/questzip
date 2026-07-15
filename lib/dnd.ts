@@ -84,6 +84,18 @@ export const knownSpellSchema = z.object({
 });
 export type KnownSpell = z.infer<typeof knownSpellSchema>;
 
+export const weaponSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  caratteristica: z.enum(["forza", "destrezza", "finezza"]).default("forza"),
+  competente: z.boolean().default(true),
+  bonusExtra: z.number().int().default(0),
+  dadoDanno: z.string().default("1d6"),
+  tipoDanno: z.string().default(""),
+  aDistanza: z.boolean().default(false),
+});
+export type Weapon = z.infer<typeof weaponSchema>;
+
 export const characterSchema = z.object({
   id: z.string(),
   nome: z.string().min(1),
@@ -117,6 +129,7 @@ export const characterSchema = z.object({
     })
     .default({ oro: 0, argento: 0, rame: 0 }),
   incantesimi: z.array(knownSpellSchema).default([]),
+  armi: z.array(weaponSchema).default([]),
   note: z.string(),
 });
 
@@ -205,6 +218,7 @@ export function newCharacter(): Character {
     inventario: [],
     monete: { oro: 0, argento: 0, rame: 0 },
     incantesimi: [],
+    armi: [],
     note: "",
   };
 }
@@ -271,6 +285,36 @@ export function spellSaveDC(level: number, abilityScore: number): number {
 
 export function spellAttackBonus(level: number, abilityScore: number): number {
   return proficiencyBonus(level) + abilityModifier(abilityScore);
+}
+
+/** Bonus al tiro per colpire di un'arma: modificatore di caratteristica (Finezza usa il
+ * migliore tra Forza e Destrezza) + bonus di competenza se competente + eventuale bonus fisso
+ * (arma magica, ecc.). Lo stesso modificatore di caratteristica si aggiunge anche ai danni. */
+export function weaponAbilityModifier(
+  caratteristica: "forza" | "destrezza" | "finezza",
+  forzaScore: number,
+  destrezzaScore: number,
+): number {
+  const str = abilityModifier(forzaScore);
+  const dex = abilityModifier(destrezzaScore);
+  if (caratteristica === "forza") return str;
+  if (caratteristica === "destrezza") return dex;
+  return Math.max(str, dex);
+}
+
+export function weaponAttackBonus(
+  caratteristica: "forza" | "destrezza" | "finezza",
+  forzaScore: number,
+  destrezzaScore: number,
+  competente: boolean,
+  level: number,
+  bonusExtra: number,
+): number {
+  return (
+    weaponAbilityModifier(caratteristica, forzaScore, destrezzaScore) +
+    (competente ? proficiencyBonus(level) : 0) +
+    bonusExtra
+  );
 }
 
 export const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const;

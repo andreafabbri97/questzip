@@ -32,12 +32,15 @@ import {
   spellSlotsForCasterLevel,
   totalLevel,
   warlockLevel,
+  weaponAbilityModifier,
+  weaponAttackBonus,
   xpForNextLevel,
   type Ability,
   type Character,
   type ClassEntry,
   type InventoryItem,
   type KnownSpell,
+  type Weapon,
 } from "@/lib/dnd";
 import { useLocalCollection } from "@/lib/storage";
 import {
@@ -339,6 +342,7 @@ function CharacterSheet({
             </span>
           </p>
           <XpTracker character={character} onChange={onChange} />
+          <LevelUpWizard character={character} onChange={onChange} />
         </section>
       </div>
 
@@ -501,6 +505,8 @@ function CharacterSheet({
       <PersonalitySection character={character} onChange={onChange} />
 
       <InventorySection character={character} onChange={onChange} />
+
+      <WeaponsSection character={character} onChange={onChange} />
 
       <SpellSlotsSection character={character} onChange={onChange} />
 
@@ -1023,6 +1029,139 @@ function XpTracker({
   );
 }
 
+const ASI_LEVELS = [4, 8, 12, 16, 19];
+
+function LevelUpWizard({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [classIndex, setClassIndex] = useState(0);
+  const [features, setFeatures] = useState<
+    { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
+  >(null);
+
+  const level = totalLevel(character.classi);
+  const derivedLevel = levelForXp(character.esperienza);
+  const canLevelUp = derivedLevel > level;
+
+  const targetClass = character.classi[classIndex];
+  const newLevel = targetClass ? targetClass.livello + 1 : 1;
+
+  useEffect(() => {
+    if (!open || !targetClass) return;
+    let cancelled = false;
+    loadClassData().then((data) => {
+      if (cancelled) return;
+      const cls = data.classes.find((c) => c.name.toLowerCase() === targetClass.nome.trim().toLowerCase());
+      if (!cls) {
+        setFeatures([]);
+        return;
+      }
+      setFeatures(resolveClassFeatures(data, cls).filter((f) => f.level === newLevel));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, targetClass, newLevel]);
+
+  if (!canLevelUp && !open) return null;
+
+  const confirm = () => {
+    if (!targetClass) return;
+    onChange({
+      ...character,
+      classi: character.classi.map((c, i) => (i === classIndex ? { ...c, livello: newLevel } : c)),
+    });
+    setOpen(false);
+    setFeatures(null);
+  };
+
+  return (
+    <div>
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs font-bold text-accent-strong hover:underline"
+        >
+          🎉 Sali di livello!
+        </button>
+      ) : (
+        <div className="mt-2 space-y-3 rounded-lg border border-accent-strong bg-surface-raised p-3">
+          <p className="text-sm font-bold text-foreground">Level up!</p>
+          {character.classi.length > 1 && (
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Classe che sale</span>
+              <select
+                value={classIndex}
+                onChange={(event) => setClassIndex(Number(event.target.value))}
+                className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+              >
+                {character.classi.map((c, i) => (
+                  <option key={i} value={i}>
+                    {c.nome || `Classe ${i + 1}`} (liv. {c.livello} → {c.livello + 1})
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {targetClass && (
+            <p className="text-sm text-muted">
+              {targetClass.nome || "Questa classe"} passa da livello {targetClass.livello} a{" "}
+              <span className="font-bold text-accent-strong">{newLevel}</span>.
+            </p>
+          )}
+          {ASI_LEVELS.includes(newLevel) && (
+            <p className="text-sm font-bold text-accent-strong">
+              ⭐ A questo livello ottieni un Aumento di Caratteristica (o un talento) — ricordati di
+              assegnarlo nella sezione Caratteristiche.
+            </p>
+          )}
+          <div>
+            <p className="text-xs uppercase tracking-widest text-muted mb-1">Nuovi privilegi</p>
+            {!features && <p className="text-sm text-muted">Caricamento…</p>}
+            {features?.length === 0 && (
+              <p className="text-sm text-muted">Nessun privilegio nuovo a questo livello.</p>
+            )}
+            {features?.map((feature) => (
+              <div
+                key={feature.name}
+                className="rounded-lg border border-edge bg-surface p-3 mt-1.5"
+              >
+                <p className="text-sm font-bold text-foreground mb-1.5">{feature.name}</p>
+                <RenderEntries entries={feature.entries} />
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-muted">
+            Ricordati di aggiornare i Punti Ferita massimi con il calcolatore qui sopra dopo aver confermato.
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={confirm}
+              className="rounded-md bg-accent-strong px-3 py-1.5 text-sm font-bold text-white hover:opacity-90"
+            >
+              Conferma livello {newLevel}
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                setFeatures(null);
+              }}
+              className="text-sm text-muted hover:underline"
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PersonalitySection({
   character,
   onChange,
@@ -1174,6 +1313,152 @@ function InventorySection({
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function WeaponsSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const setArmi = (armi: Weapon[]) => onChange({ ...character, armi });
+  const level = totalLevel(character.classi);
+  const forza = character.caratteristiche.forza;
+  const destrezza = character.caratteristiche.destrezza;
+
+  const addWeapon = () =>
+    setArmi([
+      ...character.armi,
+      {
+        id: crypto.randomUUID(),
+        nome: "",
+        caratteristica: "forza",
+        competente: true,
+        bonusExtra: 0,
+        dadoDanno: "1d6",
+        tipoDanno: "",
+        aDistanza: false,
+      },
+    ]);
+
+  const updateWeapon = (id: string, patch: Partial<Weapon>) =>
+    setArmi(character.armi.map((weapon) => (weapon.id === id ? { ...weapon, ...patch } : weapon)));
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Armi e attacchi</h2>
+        <button onClick={addWeapon} className="text-xs font-bold text-accent-strong hover:underline">
+          + Aggiungi arma
+        </button>
+      </div>
+      {character.armi.length === 0 && <p className="text-sm text-muted">Nessuna arma aggiunta ancora.</p>}
+      <div className="space-y-3">
+        {character.armi.map((weapon) => {
+          const bonus = weaponAttackBonus(
+            weapon.caratteristica,
+            forza,
+            destrezza,
+            weapon.competente,
+            level,
+            weapon.bonusExtra,
+          );
+          const dmgMod = weaponAbilityModifier(weapon.caratteristica, forza, destrezza);
+          return (
+            <div key={weapon.id} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  value={weapon.nome}
+                  onChange={(event) => updateWeapon(weapon.id, { nome: event.target.value })}
+                  placeholder="Nome arma"
+                  className="flex-1 min-w-0 rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                />
+                <button
+                  onClick={() => setArmi(character.armi.filter((w) => w.id !== weapon.id))}
+                  className="text-muted hover:text-danger text-sm shrink-0"
+                  aria-label={`Rimuovi ${weapon.nome || "arma"}`}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-widest text-muted">Caratteristica</span>
+                  <select
+                    value={weapon.caratteristica}
+                    onChange={(event) =>
+                      updateWeapon(weapon.id, {
+                        caratteristica: event.target.value as Weapon["caratteristica"],
+                      })
+                    }
+                    className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                  >
+                    <option value="forza">Forza</option>
+                    <option value="destrezza">Destrezza</option>
+                    <option value="finezza">Finezza (migliore tra For/Des)</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-widest text-muted">Dado danno</span>
+                  <input
+                    value={weapon.dadoDanno}
+                    onChange={(event) => updateWeapon(weapon.id, { dadoDanno: event.target.value })}
+                    placeholder="1d6"
+                    className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-widest text-muted">Tipo danno</span>
+                  <input
+                    value={weapon.tipoDanno}
+                    onChange={(event) => updateWeapon(weapon.id, { tipoDanno: event.target.value })}
+                    placeholder="tagliente…"
+                    className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-widest text-muted">Bonus extra</span>
+                  <input
+                    type="number"
+                    value={weapon.bonusExtra}
+                    onChange={(event) => {
+                      const parsed = Number(event.target.value);
+                      updateWeapon(weapon.id, { bonusExtra: Number.isNaN(parsed) ? 0 : Math.trunc(parsed) });
+                    }}
+                    className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={weapon.competente}
+                    onChange={(event) => updateWeapon(weapon.id, { competente: event.target.checked })}
+                  />
+                  Competente
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={weapon.aDistanza}
+                    onChange={(event) => updateWeapon(weapon.id, { aDistanza: event.target.checked })}
+                  />
+                  A distanza
+                </label>
+              </div>
+              <p className="text-sm text-accent-strong font-semibold">
+                Bonus attacco: {formatModifier(bonus)} · Danno: {weapon.dadoDanno}
+                {dmgMod !== 0 ? ` ${formatModifier(dmgMod)}` : ""}
+                {weapon.tipoDanno ? ` (${weapon.tipoDanno})` : ""}
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
