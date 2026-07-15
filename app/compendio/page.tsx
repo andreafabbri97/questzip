@@ -432,11 +432,15 @@ function RegoleSection() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-edge bg-surface-raised p-3 text-xs text-muted">
-        ⚠️ Testo estratto via OCR da scansioni (non un vero testo digitale come il resto del
-        compendio): può contenere errori di riconoscimento. Utile per una ricerca rapida, non
-        garantito parola per parola.
-      </div>
+      {fonte !== "regole_base" && (
+        <div className="rounded-lg border border-edge bg-surface-raised p-3 text-xs text-muted">
+          ⚠️ {fonte === "costa_spada" ? "Costa della Spada è" : "Costa della Spada (fra i risultati) è"}{" "}
+          estratta via OCR da scansioni (non un vero testo digitale come il resto del compendio):
+          può contenere errori di riconoscimento. Utile per una ricerca rapida, non garantito
+          parola per parola. Regole Principali invece è stata riscritta a mano, testo pulito e
+          affidabile.
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {(["tutte", "regole_base", "costa_spada"] as const).map((f) => (
@@ -505,9 +509,15 @@ function RegoleSection() {
               </button>
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-foreground">{selectedSection.titolo}</h2>
-                <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">
-                  📷 OCR
-                </span>
+                {selectedSection.fonte === "costa_spada" ? (
+                  <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">
+                    📷 OCR
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-accent-strong">
+                    ✓ Verificato
+                  </span>
+                )}
               </div>
               <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
                 {selectedSection.testo}
