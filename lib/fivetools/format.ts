@@ -83,8 +83,24 @@ const RANGE_SHAPE_NAMES: Record<string, string> = {
   cylinder: "Cilindro",
 };
 
+// Conversione ufficiale D&D ITA: 1,5 m per 5 piedi (non i 0,3048 reali) — le distanze di gioco
+// sono sempre multipli di 5 piedi, quindi *0.3 dà sempre un numero pulito (5→1,5, 10→3, 20→6…).
+function feetToMeters(amount: number): number {
+  return Math.round(amount * 0.3 * 10) / 10;
+}
+
+function formatDistanceAmount(amount: number, lang: "en" | "it"): string {
+  if (lang !== "it") return String(amount);
+  return String(feetToMeters(amount)).replace(".", ",");
+}
+
+export function formatFeet(amount: number, lang: "en" | "it" = "en"): string {
+  return `${formatDistanceAmount(amount, lang)} ${lang === "it" ? "metri" : "piedi"}`;
+}
+
 export function formatRange(
   range: { type: string; distance?: { type: string; amount?: number } } | undefined,
+  lang: "en" | "it" = "en",
 ): string {
   if (!range) return "—";
   if (range.type === "self") return "Su di sé";
@@ -93,8 +109,10 @@ export function formatRange(
 
   const distance = range.distance;
   if (!distance) return range.type;
-  const unit = distance.type === "feet" ? "piedi" : distance.type;
-  const amount = distance.amount ?? "";
+  const isFeet = distance.type === "feet";
+  const unit = isFeet ? (lang === "it" ? "metri" : "piedi") : distance.type;
+  const amount =
+    distance.amount === undefined ? "" : isFeet ? formatDistanceAmount(distance.amount, lang) : distance.amount;
 
   if (range.type === "point") return `${amount} ${unit}`;
   const shape = RANGE_SHAPE_NAMES[range.type];
@@ -161,7 +179,7 @@ const SPEED_LABELS: Record<string, string> = {
   burrow: "scavo",
 };
 
-export function formatSpeed(speed: RawCreature["speed"]): string {
+export function formatSpeed(speed: RawCreature["speed"], lang: "en" | "it" = "en"): string {
   if (!speed) return "—";
   const parts: string[] = [];
   for (const [key, value] of Object.entries(speed)) {
@@ -169,7 +187,8 @@ export function formatSpeed(speed: RawCreature["speed"]): string {
     const amount = typeof value === "number" ? value : typeof value === "object" ? value.number : null;
     if (!amount) continue;
     const label = SPEED_LABELS[key];
-    parts.push(`${label ? `${label} ` : ""}${amount} piedi`);
+    const unit = lang === "it" ? "metri" : "piedi";
+    parts.push(`${label ? `${label} ` : ""}${formatDistanceAmount(amount, lang)} ${unit}`);
   }
   return parts.join(", ") || "—";
 }
@@ -235,12 +254,19 @@ export function formatHitDie(hd: { number: number; faces: number } | undefined):
   return `${hd.number}d${hd.faces}`;
 }
 
-export function formatRaceSpeed(speed: number | Record<string, number> | undefined): string {
+export function formatRaceSpeed(
+  speed: number | Record<string, number> | undefined,
+  lang: "en" | "it" = "en",
+): string {
   if (speed === undefined) return "—";
-  if (typeof speed === "number") return `${speed} piedi`;
+  const unit = lang === "it" ? "metri" : "piedi";
+  if (typeof speed === "number") return `${formatDistanceAmount(speed, lang)} ${unit}`;
   return (
     Object.entries(speed)
-      .map(([key, value]) => `${SPEED_LABELS[key] ? `${SPEED_LABELS[key]} ` : ""}${value} piedi`)
+      .map(
+        ([key, value]) =>
+          `${SPEED_LABELS[key] ? `${SPEED_LABELS[key]} ` : ""}${formatDistanceAmount(value, lang)} ${unit}`,
+      )
       .join(", ") || "—"
   );
 }

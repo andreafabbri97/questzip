@@ -80,6 +80,7 @@ import {
   formatComponents,
   formatCreatureType,
   formatDuration,
+  formatFeet,
   formatHP,
   formatHitDie,
   formatMaterial,
@@ -745,7 +746,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
         <Stat label="Scuola" value={formatSchool(spell.school)} />
         <Stat label="Livello" value={spell.level === 0 ? "Trucchetto" : spell.level} />
         <Stat label="Tempo di lancio" value={formatTime(spell.time)} />
-        <Stat label="Gittata" value={formatRange(spell.range)} />
+        <Stat label="Gittata" value={formatRange(spell.range, language)} />
         <Stat label="Componenti" value={formatComponents(spell.components)} />
         <Stat label="Durata" value={formatDuration(spell.duration)} />
       </div>
@@ -886,7 +887,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
       <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
         <Stat label="CA" value={formatAC(creature.ac)} />
         <Stat label="PF" value={formatHP(creature.hp)} />
-        <Stat label="Velocità" value={formatSpeed(creature.speed)} />
+        <Stat label="Velocità" value={formatSpeed(creature.speed, language)} />
         <Stat label="Grado sfida" value={formatChallengeRating(creature.cr)} />
       </div>
       <div className="grid grid-cols-6 gap-2 text-center">
@@ -1027,9 +1028,12 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
     <>
       <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
         <Stat label="Taglia" value={formatSize(race.size)} />
-        <Stat label="Velocità" value={formatRaceSpeed(race.speed)} />
+        <Stat label="Velocità" value={formatRaceSpeed(race.speed, language)} />
         <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(race.ability)} />
-        <Stat label="Scurovisione" value={race.darkvision ? `${race.darkvision} piedi` : undefined} />
+        <Stat
+          label="Scurovisione"
+          value={race.darkvision ? formatFeet(race.darkvision, language) : undefined}
+        />
       </div>
       <div className="border-t border-edge pt-3">
         <EntriesBlock entries={race.entries} language={language} />
