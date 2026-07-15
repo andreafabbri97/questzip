@@ -214,6 +214,9 @@ export const encounterCombatants = pgTable("encounter_combatant", {
   hpMax: integer("hp_max").notNull(),
   hpAttuali: integer("hp_attuali").notNull(),
   isPg: boolean("is_pg").notNull().default(false),
+  condizioni: jsonb("condizioni").$type<string[]>().notNull().default([]),
+  tiriMorteSuccessi: integer("tiri_morte_successi").notNull().default(0),
+  tiriMorteFallimenti: integer("tiri_morte_fallimenti").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 

@@ -75,6 +75,7 @@ export const characterSchema = z.object({
   razza: z.string(),
   hpMax: z.number().int().min(1),
   hpAttuali: z.number().int(),
+  hpTemporanei: z.number().int().min(0).default(0),
   classeArmatura: z.number().int().min(1),
   velocita: z.number().int().min(0),
   caratteristiche: abilityScoresSchema,
@@ -83,6 +84,8 @@ export const characterSchema = z.object({
   abilitaEsperte: z.array(z.string()).default([]),
   slotUsati: z.array(z.number().int().min(0)).length(9).default([0, 0, 0, 0, 0, 0, 0, 0, 0]),
   slotPattoUsati: z.number().int().min(0).default(0),
+  tiriMorteSuccessi: z.number().int().min(0).max(3).default(0),
+  tiriMorteFallimenti: z.number().int().min(0).max(3).default(0),
   note: z.string(),
 });
 
@@ -112,6 +115,7 @@ export function newCharacter(): Character {
     razza: "",
     hpMax: 10,
     hpAttuali: 10,
+    hpTemporanei: 0,
     classeArmatura: 10,
     velocita: 9,
     caratteristiche: {
@@ -127,6 +131,8 @@ export function newCharacter(): Character {
     abilitaEsperte: [],
     slotUsati: [0, 0, 0, 0, 0, 0, 0, 0, 0],
     slotPattoUsati: 0,
+    tiriMorteSuccessi: 0,
+    tiriMorteFallimenti: 0,
     note: "",
   };
 }
@@ -145,6 +151,54 @@ export function skillModifier(
 ): number {
   const bonus = proficiencyBonus(level);
   return abilityModifier(score) + (expert ? bonus * 2 : proficient ? bonus : 0);
+}
+
+/** Percezione Passiva: 10 + il bonus della prova di Percezione (competenza/esperto inclusi). */
+export function passivePerception(
+  wisdomScore: number,
+  proficient: boolean,
+  expert: boolean,
+  level: number,
+): number {
+  return 10 + skillModifier(wisdomScore, proficient, expert, level);
+}
+
+/** Caratteristica da incantatore per classe (chiave inglese minuscola, stessa convenzione di
+ * FULL_CASTERS/HALF_CASTERS). Usata per calcolare CD e bonus d'attacco degli incantesimi. */
+const CASTING_ABILITY: Record<string, Ability> = {
+  bard: "carisma",
+  cleric: "saggezza",
+  druid: "saggezza",
+  sorcerer: "carisma",
+  warlock: "carisma",
+  wizard: "intelligenza",
+  paladin: "carisma",
+  ranger: "saggezza",
+  artificer: "intelligenza",
+};
+
+/** Trova la classe incantatrice "primaria" (di livello più alto) fra quelle del personaggio, per
+ * calcolare CD/bonus d'attacco degli incantesimi. Semplificazione: in un vero multiclasse ogni
+ * incantesimo usa la caratteristica della classe da cui proviene, ma per un riepilogo unico sulla
+ * scheda si prende la classe incantatrice con più livelli. */
+export function primaryCastingAbility(
+  classi: { nome: string; livello: number }[],
+): Ability | null {
+  let best: { livello: number; ability: Ability } | null = null;
+  for (const { nome, livello } of classi) {
+    const ability = CASTING_ABILITY[nome.trim().toLowerCase()];
+    if (!ability) continue;
+    if (!best || livello > best.livello) best = { livello, ability };
+  }
+  return best?.ability ?? null;
+}
+
+export function spellSaveDC(level: number, abilityScore: number): number {
+  return 8 + proficiencyBonus(level) + abilityModifier(abilityScore);
+}
+
+export function spellAttackBonus(level: number, abilityScore: number): number {
+  return proficiencyBonus(level) + abilityModifier(abilityScore);
 }
 
 export const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const;

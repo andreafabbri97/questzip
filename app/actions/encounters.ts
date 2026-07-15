@@ -108,7 +108,15 @@ export async function addPartyToEncounter(encounterId: string, campaignId: strin
 
 export async function updateCombatant(
   combatantId: string,
-  values: Partial<{ iniziativa: number; hpAttuali: number; hpMax: number; nome: string }>,
+  values: Partial<{
+    iniziativa: number;
+    hpAttuali: number;
+    hpMax: number;
+    nome: string;
+    condizioni: string[];
+    tiriMorteSuccessi: number;
+    tiriMorteFallimenti: number;
+  }>,
 ) {
   const userId = await requireUserId();
   const [combatant] = await db

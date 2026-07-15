@@ -596,6 +596,148 @@ function HpValue({
   );
 }
 
+const CONDIZIONI_5E = [
+  "Affascinato",
+  "Afferrato",
+  "Accecato",
+  "Assordato",
+  "Avvelenato",
+  "Incapacitato",
+  "Indebolito",
+  "Invisibile",
+  "Paralizzato",
+  "Pietrificato",
+  "Prono",
+  "Spaventato",
+  "Stordito",
+  "Trattenuto",
+];
+
+type Combatant = NonNullable<Awaited<ReturnType<typeof getActiveEncounter>>>["combatants"][number];
+
+function CombatantConditions({
+  combatant,
+  isDm,
+  onChange,
+}: {
+  combatant: Combatant;
+  isDm: boolean;
+  onChange: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const condizioni = combatant.condizioni;
+
+  if (condizioni.length === 0 && !isDm) return null;
+
+  const remove = async (condizione: string) => {
+    await updateCombatant(combatant.id, { condizioni: condizioni.filter((c) => c !== condizione) });
+    onChange();
+  };
+
+  const add = async (condizione: string) => {
+    setAdding(false);
+    if (!condizione || condizioni.includes(condizione)) return;
+    await updateCombatant(combatant.id, { condizioni: [...condizioni, condizione] });
+    onChange();
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {condizioni.map((condizione) => (
+        <span
+          key={condizione}
+          className="flex items-center gap-1 rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger"
+        >
+          {condizione}
+          {isDm && (
+            <button
+              onClick={() => remove(condizione)}
+              aria-label={`Rimuovi condizione ${condizione}`}
+              className="hover:text-foreground"
+            >
+              ×
+            </button>
+          )}
+        </span>
+      ))}
+      {isDm &&
+        (adding ? (
+          <select
+            autoFocus
+            defaultValue=""
+            onChange={(event) => add(event.target.value)}
+            onBlur={() => setAdding(false)}
+            className="rounded-full border border-edge bg-surface px-2 py-0.5 text-[10px] text-foreground"
+          >
+            <option value="" disabled>
+              Scegli…
+            </option>
+            {CONDIZIONI_5E.filter((c) => !condizioni.includes(c)).map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            className="rounded-full border border-dashed border-edge px-2 py-0.5 text-[10px] text-muted hover:text-foreground transition-colors"
+          >
+            + Condizione
+          </button>
+        ))}
+    </div>
+  );
+}
+
+function CombatantDeathSaves({
+  combatant,
+  isDm,
+  onChange,
+}: {
+  combatant: Combatant;
+  isDm: boolean;
+  onChange: () => void;
+}) {
+  const toggle = async (key: "tiriMorteSuccessi" | "tiriMorteFallimenti", index: number) => {
+    if (!isDm) return;
+    const current = combatant[key];
+    const next = index < current ? index : index + 1;
+    await updateCombatant(combatant.id, { [key]: next });
+    onChange();
+  };
+
+  const dots = (value: number, key: "tiriMorteSuccessi" | "tiriMorteFallimenti", color: string) =>
+    [0, 1, 2].map((i) => (
+      <button
+        key={i}
+        disabled={!isDm}
+        onClick={() => toggle(key, i)}
+        aria-label={`${key} ${i + 1}`}
+        className={`size-3.5 rounded-full border-2 transition-colors ${
+          i < value ? color : "border-edge bg-transparent"
+        }`}
+      />
+    ));
+
+  return (
+    <div className="flex items-center gap-3 text-[10px] text-muted">
+      <span className="font-bold text-danger">☠️ Tiri salvezza contro la morte</span>
+      <span className="flex items-center gap-1">
+        {dots(combatant.tiriMorteSuccessi, "tiriMorteSuccessi", "border-accent-strong bg-accent-strong")}
+      </span>
+      <span className="flex items-center gap-1">
+        {dots(combatant.tiriMorteFallimenti, "tiriMorteFallimenti", "border-danger bg-danger")}
+      </span>
+      {(combatant.tiriMorteSuccessi >= 3 || combatant.tiriMorteFallimenti >= 3) && (
+        <span className="font-bold text-foreground">
+          {combatant.tiriMorteSuccessi >= 3 ? "✓ Stabilizzato" : "✝ Morto"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function EncounterTracker({
   campaignId,
   isDm,
@@ -679,60 +821,88 @@ function EncounterTracker({
           {combatants.map((c, index) => (
             <li
               key={c.id}
-              className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors duration-300 ${
+              className={`rounded-lg border px-3 py-2 space-y-1.5 transition-colors duration-300 ${
                 index === encounter.currentTurn
                   ? "border-accent bg-accent/10"
                   : "border-edge bg-surface-raised"
               }`}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-bold text-muted w-6 shrink-0">{c.iniziativa}</span>
-                <span
-                  className={`text-sm truncate ${c.isPg ? "text-accent-strong font-bold" : "text-foreground"}`}
-                >
-                  {c.nome}
-                </span>
-              </div>
-              {isDm ? (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    onClick={async () => {
-                      await updateCombatant(c.id, { hpAttuali: Math.max(0, c.hpAttuali - 1) });
-                      refresh();
-                    }}
-                    className="size-6 rounded border border-edge text-danger text-xs transition-transform active:scale-90"
-                    aria-label="Togli un punto ferita"
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {isDm ? (
+                    <input
+                      type="number"
+                      value={c.iniziativa}
+                      onChange={async (event) => {
+                        const value = Number(event.target.value);
+                        if (Number.isNaN(value)) return;
+                        await updateCombatant(c.id, { iniziativa: value });
+                        refresh();
+                      }}
+                      aria-label={`Iniziativa di ${c.nome}`}
+                      className="w-10 shrink-0 rounded border border-edge bg-surface px-1 py-0.5 text-center text-xs font-bold text-muted"
+                    />
+                  ) : (
+                    <span className="text-xs font-bold text-muted w-6 shrink-0">{c.iniziativa}</span>
+                  )}
+                  <span
+                    className={`text-sm truncate ${c.isPg ? "text-accent-strong font-bold" : "text-foreground"}`}
                   >
-                    −
-                  </button>
-                  <HpValue hpAttuali={c.hpAttuali} hpMax={c.hpMax} />
-                  <button
-                    onClick={async () => {
-                      await updateCombatant(c.id, {
-                        hpAttuali: Math.min(c.hpMax, c.hpAttuali + 1),
-                      });
-                      refresh();
-                    }}
-                    className="size-6 rounded border border-edge text-accent-strong text-xs transition-transform active:scale-90"
-                    aria-label="Aggiungi un punto ferita"
-                  >
-                    +
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await removeCombatant(c.id);
-                      refresh();
-                    }}
-                    className="text-muted hover:text-danger text-xs ml-1 transition-colors"
-                    aria-label={`Rimuovi ${c.nome}`}
-                  >
-                    ×
-                  </button>
+                    {c.nome}
+                  </span>
                 </div>
-              ) : (
-                <span className="text-xs text-muted shrink-0">
-                  <HpValue hpAttuali={c.hpAttuali} hpMax={c.hpMax} suffix=" PF" />
-                </span>
+                {isDm ? (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={async () => {
+                        await updateCombatant(c.id, { hpAttuali: Math.max(0, c.hpAttuali - 1) });
+                        refresh();
+                      }}
+                      className="size-6 rounded border border-edge text-danger text-xs transition-transform active:scale-90"
+                      aria-label="Togli un punto ferita"
+                    >
+                      −
+                    </button>
+                    <HpValue hpAttuali={c.hpAttuali} hpMax={c.hpMax} />
+                    <button
+                      onClick={async () => {
+                        const hpAttuali = Math.min(c.hpMax, c.hpAttuali + 1);
+                        await updateCombatant(c.id, {
+                          hpAttuali,
+                          // recuperare anche un solo PF azzera i tiri salvezza contro la morte (regola RAW)
+                          ...(c.hpAttuali <= 0 && hpAttuali > 0
+                            ? { tiriMorteSuccessi: 0, tiriMorteFallimenti: 0 }
+                            : {}),
+                        });
+                        refresh();
+                      }}
+                      className="size-6 rounded border border-edge text-accent-strong text-xs transition-transform active:scale-90"
+                      aria-label="Aggiungi un punto ferita"
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await removeCombatant(c.id);
+                        refresh();
+                      }}
+                      className="text-muted hover:text-danger text-xs ml-1 transition-colors"
+                      aria-label={`Rimuovi ${c.nome}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted shrink-0">
+                    <HpValue hpAttuali={c.hpAttuali} hpMax={c.hpMax} suffix=" PF" />
+                  </span>
+                )}
+              </div>
+
+              <CombatantConditions combatant={c} isDm={isDm} onChange={refresh} />
+
+              {c.isPg && c.hpAttuali <= 0 && (
+                <CombatantDeathSaves combatant={c} isDm={isDm} onChange={refresh} />
               )}
             </li>
           ))}

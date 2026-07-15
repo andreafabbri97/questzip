@@ -18,11 +18,15 @@ import {
   multiclassCasterLevel,
   newCharacter,
   pactMagicForLevel,
+  passivePerception,
   pointBuyCost,
+  primaryCastingAbility,
   proficiencyBonus,
   roll4d6DropLowest,
   savingThrowModifier,
   skillModifier,
+  spellAttackBonus,
+  spellSaveDC,
   spellSlotsForCasterLevel,
   totalLevel,
   warlockLevel,
@@ -34,7 +38,9 @@ import { useLocalCollection } from "@/lib/storage";
 import {
   loadClassData,
   loadRaces,
+  resolveClassFeatures,
   resolveSubclassFeatures,
+  type RawRace,
   type RawSubclass,
 } from "@/lib/fivetools/data";
 import { RenderEntries } from "@/lib/fivetools/entries";
@@ -341,20 +347,30 @@ function CharacterSheet({
             >
               {character.hpAttuali}
               <span className="text-lg text-muted"> / {character.hpMax}</span>
+              {character.hpTemporanei > 0 && (
+                <span className="text-lg text-accent-strong"> +{character.hpTemporanei}</span>
+              )}
             </div>
             <p className="text-xs text-muted">punti ferita</p>
           </div>
           <button
-            onClick={() =>
-              set("hpAttuali", Math.min(character.hpMax, character.hpAttuali + 1))
-            }
+            onClick={() => {
+              const hpAttuali = Math.min(character.hpMax, character.hpAttuali + 1);
+              // recuperare anche un solo punto ferita azzera i tiri salvezza contro la morte (regola RAW)
+              const resetDeathSaves =
+                character.hpAttuali <= 0 && hpAttuali > 0
+                  ? { tiriMorteSuccessi: 0, tiriMorteFallimenti: 0 }
+                  : {};
+              onChange({ ...character, hpAttuali, ...resetDeathSaves });
+            }}
             className="size-11 rounded-full border border-edge bg-surface-raised text-accent-strong text-xl font-bold hover:border-accent transition-colors"
             aria-label="Aggiungi un punto ferita"
           >
             +
           </button>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        {character.hpAttuali <= 0 && <DeathSaves character={character} onChange={onChange} />}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <label className="block">
             <span className={labelClass}>PF max</span>
             <input
@@ -370,6 +386,19 @@ function CharacterSheet({
                   hpAttuali: Math.min(character.hpAttuali, hpMax),
                 });
               }}
+              className={inputClass}
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>PF temporanei</span>
+            <input
+              type="number"
+              min={0}
+              max={999}
+              value={character.hpTemporanei}
+              onChange={(event) =>
+                set("hpTemporanei", clampInt(event.target.value, 0, 999, character.hpTemporanei))
+              }
               className={inputClass}
             />
           </label>
@@ -403,7 +432,37 @@ function CharacterSheet({
             />
           </label>
         </div>
-        <HitPointCalculator character={character} onApply={(hpMax) => onChange({ ...character, hpMax, hpAttuali: hpMax })} />
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+            <span className={labelClass}>Iniziativa</span>
+            <p className="text-lg font-bold text-foreground">
+              {formatModifier(abilityModifier(character.caratteristiche.destrezza))}
+            </p>
+          </div>
+          <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+            <span className={labelClass}>Percezione passiva</span>
+            <p className="text-lg font-bold text-foreground">
+              {passivePerception(
+                character.caratteristiche.saggezza,
+                character.abilitaCompetenti.includes("Percezione"),
+                character.abilitaEsperte.includes("Percezione"),
+                totalLevel(character.classi),
+              )}
+            </p>
+          </div>
+        </div>
+        <HitPointCalculator
+          character={character}
+          onApply={(hpMax) =>
+            onChange({
+              ...character,
+              hpMax,
+              hpAttuali: hpMax,
+              tiriMorteSuccessi: 0,
+              tiriMorteFallimenti: 0,
+            })
+          }
+        />
       </section>
 
       <div className="mt-6 lg:mt-0">
@@ -412,6 +471,10 @@ function CharacterSheet({
       </div>
 
       <SavingThrowsAndSkills character={character} onChange={onChange} />
+
+      <RaceTraits razza={character.razza} />
+
+      <ClassFeaturesSection character={character} />
 
       <SpellSlotsSection character={character} onChange={onChange} />
 
@@ -783,6 +846,174 @@ function SubclassFeaturesToggle({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ClassFeaturesSection({ character }: { character: Character }) {
+  const classNames = Array.from(
+    new Set(character.classi.map((c) => c.nome.trim()).filter(Boolean)),
+  );
+  if (classNames.length === 0) return null;
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <h2 className="text-sm uppercase tracking-widest text-muted">Privilegi di classe</h2>
+      {classNames.map((name) => (
+        <ClassFeaturesToggle key={name} className={name} />
+      ))}
+    </section>
+  );
+}
+
+function ClassFeaturesToggle({ className }: { className: string }) {
+  const [showFeatures, setShowFeatures] = useState(false);
+  const [features, setFeatures] = useState<
+    { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
+  >(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadClassData().then((data) => {
+      if (cancelled) return;
+      const cls = data.classes.find((c) => c.name.toLowerCase() === className.trim().toLowerCase());
+      if (!cls) return;
+      setFeatures(resolveClassFeatures(data, cls));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [className]);
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowFeatures((prev) => !prev)}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        {showFeatures ? "Nascondi" : "Come funziona"} {className}
+      </button>
+      {showFeatures && (
+        <div className="mt-2 space-y-3 border-t border-edge pt-3">
+          {!features && <p className="text-sm text-muted">Caricamento…</p>}
+          {features?.map((feature) => (
+            <div
+              key={`${feature.name}-${feature.level}`}
+              className="rounded-lg border border-edge bg-surface-raised p-3"
+            >
+              <p className="text-sm font-bold text-foreground mb-1.5">
+                {feature.name}{" "}
+                <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+              </p>
+              <RenderEntries entries={feature.entries} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RaceTraits({ razza }: { razza: string }) {
+  const [showTraits, setShowTraits] = useState(false);
+  const [race, setRace] = useState<RawRace | null | undefined>(undefined);
+
+  useEffect(() => {
+    const name = razza.trim();
+    if (!name) return;
+    let cancelled = false;
+    loadRaces().then((races) => {
+      if (cancelled) return;
+      setRace(races.find((r) => r.name.toLowerCase() === name.toLowerCase()) ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [razza]);
+
+  if (!razza.trim() || race === null) return null;
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5">
+      <button
+        onClick={() => setShowTraits((prev) => !prev)}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        {showTraits ? "Nascondi" : "Come funziona"} {razza}
+      </button>
+      {showTraits && (
+        <div className="mt-3 border-t border-edge pt-3">
+          {!race && <p className="text-sm text-muted">Caricamento…</p>}
+          {race && <RenderEntries entries={race.entries} />}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DeathSaves({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const toggle = (key: "tiriMorteSuccessi" | "tiriMorteFallimenti", index: number) => {
+    const current = character[key];
+    // clic sul pallino già attivo più a destra = lo toglie, altrimenti riempie fino a quel punto
+    const next = index < current ? index : index + 1;
+    onChange({ ...character, [key]: next });
+  };
+
+  return (
+    <div className="mb-5 rounded-lg border border-danger/40 bg-danger/5 p-3 space-y-2">
+      <p className="text-xs font-bold text-danger">
+        ☠️ 0 PF — tiri salvezza contro la morte
+      </p>
+      <DeathSaveRow
+        label="Successi"
+        value={character.tiriMorteSuccessi}
+        color="border-accent-strong bg-accent-strong"
+        onToggle={(i) => toggle("tiriMorteSuccessi", i)}
+      />
+      <DeathSaveRow
+        label="Fallimenti"
+        value={character.tiriMorteFallimenti}
+        color="border-danger bg-danger"
+        onToggle={(i) => toggle("tiriMorteFallimenti", i)}
+      />
+      {(character.tiriMorteSuccessi >= 3 || character.tiriMorteFallimenti >= 3) && (
+        <p className="text-xs font-bold text-foreground">
+          {character.tiriMorteSuccessi >= 3 ? "✓ Stabilizzato" : "✝ Morto"}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DeathSaveRow({
+  label,
+  value,
+  color,
+  onToggle,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  onToggle: (index: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted w-20">{label}</span>
+      {[0, 1, 2].map((i) => (
+        <button
+          key={i}
+          onClick={() => onToggle(i)}
+          aria-label={`${label} ${i + 1}`}
+          className={`size-5 rounded-full border-2 transition-colors ${
+            i < value ? color : "border-edge bg-transparent"
+          }`}
+        />
+      ))}
     </div>
   );
 }
@@ -1207,6 +1438,9 @@ function SpellSlotsSection({
 
   if (casterLevel === 0 && wlLevel === 0) return null;
 
+  const castingAbility = primaryCastingAbility(character.classi);
+  const level = totalLevel(character.classi);
+
   const setUsed = (index: number, used: number) => {
     const max = maxSlots[index];
     const next = Math.min(max, Math.max(0, used));
@@ -1245,6 +1479,23 @@ function SpellSlotsSection({
           </button>
         </div>
       </div>
+
+      {castingAbility && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+            <span className="text-[10px] uppercase tracking-widest text-muted">CD tiro salvezza</span>
+            <p className="text-lg font-bold text-foreground">
+              {spellSaveDC(level, character.caratteristiche[castingAbility])}
+            </p>
+          </div>
+          <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+            <span className="text-[10px] uppercase tracking-widest text-muted">Bonus attacco</span>
+            <p className="text-lg font-bold text-foreground">
+              {formatModifier(spellAttackBonus(level, character.caratteristiche[castingAbility]))}
+            </p>
+          </div>
+        </div>
+      )}
 
       {casterLevel > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
