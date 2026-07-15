@@ -35,6 +35,7 @@ import {
   getIncantesimiIta,
   getMostriIta,
   getRazzeIta,
+  getRegoleIta,
 } from "@/app/actions/compendio-ita";
 
 // cache in memoria per la durata della pagina: gli elenchi sono piccoli, non serve rifetcharli
@@ -127,6 +128,7 @@ const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
 };
 
 export default function CompendiumPage() {
+  const [showRegole, setShowRegole] = useState(false);
   const [kind, setKind] = useState<CompendiumKind>("incantesimi");
   const [edition, setEdition] = useState<EditionFilter>("entrambe");
   const [language, setLanguage] = useState<Language>("en");
@@ -223,13 +225,14 @@ export default function CompendiumPage() {
           <button
             key={tab.kind}
             onClick={() => {
+              setShowRegole(false);
               setKind(tab.kind);
               setQuery("");
               setSelected(null);
               setPage(0);
             }}
             className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
-              kind === tab.kind
+              !showRegole && kind === tab.kind
                 ? "border-accent bg-accent/15 text-accent-strong"
                 : "border-edge bg-surface-raised text-muted hover:text-foreground"
             }`}
@@ -238,8 +241,23 @@ export default function CompendiumPage() {
             {tab.label}
           </button>
         ))}
+        <button
+          onClick={() => setShowRegole(true)}
+          className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+            showRegole
+              ? "border-accent bg-accent/15 text-accent-strong"
+              : "border-edge bg-surface-raised text-muted hover:text-foreground"
+          }`}
+        >
+          <span className="mr-1.5">📚</span>
+          Regole
+        </button>
       </div>
 
+      {showRegole && <RegoleSection />}
+
+      {!showRegole && (
+      <>
       <div className="flex flex-wrap gap-4">
         <div className="flex-1 min-w-[180px]">
           <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">Edizione</p>
@@ -371,6 +389,132 @@ export default function CompendiumPage() {
           ) : (
             <div className="flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">
               <p>Seleziona un elemento dall&apos;elenco per vedere i dettagli.</p>
+            </div>
+          )}
+        </div>
+      </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+const REGOLE_FONTI: Record<string, string> = {
+  regole_base: "Regole Principali",
+  costa_spada: "Costa della Spada",
+};
+
+// Sezione a sé, fuori dal sistema kind/Entry/LOADERS del resto del Compendio: quel sistema
+// presuppone dati bilingue EN/IT con edizione (dal mirror 5e.tools), mentre "Regole" è
+// contenuto italiano-solo estratto via OCR da scansioni pure — niente switch di lingua, niente
+// filtro edizione, solo un elenco di sezioni con un badge esplicito sulla qualità del testo.
+function RegoleSection() {
+  const [sections, setSections] = useState<Awaited<ReturnType<typeof getRegoleIta>> | null>(null);
+  const [fonte, setFonte] = useState<string>("tutte");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    getRegoleIta().then(setSections);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!sections) return [];
+    const q = query.trim().toLowerCase();
+    return sections
+      .filter((s) => fonte === "tutte" || s.fonte === fonte)
+      .filter((s) => !q || s.titolo.toLowerCase().includes(q) || s.testo.toLowerCase().includes(q))
+      .sort((a, b) => (a.pagina ?? 0) - (b.pagina ?? 0));
+  }, [sections, fonte, query]);
+
+  const selectedSection = selected !== null ? (sections?.find((s) => s.id === selected) ?? null) : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-edge bg-surface-raised p-3 text-xs text-muted">
+        ⚠️ Testo estratto via OCR da scansioni (non un vero testo digitale come il resto del
+        compendio): può contenere errori di riconoscimento. Utile per una ricerca rapida, non
+        garantito parola per parola.
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(["tutte", "regole_base", "costa_spada"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => {
+              setFonte(f);
+              setSelected(null);
+            }}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+              fonte === f
+                ? "border-accent bg-accent/15 text-accent-strong"
+                : "border-edge bg-surface-raised text-muted hover:text-foreground"
+            }`}
+          >
+            {f === "tutte" ? "Tutte le fonti" : REGOLE_FONTI[f]}
+          </button>
+        ))}
+      </div>
+
+      <input
+        value={query}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setSelected(null);
+        }}
+        placeholder="Cerca nel testo…"
+        className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
+      />
+
+      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] lg:gap-6 lg:items-start">
+        <div className={selectedSection ? "hidden lg:block space-y-2" : "space-y-2"}>
+          {sections === null && (
+            <p className="text-sm text-muted text-center py-6">Caricamento in corso…</p>
+          )}
+          {sections && filtered.length === 0 && (
+            <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
+          )}
+          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
+            {filtered.map((s) => (
+              <li key={s.id}>
+                <button
+                  onClick={() => setSelected(s.id)}
+                  className={`w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3 ${
+                    selected === s.id ? "lg:bg-surface-raised lg:border-l-2 lg:border-accent" : ""
+                  }`}
+                >
+                  <span className="min-w-0 font-bold text-foreground">{s.titolo}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted">
+                    {REGOLE_FONTI[s.fonte] ?? s.fonte}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className={selectedSection ? "min-w-0" : "hidden lg:block min-w-0"}>
+          {selectedSection ? (
+            <div className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+              <button
+                onClick={() => setSelected(null)}
+                className="lg:hidden text-sm text-muted hover:text-foreground"
+              >
+                ← Indietro
+              </button>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-foreground">{selectedSection.titolo}</h2>
+                <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">
+                  📷 OCR
+                </span>
+              </div>
+              <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+                {selectedSection.testo}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">
+              <p>Seleziona una sezione dall&apos;elenco per vedere il testo.</p>
             </div>
           )}
         </div>

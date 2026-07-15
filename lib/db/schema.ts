@@ -316,8 +316,6 @@ interface ClasseLivello {
   privilegi: string[];
 }
 
-// tabellaLivelli è vuota per le classi con colonne extra (incantesimi) dove l'estrazione
-// geometrica della tabella non è affidabile (vedi scripts/ita-compendio/extract_class_table.py)
 export const compendioItaClassi = pgTable("compendio_ita_classe", {
   id: uuid("id").primaryKey().defaultRandom(),
   nome: text("nome").notNull(),
@@ -331,5 +329,18 @@ export const compendioItaClassi = pgTable("compendio_ita_classe", {
   abilita: text("abilita"),
   equipaggiamento: text("equipaggiamento"),
   tabellaLivelli: jsonb("tabella_livelli").$type<Record<string, ClasseLivello>>().notNull(),
+  fonte: text("fonte").notNull(),
+});
+
+// Regole generali/lore (non incantesimi/mostri/razze/classi): "Regole principali" e "Guida
+// agli Avventurieri della Costa della Spada", entrambi PDF scansionati senza text layer,
+// estratti via OCR (scripts/ita-compendio/ocr_extract_pdf.py) — qualità nettamente inferiore
+// al resto del compendio (vero testo dai PDF, non riconosciuto da un'immagine). Una sezione
+// per pagina, mostrata in app con un badge esplicito che avvisa della qualità OCR.
+export const compendioItaRegole = pgTable("compendio_ita_regola", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  titolo: text("titolo").notNull(),
+  testo: text("testo").notNull(),
+  pagina: integer("pagina"),
   fonte: text("fonte").notNull(),
 });

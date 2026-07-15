@@ -14,6 +14,7 @@ import {
   compendioItaIncantesimi,
   compendioItaMostri,
   compendioItaRazze,
+  compendioItaRegole,
 } from "../../lib/db/schema.ts";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -141,6 +142,22 @@ async function seedClassi(bookKey) {
   console.log(`${classes.length} classi caricate da ${bookKey}.`);
 }
 
+async function seedRegole(bookKey) {
+  const filePath = path.join(PARSED_DIR, `${bookKey}-regole.json`);
+  const sections = JSON.parse(readFileSync(filePath, "utf-8"));
+
+  await db.delete(compendioItaRegole).where(eq(compendioItaRegole.fonte, bookKey));
+  for (const s of sections) {
+    await db.insert(compendioItaRegole).values({
+      titolo: s.titolo,
+      testo: s.testo,
+      pagina: s.pagina,
+      fonte: s.fonte,
+    });
+  }
+  console.log(`${sections.length} sezioni di regole caricate da ${bookKey}.`);
+}
+
 async function main() {
   await seedIncantesimi("phb");
   await seedIncantesimi("tasha");
@@ -150,6 +167,9 @@ async function main() {
   }
   await seedRazze("phb");
   await seedClassi("phb");
+  for (const book of ["regole_base", "costa_spada"]) {
+    await seedRegole(book);
+  }
   console.log("Fatto.");
 }
 

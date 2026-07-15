@@ -1,19 +1,15 @@
-// Unisce i campi base delle classi (parse-classi.mjs: dado vita, competenze, equipaggiamento —
-// affidabili per tutte e 12) con la tabella di progressione livelli (extract_class_table.py:
-// affidabile solo per 8/12, le classi con colonne extra per gli incantesimi hanno risultati
-// scarsi e vengono escluse dalla tabella, pur mantenendo i campi base).
+// Unisce i campi base delle classi (parse-classi.mjs: dado vita, competenze, equipaggiamento)
+// con la tabella di progressione livelli (extract_class_table.py). Dopo la riscrittura
+// dell'algoritmo (ancoraggio sul bonus di competenza + fallback sulla spaziatura fra righe,
+// invece di provare a leggere il numero di livello che su alcune righe non si estrae proprio
+// come testo) tutte e 12 le classi arrivano a 20/20 livelli, incluse le 4 incantatrici
+// principali (Mago, Stregone, Warlock) e il Monaco che prima restavano quasi vuote.
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PARSED_DIR = path.join(SCRIPT_DIR, "parsed");
-
-// tabelle di livello affidabili (16+/20 livelli estratti): le altre 4 (Mago, Monaco,
-// Stregone, Warlock) hanno colonne extra per gli incantesimi che rompono l'estrazione
-const RELIABLE_TABLES = new Set([
-  "Barbaro", "Bardo", "Chierico", "Druido", "Guerriero", "Ladro", "Paladino", "Ranger",
-]);
 
 function fixDiceNotation(text) {
   if (!text) return text;
@@ -38,7 +34,7 @@ const merged = base.map((c) => ({
   tiriSalvezza: c.tiriSalvezza,
   abilita: c.abilita,
   equipaggiamento: c.equipaggiamento,
-  tabellaLivelli: RELIABLE_TABLES.has(c.nome) ? (tables[c.nome] ?? {}) : {},
+  tabellaLivelli: tables[c.nome] ?? {},
   fonte: c.fonte,
 }));
 
