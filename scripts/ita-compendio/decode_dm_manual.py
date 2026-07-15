@@ -133,6 +133,8 @@ def cmd_align(start, end):
         for font, chars in saved.get("votes", {}).items():
             for wrong_char, counts in chars.items():
                 votes[font][wrong_char] = Counter(counts)
+        # riprende da dove si era fermata l'ultima esecuzione, invece di rifare pagine già viste
+        start = max(start, saved.get("last_page", -1) + 1)
 
     reader = easyocr.Reader(["it"], gpu=False)
     for i in range(start, end):
@@ -141,7 +143,10 @@ def cmd_align(start, end):
         print(f"pagina {i + 1}/{doc.page_count}: {len(votes)} font, {resolved} codici risolti finora")
         with open(MAP_PATH, "w", encoding="utf-8") as f:
             json.dump(
-                {"votes": {font: {c: dict(counts) for c, counts in chars.items()} for font, chars in votes.items()}},
+                {
+                    "last_page": i,
+                    "votes": {font: {c: dict(counts) for c, counts in chars.items()} for font, chars in votes.items()},
+                },
                 f,
                 ensure_ascii=False,
             )

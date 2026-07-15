@@ -1,11 +1,13 @@
 // Fan-out verso il Durable Object realtime (vedi party/campaign-room.ts), deployato
 // separatamente su Cloudflare. Le server action restano l'unica fonte di verità (scrivono
 // prima su Postgres), questo è solo un "hey, è cambiato qualcosa" best-effort verso i client
-// connessi: se PARTYKIT_HOST non è configurato o la richiesta fallisce, l'app continua a
-// funzionare esattamente come prima (nessun realtime, ma nessun errore per l'utente).
+// connessi: se NEXT_PUBLIC_PARTYKIT_HOST non è configurato o la richiesta fallisce, l'app
+// continua a funzionare esattamente come prima (nessun realtime, ma nessun errore per
+// l'utente). Stessa variabile usata dal client (lib/use-party-room.ts): il prefisso
+// NEXT_PUBLIC_ la rende disponibile anche lato server, non serve una seconda variabile.
 
 async function publish(room: string, body: unknown) {
-  const host = process.env.PARTYKIT_HOST;
+  const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
   if (!host) return;
   try {
     await fetch(`https://${host}/parties/main/${room}`, {

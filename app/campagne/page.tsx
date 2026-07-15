@@ -557,6 +557,45 @@ function CampaignDetailView({
   );
 }
 
+// Un breve lampo di colore quando i PF cambiano (danno/cura), sia da un click locale che da un
+// aggiornamento realtime in arrivo da un altro dispositivo — stesso segnale visivo in entrambi i
+// casi, perché entrambi passano dallo stesso stato React, non serve distinguerli.
+function HpValue({
+  hpAttuali,
+  hpMax,
+  suffix = "",
+}: {
+  hpAttuali: number;
+  hpMax: number;
+  suffix?: string;
+}) {
+  const [flash, setFlash] = useState<"su" | "giu" | null>(null);
+  const prevRef = useRef(hpAttuali);
+
+  useEffect(() => {
+    if (prevRef.current === hpAttuali) return;
+    setFlash(hpAttuali > prevRef.current ? "su" : "giu");
+    prevRef.current = hpAttuali;
+    const timeout = setTimeout(() => setFlash(null), 600);
+    return () => clearTimeout(timeout);
+  }, [hpAttuali]);
+
+  return (
+    <span
+      className={`inline-block w-16 rounded text-center text-xs transition-colors duration-500 ${
+        flash === "giu"
+          ? "bg-danger/25 text-danger"
+          : flash === "su"
+            ? "bg-accent/25 text-accent-strong"
+            : "text-foreground"
+      }`}
+    >
+      {hpAttuali}/{hpMax}
+      {suffix}
+    </span>
+  );
+}
+
 function EncounterTracker({
   campaignId,
   isDm,
@@ -640,7 +679,7 @@ function EncounterTracker({
           {combatants.map((c, index) => (
             <li
               key={c.id}
-              className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${
+              className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors duration-300 ${
                 index === encounter.currentTurn
                   ? "border-accent bg-accent/10"
                   : "border-edge bg-surface-raised"
@@ -661,14 +700,12 @@ function EncounterTracker({
                       await updateCombatant(c.id, { hpAttuali: Math.max(0, c.hpAttuali - 1) });
                       refresh();
                     }}
-                    className="size-6 rounded border border-edge text-danger text-xs"
+                    className="size-6 rounded border border-edge text-danger text-xs transition-transform active:scale-90"
                     aria-label="Togli un punto ferita"
                   >
                     −
                   </button>
-                  <span className="text-xs text-foreground w-14 text-center">
-                    {c.hpAttuali}/{c.hpMax}
-                  </span>
+                  <HpValue hpAttuali={c.hpAttuali} hpMax={c.hpMax} />
                   <button
                     onClick={async () => {
                       await updateCombatant(c.id, {
@@ -676,7 +713,7 @@ function EncounterTracker({
                       });
                       refresh();
                     }}
-                    className="size-6 rounded border border-edge text-accent-strong text-xs"
+                    className="size-6 rounded border border-edge text-accent-strong text-xs transition-transform active:scale-90"
                     aria-label="Aggiungi un punto ferita"
                   >
                     +
@@ -686,7 +723,7 @@ function EncounterTracker({
                       await removeCombatant(c.id);
                       refresh();
                     }}
-                    className="text-muted hover:text-danger text-xs ml-1"
+                    className="text-muted hover:text-danger text-xs ml-1 transition-colors"
                     aria-label={`Rimuovi ${c.nome}`}
                   >
                     ×
@@ -694,7 +731,7 @@ function EncounterTracker({
                 </div>
               ) : (
                 <span className="text-xs text-muted shrink-0">
-                  {c.hpAttuali}/{c.hpMax} PF
+                  <HpValue hpAttuali={c.hpAttuali} hpMax={c.hpMax} suffix=" PF" />
                 </span>
               )}
             </li>
@@ -1291,14 +1328,27 @@ function DungeonViewer({
     getDungeonTokens(dungeon.id).then(setRawTokens);
   }, [dungeon.id]);
 
+  const fetchingNewTokenRef = useRef(false);
   const { send } = usePartyRoom({ kind: "dungeon", dungeonId: dungeon.id }, (message) => {
     const msg = message as { type?: string; userId?: string; x?: number; y?: number } | null;
     if (msg?.type !== "move" || !msg.userId || typeof msg.x !== "number" || typeof msg.y !== "number") return;
-    setRawTokens((prev) =>
-      prev.some((t) => t.userId === msg.userId)
-        ? prev.map((t) => (t.userId === msg.userId ? { ...t, x: msg.x!, y: msg.y! } : t))
-        : prev,
-    );
+    setRawTokens((prev) => {
+      if (!prev.some((t) => t.userId === msg.userId)) {
+        // token di un giocatore che non avevamo ancora (l'ha appena piazzato per la prima
+        // volta): non basta il movimento per costruirlo (manca nome/immagine), si ricarica
+        // l'elenco intero per prenderlo con i dati giusti invece di ignorarlo in silenzio.
+        if (!fetchingNewTokenRef.current) {
+          fetchingNewTokenRef.current = true;
+          getDungeonTokens(dungeon.id)
+            .then(setRawTokens)
+            .finally(() => {
+              fetchingNewTokenRef.current = false;
+            });
+        }
+        return prev;
+      }
+      return prev.map((t) => (t.userId === msg.userId ? { ...t, x: msg.x!, y: msg.y! } : t));
+    });
   });
 
   const myToken = rawTokens.find((t) => t.userId === myUserId) ?? null;
@@ -1790,6 +1840,11 @@ function DungeonMap({
           const dragging = draggingTokenId === token.userId && dragPos;
           const cx = ((dragging ? dragPos!.x : token.x) + 0.5) * cellSize;
           const cy = ((dragging ? dragPos!.y : token.y) + 0.5) * cellSize;
+          // Mentre lo trascini tu, il token deve seguire il puntatore 1:1 senza ritardo —
+          // la transizione va disattivata solo per il TUO trascinamento attivo. In ogni altro
+          // caso (un token altrui che arriva via realtime, o lo scatto finale sulla cella
+          // dopo il rilascio) scivola dolcemente invece di teletrasportarsi.
+          const glide = dragging ? "none" : "cx 0.15s ease-out, cy 0.15s ease-out";
           return (
             <g
               key={token.userId}
@@ -1809,6 +1864,7 @@ function DungeonMap({
                 fill={token.color}
                 stroke={token.isMe ? "#ece5da" : "#0c0a09"}
                 strokeWidth={1.5}
+                style={{ transition: glide }}
               />
               <text
                 x={cx}
@@ -1818,6 +1874,7 @@ function DungeonMap({
                 fontSize={cellSize * 0.5}
                 fill="#0c0a09"
                 className="pointer-events-none select-none font-bold"
+                style={{ transition: glide }}
               >
                 {token.label}
               </text>
