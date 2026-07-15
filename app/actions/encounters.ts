@@ -63,7 +63,13 @@ export async function endEncounter(campaignId: string) {
 
 export async function addCombatant(
   encounterId: string,
-  combatant: { nome: string; iniziativa: number; hpMax: number; isPg?: boolean },
+  combatant: {
+    nome: string;
+    iniziativa: number;
+    hpMax: number;
+    isPg?: boolean;
+    azioniLeggendarieMax?: number;
+  },
 ) {
   const userId = await requireUserId();
   const encounter = await requireDmForEncounter(encounterId, userId);
@@ -74,6 +80,7 @@ export async function addCombatant(
     hpMax: combatant.hpMax,
     hpAttuali: combatant.hpMax,
     isPg: combatant.isPg ?? false,
+    azioniLeggendarieMax: combatant.azioniLeggendarieMax ?? 0,
   });
   await broadcastEncounterChanged(encounter.campaignId);
 }
@@ -116,6 +123,9 @@ export async function updateCombatant(
     condizioni: string[];
     tiriMorteSuccessi: number;
     tiriMorteFallimenti: number;
+    azioniLeggendarieMax: number;
+    azioniLeggendarieUsate: number;
+    concentrazione: string | null;
   }>,
 ) {
   const userId = await requireUserId();

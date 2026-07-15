@@ -50,7 +50,11 @@ import {
   DIFFICULTY_LABELS,
   encounterMultiplier,
   formatModifier,
+  multiclassCasterLevel,
+  pactMagicForLevel,
+  spellSlotsForCasterLevel,
   totalLevel,
+  warlockLevel,
   xpBudget,
   XP_BY_CR,
   type Ability,
@@ -483,6 +487,7 @@ function CampaignDetailView({
                       ),
                     )}
                   </div>
+                  <PartySpellSlots classi={pc.classi} slotUsati={pc.slotUsati} slotPattoUsati={pc.slotPattoUsati} />
                 </li>
               );
             })}
@@ -738,6 +743,146 @@ function CombatantDeathSaves({
   );
 }
 
+function CombatantLegendaryActions({
+  combatant,
+  isDm,
+  onChange,
+}: {
+  combatant: Combatant;
+  isDm: boolean;
+  onChange: () => void;
+}) {
+  const remaining = combatant.azioniLeggendarieMax - combatant.azioniLeggendarieUsate;
+
+  const spend = async (delta: number) => {
+    if (!isDm) return;
+    const next = Math.min(
+      combatant.azioniLeggendarieMax,
+      Math.max(0, combatant.azioniLeggendarieUsate + delta),
+    );
+    await updateCombatant(combatant.id, { azioniLeggendarieUsate: next });
+    onChange();
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-[10px] text-muted">
+      <span className="font-bold text-accent-strong">★ Azioni leggendarie</span>
+      <span className="text-foreground">
+        {remaining}/{combatant.azioniLeggendarieMax}
+      </span>
+      {isDm && (
+        <>
+          <button
+            onClick={() => spend(-1)}
+            className="size-4 rounded border border-edge text-accent-strong leading-none"
+            aria-label="Recupera un'azione leggendaria"
+          >
+            +
+          </button>
+          <button
+            onClick={() => spend(1)}
+            className="size-4 rounded border border-edge text-danger leading-none"
+            aria-label="Spendi un'azione leggendaria"
+          >
+            −
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CombatantConcentration({
+  combatant,
+  isDm,
+  onChange,
+}: {
+  combatant: Combatant;
+  isDm: boolean;
+  onChange: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(combatant.concentrazione ?? "");
+
+  const save = async () => {
+    setEditing(false);
+    await updateCombatant(combatant.id, { concentrazione: value.trim() || null });
+    onChange();
+  };
+
+  if (!isDm && !combatant.concentrazione) return null;
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          autoFocus
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={save}
+          onKeyDown={(event) => event.key === "Enter" && save()}
+          placeholder="Nome incantesimo"
+          className="rounded border border-edge bg-surface px-1.5 py-0.5 text-[10px] text-foreground"
+        />
+      </div>
+    );
+  }
+
+  return combatant.concentrazione ? (
+    <button
+      onClick={() => isDm && setEditing(true)}
+      className="flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent-strong w-fit"
+    >
+      🔮 Concentrazione: {combatant.concentrazione}
+    </button>
+  ) : (
+    <button
+      onClick={() => setEditing(true)}
+      className="rounded-full border border-dashed border-edge px-2 py-0.5 text-[10px] text-muted hover:text-foreground transition-colors w-fit"
+    >
+      + Concentrazione
+    </button>
+  );
+}
+
+// Sola lettura: gli slot si modificano sulla scheda in Personaggi, qui il party vede solo
+// l'ultimo stato sincronizzato (stesso principio "scatto, non live" già usato per il resto
+// della scheda condivisa in campagna).
+function PartySpellSlots({
+  classi,
+  slotUsati,
+  slotPattoUsati,
+}: {
+  classi: { nome: string; livello: number }[];
+  slotUsati: number[];
+  slotPattoUsati: number;
+}) {
+  const casterLevel = multiclassCasterLevel(classi);
+  const wlLevel = warlockLevel(classi);
+  if (casterLevel === 0 && wlLevel === 0) return null;
+
+  const maxSlots = spellSlotsForCasterLevel(casterLevel);
+  const pact = pactMagicForLevel(wlLevel);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-edge">
+      <span className="text-[9px] uppercase tracking-widest text-muted">Slot</span>
+      {maxSlots.map((max, index) =>
+        max > 0 ? (
+          <span key={index} className="text-[10px] text-foreground">
+            {index + 1}°: {max - (slotUsati[index] ?? 0)}/{max}
+          </span>
+        ) : null,
+      )}
+      {pact.slots > 0 && (
+        <span className="text-[10px] text-accent-strong">
+          Patto ({pact.slotLevel}°): {pact.slots - slotPattoUsati}/{pact.slots}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function EncounterTracker({
   campaignId,
   isDm,
@@ -901,6 +1046,12 @@ function EncounterTracker({
 
               <CombatantConditions combatant={c} isDm={isDm} onChange={refresh} />
 
+              {!c.isPg && c.azioniLeggendarieMax > 0 && (
+                <CombatantLegendaryActions combatant={c} isDm={isDm} onChange={refresh} />
+              )}
+
+              {c.isPg && <CombatantConcentration combatant={c} isDm={isDm} onChange={refresh} />}
+
               {c.isPg && c.hpAttuali <= 0 && (
                 <CombatantDeathSaves combatant={c} isDm={isDm} onChange={refresh} />
               )}
@@ -936,11 +1087,13 @@ function EncounterDmControls({
   const [nome, setNome] = useState("");
   const [iniziativa, setIniziativa] = useState(10);
   const [hpMax, setHpMax] = useState(10);
+  const [azioniLeggendarieMax, setAzioniLeggendarieMax] = useState(0);
 
   const add = async () => {
     if (!nome.trim() || hpMax < 1) return;
-    await addCombatant(encounter.id, { nome: nome.trim(), iniziativa, hpMax });
+    await addCombatant(encounter.id, { nome: nome.trim(), iniziativa, hpMax, azioniLeggendarieMax });
     setNome("");
+    setAzioniLeggendarieMax(0);
     onChange();
   };
 
@@ -957,9 +1110,10 @@ function EncounterDmControls({
           + Aggiungi il party
         </button>
         <MonsterQuickAdd
-          onPick={(name, hp) => {
+          onPick={(name, hp, legendaryActions) => {
             setNome(name);
             setHpMax(hp);
+            setAzioniLeggendarieMax(legendaryActions);
           }}
         />
       </div>
@@ -995,6 +1149,16 @@ function EncounterDmControls({
             value={hpMax}
             onChange={(event) => setHpMax(Math.max(1, Number(event.target.value) || 1))}
             className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted">
+          Az. legg.
+          <input
+            type="number"
+            min={0}
+            value={azioniLeggendarieMax}
+            onChange={(event) => setAzioniLeggendarieMax(Math.max(0, Number(event.target.value) || 0))}
+            className="w-12 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
         <button
@@ -1130,7 +1294,11 @@ function combatantHp(creature: RawCreature): number {
   return creature.hp.average ?? 10;
 }
 
-function MonsterQuickAdd({ onPick }: { onPick: (name: string, hp: number) => void }) {
+function MonsterQuickAdd({
+  onPick,
+}: {
+  onPick: (name: string, hp: number, legendaryActions: number) => void;
+}) {
   const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -1169,13 +1337,16 @@ function MonsterQuickAdd({ onPick }: { onPick: (name: string, hp: number) => voi
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  onPick(c.name, combatantHp(c));
+                  onPick(c.name, combatantHp(c), c.legendary && c.legendary.length > 0 ? 3 : 0);
                   setQuery("");
                   setOpen(false);
                 }}
                 className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-surface transition-colors"
               >
                 {c.name} <span className="text-muted">({combatantHp(c)} PF)</span>
+                {c.legendary && c.legendary.length > 0 && (
+                  <span className="ml-1 text-accent-strong">★</span>
+                )}
               </button>
             </li>
           ))}

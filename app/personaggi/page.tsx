@@ -8,6 +8,7 @@ import {
   ABILITIES,
   ABILITY_CODE_TO_KEY,
   ABILITY_LABELS,
+  ALIGNMENTS,
   POINT_BUY_BUDGET,
   SKILLS,
   STANDARD_ARRAY,
@@ -15,6 +16,7 @@ import {
   calculateMulticlassHitPoints,
   characterSchema,
   formatModifier,
+  levelForXp,
   multiclassCasterLevel,
   newCharacter,
   pactMagicForLevel,
@@ -30,14 +32,18 @@ import {
   spellSlotsForCasterLevel,
   totalLevel,
   warlockLevel,
+  xpForNextLevel,
   type Ability,
   type Character,
   type ClassEntry,
+  type InventoryItem,
+  type KnownSpell,
 } from "@/lib/dnd";
 import { useLocalCollection } from "@/lib/storage";
 import {
   loadClassData,
   loadRaces,
+  loadSpells,
   resolveClassFeatures,
   resolveSubclassFeatures,
   type RawRace,
@@ -275,6 +281,21 @@ function CharacterSheet({
               inputClassName={inputClass}
             />
           </label>
+          <label className="block">
+            <span className={labelClass}>Allineamento</span>
+            <select
+              value={character.allineamento}
+              onChange={(event) => set("allineamento", event.target.value)}
+              className={inputClass}
+            >
+              <option value="">— non scelto —</option>
+              {ALIGNMENTS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
         </section>
 
         <section className="rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
@@ -317,6 +338,7 @@ function CharacterSheet({
               {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
             </span>
           </p>
+          <XpTracker character={character} onChange={onChange} />
         </section>
       </div>
 
@@ -476,7 +498,13 @@ function CharacterSheet({
 
       <ClassFeaturesSection character={character} />
 
+      <PersonalitySection character={character} onChange={onChange} />
+
+      <InventorySection character={character} onChange={onChange} />
+
       <SpellSlotsSection character={character} onChange={onChange} />
+
+      <SpellListSection character={character} onChange={onChange} />
 
       <section className="rounded-xl border border-edge bg-surface p-5">
         <label className="block">
@@ -484,7 +512,7 @@ function CharacterSheet({
           <textarea
             value={character.note}
             onChange={(event) => set("note", event.target.value)}
-            placeholder="Equipaggiamento, incantesimi, background…"
+            placeholder="Retroscena, alleati, altri dettagli…"
             rows={5}
             className={inputClass}
           />
@@ -946,6 +974,298 @@ function RaceTraits({ razza }: { razza: string }) {
           {race && <RenderEntries entries={race.entries} />}
         </div>
       )}
+    </section>
+  );
+}
+
+function XpTracker({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const level = totalLevel(character.classi);
+  const next = xpForNextLevel(level);
+  const derivedLevel = levelForXp(character.esperienza);
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <label className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-widest text-muted">XP</span>
+        <input
+          type="number"
+          min={0}
+          max={999999}
+          value={character.esperienza}
+          onChange={(event) => {
+            const parsed = Number(event.target.value);
+            onChange({
+              ...character,
+              esperienza: Number.isNaN(parsed) ? character.esperienza : Math.max(0, Math.trunc(parsed)),
+            });
+          }}
+          className="w-24 rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground"
+        />
+      </label>
+      <p className="text-xs text-muted">
+        {next === null
+          ? "Livello massimo raggiunto."
+          : `Prossimo livello a ${next.toLocaleString("it-IT")} XP.`}
+      </p>
+      {derivedLevel !== level && (
+        <p className="text-xs font-bold text-accent-strong">
+          ⚠️ Gli XP corrispondono al livello {derivedLevel}, le classi sommano al livello {level} —
+          aggiorna il livello di classe quando sali.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PersonalitySection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const set = <K extends keyof Character>(key: K, value: Character[K]) =>
+    onChange({ ...character, [key]: value });
+  const fieldClass =
+    "mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground";
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5">
+      <button
+        onClick={() => setExpanded((prev) => !prev)}
+        className="text-sm uppercase tracking-widest text-muted hover:text-foreground transition-colors"
+      >
+        Personalità {expanded ? "▲" : "▼"}
+      </button>
+      {expanded && (
+        <div className="mt-3 grid sm:grid-cols-2 gap-3 border-t border-edge pt-3">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted">Tratti caratteriali</span>
+            <textarea
+              value={character.tratti}
+              onChange={(event) => set("tratti", event.target.value)}
+              rows={3}
+              className={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted">Legami</span>
+            <textarea
+              value={character.legami}
+              onChange={(event) => set("legami", event.target.value)}
+              rows={3}
+              className={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted">Ideali</span>
+            <textarea
+              value={character.ideali}
+              onChange={(event) => set("ideali", event.target.value)}
+              rows={3}
+              className={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted">Difetti</span>
+            <textarea
+              value={character.difetti}
+              onChange={(event) => set("difetti", event.target.value)}
+              rows={3}
+              className={fieldClass}
+            />
+          </label>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function InventorySection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const setInventario = (inventario: InventoryItem[]) => onChange({ ...character, inventario });
+  const setMonete = (monete: Character["monete"]) => onChange({ ...character, monete });
+
+  const addItem = () =>
+    setInventario([...character.inventario, { id: crypto.randomUUID(), nome: "", quantita: 1, note: "" }]);
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Equipaggiamento</h2>
+        <button onClick={addItem} className="text-xs font-bold text-accent-strong hover:underline">
+          + Aggiungi oggetto
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {(["oro", "argento", "rame"] as const).map((moneta) => (
+          <label key={moneta} className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted capitalize">{moneta}</span>
+            <input
+              type="number"
+              min={0}
+              value={character.monete[moneta]}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                setMonete({
+                  ...character.monete,
+                  [moneta]: Number.isNaN(parsed) ? 0 : Math.max(0, Math.trunc(parsed)),
+                });
+              }}
+              className="mt-1 w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+            />
+          </label>
+        ))}
+      </div>
+
+      {character.inventario.length > 0 && (
+        <div className="space-y-2">
+          {character.inventario.map((item) => (
+            <div key={item.id} className="flex items-center gap-2">
+              <input
+                value={item.nome}
+                onChange={(event) =>
+                  setInventario(
+                    character.inventario.map((i) =>
+                      i.id === item.id ? { ...i, nome: event.target.value } : i,
+                    ),
+                  )
+                }
+                placeholder="Nome oggetto"
+                className="flex-1 min-w-0 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+              />
+              <input
+                type="number"
+                min={1}
+                value={item.quantita}
+                onChange={(event) => {
+                  const parsed = Number(event.target.value);
+                  setInventario(
+                    character.inventario.map((i) =>
+                      i.id === item.id
+                        ? { ...i, quantita: Number.isNaN(parsed) ? 1 : Math.max(1, Math.trunc(parsed)) }
+                        : i,
+                    ),
+                  );
+                }}
+                className="w-16 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground text-center"
+              />
+              <button
+                onClick={() => setInventario(character.inventario.filter((i) => i.id !== item.id))}
+                className="text-muted hover:text-danger text-sm shrink-0"
+                aria-label={`Rimuovi ${item.nome || "oggetto"}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SpellListSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const casterLevel = multiclassCasterLevel(character.classi);
+  const wlLevel = warlockLevel(character.classi);
+  if (casterLevel === 0 && wlLevel === 0) return null;
+
+  const setIncantesimi = (incantesimi: KnownSpell[]) => onChange({ ...character, incantesimi });
+
+  const addSpell = () =>
+    setIncantesimi([
+      ...character.incantesimi,
+      { id: crypto.randomUUID(), nome: "", livello: 0, preparato: false },
+    ]);
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Incantesimi conosciuti</h2>
+        <button onClick={addSpell} className="text-xs font-bold text-accent-strong hover:underline">
+          + Aggiungi incantesimo
+        </button>
+      </div>
+      {character.incantesimi.length === 0 && (
+        <p className="text-sm text-muted">Nessun incantesimo aggiunto ancora.</p>
+      )}
+      <div className="space-y-2">
+        {character.incantesimi.map((spell) => (
+          <div key={spell.id} className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <Autocomplete
+                value={spell.nome}
+                onChange={(nome) =>
+                  setIncantesimi(
+                    character.incantesimi.map((s) => (s.id === spell.id ? { ...s, nome } : s)),
+                  )
+                }
+                loader={loadSpells}
+                placeholder="Fireball, Cure Wounds…"
+                inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+              />
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={9}
+              value={spell.livello}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                setIncantesimi(
+                  character.incantesimi.map((s) =>
+                    s.id === spell.id
+                      ? { ...s, livello: Number.isNaN(parsed) ? 0 : Math.min(9, Math.max(0, Math.trunc(parsed))) }
+                      : s,
+                  ),
+                );
+              }}
+              aria-label="Livello incantesimo"
+              className="w-14 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground text-center"
+            />
+            <label className="flex items-center gap-1 text-xs text-muted shrink-0">
+              <input
+                type="checkbox"
+                checked={spell.preparato}
+                onChange={(event) =>
+                  setIncantesimi(
+                    character.incantesimi.map((s) =>
+                      s.id === spell.id ? { ...s, preparato: event.target.checked } : s,
+                    ),
+                  )
+                }
+              />
+              Preparato
+            </label>
+            <button
+              onClick={() => setIncantesimi(character.incantesimi.filter((s) => s.id !== spell.id))}
+              className="text-muted hover:text-danger text-sm shrink-0"
+              aria-label={`Rimuovi ${spell.nome || "incantesimo"}`}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

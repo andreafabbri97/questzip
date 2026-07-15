@@ -185,6 +185,8 @@ export const campaignCharacters = pgTable(
     classeArmatura: integer("classe_armatura").notNull(),
     velocita: integer("velocita").notNull(),
     caratteristiche: jsonb("caratteristiche").$type<Record<Ability, number>>().notNull(),
+    slotUsati: jsonb("slot_usati").$type<number[]>().notNull().default([0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    slotPattoUsati: integer("slot_patto_usati").notNull().default(0),
     note: text("note").notNull().default(""),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
@@ -217,6 +219,9 @@ export const encounterCombatants = pgTable("encounter_combatant", {
   condizioni: jsonb("condizioni").$type<string[]>().notNull().default([]),
   tiriMorteSuccessi: integer("tiri_morte_successi").notNull().default(0),
   tiriMorteFallimenti: integer("tiri_morte_fallimenti").notNull().default(0),
+  azioniLeggendarieMax: integer("azioni_leggendarie_max").notNull().default(0),
+  azioniLeggendarieUsate: integer("azioni_leggendarie_usate").notNull().default(0),
+  concentrazione: text("concentrazione"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 

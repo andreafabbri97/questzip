@@ -68,6 +68,22 @@ export const classEntrySchema = z.object({
 
 export type ClassEntry = z.infer<typeof classEntrySchema>;
 
+export const inventoryItemSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  quantita: z.number().int().min(1).default(1),
+  note: z.string().default(""),
+});
+export type InventoryItem = z.infer<typeof inventoryItemSchema>;
+
+export const knownSpellSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  livello: z.number().int().min(0).max(9).default(0),
+  preparato: z.boolean().default(false),
+});
+export type KnownSpell = z.infer<typeof knownSpellSchema>;
+
 export const characterSchema = z.object({
   id: z.string(),
   nome: z.string().min(1),
@@ -86,6 +102,21 @@ export const characterSchema = z.object({
   slotPattoUsati: z.number().int().min(0).default(0),
   tiriMorteSuccessi: z.number().int().min(0).max(3).default(0),
   tiriMorteFallimenti: z.number().int().min(0).max(3).default(0),
+  esperienza: z.number().int().min(0).default(0),
+  allineamento: z.string().default(""),
+  tratti: z.string().default(""),
+  legami: z.string().default(""),
+  ideali: z.string().default(""),
+  difetti: z.string().default(""),
+  inventario: z.array(inventoryItemSchema).default([]),
+  monete: z
+    .object({
+      oro: z.number().int().min(0).default(0),
+      argento: z.number().int().min(0).default(0),
+      rame: z.number().int().min(0).default(0),
+    })
+    .default({ oro: 0, argento: 0, rame: 0 }),
+  incantesimi: z.array(knownSpellSchema).default([]),
   note: z.string(),
 });
 
@@ -94,6 +125,38 @@ export type Character = z.infer<typeof characterSchema>;
 export function totalLevel(classi: ClassEntry[]): number {
   return classi.reduce((sum, entry) => sum + entry.livello, 0);
 }
+
+/** Punti esperienza richiesti per raggiungere ciascun livello (1-20), regole standard 5e. */
+export const XP_PER_LEVEL = [
+  0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000,
+  165000, 195000, 225000, 265000, 305000, 355000,
+];
+
+/** Livello corrispondente a un totale di XP (1-20). */
+export function levelForXp(xp: number): number {
+  let level = 1;
+  for (let i = 0; i < XP_PER_LEVEL.length; i++) {
+    if (xp >= XP_PER_LEVEL[i]) level = i + 1;
+  }
+  return level;
+}
+
+/** XP richiesti per il prossimo livello, o null se già al livello 20 (massimo). */
+export function xpForNextLevel(level: number): number | null {
+  return level >= 20 ? null : XP_PER_LEVEL[level];
+}
+
+export const ALIGNMENTS = [
+  "Legale Buono",
+  "Neutrale Buono",
+  "Caotico Buono",
+  "Legale Neutrale",
+  "Neutrale",
+  "Caotico Neutrale",
+  "Legale Malvagio",
+  "Neutrale Malvagio",
+  "Caotico Malvagio",
+] as const;
 
 export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
@@ -133,6 +196,15 @@ export function newCharacter(): Character {
     slotPattoUsati: 0,
     tiriMorteSuccessi: 0,
     tiriMorteFallimenti: 0,
+    esperienza: 0,
+    allineamento: "",
+    tratti: "",
+    legami: "",
+    ideali: "",
+    difetti: "",
+    inventario: [],
+    monete: { oro: 0, argento: 0, rame: 0 },
+    incantesimi: [],
     note: "",
   };
 }

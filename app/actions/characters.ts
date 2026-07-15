@@ -21,6 +21,8 @@ export async function syncCharacterToCampaign(campaignId: string, character: Cha
     classeArmatura: character.classeArmatura,
     velocita: character.velocita,
     caratteristiche: character.caratteristiche,
+    slotUsati: character.slotUsati,
+    slotPattoUsati: character.slotPattoUsati,
     note: character.note,
     updatedAt: new Date(),
   };
@@ -49,6 +51,8 @@ export async function getPartyForCampaign(campaignId: string) {
       hpAttuali: campaignCharacters.hpAttuali,
       classeArmatura: campaignCharacters.classeArmatura,
       caratteristiche: campaignCharacters.caratteristiche,
+      slotUsati: campaignCharacters.slotUsati,
+      slotPattoUsati: campaignCharacters.slotPattoUsati,
       updatedAt: campaignCharacters.updatedAt,
     })
     .from(campaignCharacters)
