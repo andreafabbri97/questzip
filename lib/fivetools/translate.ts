@@ -10,6 +10,27 @@ import { useEffect, useState } from "react";
 const CACHE_KEY = "questzip:translate-cache";
 const CACHE_LIMIT = 1000;
 
+// Google Translate legge questi come parole comuni ("rogue" = "briccone"), non come nomi
+// ufficiali di classe D&D — corretti a mano prima ancora di guardare la cache, così un valore
+// sbagliato già salvato in una sessione precedente non resta appiccicato per sempre. Elenco
+// piccolo e fisso (le classi base + Artefice), stesso principio già usato altrove nel progetto
+// per correggere singoli termini noti invece di affidarsi solo al traduttore automatico.
+const KNOWN_EN_TO_IT: Record<string, string> = {
+  barbarian: "Barbaro",
+  bard: "Bardo",
+  cleric: "Chierico",
+  druid: "Druido",
+  fighter: "Guerriero",
+  rogue: "Ladro",
+  wizard: "Mago",
+  monk: "Monaco",
+  paladin: "Paladino",
+  ranger: "Ranger",
+  sorcerer: "Stregone",
+  warlock: "Warlock",
+  artificer: "Artefice",
+};
+
 let cache: Record<string, string> | null = null;
 
 function loadCache(): Record<string, string> {
@@ -39,6 +60,11 @@ export async function translateText(
 ): Promise<string | null> {
   const trimmed = text.trim();
   if (!trimmed) return trimmed;
+
+  if (source === "en" && target === "it") {
+    const known = KNOWN_EN_TO_IT[trimmed.toLowerCase()];
+    if (known) return known;
+  }
 
   const store = loadCache();
   const key = `${source}>${target}:${trimmed}`;
