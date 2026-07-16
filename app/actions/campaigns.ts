@@ -10,6 +10,7 @@ import {
   campaigns,
   users,
 } from "@/lib/db/schema";
+import { broadcastJukeboxChanged } from "@/lib/party";
 
 export async function createCampaign(nome: string, descrizione: string) {
   const userId = await requireUserId();
@@ -147,6 +148,30 @@ export async function addSessionNote(campaignId: string, titolo: string, testo: 
   const userId = await requireUserId();
   await requireMember(campaignId, userId);
   await db.insert(campaignSessionNotes).values({ campaignId, authorId: userId, titolo, testo });
+}
+
+// Jukebox condiviso: un solo brano "in riproduzione" per campagna (niente coda). Il master
+// imposta l'URL, gli altri lo leggono via realtime ma devono comunque cliccare "riproduci" sul
+// proprio dispositivo — i browser bloccano l'autoplay audio senza un gesto utente diretto, non
+// e' aggirabile lato client.
+export async function setJukeboxTrack(campaignId: string, url: string, titolo: string) {
+  const userId = await requireUserId();
+  await requireDm(campaignId, userId);
+  await db
+    .update(campaigns)
+    .set({ jukeboxUrl: url.trim() || null, jukeboxTitolo: titolo.trim() || null })
+    .where(eq(campaigns.id, campaignId));
+  await broadcastJukeboxChanged(campaignId);
+}
+
+export async function stopJukebox(campaignId: string) {
+  const userId = await requireUserId();
+  await requireDm(campaignId, userId);
+  await db
+    .update(campaigns)
+    .set({ jukeboxUrl: null, jukeboxTitolo: null })
+    .where(eq(campaigns.id, campaignId));
+  await broadcastJukeboxChanged(campaignId);
 }
 
 export async function deleteSessionNote(noteId: string) {

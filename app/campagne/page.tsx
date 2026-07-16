@@ -14,7 +14,9 @@ import {
   leaveCampaign,
   redeemInvite,
   removeMember,
+  setJukeboxTrack,
   setMemberRole,
+  stopJukebox,
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign, grantXp, grantXpToParty } from "@/app/actions/characters";
 import {
@@ -420,6 +422,8 @@ function CampaignDetailView({
           <p className="text-sm text-muted">{detail.campaign.descrizione}</p>
         )}
       </section>
+
+      <JukeboxPlayer campaignId={campaignId} isDm={isDm} campaign={detail.campaign} onChanged={refresh} />
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -920,6 +924,143 @@ function PartySpellSlots({
         </span>
       )}
     </div>
+  );
+}
+
+function getYouTubeEmbedUrl(url: string): string | null {
+  const match = url.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/,
+  );
+  return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1` : null;
+}
+
+function JukeboxPlayer({
+  campaignId,
+  isDm,
+  campaign,
+  onChanged,
+}: {
+  campaignId: string;
+  isDm: boolean;
+  campaign: { jukeboxUrl: string | null; jukeboxTitolo: string | null };
+  onChanged: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [titolo, setTitolo] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
+  usePartyRoom({ kind: "combat", campaignId }, (message) => {
+    if ((message as { type?: string } | null)?.type === "jukebox-changed") {
+      setPlaying(false);
+      onChanged();
+    }
+  });
+
+  if (!campaign.jukeboxUrl && !isDm) return null;
+
+  const embedUrl = campaign.jukeboxUrl ? getYouTubeEmbedUrl(campaign.jukeboxUrl) : null;
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <span className="text-xs uppercase tracking-widest text-muted">🎵 Jukebox</span>
+        {isDm && (
+          <button
+            onClick={() => setShowForm((prev) => !prev)}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            {showForm ? "Annulla" : campaign.jukeboxUrl ? "Cambia brano" : "+ Imposta brano"}
+          </button>
+        )}
+      </div>
+
+      {showForm && isDm && (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="URL YouTube o file audio diretto"
+            className="flex-1 min-w-[200px] rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+          />
+          <input
+            value={titolo}
+            onChange={(event) => setTitolo(event.target.value)}
+            placeholder="Nome (es. Taverna)"
+            className="w-40 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+          />
+          <button
+            onClick={async () => {
+              if (!url.trim()) return;
+              await setJukeboxTrack(campaignId, url.trim(), titolo.trim());
+              setShowForm(false);
+              setUrl("");
+              setTitolo("");
+              onChanged();
+            }}
+            className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors"
+          >
+            Imposta
+          </button>
+        </div>
+      )}
+
+      {campaign.jukeboxUrl ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <p className="text-sm text-foreground">
+              In riproduzione: <span className="font-bold">{campaign.jukeboxTitolo || "brano"}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              {!playing && (
+                <button
+                  onClick={() => setPlaying(true)}
+                  className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+                >
+                  ▶ Riproduci per me
+                </button>
+              )}
+              {playing && (
+                <button
+                  onClick={() => setPlaying(false)}
+                  className="rounded-lg border border-edge px-3 py-1.5 text-xs text-foreground hover:border-accent transition-colors"
+                >
+                  ⏸ Ferma per me
+                </button>
+              )}
+              {isDm && (
+                <button
+                  onClick={async () => {
+                    await stopJukebox(campaignId);
+                    onChanged();
+                  }}
+                  className="text-xs text-danger hover:underline"
+                >
+                  Rimuovi per tutti
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] text-muted">
+            Ognuno deve premere &ldquo;Riproduci&rdquo; sul proprio dispositivo — i browser
+            bloccano l&apos;avvio automatico dell&apos;audio.
+          </p>
+          {playing && embedUrl && (
+            <iframe
+              src={embedUrl}
+              className="w-full h-20 rounded-lg border border-edge"
+              allow="autoplay"
+              title="Jukebox"
+            />
+          )}
+          {playing && !embedUrl && (
+            <audio src={campaign.jukeboxUrl} controls autoPlay loop className="w-full" />
+          )}
+        </div>
+      ) : (
+        isDm && <p className="text-sm text-muted">Nessun brano impostato.</p>
+      )}
+    </section>
   );
 }
 

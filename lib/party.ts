@@ -27,6 +27,12 @@ export function broadcastEncounterChanged(campaignId: string) {
   return publish(`campaign-${campaignId}`, { type: "encounter-changed" });
 }
 
+// Stessa stanza "campaign-<id>" del combattimento: e' gia' sempre connessa per chi guarda la
+// pagina campagna, niente bisogno di una seconda connessione WebSocket solo per il jukebox.
+export function broadcastJukeboxChanged(campaignId: string) {
+  return publish(`campaign-${campaignId}`, { type: "jukebox-changed" });
+}
+
 export function broadcastDungeonChanged(dungeonId: string) {
   return publish(`dungeon-${dungeonId}`, { type: "dungeon-changed" });
 }
