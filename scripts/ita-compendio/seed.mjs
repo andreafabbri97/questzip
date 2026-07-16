@@ -16,6 +16,7 @@ import {
   compendioItaOggetti,
   compendioItaRazze,
   compendioItaRegole,
+  compendioItaTalenti,
 } from "../../lib/db/schema.ts";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -177,6 +178,22 @@ async function seedOggetti(bookKey) {
   console.log(`${items.length} oggetti magici caricati da ${bookKey}.`);
 }
 
+async function seedTalenti(bookKey) {
+  const filePath = path.join(PARSED_DIR, `${bookKey}-talenti.json`);
+  const feats = JSON.parse(readFileSync(filePath, "utf-8"));
+
+  await db.delete(compendioItaTalenti).where(eq(compendioItaTalenti.fonte, bookKey));
+  for (const f of feats) {
+    await db.insert(compendioItaTalenti).values({
+      nome: f.nome,
+      prerequisito: f.prerequisito,
+      descrizione: f.descrizione,
+      fonte: f.fonte,
+    });
+  }
+  console.log(`${feats.length} talenti caricati da ${bookKey}.`);
+}
+
 async function main() {
   await seedIncantesimi("phb");
   await seedIncantesimi("tasha");
@@ -190,6 +207,7 @@ async function main() {
     await seedRegole(book);
   }
   await seedOggetti("oggetti_magici");
+  await seedTalenti("phb");
   console.log("Fatto.");
 }
 

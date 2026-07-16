@@ -372,3 +372,13 @@ export const compendioItaOggetti = pgTable("compendio_ita_oggetto", {
   descrizione: text("descrizione").notNull(),
   fonte: text("fonte").notNull(),
 });
+
+// Talenti (Feats) dal capitolo "Talenti" del Manuale del Giocatore italiano — testo digitale
+// pulito (extract_pdf.py), stessa qualità di incantesimi/classi.
+export const compendioItaTalenti = pgTable("compendio_ita_talento", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nome: text("nome").notNull(),
+  prerequisito: text("prerequisito").notNull().default(""),
+  descrizione: text("descrizione").notNull(),
+  fonte: text("fonte").notNull(),
+});

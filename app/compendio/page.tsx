@@ -37,6 +37,7 @@ import {
   getOggettiIta,
   getRazzeIta,
   getRegoleIta,
+  getTalentiIta,
 } from "@/app/actions/compendio-ita";
 
 // cache in memoria per la durata della pagina: gli elenchi sono piccoli, non serve rifetcharli
@@ -65,6 +66,11 @@ let itaOggettiPromise: ReturnType<typeof getOggettiIta> | null = null;
 function loadOggettiIta() {
   if (!itaOggettiPromise) itaOggettiPromise = getOggettiIta();
   return itaOggettiPromise;
+}
+let itaTalentiPromise: ReturnType<typeof getTalentiIta> | null = null;
+function loadTalentiIta() {
+  if (!itaTalentiPromise) itaTalentiPromise = getTalentiIta();
+  return itaTalentiPromise;
 }
 
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
@@ -1120,6 +1126,43 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
 
 function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
   const prerequisite = formatPrerequisite(feat.prerequisite);
+
+  const translatedName = useTranslatedText(feat.name, "en", "it");
+  const [itaTalenti, setItaTalenti] = useState<Awaited<ReturnType<typeof getTalentiIta>> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (language !== "it") return;
+    let cancelled = false;
+    loadTalentiIta().then((data) => {
+      if (!cancelled) setItaTalenti(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  const ufficiale = useMemo(() => {
+    if (language !== "it" || !itaTalenti || !translatedName) return null;
+    const target = normalizeItaName(translatedName);
+    return itaTalenti.find((t) => normalizeItaName(t.nome) === target) ?? null;
+  }, [language, itaTalenti, translatedName]);
+
+  if (ufficiale) {
+    return (
+      <>
+        <p className="text-xs font-bold text-accent-strong">
+          📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
+        </p>
+        {ufficiale.prerequisito && <Stat label="Prerequisiti" value={ufficiale.prerequisito} />}
+        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+          {ufficiale.descrizione}
+        </p>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="grid grid-cols-2 gap-3">

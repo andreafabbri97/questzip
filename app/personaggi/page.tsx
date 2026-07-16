@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { syncCharacterToCampaign } from "@/app/actions/characters";
+import { getOggettiIta } from "@/app/actions/compendio-ita";
 import {
   ABILITIES,
   ABILITY_CODE_TO_KEY,
@@ -46,10 +47,12 @@ import {
 import { useLocalCollection } from "@/lib/storage";
 import {
   loadClassData,
+  loadItems,
   loadRaces,
   loadSpells,
   resolveClassFeatures,
   resolveSubclassFeatures,
+  type RawItem,
   type RawRace,
   type RawSubclass,
 } from "@/lib/fivetools/data";
@@ -1301,47 +1304,136 @@ function InventorySection({
       {character.inventario.length > 0 && (
         <div className="space-y-2">
           {character.inventario.map((item) => (
-            <div key={item.id} className="flex items-center gap-2">
-              <input
-                value={item.nome}
-                onChange={(event) =>
-                  setInventario(
-                    character.inventario.map((i) =>
-                      i.id === item.id ? { ...i, nome: event.target.value } : i,
-                    ),
-                  )
-                }
-                placeholder="Nome oggetto"
-                className="flex-1 min-w-0 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
-              />
-              <input
-                type="number"
-                min={1}
-                value={item.quantita}
-                onChange={(event) => {
-                  const parsed = Number(event.target.value);
-                  setInventario(
-                    character.inventario.map((i) =>
-                      i.id === item.id
-                        ? { ...i, quantita: Number.isNaN(parsed) ? 1 : Math.max(1, Math.trunc(parsed)) }
-                        : i,
-                    ),
-                  );
-                }}
-                className="w-16 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground text-center"
-              />
-              <button
-                onClick={() => setInventario(character.inventario.filter((i) => i.id !== item.id))}
-                className="text-muted hover:text-danger text-sm shrink-0"
-                aria-label={`Rimuovi ${item.nome || "oggetto"}`}
-              >
-                ×
-              </button>
+            <div key={item.id} className="rounded-lg border border-edge bg-surface-raised p-2.5 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <Autocomplete
+                    value={item.nome}
+                    onChange={(nome) =>
+                      setInventario(
+                        character.inventario.map((i) => (i.id === item.id ? { ...i, nome } : i)),
+                      )
+                    }
+                    loader={loadItems}
+                    placeholder="Pozione di Guarigione, Spada +1, torcia…"
+                    inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  value={item.quantita}
+                  onChange={(event) => {
+                    const parsed = Number(event.target.value);
+                    setInventario(
+                      character.inventario.map((i) =>
+                        i.id === item.id
+                          ? { ...i, quantita: Number.isNaN(parsed) ? 1 : Math.max(1, Math.trunc(parsed)) }
+                          : i,
+                      ),
+                    );
+                  }}
+                  className="w-16 rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground text-center"
+                />
+                <button
+                  onClick={() => setInventario(character.inventario.filter((i) => i.id !== item.id))}
+                  className="text-muted hover:text-danger text-sm shrink-0"
+                  aria-label={`Rimuovi ${item.nome || "oggetto"}`}
+                >
+                  ×
+                </button>
+              </div>
+              <InventoryItemInfo nome={item.nome} />
             </div>
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+// confronta i nomi ignorando maiuscole/accenti/punteggiatura, stessa euristica usata nel
+// Compendio (app/compendio/page.tsx) per far combaciare il nome italiano ufficiale con la
+// traduzione automatica del nome inglese
+function normalizeItaName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+const ITEM_RARITY_LABELS: Record<string, string> = {
+  common: "comune",
+  uncommon: "non comune",
+  rare: "raro",
+  "very rare": "molto raro",
+  legendary: "leggendario",
+  artifact: "artefatto",
+};
+
+function InventoryItemInfo({ nome }: { nome: string }) {
+  const [showInfo, setShowInfo] = useState(false);
+  const [items, setItems] = useState<RawItem[] | null>(null);
+  const [oggettiIta, setOggettiIta] = useState<Awaited<ReturnType<typeof getOggettiIta>> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    loadItems().then(setItems);
+  }, []);
+
+  const match = items?.find((i) => i.name.toLowerCase() === nome.trim().toLowerCase()) ?? null;
+  const translatedName = useTranslatedText(match?.name, "en", "it");
+
+  useEffect(() => {
+    if (!showInfo || !match) return;
+    let cancelled = false;
+    getOggettiIta().then((data) => {
+      if (!cancelled) setOggettiIta(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showInfo, match]);
+
+  if (!match) return null;
+
+  const rarity = match.rarity ? (ITEM_RARITY_LABELS[match.rarity] ?? match.rarity) : null;
+  const attunement = match.reqAttune ? "richiede sintonia" : null;
+
+  const ufficiale =
+    oggettiIta && translatedName
+      ? (oggettiIta.find((o) => normalizeItaName(o.nome) === normalizeItaName(translatedName)) ?? null)
+      : null;
+
+  return (
+    <div className="pt-1 border-t border-edge/60">
+      <button
+        onClick={() => setShowInfo((prev) => !prev)}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        {[rarity, attunement].filter(Boolean).join(" · ") || "Oggetto magico"}
+        {" — "}
+        {showInfo ? "Nascondi" : "Come funziona"}
+      </button>
+      {showInfo && (
+        <div className="mt-2">
+          {ufficiale ? (
+            <>
+              <p className="text-[10px] font-bold text-accent-strong mb-1">📖 Testo ufficiale</p>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                {ufficiale.descrizione}
+              </p>
+            </>
+          ) : match.entries ? (
+            <RenderEntries entries={match.entries} />
+          ) : (
+            <p className="text-sm text-muted">Nessuna descrizione disponibile.</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
