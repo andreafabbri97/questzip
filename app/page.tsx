@@ -30,7 +30,7 @@ const sections = [
     icon: "📖",
     title: "Compendio",
     description:
-      "Incantesimi, mostri e oggetti magici consultabili al volo, via Open5e.",
+      "Incantesimi, mostri, oggetti magici, razze, talenti, classi e regole — anche in italiano ufficiale.",
     ready: true,
   },
 ];
@@ -81,8 +81,8 @@ export default function Home() {
       </section>
 
       <p className="text-center text-xs text-muted">
-        I dati sono salvati sul tuo dispositivo. Sincronizzazione tra master e
-        giocatori in arrivo nelle prossime versioni.
+        Le Campagne sono condivise in tempo reale fra master e giocatori. I Personaggi restano
+        sul tuo dispositivo — porti tu lo scatto in campagna quando vuoi sincronizzarlo.
       </p>
     </div>
   );
