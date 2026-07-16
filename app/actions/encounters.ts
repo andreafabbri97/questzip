@@ -1,6 +1,6 @@
 "use server";
 
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { broadcastEncounterChanged } from "@/lib/party";
@@ -92,18 +92,19 @@ export async function addPartyToEncounter(encounterId: string, campaignId: strin
   const [party, already] = await Promise.all([
     db.select().from(campaignCharacters).where(eq(campaignCharacters.campaignId, campaignId)),
     db
-      .select({ nome: encounterCombatants.nome })
+      .select({ characterUserId: encounterCombatants.characterUserId })
       .from(encounterCombatants)
       .where(eq(encounterCombatants.encounterId, encounterId)),
   ]);
-  const alreadyNames = new Set(already.map((c) => c.nome));
-  const toAdd = party.filter((pc) => !alreadyNames.has(pc.nome));
+  const alreadyUserIds = new Set(already.map((c) => c.characterUserId).filter(Boolean));
+  const toAdd = party.filter((pc) => !alreadyUserIds.has(pc.userId));
   if (toAdd.length === 0) return;
 
   await db.insert(encounterCombatants).values(
     toAdd.map((pc) => ({
       encounterId,
       nome: pc.nome,
+      characterUserId: pc.userId,
       iniziativa: 10,
       hpMax: pc.hpMax,
       hpAttuali: pc.hpAttuali,
@@ -155,19 +156,20 @@ export async function nextTurn(encounterId: string) {
   const userId = await requireUserId();
   const encounter = await requireDmForEncounter(encounterId, userId);
 
-  const combatants = await db
-    .select()
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(encounterCombatants)
     .where(eq(encounterCombatants.encounterId, encounterId));
-  if (combatants.length === 0) return;
+  if (count === 0) return;
 
-  const nextIndex = encounter.currentTurn + 1;
-  const wrapped = nextIndex >= combatants.length;
+  // Aggiornamento in un'unica istruzione SQL che legge current_turn dalla riga al momento
+  // dell'esecuzione (non da un valore letto prima in JS): due click quasi simultanei non
+  // possono più "perdersi" leggendo entrambi lo stesso turno di partenza.
   await db
     .update(campaignEncounters)
     .set({
-      currentTurn: wrapped ? 0 : nextIndex,
-      round: wrapped ? encounter.round + 1 : encounter.round,
+      currentTurn: sql`CASE WHEN ${campaignEncounters.currentTurn} + 1 >= ${count} THEN 0 ELSE ${campaignEncounters.currentTurn} + 1 END`,
+      round: sql`CASE WHEN ${campaignEncounters.currentTurn} + 1 >= ${count} THEN ${campaignEncounters.round} + 1 ELSE ${campaignEncounters.round} END`,
     })
     .where(eq(campaignEncounters.id, encounterId));
   await broadcastEncounterChanged(encounter.campaignId);

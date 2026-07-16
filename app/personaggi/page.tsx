@@ -14,6 +14,7 @@ import {
   STANDARD_ARRAY,
   abilityModifier,
   calculateMulticlassHitPoints,
+  canonicalClassName,
   characterSchema,
   formatModifier,
   levelForXp,
@@ -724,6 +725,7 @@ function ClassRow({
             placeholder="Fighter, Wizard…"
             inputClassName={rowInputClass}
           />
+          <ClassNameWarning name={entry.nome} />
         </div>
         <label className="block w-16 shrink-0">
           <span className="text-[10px] uppercase tracking-widest text-muted">Livello</span>
@@ -773,6 +775,32 @@ function ClassRow({
   );
 }
 
+function ClassNameWarning({ name }: { name: string }) {
+  const [names, setNames] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadClassNames().then((classes) => {
+      if (!cancelled) setNames(classes.map((c) => c.name));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const trimmed = name.trim();
+  if (!trimmed || !names) return null;
+  const canonical = canonicalClassName(trimmed).toLowerCase();
+  if (names.some((n) => n.toLowerCase() === canonical)) return null;
+
+  return (
+    <p className="text-[10px] text-accent mt-1">
+      ⚠️ Classe non riconosciuta dal Compendio: scegli un nome dai suggerimenti per avere slot
+      incantesimi, privilegi e calcoli automatici collegati.
+    </p>
+  );
+}
+
 function ClassSubclassPicker({
   className,
   value,
@@ -788,7 +816,7 @@ function ClassSubclassPicker({
   const [title, setTitle] = useState("Sottoclasse");
 
   useEffect(() => {
-    const name = className.trim().toLowerCase();
+    const name = canonicalClassName(className).toLowerCase();
     if (!name) return;
     let cancelled = false;
     loadClassData().then((data) => {
@@ -845,7 +873,7 @@ function SubclassFeaturesToggle({
     loadClassData().then((data) => {
       if (cancelled) return;
       const subclass = data.subclasses.find(
-        (s) => s.name === subclassName && s.className.toLowerCase() === className.trim().toLowerCase(),
+        (s) => s.name === subclassName && s.className.toLowerCase() === canonicalClassName(className).toLowerCase(),
       );
       if (!subclass) return;
       setFeatures(resolveSubclassFeatures(data, subclass));
@@ -909,7 +937,7 @@ function ClassFeaturesToggle({ className }: { className: string }) {
     let cancelled = false;
     loadClassData().then((data) => {
       if (cancelled) return;
-      const cls = data.classes.find((c) => c.name.toLowerCase() === className.trim().toLowerCase());
+      const cls = data.classes.find((c) => c.name.toLowerCase() === canonicalClassName(className).toLowerCase());
       if (!cls) return;
       setFeatures(resolveClassFeatures(data, cls));
     });
@@ -1056,7 +1084,7 @@ function LevelUpWizard({
     let cancelled = false;
     loadClassData().then((data) => {
       if (cancelled) return;
-      const cls = data.classes.find((c) => c.name.toLowerCase() === targetClass.nome.trim().toLowerCase());
+      const cls = data.classes.find((c) => c.name.toLowerCase() === canonicalClassName(targetClass.nome).toLowerCase());
       if (!cls) {
         setFeatures([]);
         return;
@@ -1898,7 +1926,7 @@ function SavingThrowsAndSkills({
     if (!primary?.nome.trim()) return;
     const data = await loadClassData();
     const cls = data.classes.find(
-      (c) => c.name.toLowerCase() === primary.nome.trim().toLowerCase(),
+      (c) => c.name.toLowerCase() === canonicalClassName(primary.nome).toLowerCase(),
     );
     const abilities = (cls?.proficiency ?? [])
       .map((code) => ABILITY_CODE_TO_KEY[code])

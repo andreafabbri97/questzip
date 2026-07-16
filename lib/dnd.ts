@@ -249,6 +249,33 @@ export function passivePerception(
   return 10 + skillModifier(wisdomScore, proficient, expert, level);
 }
 
+/** Nomi italiani ufficiali delle classi base (PHB + Artefice di Tasha's), per riconoscere un nome
+ * scritto a mano (es. "Mago") e ricondurlo al nome inglese usato dai dati del Compendio (es.
+ * "Wizard"). Elenco piccolo e fisso: non serve un servizio di traduzione per 13 nomi noti. */
+const CLASS_NAME_IT_TO_EN: Record<string, string> = {
+  barbaro: "Barbarian",
+  bardo: "Bard",
+  chierico: "Cleric",
+  druido: "Druid",
+  guerriero: "Fighter",
+  ladro: "Rogue",
+  mago: "Wizard",
+  monaco: "Monk",
+  paladino: "Paladin",
+  ranger: "Ranger",
+  stregone: "Sorcerer",
+  warlock: "Warlock",
+  artefice: "Artificer",
+};
+
+/** Riconduce un nome di classe scritto in italiano (es. "Mago") al nome inglese canonico usato dal
+ * Compendio (es. "Wizard"); se il nome è già inglese o non riconosciuto, lo restituisce solo
+ * ripulito (trim), senza alterarlo altrimenti. */
+export function canonicalClassName(nome: string): string {
+  const trimmed = nome.trim();
+  return CLASS_NAME_IT_TO_EN[trimmed.toLowerCase()] ?? trimmed;
+}
+
 /** Caratteristica da incantatore per classe (chiave inglese minuscola, stessa convenzione di
  * FULL_CASTERS/HALF_CASTERS). Usata per calcolare CD e bonus d'attacco degli incantesimi. */
 const CASTING_ABILITY: Record<string, Ability> = {
@@ -272,7 +299,7 @@ export function primaryCastingAbility(
 ): Ability | null {
   let best: { livello: number; ability: Ability } | null = null;
   for (const { nome, livello } of classi) {
-    const ability = CASTING_ABILITY[nome.trim().toLowerCase()];
+    const ability = CASTING_ABILITY[canonicalClassName(nome).toLowerCase()];
     if (!ability) continue;
     if (!best || livello > best.livello) best = { livello, ability };
   }
@@ -465,7 +492,7 @@ const HALF_CASTERS = new Set(["paladin", "ranger"]);
 export function multiclassCasterLevel(classi: { nome: string; livello: number }[]): number {
   let total = 0;
   for (const { nome, livello } of classi) {
-    const key = nome.trim().toLowerCase();
+    const key = canonicalClassName(nome).toLowerCase();
     if (FULL_CASTERS.has(key)) total += livello;
     else if (HALF_CASTERS.has(key)) total += Math.floor(livello / 2);
     else if (key === "artificer") total += Math.ceil(livello / 2);
@@ -494,7 +521,7 @@ const PACT_MAGIC: { slotLevel: number; slots: number }[] = [
 
 export function warlockLevel(classi: { nome: string; livello: number }[]): number {
   return classi
-    .filter((c) => c.nome.trim().toLowerCase() === "warlock")
+    .filter((c) => canonicalClassName(c.nome).toLowerCase() === "warlock")
     .reduce((sum, c) => sum + c.livello, 0);
 }
 

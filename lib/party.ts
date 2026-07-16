@@ -26,3 +26,11 @@ async function publish(room: string, body: unknown) {
 export function broadcastEncounterChanged(campaignId: string) {
   return publish(`campaign-${campaignId}`, { type: "encounter-changed" });
 }
+
+export function broadcastDungeonChanged(dungeonId: string) {
+  return publish(`dungeon-${dungeonId}`, { type: "dungeon-changed" });
+}
+
+export function broadcastDungeonDeleted(dungeonId: string) {
+  return publish(`dungeon-${dungeonId}`, { type: "dungeon-deleted" });
+}

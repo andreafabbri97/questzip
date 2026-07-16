@@ -62,6 +62,7 @@ export async function getPartyForCampaign(campaignId: string) {
 
 export async function removeMyCharacterFromCampaign(campaignId: string) {
   const userId = await requireUserId();
+  await requireMember(campaignId, userId);
   await db
     .delete(campaignCharacters)
     .where(and(eq(campaignCharacters.campaignId, campaignId), eq(campaignCharacters.userId, userId)));

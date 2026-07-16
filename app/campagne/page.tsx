@@ -538,16 +538,18 @@ function CampaignDetailView({
                     <span className="text-xs text-muted">
                       {new Date(note.createdAt).toLocaleDateString("it-IT")}
                     </span>
-                    <button
-                      onClick={async () => {
-                        await deleteSessionNote(note.id);
-                        refresh();
-                      }}
-                      className="text-muted hover:text-danger text-sm"
-                      aria-label={`Elimina ${note.titolo}`}
-                    >
-                      ×
-                    </button>
+                    {(isDm || note.authorId === userId) && (
+                      <button
+                        onClick={async () => {
+                          await deleteSessionNote(note.id);
+                          refresh();
+                        }}
+                        className="text-muted hover:text-danger text-sm"
+                        aria-label={`Elimina ${note.titolo}`}
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 </div>
                 {note.testo && (
@@ -1659,6 +1661,16 @@ function DungeonViewer({
   const [markerMode, setMarkerMode] = useState(false);
   const [cells, setCells] = useState<CellType[][]>(dungeon.cells);
   const [dirty, setDirty] = useState(false);
+
+  // `dungeon` è lo stesso oggetto React-key (id) ma un riferimento nuovo ad ogni refetch (es.
+  // dopo un aggiornamento realtime): risincronizza le celle locali durante il render (non in un
+  // effetto, per evitare un render a cascata), a meno che non ci siano modifiche non salvate in
+  // corso (altrimenti le cancellerebbe).
+  const [syncedCells, setSyncedCells] = useState(dungeon.cells);
+  if (dungeon.cells !== syncedCells && !dirty) {
+    setSyncedCells(dungeon.cells);
+    setCells(dungeon.cells);
+  }
   const [saving, setSaving] = useState(false);
   const [rawTokens, setRawTokens] = useState<
     { userId: string; x: number; y: number; name: string | null }[]
@@ -1671,8 +1683,24 @@ function DungeonViewer({
 
   const fetchingNewTokenRef = useRef(false);
   const { send } = usePartyRoom({ kind: "dungeon", dungeonId: dungeon.id }, (message) => {
-    const msg = message as { type?: string; userId?: string; x?: number; y?: number } | null;
-    if (msg?.type !== "move" || !msg.userId || typeof msg.x !== "number" || typeof msg.y !== "number") return;
+    const msg = message as
+      | { type?: string; userId?: string; x?: number; y?: number }
+      | null;
+    if (!msg?.type) return;
+
+    if (msg.type === "dungeon-changed") {
+      onRoomUpdated();
+      return;
+    }
+    if (msg.type === "dungeon-deleted") {
+      onDeleted();
+      return;
+    }
+    if (msg.type === "remove" && msg.userId) {
+      setRawTokens((prev) => prev.filter((t) => t.userId !== msg.userId));
+      return;
+    }
+    if (msg.type !== "move" || !msg.userId || typeof msg.x !== "number" || typeof msg.y !== "number") return;
     setRawTokens((prev) => {
       if (!prev.some((t) => t.userId === msg.userId)) {
         // token di un giocatore che non avevamo ancora (l'ha appena piazzato per la prima
@@ -1718,14 +1746,18 @@ function DungeonViewer({
 
   const placeMyToken = async () => {
     if (!myUserId) return;
-    await upsertMyToken(dungeon.id, Math.floor(dungeon.width / 2), Math.floor(dungeon.height / 2));
+    const x = Math.floor(dungeon.width / 2);
+    const y = Math.floor(dungeon.height / 2);
+    await upsertMyToken(dungeon.id, x, y);
     const fresh = await getDungeonTokens(dungeon.id);
     setRawTokens(fresh);
+    send({ type: "move", x, y });
   };
 
   const removeMyTokenFromMap = async () => {
     await removeMyToken(dungeon.id);
     setRawTokens((prev) => prev.filter((t) => t.userId !== myUserId));
+    send({ type: "remove" });
   };
 
   const paintCell = (x: number, y: number) => {

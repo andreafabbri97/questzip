@@ -2,7 +2,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { requireDm, requireUserId } from "@/lib/campaign-auth";
+import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import {
   campaignInvites,
   campaignMembers,
@@ -145,15 +145,20 @@ export async function deleteCampaign(campaignId: string) {
 
 export async function addSessionNote(campaignId: string, titolo: string, testo: string) {
   const userId = await requireUserId();
-  const [membership] = await db
-    .select()
-    .from(campaignMembers)
-    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
-  if (!membership) throw new Error("Non fai parte di questa campagna.");
+  await requireMember(campaignId, userId);
   await db.insert(campaignSessionNotes).values({ campaignId, authorId: userId, titolo, testo });
 }
 
 export async function deleteSessionNote(noteId: string) {
-  await requireUserId();
+  const userId = await requireUserId();
+  const [note] = await db
+    .select()
+    .from(campaignSessionNotes)
+    .where(eq(campaignSessionNotes.id, noteId));
+  if (!note) return;
+  const membership = await requireMember(note.campaignId, userId);
+  if (note.authorId !== userId && membership.role !== "dm") {
+    throw new Error("Solo l'autore o il master possono eliminare questa nota.");
+  }
   await db.delete(campaignSessionNotes).where(eq(campaignSessionNotes.id, noteId));
 }

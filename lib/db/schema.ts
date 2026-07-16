@@ -212,6 +212,10 @@ export const encounterCombatants = pgTable("encounter_combatant", {
     .notNull()
     .references(() => campaignEncounters.id, { onDelete: "cascade" }),
   nome: text("nome").notNull(),
+  // Collega un combattente-PG al suo proprietario, per riconoscerlo in modo affidabile
+  // (es. quando si aggiunge di nuovo il party) invece di confrontare il nome, che due
+  // personaggi potrebbero condividere. Null per mostri/aggiunte manuali.
+  characterUserId: text("character_user_id").references(() => users.id, { onDelete: "cascade" }),
   iniziativa: integer("iniziativa").notNull().default(0),
   hpMax: integer("hp_max").notNull(),
   hpAttuali: integer("hp_attuali").notNull(),

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
 import { generateDungeon, type CellType, type DungeonConfig, type DungeonRoom } from "@/lib/dungeon";
+import { broadcastDungeonChanged, broadcastDungeonDeleted } from "@/lib/party";
 
 export async function createDungeon(campaignId: string, nome: string, config: DungeonConfig) {
   const userId = await requireUserId();
@@ -91,6 +92,7 @@ export async function updateRoomNotes(
     room.id === roomId ? { ...room, encounter: values.encounter, reward: values.reward } : room,
   );
   await db.update(campaignDungeons).set({ rooms }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
 }
 
 export async function updateDungeonCells(dungeonId: string, cells: CellType[][]) {
@@ -106,6 +108,7 @@ export async function updateDungeonCells(dungeonId: string, cells: CellType[][])
     throw new Error("Dimensioni della mappa non valide.");
   }
   await db.update(campaignDungeons).set({ cells }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
 }
 
 export async function addMarker(dungeonId: string, x: number, y: number, label: string) {
@@ -132,6 +135,7 @@ export async function addMarker(dungeonId: string, x: number, y: number, label: 
   };
   const rooms = [...dungeon.rooms, marker];
   await db.update(campaignDungeons).set({ rooms }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
   return marker;
 }
 
@@ -146,6 +150,7 @@ export async function deleteMarker(dungeonId: string, roomId: number) {
 
   const rooms = dungeon.rooms.filter((room) => room.id !== roomId);
   await db.update(campaignDungeons).set({ rooms }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
 }
 
 export async function deleteDungeon(dungeonId: string) {
@@ -157,6 +162,7 @@ export async function deleteDungeon(dungeonId: string) {
   if (!dungeon) return;
   await requireDm(dungeon.campaignId, userId);
   await db.delete(campaignDungeons).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonDeleted(dungeonId);
 }
 
 // --- Token della lavagna condivisa: posizione persistita, movimento live via PartyKit ---
@@ -205,6 +211,12 @@ export async function upsertMyToken(dungeonId: string, x: number, y: number) {
 
 export async function removeMyToken(dungeonId: string) {
   const userId = await requireUserId();
+  const [dungeon] = await db
+    .select({ campaignId: campaignDungeons.campaignId })
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) return;
+  await requireMember(dungeon.campaignId, userId);
   await db
     .delete(dungeonTokens)
     .where(and(eq(dungeonTokens.dungeonId, dungeonId), eq(dungeonTokens.userId, userId)));
