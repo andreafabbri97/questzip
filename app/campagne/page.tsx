@@ -36,7 +36,12 @@ import {
   getDungeon,
   getDungeonsForCampaign,
   getDungeonTokens,
+  moveMonsterToken,
+  placeMonsterToken,
+  removeMonsterToken,
   removeMyToken,
+  setFogOfWar,
+  toggleRoomRevealed,
   updateDungeonCells,
   updateRoomNotes,
   upsertMyToken,
@@ -46,6 +51,7 @@ import type {
   CorridorStyle,
   DeadEndRemoval,
   DungeonConfig,
+  MonsterToken,
   RoomDensity,
   RoomShape,
   StairsOption,
@@ -1740,6 +1746,67 @@ function creatureXp(creature: RawCreature): number {
   return XP_BY_CR[typeof creature.cr === "string" ? creature.cr : (creature.cr?.cr ?? "")] ?? 0;
 }
 
+function MonsterTokenSearch({
+  onPick,
+  picked,
+}: {
+  onPick: (name: string) => void;
+  picked: string | null;
+}) {
+  const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open || creatures) return;
+    loadCreatures().then(setCreatures);
+  }, [open, creatures]);
+
+  const q = query.trim().toLowerCase();
+  const suggestions =
+    creatures && q.length >= 2
+      ? creatures.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 6)
+      : [];
+
+  return (
+    <div className="relative flex items-center gap-1.5">
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Cerca mostro da piazzare…"
+        className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-xs text-foreground w-52"
+      />
+      {picked && (
+        <span className="text-xs text-accent-strong font-bold">
+          {picked} — clicca sulla mappa
+        </span>
+      )}
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-10 top-full mt-1 w-56 max-h-48 overflow-auto rounded-lg border border-edge bg-surface-raised shadow-lg">
+          {suggestions.map((c, index) => (
+            <li key={`${c.source}-${c.name}-${index}`}>
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onPick(c.name);
+                  setQuery(c.name);
+                  setOpen(false);
+                }}
+                className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-surface transition-colors"
+              >
+                {c.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function MonsterQuickAdd({
   onPick,
 }: {
@@ -2350,6 +2417,31 @@ function DungeonViewer({
     onRoomUpdated();
   };
 
+  const [monsterMode, setMonsterMode] = useState(false);
+  const [monsterToPlace, setMonsterToPlace] = useState<string | null>(null);
+
+  const placeMonster = async (x: number, y: number) => {
+    if (!monsterToPlace) return;
+    await placeMonsterToken(dungeon.id, monsterToPlace, x, y);
+    setMonsterToPlace(null);
+    onRoomUpdated();
+  };
+
+  const moveMonster = async (id: string, x: number, y: number) => {
+    await moveMonsterToken(dungeon.id, id, x, y);
+    onRoomUpdated();
+  };
+
+  const removeMonster = async (id: string) => {
+    await removeMonsterToken(dungeon.id, id);
+    onRoomUpdated();
+  };
+
+  const toggleFogOfWar = async () => {
+    await setFogOfWar(dungeon.id, !dungeon.fogOfWar);
+    onRoomUpdated();
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -2443,6 +2535,43 @@ function DungeonViewer({
         </div>
       )}
 
+      {isDm && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-edge bg-surface-raised p-2">
+          <label className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+            <input
+              type="checkbox"
+              checked={dungeon.fogOfWar}
+              onChange={toggleFogOfWar}
+            />
+            🌫️ Fog of war
+          </label>
+          {dungeon.fogOfWar && (
+            <span className="text-[10px] text-muted">
+              i giocatori vedono solo le stanze rivelate — apri una stanza per rivelarla
+            </span>
+          )}
+          <button
+            onClick={() => {
+              setMonsterMode((prev) => !prev);
+              setMonsterToPlace(null);
+            }}
+            className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+              monsterMode
+                ? "border-accent bg-accent/15 text-accent-strong"
+                : "border-edge bg-surface text-muted hover:text-foreground"
+            }`}
+          >
+            👹 Piazza mostro
+          </button>
+          {monsterMode && (
+            <MonsterTokenSearch
+              onPick={(name) => setMonsterToPlace(name)}
+              picked={monsterToPlace}
+            />
+          )}
+        </div>
+      )}
+
       <DungeonMap
         dungeon={{ ...dungeon, cells }}
         activeRoomId={selectedRoomId}
@@ -2457,12 +2586,22 @@ function DungeonViewer({
         tokens={tokens}
         onTokenDrag={handleTokenDrag}
         onTokenDragEnd={handleTokenDragEnd}
+        isDm={isDm}
+        fogOfWar={dungeon.fogOfWar}
+        revealedRooms={dungeon.revealedRooms}
+        monsterTokens={dungeon.monsterTokens}
+        monsterPlaceMode={monsterMode && Boolean(monsterToPlace)}
+        onPlaceMonster={placeMonster}
+        onMoveMonster={moveMonster}
+        onRemoveMonster={removeMonster}
       />
       {selectedRoom && isDm && !editMode && (
         <RoomNotesEditor
           key={selectedRoom.id}
           dungeonId={dungeon.id}
           room={selectedRoom}
+          fogOfWar={dungeon.fogOfWar}
+          revealed={dungeon.revealedRooms.includes(selectedRoom.id)}
           onSaved={onRoomUpdated}
           onDeleted={() => {
             setSelectedRoomId(null);
@@ -2480,11 +2619,15 @@ function DungeonViewer({
 function RoomNotesEditor({
   dungeonId,
   room,
+  fogOfWar,
+  revealed,
   onSaved,
   onDeleted,
 }: {
   dungeonId: string;
   room: DungeonFull["rooms"][number];
+  fogOfWar: boolean;
+  revealed: boolean;
   onSaved: () => void;
   onDeleted: () => void;
 }) {
@@ -2513,6 +2656,16 @@ function RoomNotesEditor({
           Elimina
         </button>
       </div>
+      {fogOfWar && (
+        <label className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+          <input
+            type="checkbox"
+            checked={revealed}
+            onChange={() => toggleRoomRevealed(dungeonId, room.id).then(onSaved)}
+          />
+          👁️ Rivelata ai giocatori
+        </label>
+      )}
       <label className="block">
         <span className="text-[10px] uppercase tracking-widest text-muted">Incontro</span>
         <textarea
@@ -2583,6 +2736,14 @@ function DungeonMap({
   tokens,
   onTokenDrag,
   onTokenDragEnd,
+  isDm = false,
+  fogOfWar = false,
+  revealedRooms = [],
+  monsterTokens = [],
+  monsterPlaceMode = false,
+  onPlaceMonster,
+  onMoveMonster,
+  onRemoveMonster,
 }: {
   dungeon: { width: number; height: number; cells: CellType[][]; rooms: DungeonFull["rooms"] };
   activeRoomId: number | null;
@@ -2594,6 +2755,14 @@ function DungeonMap({
   tokens?: DungeonToken[];
   onTokenDrag?: (x: number, y: number) => void;
   onTokenDragEnd?: (x: number, y: number) => void;
+  isDm?: boolean;
+  fogOfWar?: boolean;
+  revealedRooms?: number[];
+  monsterTokens?: MonsterToken[];
+  monsterPlaceMode?: boolean;
+  onPlaceMonster?: (x: number, y: number) => void;
+  onMoveMonster?: (id: string, x: number, y: number) => void;
+  onRemoveMonster?: (id: string) => void;
 }) {
   const cellSize = 14;
   const isPaintingRef = useRef(false);
@@ -2602,6 +2771,19 @@ function DungeonMap({
   const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const lastSentRef = useRef(0);
+  const draggingMonsterRef = useRef<string | null>(null);
+  const [draggingMonsterId, setDraggingMonsterId] = useState<string | null>(null);
+  const [monsterDragPos, setMonsterDragPos] = useState<{ x: number; y: number } | null>(null);
+
+  const fogActive = fogOfWar && !isDm;
+  const revealedSet = new Set(revealedRooms);
+  const hiddenCells = new Set<string>();
+  if (fogActive) {
+    for (const room of dungeon.rooms) {
+      if (revealedSet.has(room.id)) continue;
+      for (const [x, y] of room.cells) hiddenCells.add(`${x},${y}`);
+    }
+  }
 
   useEffect(() => {
     if (!editable) return;
@@ -2649,9 +2831,48 @@ function DungeonMap({
     };
   }, [tokens, dungeon.width, dungeon.height, onTokenDrag, onTokenDragEnd]);
 
+  // Trascinamento dei token mostro: solo il master li muove, quindi niente relay realtime
+  // per-frame come per i token giocatore — solo uno stato visivo locale mentre trascini, con
+  // scrittura sul server (e broadcast agli altri client) al rilascio.
+  useEffect(() => {
+    if (!isDm) return;
+    const clientToCell = (clientX: number, clientY: number) => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const x = Math.min(dungeon.width - 1, Math.max(0, ((clientX - rect.left) / rect.width) * dungeon.width));
+      const y = Math.min(dungeon.height - 1, Math.max(0, ((clientY - rect.top) / rect.height) * dungeon.height));
+      return { x, y };
+    };
+    const move = (event: PointerEvent) => {
+      if (!draggingMonsterRef.current) return;
+      const pos = clientToCell(event.clientX, event.clientY);
+      if (pos) setMonsterDragPos(pos);
+    };
+    const up = () => {
+      const id = draggingMonsterRef.current;
+      if (!id) return;
+      draggingMonsterRef.current = null;
+      setDraggingMonsterId(null);
+      setMonsterDragPos((pos) => {
+        if (pos) onMoveMonster?.(id, Math.round(pos.x), Math.round(pos.y));
+        return null;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [isDm, dungeon.width, dungeon.height, onMoveMonster]);
+
   const handleCellDown = (x: number, y: number) => {
     if (markerMode) {
       onPlaceMarker?.(x, y);
+      return;
+    }
+    if (monsterPlaceMode) {
+      onPlaceMonster?.(x, y);
       return;
     }
     isPaintingRef.current = true;
@@ -2675,6 +2896,18 @@ function DungeonMap({
       >
         {dungeon.cells.map((row, y) =>
           row.map((cell, x) => {
+            if (hiddenCells.has(`${x},${y}`)) {
+              return (
+                <rect
+                  key={`${x}-${y}`}
+                  x={x * cellSize}
+                  y={y * cellSize}
+                  width={cellSize}
+                  height={cellSize}
+                  fill="#0c0a09"
+                />
+              );
+            }
             const fill = CELL_FILL[cell];
             if (!fill) return null;
             return (
@@ -2690,9 +2923,10 @@ function DungeonMap({
           }),
         )}
         {dungeon.rooms.map((room) => {
-          const fill = activeRoomId === room.id ? "#e0a83e33" : "#241f1a";
-          const stroke = activeRoomId === room.id ? "#e0a83e" : "#3b322a";
-          const label = (
+          const hidden = fogActive && !revealedSet.has(room.id);
+          const fill = hidden ? "#0c0a09" : activeRoomId === room.id ? "#e0a83e33" : "#241f1a";
+          const stroke = hidden ? "#0c0a09" : activeRoomId === room.id ? "#e0a83e" : "#3b322a";
+          const label = hidden ? null : (
             <text
               x={room.centerX * cellSize + cellSize / 2}
               y={room.centerY * cellSize + cellSize / 2}
@@ -2705,11 +2939,12 @@ function DungeonMap({
               {room.label}
             </text>
           );
+          const handleClick = hidden ? undefined : () => onRoomClick(room.id);
 
           if (room.vectorShape?.type === "circle") {
             const { cx, cy, r } = room.vectorShape;
             return (
-              <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
+              <g key={room.id} onClick={handleClick} className={hidden ? "" : "cursor-pointer"}>
                 <circle
                   cx={cx * cellSize}
                   cy={cy * cellSize}
@@ -2728,7 +2963,7 @@ function DungeonMap({
               .map(([x, y]) => `${x * cellSize},${y * cellSize}`)
               .join(" ");
             return (
-              <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
+              <g key={room.id} onClick={handleClick} className={hidden ? "" : "cursor-pointer"}>
                 <polygon points={points} fill={fill} stroke={stroke} strokeWidth={1.5} />
                 {label}
               </g>
@@ -2736,7 +2971,7 @@ function DungeonMap({
           }
 
           return (
-            <g key={room.id} onClick={() => onRoomClick(room.id)} className="cursor-pointer">
+            <g key={room.id} onClick={handleClick} className={hidden ? "" : "cursor-pointer"}>
               {room.cells.map(([x, y], index) => (
                 <rect
                   key={index}
@@ -2753,7 +2988,7 @@ function DungeonMap({
             </g>
           );
         })}
-        {editable &&
+        {(editable || monsterPlaceMode) &&
           dungeon.cells.map((row, y) =>
             row.map((_cell, x) => (
               <rect
@@ -2765,7 +3000,7 @@ function DungeonMap({
                 fill="transparent"
                 stroke="#3b322a33"
                 strokeWidth={0.5}
-                className={markerMode ? "cursor-crosshair" : "cursor-pointer"}
+                className={markerMode || monsterPlaceMode ? "cursor-crosshair" : "cursor-pointer"}
                 onPointerDown={() => handleCellDown(x, y)}
                 onPointerEnter={() => handleCellEnter(x, y)}
               />
@@ -2812,6 +3047,55 @@ function DungeonMap({
                 style={{ transition: glide }}
               >
                 {token.label}
+              </text>
+            </g>
+          );
+        })}
+        {monsterTokens.map((monster) => {
+          const dragging = draggingMonsterId === monster.id && monsterDragPos;
+          const cx = ((dragging ? monsterDragPos!.x : monster.x) + 0.5) * cellSize;
+          const cy = ((dragging ? monsterDragPos!.y : monster.y) + 0.5) * cellSize;
+          const glide = dragging ? "none" : "cx 0.15s ease-out, cy 0.15s ease-out";
+          return (
+            <g
+              key={monster.id}
+              onPointerDown={(event) => {
+                if (!isDm) return;
+                event.stopPropagation();
+                draggingMonsterRef.current = monster.id;
+                setDraggingMonsterId(monster.id);
+                setMonsterDragPos({ x: monster.x, y: monster.y });
+              }}
+              onDoubleClick={(event) => {
+                if (!isDm) return;
+                event.stopPropagation();
+                if (window.confirm(`Rimuovere "${monster.nome}" dalla mappa?`)) {
+                  onRemoveMonster?.(monster.id);
+                }
+              }}
+              className={isDm ? "cursor-grab" : undefined}
+            >
+              <rect
+                x={cx - cellSize * 0.42}
+                y={cy - cellSize * 0.42}
+                width={cellSize * 0.84}
+                height={cellSize * 0.84}
+                fill={monster.colore}
+                stroke="#0c0a09"
+                strokeWidth={1.5}
+                style={{ transition: glide }}
+              />
+              <text
+                x={cx}
+                y={cy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={cellSize * 0.45}
+                fill="#ece5da"
+                className="pointer-events-none select-none font-bold"
+                style={{ transition: glide }}
+              >
+                {tokenInitials(monster.nome)}
               </text>
             </g>
           );

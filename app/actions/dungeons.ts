@@ -4,7 +4,13 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
-import { generateDungeon, type CellType, type DungeonConfig, type DungeonRoom } from "@/lib/dungeon";
+import {
+  generateDungeon,
+  type CellType,
+  type DungeonConfig,
+  type DungeonRoom,
+  type MonsterToken,
+} from "@/lib/dungeon";
 import { broadcastDungeonChanged, broadcastDungeonDeleted } from "@/lib/party";
 
 export async function createDungeon(campaignId: string, nome: string, config: DungeonConfig) {
@@ -163,6 +169,102 @@ export async function deleteDungeon(dungeonId: string) {
   await requireDm(dungeon.campaignId, userId);
   await db.delete(campaignDungeons).where(eq(campaignDungeons.id, dungeonId));
   await broadcastDungeonDeleted(dungeonId);
+}
+
+// --- Fog of war semplificata: reveal a livello di stanza, non vera dynamic lighting ---
+
+export async function setFogOfWar(dungeonId: string, enabled: boolean) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select({ campaignId: campaignDungeons.campaignId })
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireDm(dungeon.campaignId, userId);
+
+  await db.update(campaignDungeons).set({ fogOfWar: enabled }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
+}
+
+export async function toggleRoomRevealed(dungeonId: string, roomId: number) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select()
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireDm(dungeon.campaignId, userId);
+
+  const revealedRooms = dungeon.revealedRooms.includes(roomId)
+    ? dungeon.revealedRooms.filter((id) => id !== roomId)
+    : [...dungeon.revealedRooms, roomId];
+  await db
+    .update(campaignDungeons)
+    .set({ revealedRooms })
+    .where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
+}
+
+// --- Token mostro piazzati dal master: posizione persistita al rilascio, niente relay
+// per-frame (solo il master li muove, non serve la fluidità in tempo reale dei token
+// giocatore) — l'aggiornamento arriva agli altri client via lo stesso broadcast delle celle.
+
+export async function placeMonsterToken(dungeonId: string, nome: string, x: number, y: number) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select()
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireDm(dungeon.campaignId, userId);
+
+  if (x < 0 || y < 0 || x >= dungeon.width || y >= dungeon.height) {
+    throw new Error("Punto fuori dalla mappa.");
+  }
+  const colors = ["#c0392b", "#8e44ad", "#16a085", "#d35400", "#2c3e50"];
+  const token: MonsterToken = {
+    id: crypto.randomUUID(),
+    nome: nome.trim() || "Mostro",
+    x,
+    y,
+    colore: colors[dungeon.monsterTokens.length % colors.length],
+  };
+  const monsterTokens = [...dungeon.monsterTokens, token];
+  await db.update(campaignDungeons).set({ monsterTokens }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
+  return token;
+}
+
+export async function moveMonsterToken(dungeonId: string, tokenId: string, x: number, y: number) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select()
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireDm(dungeon.campaignId, userId);
+
+  const cx = Math.min(dungeon.width - 1, Math.max(0, Math.round(x)));
+  const cy = Math.min(dungeon.height - 1, Math.max(0, Math.round(y)));
+  const monsterTokens = dungeon.monsterTokens.map((t) =>
+    t.id === tokenId ? { ...t, x: cx, y: cy } : t,
+  );
+  await db.update(campaignDungeons).set({ monsterTokens }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
+}
+
+export async function removeMonsterToken(dungeonId: string, tokenId: string) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select()
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireDm(dungeon.campaignId, userId);
+
+  const monsterTokens = dungeon.monsterTokens.filter((t) => t.id !== tokenId);
+  await db.update(campaignDungeons).set({ monsterTokens }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
 }
 
 // --- Token della lavagna condivisa: posizione persistita, movimento live via PartyKit ---

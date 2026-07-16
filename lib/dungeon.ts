@@ -34,6 +34,18 @@ export interface DungeonData {
   rooms: DungeonRoom[];
 }
 
+/** Token mostro piazzato dal master sulla mappa (a differenza dei token giocatore, non è legato
+ * a un utente: posizione persistita al rilascio del trascinamento, aggiornata via lo stesso
+ * broadcast "dungeon-changed" già usato per celle/stanze — non ha bisogno del relay per-frame
+ * usato per i token giocatore, dato che solo il master lo muove). */
+export interface MonsterToken {
+  id: string;
+  nome: string;
+  x: number;
+  y: number;
+  colore: string;
+}
+
 export interface DungeonConfig {
   minRooms: number;
   maxRooms: number;

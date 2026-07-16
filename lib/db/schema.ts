@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 import type { Ability, ClassEntry } from "@/lib/dnd";
-import type { CellType, DungeonRoom } from "@/lib/dungeon";
+import type { CellType, DungeonRoom, MonsterToken } from "@/lib/dungeon";
 import type { RegionalMarker, TerrainType } from "@/lib/regional-map";
 
 // --- Tabelle richieste dall'adapter Drizzle di Auth.js ---
@@ -81,6 +81,12 @@ export const campaigns = pgTable("campaign", {
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  // Jukebox condiviso: un solo brano "in riproduzione" per campagna (niente coda/playlist,
+  // fuori scope). Il master imposta l'URL, ogni client lo legge via realtime ma deve comunque
+  // cliccare "riproduci" da sé — i browser bloccano l'autoplay audio senza un gesto utente,
+  // non è aggirabile lato client.
+  jukeboxUrl: text("jukebox_url"),
+  jukeboxTitolo: text("jukebox_titolo"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
@@ -129,6 +135,13 @@ export const campaignDungeons = pgTable("campaign_dungeon", {
   height: integer("height").notNull(),
   cells: jsonb("cells").$type<CellType[][]>().notNull(),
   rooms: jsonb("rooms").$type<DungeonRoom[]>().notNull(),
+  // Fog of war semplificata: non vera dynamic lighting (raycasting sulla geometria), solo
+  // reveal a livello di stanza. Se disattivata (default, dungeon esistenti inclusi) tutti
+  // vedono tutto come prima — comportamento invariato per retrocompatibilità. Il master vede
+  // sempre tutto indipendentemente da questo campo, solo la vista dei giocatori ne tiene conto.
+  fogOfWar: boolean("fog_of_war").notNull().default(false),
+  revealedRooms: jsonb("revealed_rooms").$type<number[]>().notNull().default([]),
+  monsterTokens: jsonb("monster_tokens").$type<MonsterToken[]>().notNull().default([]),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
@@ -149,6 +162,46 @@ export const campaignRegionalMaps = pgTable("campaign_regional_map", {
   height: integer("height").notNull(),
   cells: jsonb("cells").$type<TerrainType[][]>().notNull(),
   markers: jsonb("markers").$type<RegionalMarker[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// Handout: lore/immagini condivisibili dal master, indipendenti da una mappa o da una stanza
+// specifica (a differenza delle note di stanza/marcatore) — es. una lettera, il ritratto di un
+// villain, lo stemma di una casata. "Visibile" parte falso: il master li prepara in anticipo e
+// li rivela al momento giusto della narrazione.
+export const campaignHandouts = pgTable("campaign_handout", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  titolo: text("titolo").notNull(),
+  testo: text("testo").notNull().default(""),
+  immagineUrl: text("immagine_url"),
+  visibile: boolean("visibile").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export interface RollTableEntry {
+  testo: string;
+  peso: number;
+}
+
+// Tabelle casuali personalizzate del master (bottino homebrew, incontri, dressing di scena...).
+// Il tiro vero e proprio (scelta pesata) è puro calcolo lato client una volta caricata la
+// tabella — non serve una server action solo per estrarre un elemento da un array già in mano.
+export const campaignRollTables = pgTable("campaign_roll_table", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  nome: text("nome").notNull(),
+  voci: jsonb("voci").$type<RollTableEntry[]>().notNull().default([]),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
