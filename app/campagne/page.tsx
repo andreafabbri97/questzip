@@ -16,7 +16,7 @@ import {
   removeMember,
   setMemberRole,
 } from "@/app/actions/campaigns";
-import { getPartyForCampaign } from "@/app/actions/characters";
+import { getPartyForCampaign, grantXp, grantXpToParty } from "@/app/actions/characters";
 import {
   addCombatant,
   addPartyToEncounter,
@@ -524,6 +524,17 @@ function CampaignDetailView({
                     )}
                   </div>
                   <PartySpellSlots classi={pc.classi} slotUsati={pc.slotUsati} slotPattoUsati={pc.slotPattoUsati} />
+                  <div className="mt-2 pt-2 border-t border-edge/60 flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-xs text-muted">
+                      {pc.esperienza} XP
+                      {pc.xpInSospeso > 0 && (
+                        <span className="ml-1.5 text-accent-strong">
+                          (+{pc.xpInSospeso} in attesa che {pc.playerName} li applichi)
+                        </span>
+                      )}
+                    </p>
+                    {isDm && <GrantXpInline campaignId={campaignId} targetUserId={pc.userId} />}
+                  </div>
                 </li>
               );
             })}
@@ -1088,6 +1099,7 @@ function EncounterTracker({
           encounter={encounter}
           campaignId={campaignId}
           partyLevels={partyLevels}
+          combatants={combatants}
           onChange={refresh}
         />
       )}
@@ -1100,23 +1112,27 @@ function EncounterDmControls({
   encounter,
   campaignId,
   partyLevels,
+  combatants,
   onChange,
 }: {
   encounter: { id: string };
   campaignId: string;
   partyLevels: number[];
+  combatants: Combatant[];
   onChange: () => void;
 }) {
   const [nome, setNome] = useState("");
   const [iniziativa, setIniziativa] = useState(10);
   const [hpMax, setHpMax] = useState(10);
   const [azioniLeggendarieMax, setAzioniLeggendarieMax] = useState(0);
+  const [xp, setXp] = useState(0);
 
   const add = async () => {
     if (!nome.trim() || hpMax < 1) return;
-    await addCombatant(encounter.id, { nome: nome.trim(), iniziativa, hpMax, azioniLeggendarieMax });
+    await addCombatant(encounter.id, { nome: nome.trim(), iniziativa, hpMax, azioniLeggendarieMax, xp });
     setNome("");
     setAzioniLeggendarieMax(0);
+    setXp(0);
     onChange();
   };
 
@@ -1133,10 +1149,11 @@ function EncounterDmControls({
           + Aggiungi il party
         </button>
         <MonsterQuickAdd
-          onPick={(name, hp, legendaryActions) => {
+          onPick={(name, hp, legendaryActions, monsterXp) => {
             setNome(name);
             setHpMax(hp);
             setAzioniLeggendarieMax(legendaryActions);
+            setXp(monsterXp);
           }}
         />
       </div>
@@ -1188,6 +1205,16 @@ function EncounterDmControls({
             className="w-12 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
+        <label className="flex items-center gap-1 text-xs text-muted">
+          XP
+          <input
+            type="number"
+            min={0}
+            value={xp}
+            onChange={(event) => setXp(Math.max(0, Number(event.target.value) || 0))}
+            className="w-16 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
         <button
           onClick={add}
           className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
@@ -1195,6 +1222,160 @@ function EncounterDmControls({
           Aggiungi
         </button>
       </div>
+
+      <XpDistributor campaignId={campaignId} combatants={combatants} />
+    </div>
+  );
+}
+
+function XpDistributor({
+  campaignId,
+  combatants,
+}: {
+  campaignId: string;
+  combatants: Combatant[];
+}) {
+  const monsterXp = combatants.filter((c) => !c.isPg).reduce((sum, c) => sum + c.xp, 0);
+  const pgCount = combatants.filter((c) => c.isPg).length;
+  const suggestedShare = pgCount > 0 ? Math.floor(monsterXp / pgCount) : monsterXp;
+
+  const [perPlayer, setPerPlayer] = useState(suggestedShare);
+  const [touched, setTouched] = useState(false);
+  const [autoLevelUp, setAutoLevelUp] = useState(true);
+  const [granting, setGranting] = useState(false);
+  const [granted, setGranted] = useState(false);
+
+  // il totale XP dei mostri cambia mentre il master aggiunge/rimuove combattenti: finché il
+  // master non ha toccato il campo a mano, resta agganciato al suggerimento; una volta
+  // modificato manualmente, resta quello che ha scelto anche se il suggerimento cambia dopo
+  // (altrimenti una modifica manuale verrebbe silenziosamente scavalcata al prossimo mostro
+  // aggiunto)
+  const [lastSuggested, setLastSuggested] = useState(suggestedShare);
+  if (suggestedShare !== lastSuggested) {
+    setLastSuggested(suggestedShare);
+    if (!touched) setPerPlayer(suggestedShare);
+  }
+
+  if (monsterXp === 0 && pgCount === 0) return null;
+
+  const grant = async () => {
+    setGranting(true);
+    try {
+      await grantXpToParty(campaignId, perPlayer, autoLevelUp);
+      setGranted(true);
+    } finally {
+      setGranting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">Distribuisci XP al party</p>
+      <p className="text-xs text-muted">
+        Mostri nel combattimento: {monsterXp} XP totali ÷ {pgCount || "?"} PG ={" "}
+        {suggestedShare} XP a testa (modificabile).
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          XP a testa
+          <input
+            type="number"
+            min={0}
+            value={perPlayer}
+            onChange={(event) => {
+              setPerPlayer(Math.max(0, Number(event.target.value) || 0));
+              setTouched(true);
+              setGranted(false);
+            }}
+            className="w-20 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={autoLevelUp}
+            onChange={(event) => setAutoLevelUp(event.target.checked)}
+          />
+          Level up automatico se possibile
+        </label>
+        <button
+          onClick={grant}
+          disabled={granting || perPlayer <= 0}
+          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        >
+          {granting ? "Assegno…" : granted ? "✓ Assegnato" : "Assegna XP"}
+        </button>
+      </div>
+      <p className="text-[10px] text-muted">
+        Ogni giocatore vedrà l&apos;XP in sospeso sulla propria scheda Personaggio e dovrà
+        applicarla lui (l&apos;app non modifica la scheda di qualcun altro direttamente).
+      </p>
+    </div>
+  );
+}
+
+function GrantXpInline({
+  campaignId,
+  targetUserId,
+}: {
+  campaignId: string;
+  targetUserId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(0);
+  const [autoLevelUp, setAutoLevelUp] = useState(true);
+  const [granting, setGranting] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        + Assegna XP
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <input
+        type="number"
+        min={0}
+        value={amount}
+        onChange={(event) => setAmount(Math.max(0, Number(event.target.value) || 0))}
+        className="w-16 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-foreground text-center"
+        placeholder="XP"
+        autoFocus
+      />
+      <label className="flex items-center gap-1 text-muted">
+        <input
+          type="checkbox"
+          checked={autoLevelUp}
+          onChange={(event) => setAutoLevelUp(event.target.checked)}
+        />
+        auto level up
+      </label>
+      <button
+        onClick={async () => {
+          if (amount <= 0) return;
+          setGranting(true);
+          try {
+            await grantXp(campaignId, targetUserId, amount, autoLevelUp);
+            setOpen(false);
+            setAmount(0);
+          } finally {
+            setGranting(false);
+          }
+        }}
+        disabled={granting || amount <= 0}
+        className="rounded-md bg-accent text-background font-bold px-2 py-1 hover:bg-accent-strong transition-colors disabled:opacity-50"
+      >
+        {granting ? "…" : "Assegna"}
+      </button>
+      <button onClick={() => setOpen(false)} className="text-muted hover:text-foreground">
+        ×
+      </button>
     </div>
   );
 }
@@ -1398,6 +1579,7 @@ function EncounterGenerator({
     creature: RawCreature;
     count: number;
     totalXp: number;
+    xpPerMonster: number;
   } | null>(null);
   const [adding, setAdding] = useState(false);
   // parte precompilata dal party sincronizzato, ma modificabile: utile per pianificare un
@@ -1416,11 +1598,8 @@ function EncounterGenerator({
     if (!creatures) setCreatures(pool);
 
     const withXp = pool
-      .map((creature) => ({
-        creature,
-        xp: XP_BY_CR[typeof creature.cr === "string" ? creature.cr : (creature.cr?.cr ?? "")],
-      }))
-      .filter((entry): entry is { creature: RawCreature; xp: number } => Boolean(entry.xp));
+      .map((creature) => ({ creature, xp: creatureXp(creature) }))
+      .filter((entry) => entry.xp > 0);
 
     if (withXp.length === 0) return;
 
@@ -1437,7 +1616,12 @@ function EncounterGenerator({
         .slice(0, 20);
     }
     const pick = candidates[Math.floor(Math.random() * candidates.length)];
-    setSuggestion({ creature: pick.creature, count, totalXp: adjustedEncounterXp(pick.xp, count) });
+    setSuggestion({
+      creature: pick.creature,
+      count,
+      totalXp: adjustedEncounterXp(pick.xp, count),
+      xpPerMonster: pick.xp,
+    });
   };
 
   const addToEncounter = async () => {
@@ -1450,6 +1634,7 @@ function EncounterGenerator({
           suggestion.count > 1 ? `${suggestion.creature.name} ${i + 1}` : suggestion.creature.name,
         iniziativa: 10,
         hpMax: hp,
+        xp: suggestion.xpPerMonster,
       });
     }
     setAdding(false);
@@ -1551,10 +1736,14 @@ function combatantHp(creature: RawCreature): number {
   return creature.hp.average ?? 10;
 }
 
+function creatureXp(creature: RawCreature): number {
+  return XP_BY_CR[typeof creature.cr === "string" ? creature.cr : (creature.cr?.cr ?? "")] ?? 0;
+}
+
 function MonsterQuickAdd({
   onPick,
 }: {
-  onPick: (name: string, hp: number, legendaryActions: number) => void;
+  onPick: (name: string, hp: number, legendaryActions: number, xp: number) => void;
 }) {
   const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
   const [query, setQuery] = useState("");
@@ -1594,7 +1783,12 @@ function MonsterQuickAdd({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  onPick(c.name, combatantHp(c), c.legendary && c.legendary.length > 0 ? 3 : 0);
+                  onPick(
+                    c.name,
+                    combatantHp(c),
+                    c.legendary && c.legendary.length > 0 ? 3 : 0,
+                    creatureXp(c),
+                  );
                   setQuery("");
                   setOpen(false);
                 }}

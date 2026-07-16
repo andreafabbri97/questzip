@@ -69,6 +69,7 @@ export async function addCombatant(
     hpMax: number;
     isPg?: boolean;
     azioniLeggendarieMax?: number;
+    xp?: number;
   },
 ) {
   const userId = await requireUserId();
@@ -81,6 +82,7 @@ export async function addCombatant(
     hpAttuali: combatant.hpMax,
     isPg: combatant.isPg ?? false,
     azioniLeggendarieMax: combatant.azioniLeggendarieMax ?? 0,
+    xp: combatant.xp ?? 0,
   });
   await broadcastEncounterChanged(encounter.campaignId);
 }

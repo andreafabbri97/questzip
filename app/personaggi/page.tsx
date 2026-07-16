@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { getMyCampaigns } from "@/app/actions/campaigns";
-import { syncCharacterToCampaign } from "@/app/actions/characters";
+import { claimXp, getMyCharacterInCampaign, syncCharacterToCampaign } from "@/app/actions/characters";
 import { getOggettiIta, getTalentiIta } from "@/app/actions/compendio-ita";
 import {
   ABILITIES,
@@ -369,7 +369,7 @@ function CharacterSheet({
         </section>
       </div>
 
-      <CampaignSync character={character} />
+      <CampaignSync character={character} onChange={onChange} />
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="rounded-xl border border-edge bg-surface p-5">
@@ -557,7 +557,13 @@ function CharacterSheet({
   );
 }
 
-function CampaignSync({ character }: { character: Character }) {
+function CampaignSync({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
   const { status } = useSession();
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
     null,
@@ -566,6 +572,8 @@ function CampaignSync({ character }: { character: Character }) {
   const [syncedAt, setSyncedAt] = useState<Date | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingXp, setPendingXp] = useState(0);
+  const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -574,6 +582,40 @@ function CampaignSync({ character }: { character: Character }) {
       setSelected((prev) => prev || list[0]?.id || "");
     });
   }, [status]);
+
+  useEffect(() => {
+    if (!selected) return;
+    let cancelled = false;
+    getMyCharacterInCampaign(selected).then((row) => {
+      if (!cancelled) setPendingXp(row?.xpInSospeso ?? 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
+
+  const claim = async () => {
+    if (!selected || pendingXp <= 0) return;
+    setClaiming(true);
+    try {
+      const { amount, autoLevelUp } = await claimXp(selected);
+      if (amount > 0) {
+        const newXp = character.esperienza + amount;
+        let classi = character.classi;
+        // stesso identico effetto di confermare il wizard di level-up già esistente: aggiorna
+        // solo il numero di livello, i PF restano un passo manuale successivo — per multiclasse
+        // non tocca nulla, serve comunque scegliere quale classe sale
+        if (autoLevelUp && classi.length === 1) {
+          const newLevel = Math.min(20, levelForXp(newXp));
+          if (newLevel > classi[0].livello) classi = [{ ...classi[0], livello: newLevel }];
+        }
+        onChange({ ...character, esperienza: newXp, classi });
+      }
+      setPendingXp(0);
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   if (status !== "authenticated") {
     return (
@@ -616,6 +658,21 @@ function CampaignSync({ character }: { character: Character }) {
 
   return (
     <section className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+      {pendingXp > 0 && (
+        <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg border border-accent-strong bg-accent/10 px-3 py-2">
+          <span className="text-sm text-foreground">
+            🎉 Il master ti ha assegnato <span className="font-bold">{pendingXp} XP</span> in
+            questa campagna.
+          </span>
+          <button
+            onClick={claim}
+            disabled={claiming}
+            className="rounded-lg bg-accent-strong text-background font-bold px-3 py-1.5 text-xs hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {claiming ? "…" : "Applica alla scheda"}
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs uppercase tracking-widest text-muted shrink-0">
           Porta in campagna
