@@ -127,6 +127,20 @@ const EDITIONS: { value: EditionFilter; label: string }[] = [
 
 type Entry = RawSpell | RawCreature | RawItem | RawRace | RawFeat | RawBackground | RawCondition | RawClass;
 
+type SortMode = "nome" | "cr" | "rarita" | "manuale";
+
+function crToNumber(cr: RawCreature["cr"]): number {
+  const s = typeof cr === "string" ? cr : (cr?.cr ?? "");
+  if (s.includes("/")) {
+    const [n, d] = s.split("/").map(Number);
+    return d ? n / d : -1;
+  }
+  const n = Number(s);
+  return Number.isNaN(n) ? -1 : n;
+}
+
+const RARITY_ORDER = ["none", "common", "uncommon", "rare", "very rare", "legendary", "artifact"];
+
 const PAGE_SIZE = 30;
 
 const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
@@ -148,6 +162,7 @@ export default function CompendiumPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Entry | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("nome");
 
   const [books, setBooks] = useState<Map<string, BookMeta> | null>(null);
   const [dataByKind, setDataByKind] = useState<Partial<Record<CompendiumKind, Entry[]>>>({});
@@ -207,8 +222,26 @@ export default function CompendiumPage() {
         if (edition === "entrambe") return true;
         return books.get(entry.source)?.edition === edition;
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [categoryData, books, query, edition, translatedQuery]);
+      .sort((a, b) => {
+        if (sortMode === "cr" && kind === "mostri") {
+          const diff = crToNumber((a as RawCreature).cr) - crToNumber((b as RawCreature).cr);
+          if (diff !== 0) return diff;
+        }
+        if (sortMode === "rarita" && kind === "oggetti") {
+          const diff =
+            RARITY_ORDER.indexOf((a as RawItem).rarity ?? "none") -
+            RARITY_ORDER.indexOf((b as RawItem).rarity ?? "none");
+          if (diff !== 0) return diff;
+        }
+        if (sortMode === "manuale") {
+          const diff = (books.get(a.source)?.name ?? a.source).localeCompare(
+            books.get(b.source)?.name ?? b.source,
+          );
+          if (diff !== 0) return diff;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
@@ -243,6 +276,7 @@ export default function CompendiumPage() {
               setQuery("");
               setSelected(null);
               setPage(0);
+              setSortMode("nome");
             }}
             className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
               !showRegole && kind === tab.kind
@@ -310,6 +344,35 @@ export default function CompendiumPage() {
                 }`}
               >
                 <FlagIcon lang={lang} className="w-5 h-auto rounded-sm" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">Ordina per</p>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { value: "nome", label: "Nome" },
+                ...(kind === "mostri" ? [{ value: "cr", label: "GS" } as const] : []),
+                ...(kind === "oggetti" ? [{ value: "rarita", label: "Rarità" } as const] : []),
+                { value: "manuale", label: "Manuale" },
+              ] as { value: SortMode; label: string }[]
+            ).map((option) => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  setSortMode(option.value);
+                  setPage(0);
+                }}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                  sortMode === option.value
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : "border-edge bg-surface-raised text-muted hover:text-foreground"
+                }`}
+              >
+                {option.label}
               </button>
             ))}
           </div>
@@ -1229,6 +1292,25 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
     return match;
   }, [language, itaClassi, translatedName]);
 
+  const subclasses = useMemo(() => {
+    if (!classData) return [];
+    const names = new Set<string>();
+    return classData.subclasses
+      .filter((sub) => sub.className === cls.name && sub.classSource === cls.source)
+      .filter((sub) => (names.has(sub.name) ? false : (names.add(sub.name), true)));
+  }, [classData, cls]);
+
+  const subclassesBlock = classData && subclasses.length > 0 && (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">
+        {cls.subclassTitle ?? "Sottoclassi"}
+      </p>
+      {subclasses.map((sub) => (
+        <SubclassAccordion key={sub.name} subclass={sub} classData={classData} language={language} />
+      ))}
+    </div>
+  );
+
   if (ufficiale) {
     const livelli = Object.entries(ufficiale.tabellaLivelli)
       .map(([livello, dati]) => ({ livello: Number(livello), ...dati }))
@@ -1270,6 +1352,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
               ))}
           </div>
         </div>
+        {subclassesBlock}
       </>
     );
   }
@@ -1277,11 +1360,6 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   if (!classData) {
     return <p className="text-sm text-muted">Caricamento…</p>;
   }
-
-  const names = new Set<string>();
-  const subclasses = classData.subclasses
-    .filter((sub) => sub.className === cls.name && sub.classSource === cls.source)
-    .filter((sub) => (names.has(sub.name) ? false : (names.add(sub.name), true)));
 
   const classFeatures = resolveClassFeatures(classData, cls);
   const featuresByLevel = new Map<number, string[]>();
@@ -1378,21 +1456,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
         </div>
       )}
 
-      {subclasses.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-widest text-muted">
-            {cls.subclassTitle ?? "Sottoclassi"}
-          </p>
-          {subclasses.map((sub) => (
-            <SubclassAccordion
-              key={sub.name}
-              subclass={sub}
-              classData={classData}
-              language={language}
-            />
-          ))}
-        </div>
-      )}
+      {subclassesBlock}
     </>
   );
 }
