@@ -42,7 +42,7 @@ import {
   upsertMyToken,
 } from "@/app/actions/dungeons";
 import type { CellType, DungeonConfig, RoomShape } from "@/lib/dungeon";
-import { loadCreatures, type RawCreature } from "@/lib/fivetools/data";
+import { loadCreatures, loadItems, type RawCreature, type RawItem } from "@/lib/fivetools/data";
 import { usePartyRoom } from "@/lib/use-party-room";
 import {
   abilityModifier,
@@ -53,13 +53,21 @@ import {
   formatModifier,
   multiclassCasterLevel,
   pactMagicForLevel,
+  pickTreasureRarity,
+  rollGemsAndArt,
+  rollHoardCoins,
+  rollIndividualCoins,
+  rollMagicItemCount,
   spellSlotsForCasterLevel,
   totalLevel,
+  treasureTierForCr,
   warlockLevel,
   xpBudget,
   XP_BY_CR,
   type Ability,
+  type CoinResult,
   type EncounterDifficulty,
+  type TreasureTier,
 } from "@/lib/dnd";
 
 type CampaignSummary = Awaited<ReturnType<typeof getMyCampaigns>>[number];
@@ -1111,6 +1119,9 @@ function EncounterDmControls({
           onAdded={onChange}
         />
       )}
+      <TreasureGenerator
+        defaultCr={partyLevels.length > 0 ? Math.round(partyLevels.reduce((a, b) => a + b, 0) / partyLevels.length) : 1}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={nome}
@@ -1158,6 +1169,130 @@ function EncounterDmControls({
   );
 }
 
+const COIN_LABELS: { key: keyof CoinResult; label: string }[] = [
+  { key: "mp", label: "mp" },
+  { key: "mo", label: "mo" },
+  { key: "me", label: "me" },
+  { key: "ma", label: "ma" },
+  { key: "mr", label: "mr" },
+];
+
+function formatCoins(coins: CoinResult): string {
+  return COIN_LABELS.filter((c) => coins[c.key] > 0)
+    .map((c) => `${coins[c.key]} ${c.label}`)
+    .join(", ") || "—";
+}
+
+function TreasureGenerator({ defaultCr }: { defaultCr: number }) {
+  const [cr, setCr] = useState(defaultCr);
+  const [mode, setMode] = useState<"individuale" | "tesoro">("individuale");
+  const [items, setItems] = useState<RawItem[] | null>(null);
+  const [result, setResult] = useState<{
+    coins: CoinResult;
+    gemsArt: { count: number; value: number } | null;
+    magicItems: RawItem[];
+  } | null>(null);
+  const [rolling, setRolling] = useState(false);
+
+  const roll = async () => {
+    setRolling(true);
+    const tier: TreasureTier = treasureTierForCr(cr);
+    const coins = mode === "individuale" ? rollIndividualCoins(tier) : rollHoardCoins(tier);
+    const gemsArt = mode === "tesoro" ? rollGemsAndArt(tier) : null;
+
+    const magicItems: RawItem[] = [];
+    if (mode === "tesoro") {
+      const magicCount = rollMagicItemCount(tier);
+      if (magicCount > 0) {
+        const pool = items ?? (await loadItems());
+        if (!items) setItems(pool);
+        for (let i = 0; i < magicCount; i++) {
+          const rarity = pickTreasureRarity(tier);
+          const candidates = pool.filter((it) => it.rarity === rarity);
+          if (candidates.length > 0) {
+            magicItems.push(candidates[Math.floor(Math.random() * candidates.length)]);
+          }
+        }
+      }
+    }
+
+    setResult({ coins, gemsArt, magicItems });
+    setRolling(false);
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">Genera ricompensa</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex rounded-lg border border-edge overflow-hidden">
+          {(["individuale", "tesoro"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                mode === m ? "bg-accent/15 text-accent-strong" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {m === "individuale" ? "Individuale" : "Tesoro (party)"}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          GS
+          <input
+            type="number"
+            min={0}
+            max={30}
+            value={cr}
+            onChange={(event) => setCr(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}
+            className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <button
+          onClick={roll}
+          disabled={rolling}
+          className="text-xs font-bold rounded-lg border border-edge px-2 py-1.5 text-foreground hover:border-accent transition-colors disabled:opacity-50"
+        >
+          🎲 Genera
+        </button>
+      </div>
+
+      {result && (
+        <div className="rounded-md border border-accent/40 bg-surface-raised px-3 py-2 space-y-1.5 text-sm">
+          <p className="text-foreground">
+            <span className="text-muted">Monete: </span>
+            <span className="font-bold">{formatCoins(result.coins)}</span>
+          </p>
+          {result.gemsArt && (
+            <p className="text-foreground">
+              <span className="text-muted">Gemme/oggetti d&apos;arte: </span>
+              <span className="font-bold">
+                {result.gemsArt.count} da {result.gemsArt.value} mo ciascuno
+              </span>
+            </p>
+          )}
+          {result.magicItems.length > 0 && (
+            <div>
+              <p className="text-muted mb-1">Oggetti magici:</p>
+              <ul className="space-y-0.5">
+                {result.magicItems.map((item, index) => (
+                  <li key={index} className="text-foreground">
+                    <span className="font-bold">{item.name}</span>{" "}
+                    <span className="text-xs text-muted capitalize">({item.rarity})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {mode === "tesoro" && !result.gemsArt && result.magicItems.length === 0 && (
+            <p className="text-xs text-muted">Solo monete questa volta.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EncounterGenerator({
   encounterId,
   partyLevels,
@@ -1175,8 +1310,16 @@ function EncounterGenerator({
     totalXp: number;
   } | null>(null);
   const [adding, setAdding] = useState(false);
+  // parte precompilata dal party sincronizzato, ma modificabile: utile per pianificare un
+  // incontro con un party diverso da quello attuale (assenti, PNG aggiunti, ecc.)
+  const [levels, setLevels] = useState<number[]>(partyLevels);
 
-  const budget = xpBudget(partyLevels, difficulty);
+  const updateLevel = (index: number, value: number) =>
+    setLevels((prev) => prev.map((l, i) => (i === index ? Math.min(20, Math.max(1, value)) : l)));
+  const addMember = () => setLevels((prev) => [...prev, 1]);
+  const removeMember = (index: number) => setLevels((prev) => prev.filter((_, i) => i !== index));
+
+  const budget = xpBudget(levels, difficulty);
 
   const generate = async () => {
     const pool = creatures ?? (await loadCreatures());
@@ -1227,6 +1370,44 @@ function EncounterGenerator({
   return (
     <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
       <p className="text-xs uppercase tracking-widest text-muted">Genera incontro casuale</p>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-widest text-muted mr-1">Party (livelli)</span>
+        {levels.map((level, index) => (
+          <span key={index} className="flex items-center gap-0.5">
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={level}
+              onChange={(event) => updateLevel(index, Number(event.target.value) || 1)}
+              className="w-10 rounded-md border border-edge bg-surface-raised px-1 py-1 text-xs text-foreground text-center"
+            />
+            <button
+              onClick={() => removeMember(index)}
+              className="text-muted hover:text-danger text-xs"
+              aria-label={`Rimuovi PG ${index + 1} dal calcolo`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <button
+          onClick={addMember}
+          className="text-xs font-bold text-accent-strong hover:underline"
+        >
+          + PG
+        </button>
+        {levels.length !== partyLevels.length && (
+          <button
+            onClick={() => setLevels(partyLevels)}
+            className="text-xs text-muted hover:text-foreground hover:underline"
+          >
+            ↺ party attuale
+          </button>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={difficulty}
@@ -1240,7 +1421,7 @@ function EncounterGenerator({
           ))}
         </select>
         <span className="text-xs text-muted">
-          Budget: {budget} XP ({partyLevels.length} PG)
+          Budget: {budget} XP ({levels.length} PG)
         </span>
         <button
           onClick={generate}

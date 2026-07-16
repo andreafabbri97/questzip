@@ -608,3 +608,155 @@ export function pactMagicForLevel(level: number): { slotLevel: number; slots: nu
   return PACT_MAGIC[Math.min(20, level) - 1];
 }
 
+// --- Generatore di ricompense (tabelle standard 2014 DMG) ---
+
+export type TreasureTier = "0-4" | "5-10" | "11-16" | "17+";
+
+export function treasureTierForCr(cr: number): TreasureTier {
+  if (cr <= 4) return "0-4";
+  if (cr <= 10) return "5-10";
+  if (cr <= 16) return "11-16";
+  return "17+";
+}
+
+function rollDice(count: number, faces: number): number {
+  let total = 0;
+  for (let i = 0; i < count; i++) total += Math.floor(Math.random() * faces) + 1;
+  return total;
+}
+
+export interface CoinResult {
+  mr: number; // monete di rame
+  ma: number; // monete d'argento
+  me: number; // monete elettro
+  mo: number; // monete d'oro
+  mp: number; // monete di platino
+}
+
+/** Monete per un singolo mostro/individuo, tabella "Treasure: Challenge X" del DMG. */
+export function rollIndividualCoins(tier: TreasureTier): CoinResult {
+  const roll = Math.floor(Math.random() * 100) + 1;
+  const empty: CoinResult = { mr: 0, ma: 0, me: 0, mo: 0, mp: 0 };
+  if (tier === "0-4") {
+    if (roll <= 30) return { ...empty, mr: rollDice(5, 6) };
+    if (roll <= 60) return { ...empty, ma: rollDice(4, 6) };
+    if (roll <= 70) return { ...empty, me: rollDice(3, 6) };
+    if (roll <= 95) return { ...empty, mo: rollDice(3, 6) };
+    return { ...empty, mp: rollDice(1, 6) };
+  }
+  if (tier === "5-10") {
+    if (roll <= 30) return { ...empty, mr: rollDice(4, 6) * 10, ma: rollDice(1, 6) * 10 };
+    if (roll <= 60) return { ...empty, ma: rollDice(1, 6) * 10, mo: rollDice(1, 6) * 10 };
+    if (roll <= 70) return { ...empty, me: rollDice(1, 6) * 10, mo: rollDice(1, 6) * 10 };
+    if (roll <= 95) return { ...empty, mo: rollDice(2, 6) * 10 };
+    return { ...empty, mo: rollDice(2, 6) * 10, mp: rollDice(1, 6) * 10 };
+  }
+  if (tier === "11-16") {
+    if (roll <= 20) return { ...empty, ma: rollDice(2, 6) * 100, mo: rollDice(1, 6) * 100 };
+    if (roll <= 35) return { ...empty, me: rollDice(1, 6) * 100, mo: rollDice(1, 6) * 100 };
+    if (roll <= 75) return { ...empty, mo: rollDice(2, 6) * 100 };
+    return { ...empty, mo: rollDice(2, 6) * 100, mp: rollDice(1, 6) * 100 };
+  }
+  if (roll <= 15) return { ...empty, me: rollDice(2, 6) * 1000, mo: rollDice(8, 6) * 100 };
+  if (roll <= 55) return { ...empty, mo: rollDice(1, 6) * 1000, mp: rollDice(1, 6) * 100 };
+  return { ...empty, mo: rollDice(1, 6) * 1000, mp: rollDice(2, 6) * 100 };
+}
+
+/** Monete per un tesoro d'incontro (party intero), tabella "Treasure Hoard: Challenge X". */
+export function rollHoardCoins(tier: TreasureTier): CoinResult {
+  const roll = Math.floor(Math.random() * 100) + 1;
+  const empty: CoinResult = { mr: 0, ma: 0, me: 0, mo: 0, mp: 0 };
+  if (tier === "0-4") {
+    if (roll <= 6) return { ...empty, mr: rollDice(6, 6) * 100 };
+    if (roll <= 16) return { ...empty, mr: rollDice(3, 6) * 100, ma: rollDice(2, 6) * 100 };
+    if (roll <= 29) return { ...empty, ma: rollDice(2, 6) * 100, mo: rollDice(2, 6) * 10 };
+    if (roll <= 52) return { ...empty, ma: rollDice(3, 6) * 100, mo: rollDice(2, 6) * 100 };
+    if (roll <= 74) return { ...empty, mo: rollDice(2, 6) * 100 };
+    if (roll <= 95) return { ...empty, mo: rollDice(2, 6) * 100, mp: rollDice(1, 6) * 10 };
+    return { ...empty, mo: rollDice(2, 6) * 100, mp: rollDice(2, 6) * 10 };
+  }
+  if (tier === "5-10") {
+    if (roll <= 6) return { ...empty, mr: rollDice(2, 6) * 100, mo: rollDice(2, 6) * 100 };
+    if (roll <= 16) return { ...empty, ma: rollDice(2, 6) * 100, mo: rollDice(2, 6) * 100 };
+    if (roll <= 29) return { ...empty, ma: rollDice(5, 6) * 100, mo: rollDice(3, 6) * 100 };
+    if (roll <= 52) return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(1, 6) * 10 };
+    if (roll <= 74) return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(2, 6) * 10 };
+    if (roll <= 95) return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(3, 6) * 10 };
+    return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(4, 6) * 10 };
+  }
+  if (tier === "11-16") {
+    if (roll <= 5) return { ...empty, ma: rollDice(4, 6) * 1000 };
+    if (roll <= 14) return { ...empty, ma: rollDice(1, 6) * 1000, mo: rollDice(1, 6) * 1000 };
+    if (roll <= 27) return { ...empty, mo: rollDice(2, 6) * 1000 };
+    if (roll <= 53) return { ...empty, mo: rollDice(2, 6) * 1000, mp: rollDice(1, 6) * 100 };
+    if (roll <= 78) return { ...empty, mo: rollDice(4, 6) * 1000, mp: rollDice(1, 6) * 100 };
+    return { ...empty, mo: rollDice(4, 6) * 1000, mp: rollDice(2, 6) * 100 };
+  }
+  if (roll <= 7) return { ...empty, mo: rollDice(2, 6) * 1000, mp: rollDice(1, 6) * 1000 };
+  if (roll <= 29) return { ...empty, mo: rollDice(8, 6) * 1000, mp: rollDice(1, 6) * 1000 };
+  if (roll <= 68) return { ...empty, mo: rollDice(6, 6) * 1000, mp: rollDice(2, 6) * 1000 };
+  return { ...empty, mo: rollDice(6, 6) * 1000, mp: rollDice(3, 6) * 1000 };
+}
+
+/** Valori tipici (in mo) di gemme/oggetti d'arte per fascia di GS, tabella DMG semplificata:
+ * niente nomi di fantasia inventati, solo il valore — restano da descrivere a voce dal master. */
+const GEM_ART_VALUES: Record<TreasureTier, number[]> = {
+  "0-4": [10, 25, 50],
+  "5-10": [50, 100, 250],
+  "11-16": [250, 750, 2500],
+  "17+": [2500, 7500, 25000],
+};
+
+export interface GemArtResult {
+  count: number;
+  value: number;
+}
+
+/** Numero e valore di gemme/oggetti d'arte in un tesoro d'incontro (semplificato dalla tabella
+ * DMG: stessa fascia di valore usata dal libro per il GS, senza i nomi di fantasia specifici). */
+export function rollGemsAndArt(tier: TreasureTier): GemArtResult | null {
+  if (Math.random() > 0.5) return null;
+  const values = GEM_ART_VALUES[tier];
+  const value = values[Math.floor(Math.random() * values.length)];
+  const count = rollDice(2, 4);
+  return { count, value };
+}
+
+/** Rarità plausibili per gli oggetti magici di un tesoro, per fascia di GS (stessa proporzione
+ * approssimativa delle tabelle DMG A-I: ai GS bassi prevalgono oggetti comuni/non comuni, ai GS
+ * alti oggetti rari/molto rari/leggendari). Usata per pescare un oggetto vero dal Compendio
+ * invece di inventare nomi — niente tabelle A-I riprodotte parola per parola. */
+const MAGIC_ITEM_RARITY_WEIGHTS: Record<TreasureTier, [string, number][]> = {
+  "0-4": [["common", 5], ["uncommon", 3], ["rare", 1]],
+  "5-10": [["uncommon", 4], ["rare", 3], ["very rare", 1]],
+  "11-16": [["rare", 4], ["very rare", 3], ["legendary", 1]],
+  "17+": [["very rare", 3], ["legendary", 4], ["artifact", 1]],
+};
+
+export function pickTreasureRarity(tier: TreasureTier): string {
+  const weights = MAGIC_ITEM_RARITY_WEIGHTS[tier];
+  const total = weights.reduce((sum, [, w]) => sum + w, 0);
+  let roll = Math.random() * total;
+  for (const [rarity, w] of weights) {
+    if (roll < w) return rarity;
+    roll -= w;
+  }
+  return weights[0][0];
+}
+
+/** Probabilità (0-1) che un tesoro d'incontro contenga oggetti magici, e quanti, per fascia di
+ * GS — approssima la frequenza delle tabelle DMG senza riprodurle nel dettaglio. */
+const MAGIC_ITEM_CHANCE: Record<TreasureTier, { chance: number; count: [number, number] }> = {
+  "0-4": { chance: 0.3, count: [1, 1] },
+  "5-10": { chance: 0.5, count: [1, 2] },
+  "11-16": { chance: 0.7, count: [1, 3] },
+  "17+": { chance: 0.9, count: [2, 4] },
+};
+
+export function rollMagicItemCount(tier: TreasureTier): number {
+  const { chance, count } = MAGIC_ITEM_CHANCE[tier];
+  if (Math.random() > chance) return 0;
+  const [min, max] = count;
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
