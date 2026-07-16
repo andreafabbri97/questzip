@@ -41,7 +41,15 @@ import {
   updateRoomNotes,
   upsertMyToken,
 } from "@/app/actions/dungeons";
-import type { CellType, DungeonConfig, RoomShape } from "@/lib/dungeon";
+import type {
+  CellType,
+  CorridorStyle,
+  DeadEndRemoval,
+  DungeonConfig,
+  RoomDensity,
+  RoomShape,
+  StairsOption,
+} from "@/lib/dungeon";
 import { loadCreatures, loadItems, type RawCreature, type RawItem } from "@/lib/fivetools/data";
 import { generateName, NAME_RACES, type NameRace } from "@/lib/names";
 import { usePartyRoom } from "@/lib/use-party-room";
@@ -1695,6 +1703,31 @@ const SHAPE_LABELS: Record<RoomShape, string> = {
   polygonal: "Poligonali",
 };
 
+const DENSITY_LABELS: Record<RoomDensity, string> = {
+  sparse: "Sparse",
+  scattered: "Sparpagliate",
+  dense: "Dense",
+  symmetric: "Simmetriche",
+};
+
+const CORRIDOR_LABELS: Record<CorridorStyle, string> = {
+  straight: "Dritti",
+  errant: "Vaganti",
+  labyrinth: "Labirinto",
+};
+
+const DEADEND_LABELS: Record<DeadEndRemoval, string> = {
+  none: "Nessuno",
+  some: "Alcuni",
+  all: "Tutti",
+};
+
+const STAIRS_LABELS: Record<StairsOption, string> = {
+  no: "No",
+  yes: "Sì",
+  many: "Diverse",
+};
+
 function NewDungeonForm({
   campaignId,
   onCreated,
@@ -1706,6 +1739,10 @@ function NewDungeonForm({
   const [minRooms, setMinRooms] = useState(5);
   const [maxRooms, setMaxRooms] = useState(10);
   const [shape, setShape] = useState<RoomShape>("rectangular");
+  const [density, setDensity] = useState<RoomDensity>("scattered");
+  const [corridorStyle, setCorridorStyle] = useState<CorridorStyle>("straight");
+  const [removeDeadends, setRemoveDeadends] = useState<DeadEndRemoval>("none");
+  const [stairs, setStairs] = useState<StairsOption>("no");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1717,7 +1754,15 @@ function NewDungeonForm({
     setGenerating(true);
     setError(null);
     try {
-      const config: DungeonConfig = { minRooms, maxRooms, shape };
+      const config: DungeonConfig = {
+        minRooms,
+        maxRooms,
+        shape,
+        density,
+        corridorStyle,
+        removeDeadends,
+        stairs,
+      };
       const dungeon = await createDungeon(campaignId, nome.trim(), config);
       setNome("");
       onCreated(dungeon);
@@ -1774,14 +1819,90 @@ function NewDungeonForm({
             </button>
           ))}
         </div>
-        <button
-          onClick={generate}
-          disabled={generating}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
-        >
-          {generating ? "Genero…" : "🎲 Genera"}
-        </button>
       </div>
+
+      <div className="grid sm:grid-cols-2 gap-2">
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-widest text-muted">Densità stanze</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {(Object.keys(DENSITY_LABELS) as RoomDensity[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => setDensity(option)}
+                className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                  density === option
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : "border-edge bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                {DENSITY_LABELS[option]}
+              </button>
+            ))}
+          </div>
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-widest text-muted">Corridoi</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {(Object.keys(CORRIDOR_LABELS) as CorridorStyle[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => setCorridorStyle(option)}
+                className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                  corridorStyle === option
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : "border-edge bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                {CORRIDOR_LABELS[option]}
+              </button>
+            ))}
+          </div>
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-widest text-muted">Rimuovi vicoli ciechi</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {(Object.keys(DEADEND_LABELS) as DeadEndRemoval[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => setRemoveDeadends(option)}
+                className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                  removeDeadends === option
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : "border-edge bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                {DEADEND_LABELS[option]}
+              </button>
+            ))}
+          </div>
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-widest text-muted">Scale</span>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {(Object.keys(STAIRS_LABELS) as StairsOption[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => setStairs(option)}
+                className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                  stairs === option
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : "border-edge bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                {STAIRS_LABELS[option]}
+              </button>
+            ))}
+          </div>
+        </label>
+      </div>
+
+      <button
+        onClick={generate}
+        disabled={generating}
+        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+      >
+        {generating ? "Genero…" : "🎲 Genera"}
+      </button>
       {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );

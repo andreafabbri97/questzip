@@ -7,6 +7,10 @@
 
 export type CellType = "wall" | "floor" | "door" | "corridor";
 export type RoomShape = "rectangular" | "organic" | "circular" | "polygonal";
+export type RoomDensity = "sparse" | "scattered" | "dense" | "symmetric";
+export type CorridorStyle = "straight" | "errant" | "labyrinth";
+export type DeadEndRemoval = "none" | "some" | "all";
+export type StairsOption = "no" | "yes" | "many";
 
 export type VectorShape =
   | { type: "circle"; cx: number; cy: number; r: number }
@@ -34,6 +38,10 @@ export interface DungeonConfig {
   minRooms: number;
   maxRooms: number;
   shape: RoomShape;
+  density?: RoomDensity;
+  corridorStyle?: CorridorStyle;
+  removeDeadends?: DeadEndRemoval;
+  stairs?: StairsOption;
 }
 
 interface Rect {
@@ -231,44 +239,129 @@ function minimumSpanningEdges(
   return edges;
 }
 
+/** "straight" = L, due tratti dritti come prima. "errant"/"labyrinth" avanzano una cella alla
+ * volta verso il bersaglio ma con una probabilità (bassa per errant, alta per labyrinth) di
+ * deviare lateralmente invece di procedere dritti, per un percorso più tortuoso. */
 function carveCorridor(
   cells: CellType[][],
   from: { centerX: number; centerY: number },
   to: { centerX: number; centerY: number },
+  style: CorridorStyle = "straight",
 ) {
-  let [x, y] = [Math.round(from.centerX), Math.round(from.centerY)];
-  const targetX = Math.round(to.centerX);
-  const targetY = Math.round(to.centerY);
+  const width = cells[0]?.length ?? 0;
+  const height = cells.length;
   const carve = (cx: number, cy: number) => {
     if (cells[cy]?.[cx] === "wall") cells[cy][cx] = "corridor";
   };
-  const horizontalFirst = Math.random() < 0.5;
 
-  const stepX = () => {
-    while (x !== targetX) {
-      x += x < targetX ? 1 : -1;
-      carve(x, y);
+  if (style === "straight") {
+    let [x, y] = [Math.round(from.centerX), Math.round(from.centerY)];
+    const targetX = Math.round(to.centerX);
+    const targetY = Math.round(to.centerY);
+    const horizontalFirst = Math.random() < 0.5;
+    const stepX = () => {
+      while (x !== targetX) {
+        x += x < targetX ? 1 : -1;
+        carve(x, y);
+      }
+    };
+    const stepY = () => {
+      while (y !== targetY) {
+        y += y < targetY ? 1 : -1;
+        carve(x, y);
+      }
+    };
+    if (horizontalFirst) {
+      stepX();
+      stepY();
+    } else {
+      stepY();
+      stepX();
     }
-  };
-  const stepY = () => {
-    while (y !== targetY) {
-      y += y < targetY ? 1 : -1;
-      carve(x, y);
-    }
-  };
+    return;
+  }
 
-  if (horizontalFirst) {
-    stepX();
-    stepY();
-  } else {
-    stepY();
-    stepX();
+  const wanderChance = style === "labyrinth" ? 0.55 : 0.2;
+  let [x, y] = [Math.round(from.centerX), Math.round(from.centerY)];
+  const targetX = Math.round(to.centerX);
+  const targetY = Math.round(to.centerY);
+  let guard = (Math.abs(targetX - x) + Math.abs(targetY - y)) * 6 + 20;
+  carve(x, y);
+  while ((x !== targetX || y !== targetY) && guard-- > 0) {
+    const towardMoves: [number, number][] = [];
+    if (x !== targetX) towardMoves.push([x < targetX ? 1 : -1, 0]);
+    if (y !== targetY) towardMoves.push([0, y < targetY ? 1 : -1]);
+    const allDirections: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const sidewaysMoves: [number, number][] = allDirections.filter(
+      ([dx, dy]) => !towardMoves.some(([tx, ty]) => tx === dx && ty === dy),
+    );
+
+    const useWander = Math.random() < wanderChance && sidewaysMoves.length > 0;
+    const [dx, dy] = useWander
+      ? sidewaysMoves[randInt(0, sidewaysMoves.length - 1)]
+      : towardMoves[randInt(0, towardMoves.length - 1)];
+    const nx = Math.min(width - 2, Math.max(1, x + dx));
+    const ny = Math.min(height - 2, Math.max(1, y + dy));
+    x = nx;
+    y = ny;
+    carve(x, y);
+  }
+  // se il vagabondaggio non è arrivato esatto a destinazione, chiude dritto l'ultimo tratto
+  while (x !== targetX) {
+    x += x < targetX ? 1 : -1;
+    carve(x, y);
+  }
+  while (y !== targetY) {
+    y += y < targetY ? 1 : -1;
+    carve(x, y);
   }
 }
 
+/** Rimuove i vicoli ciechi (celle di corridoio con un solo vicino aperto), un'iterazione alla
+ * volta come nella generazione classica di labirinti — "some" ne rimuove circa metà con un
+ * singolo passaggio, "all" itera finché non ne restano più. */
+function removeDeadEnds(cells: CellType[][], mode: DeadEndRemoval) {
+  if (mode === "none") return;
+  const height = cells.length;
+  const width = cells[0]?.length ?? 0;
+  const isOpen = (x: number, y: number) => {
+    const c = cells[y]?.[x];
+    return c === "corridor" || c === "floor" || c === "door";
+  };
+
+  const passes = mode === "all" ? width * height : 1;
+  for (let pass = 0; pass < passes; pass++) {
+    let removedAny = false;
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        if (cells[y][x] !== "corridor") continue;
+        const openNeighbors = [
+          [x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1],
+        ].filter(([nx, ny]) => isOpen(nx, ny)).length;
+        if (openNeighbors > 1) continue;
+        if (mode === "some" && Math.random() > 0.5) continue;
+        cells[y][x] = "wall";
+        removedAny = true;
+      }
+    }
+    if (!removedAny) break;
+  }
+}
+
+// Densità: quanto è grande la griglia rispetto al numero di stanze — griglia più larga a
+// parità di stanze = stanze più sparse. "Symmetric" non cambia la griglia, cambia solo il modo
+// in cui le stanze vengono piazzate (vedi sotto).
+const DENSITY_MULTIPLIER: Record<RoomDensity, number> = {
+  dense: 7,
+  scattered: 9,
+  sparse: 12,
+  symmetric: 9,
+};
+
 export function generateDungeon(config: DungeonConfig): DungeonData {
   const roomCount = randInt(config.minRooms, config.maxRooms);
-  const gridSize = Math.ceil(Math.sqrt(roomCount)) * 9 + 6;
+  const density = config.density ?? "scattered";
+  const gridSize = Math.ceil(Math.sqrt(roomCount)) * DENSITY_MULTIPLIER[density] + 6;
   const width = gridSize;
   const height = gridSize;
 
@@ -277,16 +370,41 @@ export function generateDungeon(config: DungeonConfig): DungeonData {
   );
 
   const placed: Rect[] = [];
-  for (let i = 0; i < roomCount; i++) {
-    for (let attempt = 0; attempt < 60; attempt++) {
-      const w = randInt(3, 7);
-      const h = randInt(3, 7);
-      const x = randInt(1, Math.max(1, width - w - 1));
-      const y = randInt(1, Math.max(1, height - h - 1));
-      const rect = { x, y, w, h };
-      if (!placed.some((existing) => rectsOverlap(rect, existing, 1))) {
-        placed.push(rect);
-        break;
+  if (density === "symmetric") {
+    // piazza solo nella metà sinistra, poi rispecchia ogni stanza sull'asse verticale: un
+    // dungeon simmetrico, come un tempio o una fortezza progettata apposta
+    const halfWidth = Math.max(4, Math.floor(width / 2) - 1);
+    const halfCount = Math.ceil(roomCount / 2);
+    for (let i = 0; i < halfCount; i++) {
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const w = randInt(3, 7);
+        const h = randInt(3, 7);
+        const x = randInt(1, Math.max(1, halfWidth - w));
+        const y = randInt(1, Math.max(1, height - h - 1));
+        const rect = { x, y, w, h };
+        const mirrored = { x: width - x - w, y, w, h };
+        if (
+          !placed.some((existing) => rectsOverlap(rect, existing, 1)) &&
+          !placed.some((existing) => rectsOverlap(mirrored, existing, 1)) &&
+          !rectsOverlap(rect, mirrored, 1)
+        ) {
+          placed.push(rect, mirrored);
+          break;
+        }
+      }
+    }
+  } else {
+    for (let i = 0; i < roomCount; i++) {
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const w = randInt(3, 7);
+        const h = randInt(3, 7);
+        const x = randInt(1, Math.max(1, width - w - 1));
+        const y = randInt(1, Math.max(1, height - h - 1));
+        const rect = { x, y, w, h };
+        if (!placed.some((existing) => rectsOverlap(rect, existing, 1))) {
+          placed.push(rect);
+          break;
+        }
       }
     }
   }
@@ -334,16 +452,19 @@ export function generateDungeon(config: DungeonConfig): DungeonData {
     };
   });
 
+  const corridorStyle = config.corridorStyle ?? "straight";
   const edges = minimumSpanningEdges(rooms);
-  for (const [a, b] of edges) carveCorridor(cells, rooms[a], rooms[b]);
+  for (const [a, b] of edges) carveCorridor(cells, rooms[a], rooms[b], corridorStyle);
 
   // qualche anello extra per rendere il dungeon meno lineare
   const extraLoops = Math.floor(rooms.length * 0.15);
   for (let i = 0; i < extraLoops && rooms.length > 2; i++) {
     const a = randInt(0, rooms.length - 1);
     const b = randInt(0, rooms.length - 1);
-    if (a !== b) carveCorridor(cells, rooms[a], rooms[b]);
+    if (a !== b) carveCorridor(cells, rooms[a], rooms[b], corridorStyle);
   }
+
+  removeDeadEnds(cells, config.removeDeadends ?? "none");
 
   // porte: celle di corridoio adiacenti a una cella di stanza
   for (let y = 0; y < height; y++) {
@@ -357,6 +478,25 @@ export function generateDungeon(config: DungeonConfig): DungeonData {
       ];
       const touchesRoom = neighbors.some(([nx, ny]) => cells[ny]?.[nx] === "floor");
       if (touchesRoom && Math.random() < 0.5) cells[y][x] = "door";
+    }
+  }
+
+  const stairsOption = config.stairs ?? "no";
+  if (stairsOption !== "no" && rooms.length > 0) {
+    const stairsCount = stairsOption === "many" ? Math.min(rooms.length, randInt(2, 3)) : 1;
+    const roomOrder = [...rooms].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < stairsCount; i++) {
+      const room = roomOrder[i % roomOrder.length];
+      const [sx, sy] = room.cells[randInt(0, room.cells.length - 1)];
+      rooms.push({
+        id: rooms.length,
+        label: stairsCount > 1 ? `🪜 Scale ${i + 1}` : "🪜 Scale",
+        cells: [[sx, sy]],
+        centerX: sx,
+        centerY: sy,
+        encounter: "",
+        reward: "",
+      });
     }
   }
 
