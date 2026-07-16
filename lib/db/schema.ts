@@ -356,3 +356,19 @@ export const compendioItaRegole = pgTable("compendio_ita_regola", {
   pagina: integer("pagina"),
   fonte: text("fonte").notNull(),
 });
+
+// Oggetti magici in italiano, estratti via OCR da un PDF privato ("Oggetti Magici (Dm e Book
+// of many things).pdf") che si è rivelato essere uno screenshot del catalogo "OGGETTI MAGICI
+// A-Z" del Manuale del DM italiano — leggibile via OCR nonostante il Manuale del DM digitale
+// abbia il font offuscato (vedi compendioItaRegole sopra per il resto del contesto sui PDF
+// privati). Qualità OCR inferiore al resto (screenshot, non scansione), quindi mostrato con lo
+// stesso badge esplicito già usato per costa_spada.
+export const compendioItaOggetti = pgTable("compendio_ita_oggetto", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nome: text("nome").notNull(),
+  categoria: text("categoria").notNull().default(""),
+  rarita: text("rarita").notNull().default(""),
+  sintonia: boolean("sintonia").notNull().default(false),
+  descrizione: text("descrizione").notNull(),
+  fonte: text("fonte").notNull(),
+});

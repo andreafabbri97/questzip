@@ -13,6 +13,7 @@ import {
   compendioItaClassi,
   compendioItaIncantesimi,
   compendioItaMostri,
+  compendioItaOggetti,
   compendioItaRazze,
   compendioItaRegole,
 } from "../../lib/db/schema.ts";
@@ -158,6 +159,24 @@ async function seedRegole(bookKey) {
   console.log(`${sections.length} sezioni di regole caricate da ${bookKey}.`);
 }
 
+async function seedOggetti(bookKey) {
+  const filePath = path.join(PARSED_DIR, `${bookKey}-oggetti.json`);
+  const items = JSON.parse(readFileSync(filePath, "utf-8"));
+
+  await db.delete(compendioItaOggetti).where(eq(compendioItaOggetti.fonte, bookKey));
+  for (const i of items) {
+    await db.insert(compendioItaOggetti).values({
+      nome: i.nome,
+      categoria: i.categoria,
+      rarita: i.rarita,
+      sintonia: i.sintonia,
+      descrizione: i.descrizione,
+      fonte: i.fonte,
+    });
+  }
+  console.log(`${items.length} oggetti magici caricati da ${bookKey}.`);
+}
+
 async function main() {
   await seedIncantesimi("phb");
   await seedIncantesimi("tasha");
@@ -167,9 +186,10 @@ async function main() {
   }
   await seedRazze("phb");
   await seedClassi("phb");
-  for (const book of ["regole_base", "costa_spada"]) {
+  for (const book of ["regole_base", "costa_spada", "oggetti_magici"]) {
     await seedRegole(book);
   }
+  await seedOggetti("oggetti_magici");
   console.log("Fatto.");
 }
 

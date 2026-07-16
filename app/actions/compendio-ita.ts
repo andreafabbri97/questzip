@@ -6,6 +6,7 @@ import {
   compendioItaClassi,
   compendioItaIncantesimi,
   compendioItaMostri,
+  compendioItaOggetti,
   compendioItaRazze,
   compendioItaRegole,
 } from "@/lib/db/schema";
@@ -38,4 +39,9 @@ export async function getClassiIta() {
 export async function getRegoleIta() {
   await requireAuth();
   return db.select().from(compendioItaRegole);
+}
+
+export async function getOggettiIta() {
+  await requireAuth();
+  return db.select().from(compendioItaOggetti);
 }

@@ -34,6 +34,7 @@ import {
   getClassiIta,
   getIncantesimiIta,
   getMostriIta,
+  getOggettiIta,
   getRazzeIta,
   getRegoleIta,
 } from "@/app/actions/compendio-ita";
@@ -59,6 +60,11 @@ let itaClassiPromise: ReturnType<typeof getClassiIta> | null = null;
 function loadClassiIta() {
   if (!itaClassiPromise) itaClassiPromise = getClassiIta();
   return itaClassiPromise;
+}
+let itaOggettiPromise: ReturnType<typeof getOggettiIta> | null = null;
+function loadOggettiIta() {
+  if (!itaOggettiPromise) itaOggettiPromise = getOggettiIta();
+  return itaOggettiPromise;
 }
 
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
@@ -403,6 +409,14 @@ export default function CompendiumPage() {
 const REGOLE_FONTI: Record<string, string> = {
   regole_base: "Regole Principali",
   costa_spada: "Costa della Spada",
+  oggetti_magici: "Oggetti Magici (EN)",
+};
+
+const REGOLE_WARNINGS: Record<string, string> = {
+  costa_spada:
+    "estratta via OCR da scansioni (non un vero testo digitale come il resto del compendio): può contenere errori di riconoscimento. Utile per una ricerca rapida, non garantita parola per parola.",
+  oggetti_magici:
+    "estratta via OCR da un PDF privato di qualità ancora più bassa (sembra uno screenshot di un lettore, non una vera scansione) ed è in INGLESE, non tradotta: aspettati più errori del solito. Le schede dei singoli oggetti magici non sono incluse qui — sono già nel tab Oggetti, in versione pulita e completa; questa sezione ha solo il testo di ambientazione/consigli per il master attorno agli oggetti.",
 };
 
 // Sezione a sé, fuori dal sistema kind/Entry/LOADERS del resto del Compendio: quel sistema
@@ -434,16 +448,19 @@ function RegoleSection() {
     <div className="space-y-4">
       {fonte !== "regole_base" && (
         <div className="rounded-lg border border-edge bg-surface-raised p-3 text-xs text-muted">
-          ⚠️ {fonte === "costa_spada" ? "Costa della Spada è" : "Costa della Spada (fra i risultati) è"}{" "}
-          estratta via OCR da scansioni (non un vero testo digitale come il resto del compendio):
-          può contenere errori di riconoscimento. Utile per una ricerca rapida, non garantito
-          parola per parola. Regole Principali invece è stata riscritta a mano, testo pulito e
-          affidabile.
+          {fonte === "tutte" ? (
+            <>
+              ⚠️ Solo Regole Principali è stata riscritta a mano (testo pulito e affidabile); le
+              altre fonti fra i risultati sono {REGOLE_WARNINGS.costa_spada}
+            </>
+          ) : (
+            <>⚠️ {REGOLE_FONTI[fonte] ?? fonte} è {REGOLE_WARNINGS[fonte] ?? "estratta via OCR."}</>
+          )}
         </div>
       )}
 
       <div className="flex flex-wrap gap-2">
-        {(["tutte", "regole_base", "costa_spada"] as const).map((f) => (
+        {(["tutte", "regole_base", "costa_spada", "oggetti_magici"] as const).map((f) => (
           <button
             key={f}
             onClick={() => {
@@ -509,13 +526,17 @@ function RegoleSection() {
               </button>
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-foreground">{selectedSection.titolo}</h2>
-                {selectedSection.fonte === "costa_spada" ? (
-                  <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">
-                    📷 OCR
-                  </span>
-                ) : (
+                {selectedSection.fonte === "regole_base" ? (
                   <span className="shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-accent-strong">
                     ✓ Verificato
+                  </span>
+                ) : selectedSection.fonte === "oggetti_magici" ? (
+                  <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">
+                    📷 OCR · EN
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">
+                    📷 OCR
                   </span>
                 )}
               </div>
@@ -698,6 +719,7 @@ function Stat({ label, value }: { label: string; value: string | number | undefi
 const ITA_SOURCE_NAMES: Record<string, string> = {
   phb: "Manuale del Giocatore",
   mm: "Manuale dei Mostri",
+  oggetti_magici: "Manuale del DM (OCR)",
 };
 
 function SpellDetail({ spell, language }: { spell: RawSpell; language: Language }) {
@@ -965,6 +987,50 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
       : typeof item.reqAttune === "string"
         ? `richiede sintonia (${item.reqAttune})`
         : null;
+
+  const translatedName = useTranslatedText(item.name, "en", "it");
+  const [itaOggetti, setItaOggetti] = useState<Awaited<ReturnType<typeof getOggettiIta>> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (language !== "it") return;
+    let cancelled = false;
+    loadOggettiIta().then((data) => {
+      if (!cancelled) setItaOggetti(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  const ufficiale = useMemo(() => {
+    if (language !== "it" || !itaOggetti || !translatedName) return null;
+    const target = normalizeItaName(translatedName);
+    return itaOggetti.find((o) => normalizeItaName(o.nome) === target) ?? null;
+  }, [language, itaOggetti, translatedName]);
+
+  if (ufficiale) {
+    return (
+      <>
+        <p className="text-xs font-bold text-accent-strong">
+          📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
+        </p>
+        <p className="text-sm text-muted italic capitalize">
+          {[ufficiale.categoria, ufficiale.rarita, ufficiale.sintonia ? "richiede sintonia" : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+          {ufficiale.descrizione}
+        </p>
+        <p className="text-[10px] text-muted">
+          ⚠️ testo estratto via OCR da un PDF privato di qualità bassa (screenshot, non
+          scansione): può contenere errori di riconoscimento.
+        </p>
+      </>
+    );
+  }
 
   return (
     <>
