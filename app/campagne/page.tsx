@@ -27,6 +27,13 @@ import {
   updateHandout,
 } from "@/app/actions/handouts";
 import {
+  createRollTable,
+  deleteRollTable,
+  getRollTablesForCampaign,
+  updateRollTable,
+} from "@/app/actions/roll-tables";
+import type { RollTableEntry } from "@/lib/db/schema";
+import {
   addCombatant,
   addPartyToEncounter,
   endEncounter,
@@ -433,6 +440,8 @@ function CampaignDetailView({
       <JukeboxPlayer campaignId={campaignId} isDm={isDm} campaign={detail.campaign} onChanged={refresh} />
 
       <HandoutsSection campaignId={campaignId} isDm={isDm} />
+
+      <RollTablesSection campaignId={campaignId} isDm={isDm} />
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -1316,6 +1325,215 @@ function HandoutDetail({
       {handout.testo && (
         <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{handout.testo}</p>
       )}
+    </div>
+  );
+}
+
+type RollTable = Awaited<ReturnType<typeof getRollTablesForCampaign>>[number];
+
+function rollWeighted(voci: RollTableEntry[]): RollTableEntry | null {
+  const validVoci = voci.filter((v) => v.peso > 0);
+  if (validVoci.length === 0) return null;
+  const total = validVoci.reduce((sum, v) => sum + v.peso, 0);
+  let roll = Math.random() * total;
+  for (const voce of validVoci) {
+    if (roll < voce.peso) return voce;
+    roll -= voce.peso;
+  }
+  return validVoci[validVoci.length - 1];
+}
+
+function RollTablesSection({ campaignId, isDm }: { campaignId: string; isDm: boolean }) {
+  const [tables, setTables] = useState<RollTable[] | null>(null);
+  const [results, setResults] = useState<Record<string, string>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const refresh = () => {
+    getRollTablesForCampaign(campaignId).then(setTables);
+  };
+  useEffect(refresh, [campaignId]);
+
+  if (tables === null) return null;
+  if (tables.length === 0 && !isDm) return null;
+
+  const roll = (table: RollTable) => {
+    const result = rollWeighted(table.voci);
+    setResults((prev) => ({ ...prev, [table.id]: result?.testo ?? "Tabella vuota." }));
+  };
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">🎲 Tabelle personalizzate</h2>
+        {isDm && (
+          <button
+            onClick={async () => {
+              const nome = window.prompt("Nome della tabella", "Bottino minore");
+              if (nome === null) return;
+              const table = await createRollTable(campaignId, nome);
+              refresh();
+              setEditingId(table.id);
+            }}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            + Nuova tabella
+          </button>
+        )}
+      </div>
+
+      {tables.length === 0 ? (
+        <p className="text-sm text-muted">Nessuna tabella ancora.</p>
+      ) : (
+        <div className="space-y-2">
+          {tables.map((table) =>
+            editingId === table.id ? (
+              <RollTableEditor
+                key={table.id}
+                table={table}
+                onSaved={() => {
+                  setEditingId(null);
+                  refresh();
+                }}
+                onCancel={() => setEditingId(null)}
+                onDeleted={() => {
+                  setEditingId(null);
+                  refresh();
+                }}
+              />
+            ) : (
+              <div
+                key={table.id}
+                className="rounded-lg border border-edge bg-surface-raised p-3 space-y-1.5"
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <p className="text-sm font-bold text-foreground">
+                    {table.nome} <span className="text-xs text-muted">({table.voci.length} voci)</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => roll(table)}
+                      disabled={table.voci.length === 0}
+                      className="rounded-md bg-accent text-background font-bold px-2.5 py-1 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+                    >
+                      🎲 Tira
+                    </button>
+                    {isDm && (
+                      <button
+                        onClick={() => setEditingId(table.id)}
+                        className="text-xs text-muted hover:text-foreground"
+                      >
+                        Modifica
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {results[table.id] && (
+                  <p className="text-sm text-accent-strong font-bold">→ {results[table.id]}</p>
+                )}
+              </div>
+            ),
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RollTableEditor({
+  table,
+  onSaved,
+  onCancel,
+  onDeleted,
+}: {
+  table: RollTable;
+  onSaved: () => void;
+  onCancel: () => void;
+  onDeleted: () => void;
+}) {
+  const [nome, setNome] = useState(table.nome);
+  const [voci, setVoci] = useState<RollTableEntry[]>(table.voci);
+  const [saving, setSaving] = useState(false);
+
+  const addRow = () => setVoci((prev) => [...prev, { testo: "", peso: 1 }]);
+  const updateRow = (index: number, patch: Partial<RollTableEntry>) =>
+    setVoci((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)));
+  const removeRow = (index: number) => setVoci((prev) => prev.filter((_, i) => i !== index));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await updateRollTable(
+        table.id,
+        nome,
+        voci.filter((v) => v.testo.trim()),
+      );
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-accent/40 bg-surface-raised p-3 space-y-2">
+      <input
+        value={nome}
+        onChange={(event) => setNome(event.target.value)}
+        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm font-bold text-foreground"
+      />
+      <div className="space-y-1.5">
+        {voci.map((voce, index) => (
+          <div key={index} className="flex items-center gap-1.5">
+            <input
+              value={voce.testo}
+              onChange={(event) => updateRow(index, { testo: event.target.value })}
+              placeholder="Es. Pozione di cura"
+              className="flex-1 min-w-0 rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+            />
+            <input
+              type="number"
+              min={1}
+              value={voce.peso}
+              onChange={(event) =>
+                updateRow(index, { peso: Math.max(1, Number(event.target.value) || 1) })
+              }
+              title="Peso (probabilità relativa)"
+              className="w-14 rounded-md border border-edge bg-surface px-1.5 py-1.5 text-sm text-foreground text-center"
+            />
+            <button
+              onClick={() => removeRow(index)}
+              className="text-muted hover:text-danger text-sm shrink-0"
+              aria-label="Rimuovi voce"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button onClick={addRow} className="text-xs font-bold text-accent-strong hover:underline">
+          + Voce
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        >
+          {saving ? "…" : "Salva"}
+        </button>
+        <button onClick={onCancel} className="text-xs text-muted hover:underline">
+          Annulla
+        </button>
+        <button
+          onClick={async () => {
+            if (!window.confirm(`Eliminare "${table.nome}"?`)) return;
+            await deleteRollTable(table.id);
+            onDeleted();
+          }}
+          className="text-xs text-danger hover:underline ml-auto"
+        >
+          Elimina tabella
+        </button>
+      </div>
     </div>
   );
 }
