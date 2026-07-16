@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { campaignCharacters, users } from "@/lib/db/schema";
@@ -98,23 +98,53 @@ export async function grantXp(
   await requireDm(campaignId, dmId);
   if (amount <= 0) return;
 
-  await db
+  const [updated] = await db
     .update(campaignCharacters)
     .set({ xpInSospeso: sql`${campaignCharacters.xpInSospeso} + ${amount}`, xpAutoLevel: autoLevelUp })
     .where(
       and(eq(campaignCharacters.campaignId, campaignId), eq(campaignCharacters.userId, targetUserId)),
-    );
+    )
+    .returning({ userId: campaignCharacters.userId });
+
+  // UPDATE su 0 righe non genera errori di suo: senza questo controllo il master vedrebbe
+  // "✓ Assegnato" anche se il giocatore non ha ancora sincronizzato un personaggio in campagna.
+  if (!updated) throw new Error("Il giocatore non ha ancora sincronizzato un personaggio in questa campagna.");
 }
 
-export async function grantXpToParty(campaignId: string, perPlayerAmount: number, autoLevelUp: boolean) {
+// userIds: chi ha davvero partecipato (di solito i characterUserId dei combattenti-PG
+// dell'incontro appena concluso) — SENZA questo filtro finirebbe per assegnare XP anche ai
+// personaggi sincronizzati ma assenti da quella sessione/incontro, non solo a chi ha combattuto.
+export async function grantXpToParty(
+  campaignId: string,
+  perPlayerAmount: number,
+  autoLevelUp: boolean,
+  userIds: string[],
+) {
   const dmId = await requireUserId();
   await requireDm(campaignId, dmId);
-  if (perPlayerAmount <= 0) return;
+  if (perPlayerAmount <= 0 || userIds.length === 0) return;
 
-  await db
+  const updated = await db
     .update(campaignCharacters)
     .set({ xpInSospeso: sql`${campaignCharacters.xpInSospeso} + ${perPlayerAmount}`, xpAutoLevel: autoLevelUp })
-    .where(eq(campaignCharacters.campaignId, campaignId));
+    .where(
+      and(
+        eq(campaignCharacters.campaignId, campaignId),
+        inArray(campaignCharacters.userId, userIds),
+      ),
+    )
+    .returning({ userId: campaignCharacters.userId });
+
+  // Come per grantXp: se qualcuno dei partecipanti non ha (più) un personaggio sincronizzato
+  // (es. si è rimosso dalla campagna tra la fine del combattimento e l'assegnazione XP), l'UPDATE
+  // lo salta silenziosamente — segnalalo invece di far credere che sia andato tutto a buon fine.
+  if (updated.length < userIds.length) {
+    throw new Error(
+      updated.length === 0
+        ? "Nessuno dei giocatori selezionati ha un personaggio sincronizzato in questa campagna."
+        : `XP assegnata solo a ${updated.length} su ${userIds.length} giocatori: qualcuno non ha (più) un personaggio sincronizzato.`,
+    );
+  }
 }
 
 export async function claimXp(campaignId: string) {

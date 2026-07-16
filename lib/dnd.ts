@@ -201,7 +201,7 @@ export const characterSchema = z.object({
   incantesimi: z.array(knownSpellSchema).default([]),
   armi: z.array(weaponSchema).default([]),
   talenti: z.array(knownFeatSchema).default([]),
-  note: z.string(),
+  note: z.string().default(""),
 });
 
 export type Character = z.infer<typeof characterSchema>;

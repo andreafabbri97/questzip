@@ -77,8 +77,28 @@ export async function getDungeon(dungeonId: string) {
     .from(campaignDungeons)
     .where(eq(campaignDungeons.id, dungeonId));
   if (!dungeon) throw new Error("Dungeon non trovato.");
-  await requireMember(dungeon.campaignId, userId);
-  return dungeon;
+  const membership = await requireMember(dungeon.campaignId, userId);
+
+  if (membership.role === "dm" || !dungeon.fogOfWar) return dungeon;
+
+  // Fog attiva e non sei il master: nascondi anche lato server ciò che il client nasconderebbe
+  // comunque, così un giocatore che ispeziona il traffico di rete non legge note di stanze/
+  // mostri non ancora rivelati — la sola UI non basta a proteggerli.
+  const revealedSet = new Set(dungeon.revealedRooms);
+  const hiddenCellKeys = new Set<string>();
+  const rooms = dungeon.rooms.map((room) => {
+    if (revealedSet.has(room.id)) return room;
+    for (const [x, y] of room.cells) hiddenCellKeys.add(`${x},${y}`);
+    return { ...room, encounter: "", reward: "" };
+  });
+  const cells = dungeon.cells.map((row, y) =>
+    row.map((cell, x) => (hiddenCellKeys.has(`${x},${y}`) ? "wall" : cell)),
+  );
+  const monsterTokens = dungeon.monsterTokens.filter(
+    (m) => !hiddenCellKeys.has(`${m.x},${m.y}`),
+  );
+
+  return { ...dungeon, rooms, cells, monsterTokens };
 }
 
 export async function updateRoomNotes(

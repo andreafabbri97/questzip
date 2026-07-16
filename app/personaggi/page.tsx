@@ -2192,6 +2192,17 @@ function AbilityScoreSection({
   const [assignment, setAssignment] = useState<Partial<Record<Ability, number>>>({});
 
   const switchMode = (next: GenMode) => {
+    if (next === "punti" && mode !== "punti") {
+      const hasScores = Object.values(character.caratteristiche).some((v) => v !== 8);
+      if (
+        hasScores &&
+        !window.confirm(
+          "Passando ad Acquisto punti le caratteristiche attuali verranno azzerate a 8. Continuare?",
+        )
+      ) {
+        return;
+      }
+    }
     setMode(next);
     setAssignment({});
     if (next === "array") setPool([...STANDARD_ARRAY]);

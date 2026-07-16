@@ -1857,7 +1857,13 @@ function XpDistributor({
   combatants: Combatant[];
 }) {
   const monsterXp = combatants.filter((c) => !c.isPg).reduce((sum, c) => sum + c.xp, 0);
-  const pgCount = combatants.filter((c) => c.isPg).length;
+  // solo i PG davvero collegati a un personaggio sincronizzato possono ricevere XP (vedi
+  // grantXpToParty) — un PG aggiunto a mano senza passare da "Aggiungi il party" non ha un
+  // characterUserId e va escluso sia dal conteggio che dal bersaglio dell'assegnazione.
+  const participantUserIds = combatants
+    .filter((c): c is Combatant & { characterUserId: string } => c.isPg && Boolean(c.characterUserId))
+    .map((c) => c.characterUserId);
+  const pgCount = participantUserIds.length;
   const suggestedShare = pgCount > 0 ? Math.floor(monsterXp / pgCount) : monsterXp;
 
   const [perPlayer, setPerPlayer] = useState(suggestedShare);
@@ -1865,6 +1871,7 @@ function XpDistributor({
   const [autoLevelUp, setAutoLevelUp] = useState(true);
   const [granting, setGranting] = useState(false);
   const [granted, setGranted] = useState(false);
+  const [error, setError] = useState("");
 
   // il totale XP dei mostri cambia mentre il master aggiunge/rimuove combattenti: finché il
   // master non ha toccato il campo a mano, resta agganciato al suggerimento; una volta
@@ -1881,9 +1888,12 @@ function XpDistributor({
 
   const grant = async () => {
     setGranting(true);
+    setError("");
     try {
-      await grantXpToParty(campaignId, perPlayer, autoLevelUp);
+      await grantXpToParty(campaignId, perPlayer, autoLevelUp, participantUserIds);
       setGranted(true);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setGranting(false);
     }
@@ -1921,12 +1931,13 @@ function XpDistributor({
         </label>
         <button
           onClick={grant}
-          disabled={granting || perPlayer <= 0}
+          disabled={granting || perPlayer <= 0 || participantUserIds.length === 0}
           className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
         >
           {granting ? "Assegno…" : granted ? "✓ Assegnato" : "Assegna XP"}
         </button>
       </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
       <p className="text-[10px] text-muted">
         Ogni giocatore vedrà l&apos;XP in sospeso sulla propria scheda Personaggio e dovrà
         applicarla lui (l&apos;app non modifica la scheda di qualcun altro direttamente).
@@ -1946,6 +1957,7 @@ function GrantXpInline({
   const [amount, setAmount] = useState(0);
   const [autoLevelUp, setAutoLevelUp] = useState(true);
   const [granting, setGranting] = useState(false);
+  const [error, setError] = useState("");
 
   if (!open) {
     return (
@@ -1959,7 +1971,7 @@ function GrantXpInline({
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-xs">
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
       <input
         type="number"
         min={0}
@@ -1981,10 +1993,13 @@ function GrantXpInline({
         onClick={async () => {
           if (amount <= 0) return;
           setGranting(true);
+          setError("");
           try {
             await grantXp(campaignId, targetUserId, amount, autoLevelUp);
             setOpen(false);
             setAmount(0);
+          } catch (err) {
+            setError((err as Error).message);
           } finally {
             setGranting(false);
           }
@@ -1994,6 +2009,7 @@ function GrantXpInline({
       >
         {granting ? "…" : "Assegna"}
       </button>
+      {error && <p className="w-full text-red-400">{error}</p>}
       <button onClick={() => setOpen(false)} className="text-muted hover:text-foreground">
         ×
       </button>
@@ -3224,9 +3240,11 @@ function DungeonViewer({
           }}
         />
       )}
-      {selectedRoom && !isDm && (
-        <p className="text-sm text-muted">Stanza {selectedRoom.label}.</p>
-      )}
+      {selectedRoom &&
+        !isDm &&
+        (!dungeon.fogOfWar || dungeon.revealedRooms.includes(selectedRoom.id)) && (
+          <p className="text-sm text-muted">Stanza {selectedRoom.label}.</p>
+        )}
     </div>
   );
 }
@@ -3667,6 +3685,9 @@ function DungeonMap({
           );
         })}
         {monsterTokens.map((monster) => {
+          // stesso fog dei giocatori: un mostro piazzato in un'imboscata dentro una stanza non
+          // ancora rivelata non deve tradirsi comparendo comunque sulla mappa
+          if (fogActive && hiddenCells.has(`${monster.x},${monster.y}`)) return null;
           const dragging = draggingMonsterId === monster.id && monsterDragPos;
           const cx = ((dragging ? monsterDragPos!.x : monster.x) + 0.5) * cellSize;
           const cy = ((dragging ? monsterDragPos!.y : monster.y) + 0.5) * cellSize;

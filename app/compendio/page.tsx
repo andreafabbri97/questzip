@@ -131,6 +131,7 @@ type SortMode = "nome" | "cr" | "rarita" | "manuale";
 
 function crToNumber(cr: RawCreature["cr"]): number {
   const s = typeof cr === "string" ? cr : (cr?.cr ?? "");
+  if (s === "") return -1;
   if (s.includes("/")) {
     const [n, d] = s.split("/").map(Number);
     return d ? n / d : -1;
