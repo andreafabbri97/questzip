@@ -96,6 +96,70 @@ export const weaponSchema = z.object({
 });
 export type Weapon = z.infer<typeof weaponSchema>;
 
+export const knownFeatSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+});
+export type KnownFeat = z.infer<typeof knownFeatSchema>;
+
+/** Le 16 lingue standard del PHB (8 comuni + 8 esoteriche): elenco piccolo e fisso, usato solo
+ * per suggerire scelte comuni — restano comunque testo libero per lingue homebrew/regionali. */
+export const LANGUAGES = [
+  "Comune",
+  "Nanico",
+  "Elfico",
+  "Gigante",
+  "Gnomesco",
+  "Goblin",
+  "Halfling",
+  "Orchesco",
+  "Abissale",
+  "Celestiale",
+  "Draconico",
+  "Linguaggio Profondo",
+  "Infernale",
+  "Primordiale",
+  "Silvano",
+  "Sottocomune",
+] as const;
+
+/** I 13 tipi di danno standard 5e, per resistenze/immunità/vulnerabilità. */
+export const DAMAGE_TYPES = [
+  "Acido",
+  "Contundente",
+  "Freddo",
+  "Fuoco",
+  "Forza",
+  "Fulmine",
+  "Necrotico",
+  "Perforante",
+  "Veleno",
+  "Psichico",
+  "Radiante",
+  "Tagliente",
+  "Tuono",
+] as const;
+
+/** Le 14 condizioni standard 5e (stesso elenco usato per il tracker di combattimento in
+ * Campagne, vedi app/campagne/page.tsx): qui serve per le condizioni attive sulla scheda
+ * Personaggio anche fuori da un combattimento (es. una maledizione fra una sessione e l'altra). */
+export const CONDIZIONI_5E = [
+  "Affascinato",
+  "Afferrato",
+  "Accecato",
+  "Assordato",
+  "Avvelenato",
+  "Incapacitato",
+  "Indebolito",
+  "Invisibile",
+  "Paralizzato",
+  "Pietrificato",
+  "Prono",
+  "Spaventato",
+  "Stordito",
+  "Trattenuto",
+] as const;
+
 export const characterSchema = z.object({
   id: z.string(),
   nome: z.string().min(1),
@@ -116,10 +180,16 @@ export const characterSchema = z.object({
   tiriMorteFallimenti: z.number().int().min(0).max(3).default(0),
   esperienza: z.number().int().min(0).default(0),
   allineamento: z.string().default(""),
+  background: z.string().default(""),
   tratti: z.string().default(""),
   legami: z.string().default(""),
   ideali: z.string().default(""),
   difetti: z.string().default(""),
+  linguaggi: z.array(z.string()).default([]),
+  resistenze: z.array(z.string()).default([]),
+  immunita: z.array(z.string()).default([]),
+  vulnerabilita: z.array(z.string()).default([]),
+  condizioniAttive: z.array(z.string()).default([]),
   inventario: z.array(inventoryItemSchema).default([]),
   monete: z
     .object({
@@ -130,6 +200,7 @@ export const characterSchema = z.object({
     .default({ oro: 0, argento: 0, rame: 0 }),
   incantesimi: z.array(knownSpellSchema).default([]),
   armi: z.array(weaponSchema).default([]),
+  talenti: z.array(knownFeatSchema).default([]),
   note: z.string(),
 });
 
@@ -211,14 +282,21 @@ export function newCharacter(): Character {
     tiriMorteFallimenti: 0,
     esperienza: 0,
     allineamento: "",
+    background: "",
     tratti: "",
     legami: "",
     ideali: "",
     difetti: "",
+    linguaggi: [],
+    resistenze: [],
+    immunita: [],
+    vulnerabilita: [],
+    condizioniAttive: [],
     inventario: [],
     monete: { oro: 0, argento: 0, rame: 0 },
     incantesimi: [],
     armi: [],
+    talenti: [],
     note: "",
   };
 }

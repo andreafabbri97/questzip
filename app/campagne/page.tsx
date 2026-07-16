@@ -47,6 +47,7 @@ import { usePartyRoom } from "@/lib/use-party-room";
 import {
   abilityModifier,
   adjustedEncounterXp,
+  CONDIZIONI_5E,
   DIFFICULTY_LABELS,
   encounterMultiplier,
   formatModifier,
@@ -602,23 +603,6 @@ function HpValue({
     </span>
   );
 }
-
-const CONDIZIONI_5E = [
-  "Affascinato",
-  "Afferrato",
-  "Accecato",
-  "Assordato",
-  "Avvelenato",
-  "Incapacitato",
-  "Indebolito",
-  "Invisibile",
-  "Paralizzato",
-  "Pietrificato",
-  "Prono",
-  "Spaventato",
-  "Stordito",
-  "Trattenuto",
-];
 
 type Combatant = NonNullable<Awaited<ReturnType<typeof getActiveEncounter>>>["combatants"][number];
 

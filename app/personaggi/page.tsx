@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { syncCharacterToCampaign } from "@/app/actions/characters";
-import { getOggettiIta } from "@/app/actions/compendio-ita";
+import { getOggettiIta, getTalentiIta } from "@/app/actions/compendio-ita";
 import {
   ABILITIES,
   ABILITY_CODE_TO_KEY,
   ABILITY_LABELS,
   ALIGNMENTS,
+  CONDIZIONI_5E,
+  DAMAGE_TYPES,
+  LANGUAGES,
   POINT_BUY_BUDGET,
   SKILLS,
   STANDARD_ARRAY,
@@ -41,17 +44,22 @@ import {
   type Character,
   type ClassEntry,
   type InventoryItem,
+  type KnownFeat,
   type KnownSpell,
   type Weapon,
 } from "@/lib/dnd";
 import { useLocalCollection } from "@/lib/storage";
 import {
+  loadBackgrounds,
   loadClassData,
+  loadFeats,
   loadItems,
   loadRaces,
   loadSpells,
   resolveClassFeatures,
   resolveSubclassFeatures,
+  type RawBackground,
+  type RawFeat,
   type RawItem,
   type RawRace,
   type RawSubclass,
@@ -303,6 +311,17 @@ function CharacterSheet({
               ))}
             </select>
           </label>
+          <label className="block">
+            <span className={labelClass}>Background</span>
+            <Autocomplete
+              value={character.background}
+              onChange={(value) => set("background", value)}
+              loader={loadBackgrounds}
+              placeholder="Acolyte, Soldier, Sage…"
+              inputClassName={inputClass}
+            />
+          </label>
+          <BackgroundTraits background={character.background} />
         </section>
 
         <section className="rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
@@ -502,9 +521,15 @@ function CharacterSheet({
 
       <SavingThrowsAndSkills character={character} onChange={onChange} />
 
+      <ActiveConditionsSection character={character} onChange={onChange} />
+
       <RaceTraits razza={character.razza} />
 
       <ClassFeaturesSection character={character} />
+
+      <TalentiSection character={character} onChange={onChange} />
+
+      <LanguagesAndResistancesSection character={character} onChange={onChange} />
 
       <PersonalitySection character={character} onChange={onChange} />
 
@@ -1015,6 +1040,43 @@ function RaceTraits({ razza }: { razza: string }) {
   );
 }
 
+function BackgroundTraits({ background }: { background: string }) {
+  const [showTraits, setShowTraits] = useState(false);
+  const [data, setData] = useState<RawBackground | null | undefined>(undefined);
+
+  useEffect(() => {
+    const name = background.trim();
+    if (!name) return;
+    let cancelled = false;
+    loadBackgrounds().then((backgrounds) => {
+      if (cancelled) return;
+      setData(backgrounds.find((b) => b.name.toLowerCase() === name.toLowerCase()) ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [background]);
+
+  if (!background.trim() || data === null) return null;
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowTraits((prev) => !prev)}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        {showTraits ? "Nascondi" : "Come funziona"} {background}
+      </button>
+      {showTraits && (
+        <div className="mt-2 border-t border-edge pt-3">
+          {!data && <p className="text-sm text-muted">Caricamento…</p>}
+          {data && <RenderEntries entries={data.entries} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function XpTracker({
   character,
   onChange,
@@ -1430,6 +1492,237 @@ function InventoryItemInfo({ nome }: { nome: string }) {
             <RenderEntries entries={match.entries} />
           ) : (
             <p className="text-sm text-muted">Nessuna descrizione disponibile.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChipToggle({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  options: readonly string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div>
+      {label && <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">{label}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => {
+          const active = selected.includes(opt);
+          return (
+            <button
+              key={opt}
+              onClick={() => onToggle(opt)}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                active
+                  ? "border-accent bg-accent/15 text-accent-strong"
+                  : "border-edge bg-surface-raised text-muted hover:text-foreground"
+              }`}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LanguagesAndResistancesSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const toggle = (
+    key: "linguaggi" | "resistenze" | "immunita" | "vulnerabilita",
+    value: string,
+  ) => {
+    const current = character[key];
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+    onChange({ ...character, [key]: next });
+  };
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+      <h2 className="text-sm uppercase tracking-widest text-muted">Lingue e resistenze</h2>
+      <ChipToggle
+        label="Lingue conosciute"
+        options={LANGUAGES}
+        selected={character.linguaggi}
+        onToggle={(v) => toggle("linguaggi", v)}
+      />
+      <ChipToggle
+        label="Resistenza ai danni"
+        options={DAMAGE_TYPES}
+        selected={character.resistenze}
+        onToggle={(v) => toggle("resistenze", v)}
+      />
+      <ChipToggle
+        label="Immunità ai danni"
+        options={DAMAGE_TYPES}
+        selected={character.immunita}
+        onToggle={(v) => toggle("immunita", v)}
+      />
+      <ChipToggle
+        label="Vulnerabilità ai danni"
+        options={DAMAGE_TYPES}
+        selected={character.vulnerabilita}
+        onToggle={(v) => toggle("vulnerabilita", v)}
+      />
+    </section>
+  );
+}
+
+function ActiveConditionsSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const toggle = (value: string) => {
+    const next = character.condizioniAttive.includes(value)
+      ? character.condizioniAttive.filter((v) => v !== value)
+      : [...character.condizioniAttive, value];
+    onChange({ ...character, condizioniAttive: next });
+  };
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-2">
+      <h2 className="text-sm uppercase tracking-widest text-muted">Condizioni attive</h2>
+      <p className="text-xs text-muted">
+        Per condizioni che durano oltre un singolo combattimento (es. una maledizione). Durante un
+        combattimento in Campagna si usa invece il tracker lì.
+      </p>
+      <ChipToggle
+        label=""
+        options={CONDIZIONI_5E}
+        selected={character.condizioniAttive}
+        onToggle={toggle}
+      />
+    </section>
+  );
+}
+
+function TalentiSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const setTalenti = (talenti: KnownFeat[]) => onChange({ ...character, talenti });
+
+  const addTalento = () =>
+    setTalenti([...character.talenti, { id: crypto.randomUUID(), nome: "" }]);
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Talenti</h2>
+        <button onClick={addTalento} className="text-xs font-bold text-accent-strong hover:underline">
+          + Aggiungi talento
+        </button>
+      </div>
+      {character.talenti.length === 0 && (
+        <p className="text-sm text-muted">Nessun talento aggiunto ancora.</p>
+      )}
+      <div className="space-y-2">
+        {character.talenti.map((talento) => (
+          <div key={talento.id} className="rounded-lg border border-edge bg-surface-raised p-2.5 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Autocomplete
+                  value={talento.nome}
+                  onChange={(nome) =>
+                    setTalenti(
+                      character.talenti.map((t) => (t.id === talento.id ? { ...t, nome } : t)),
+                    )
+                  }
+                  loader={loadFeats}
+                  placeholder="Alert, Lucky, Tough…"
+                  inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                />
+              </div>
+              <button
+                onClick={() => setTalenti(character.talenti.filter((t) => t.id !== talento.id))}
+                className="text-muted hover:text-danger text-sm shrink-0"
+                aria-label={`Rimuovi ${talento.nome || "talento"}`}
+              >
+                ×
+              </button>
+            </div>
+            <FeatInfo nome={talento.nome} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FeatInfo({ nome }: { nome: string }) {
+  const [showInfo, setShowInfo] = useState(false);
+  const [feats, setFeats] = useState<RawFeat[] | null>(null);
+  const [talentiIta, setTalentiIta] = useState<Awaited<ReturnType<typeof getTalentiIta>> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    loadFeats().then(setFeats);
+  }, []);
+
+  const match = feats?.find((f) => f.name.toLowerCase() === nome.trim().toLowerCase()) ?? null;
+  const translatedName = useTranslatedText(match?.name, "en", "it");
+
+  useEffect(() => {
+    if (!showInfo || !match) return;
+    let cancelled = false;
+    getTalentiIta().then((data) => {
+      if (!cancelled) setTalentiIta(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showInfo, match]);
+
+  if (!match) return null;
+
+  const ufficiale =
+    talentiIta && translatedName
+      ? (talentiIta.find((t) => normalizeItaName(t.nome) === normalizeItaName(translatedName)) ?? null)
+      : null;
+
+  return (
+    <div className="pt-1 border-t border-edge/60">
+      <button
+        onClick={() => setShowInfo((prev) => !prev)}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        {showInfo ? "Nascondi" : "Come funziona"}
+      </button>
+      {showInfo && (
+        <div className="mt-2">
+          {ufficiale ? (
+            <>
+              <p className="text-[10px] font-bold text-accent-strong mb-1">📖 Testo ufficiale</p>
+              {ufficiale.prerequisito && (
+                <p className="text-xs text-muted mb-1">Prerequisiti: {ufficiale.prerequisito}</p>
+              )}
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                {ufficiale.descrizione}
+              </p>
+            </>
+          ) : (
+            <RenderEntries entries={match.entries} />
           )}
         </div>
       )}
