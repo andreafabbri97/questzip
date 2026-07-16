@@ -43,6 +43,7 @@ import {
 } from "@/app/actions/dungeons";
 import type { CellType, DungeonConfig, RoomShape } from "@/lib/dungeon";
 import { loadCreatures, loadItems, type RawCreature, type RawItem } from "@/lib/fivetools/data";
+import { generateName, NAME_RACES, type NameRace } from "@/lib/names";
 import { usePartyRoom } from "@/lib/use-party-room";
 import {
   abilityModifier,
@@ -1122,6 +1123,7 @@ function EncounterDmControls({
       <TreasureGenerator
         defaultCr={partyLevels.length > 0 ? Math.round(partyLevels.reduce((a, b) => a + b, 0) / partyLevels.length) : 1}
       />
+      <NameGenerator />
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={nome}
@@ -1165,6 +1167,66 @@ function EncounterDmControls({
           Aggiungi
         </button>
       </div>
+    </div>
+  );
+}
+
+function NameGenerator() {
+  const [race, setRace] = useState<NameRace>("Umano");
+  const [gender, setGender] = useState<"maschile" | "femminile">("maschile");
+  const [names, setNames] = useState<string[]>([]);
+
+  const roll = () => {
+    setNames(Array.from({ length: 5 }, () => generateName(race, gender)));
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">Genera nomi PNG</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={race}
+          onChange={(event) => setRace(event.target.value as NameRace)}
+          className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+        >
+          {NAME_RACES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <div className="flex rounded-lg border border-edge overflow-hidden">
+          {(["maschile", "femminile"] as const).map((g) => (
+            <button
+              key={g}
+              onClick={() => setGender(g)}
+              className={`px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                gender === g ? "bg-accent/15 text-accent-strong" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {g === "maschile" ? "M" : "F"}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={roll}
+          className="text-xs font-bold rounded-lg border border-edge px-2 py-1.5 text-foreground hover:border-accent transition-colors"
+        >
+          🎲 Genera
+        </button>
+      </div>
+      {names.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {names.map((n, index) => (
+            <li
+              key={index}
+              className="rounded-md border border-edge bg-surface-raised px-2.5 py-1 text-sm text-foreground"
+            >
+              {n}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
