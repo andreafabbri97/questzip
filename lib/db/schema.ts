@@ -14,6 +14,7 @@ import {
 import type { AdapterAccountType } from "next-auth/adapters";
 import type { Ability, ClassEntry } from "@/lib/dnd";
 import type { CellType, DungeonRoom } from "@/lib/dungeon";
+import type { RegionalMarker, TerrainType } from "@/lib/regional-map";
 
 // --- Tabelle richieste dall'adapter Drizzle di Auth.js ---
 
@@ -131,6 +132,26 @@ export const campaignDungeons = pgTable("campaign_dungeon", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
+// Mappa regionale/di mondo (scala diversa dal dungeon): terreno dipinto cella per cella +
+// marcatori con etichetta/icona. Stesso principio del dungeon (griglia + salvataggio manuale,
+// niente sync realtime sulle celle), tabella a sé perché il "cell type" è il terreno e non
+// muri/porte.
+export const campaignRegionalMaps = pgTable("campaign_regional_map", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  nome: text("nome").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  cells: jsonb("cells").$type<TerrainType[][]>().notNull(),
+  markers: jsonb("markers").$type<RegionalMarker[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
 // Posizione (in celle di griglia) del segnalino di ogni giocatore sulla lavagna condivisa
 // di un dungeon. Un solo token per utente per dungeon (PK composita). Aggiornata dalla
 // server action upsertMyToken al rilascio del trascinamento; il movimento durante il
@@ -187,6 +208,13 @@ export const campaignCharacters = pgTable(
     caratteristiche: jsonb("caratteristiche").$type<Record<Ability, number>>().notNull(),
     slotUsati: jsonb("slot_usati").$type<number[]>().notNull().default([0, 0, 0, 0, 0, 0, 0, 0, 0]),
     slotPattoUsati: integer("slot_patto_usati").notNull().default(0),
+    esperienza: integer("esperienza").notNull().default(0),
+    // "Casella postale" XP separata dal resto della riga: il push del giocatore (syncCharacterToCampaign)
+    // non la include mai nei valori scritti, quindi il master può depositarci XP senza rischiare che
+    // una sincronizzazione successiva del giocatore la sovrascriva. Il giocatore la "reclama" in
+    // locale (claimXp) e la riga torna a 0.
+    xpInSospeso: integer("xp_in_sospeso").notNull().default(0),
+    xpAutoLevel: boolean("xp_auto_level").notNull().default(true),
     note: text("note").notNull().default(""),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
@@ -226,6 +254,9 @@ export const encounterCombatants = pgTable("encounter_combatant", {
   azioniLeggendarieMax: integer("azioni_leggendarie_max").notNull().default(0),
   azioniLeggendarieUsate: integer("azioni_leggendarie_usate").notNull().default(0),
   concentrazione: text("concentrazione"),
+  // XP che vale questo combattente se sconfitto (mostri: da GS via XP_BY_CR al momento
+  // dell'aggiunta; PG e aggiunte manuali restano a 0, non contano nella somma di fine scontro).
+  xp: integer("xp").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
