@@ -20,6 +20,13 @@ import {
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign, grantXp, grantXpToParty } from "@/app/actions/characters";
 import {
+  createHandout,
+  deleteHandout,
+  getHandoutsForCampaign,
+  toggleHandoutVisible,
+  updateHandout,
+} from "@/app/actions/handouts";
+import {
   addCombatant,
   addPartyToEncounter,
   endEncounter,
@@ -424,6 +431,8 @@ function CampaignDetailView({
       </section>
 
       <JukeboxPlayer campaignId={campaignId} isDm={isDm} campaign={detail.campaign} onChanged={refresh} />
+
+      <HandoutsSection campaignId={campaignId} isDm={isDm} />
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -1061,6 +1070,253 @@ function JukeboxPlayer({
         isDm && <p className="text-sm text-muted">Nessun brano impostato.</p>
       )}
     </section>
+  );
+}
+
+type Handout = Awaited<ReturnType<typeof getHandoutsForCampaign>>[number];
+
+function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boolean }) {
+  const [handouts, setHandouts] = useState<Handout[] | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [selected, setSelected] = useState<Handout | null>(null);
+
+  const refresh = () => {
+    getHandoutsForCampaign(campaignId).then(setHandouts);
+  };
+  useEffect(refresh, [campaignId]);
+
+  if (handouts === null) return null;
+  if (handouts.length === 0 && !isDm) return null;
+
+  return (
+    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">📜 Handout</h2>
+        {isDm && (
+          <button
+            onClick={() => setShowForm((prev) => !prev)}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            {showForm ? "Annulla" : "+ Nuovo handout"}
+          </button>
+        )}
+      </div>
+
+      {showForm && isDm && (
+        <NewHandoutForm
+          campaignId={campaignId}
+          onCreated={() => {
+            setShowForm(false);
+            refresh();
+          }}
+        />
+      )}
+
+      {handouts.length === 0 ? (
+        <p className="text-sm text-muted">Nessun handout ancora.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {handouts.map((h) => (
+            <button
+              key={h.id}
+              onClick={() => setSelected(selected?.id === h.id ? null : h)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+                selected?.id === h.id
+                  ? "border-accent bg-accent/15 text-accent-strong"
+                  : "border-edge bg-surface-raised text-muted hover:text-foreground"
+              } ${isDm && !h.visibile ? "opacity-60" : ""}`}
+            >
+              {h.titolo}
+              {isDm && !h.visibile && " (nascosto)"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selected && (
+        <HandoutDetail
+          key={selected.id}
+          handout={selected}
+          isDm={isDm}
+          onChanged={() => {
+            refresh();
+          }}
+          onDeleted={() => {
+            setSelected(null);
+            refresh();
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function NewHandoutForm({
+  campaignId,
+  onCreated,
+}: {
+  campaignId: string;
+  onCreated: () => void;
+}) {
+  const [titolo, setTitolo] = useState("");
+  const [testo, setTesto] = useState("");
+  const [immagineUrl, setImmagineUrl] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const create = async () => {
+    if (!titolo.trim()) return;
+    setCreating(true);
+    try {
+      await createHandout(campaignId, titolo, testo, immagineUrl);
+      setTitolo("");
+      setTesto("");
+      setImmagineUrl("");
+      onCreated();
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+      <input
+        value={titolo}
+        onChange={(event) => setTitolo(event.target.value)}
+        placeholder="Titolo (es. Lettera del Re)"
+        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+      />
+      <textarea
+        value={testo}
+        onChange={(event) => setTesto(event.target.value)}
+        placeholder="Testo…"
+        rows={3}
+        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+      />
+      <input
+        value={immagineUrl}
+        onChange={(event) => setImmagineUrl(event.target.value)}
+        placeholder="URL immagine (opzionale)"
+        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+      />
+      <button
+        onClick={create}
+        disabled={creating || !titolo.trim()}
+        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+      >
+        {creating ? "Creo…" : "Crea (nascosto ai giocatori)"}
+      </button>
+    </div>
+  );
+}
+
+function HandoutDetail({
+  handout,
+  isDm,
+  onChanged,
+  onDeleted,
+}: {
+  handout: Handout;
+  isDm: boolean;
+  onChanged: () => void;
+  onDeleted: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [titolo, setTitolo] = useState(handout.titolo);
+  const [testo, setTesto] = useState(handout.testo);
+  const [immagineUrl, setImmagineUrl] = useState(handout.immagineUrl ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await updateHandout(handout.id, { titolo, testo, immagineUrl });
+      setEditing(false);
+      onChanged();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="rounded-lg border border-accent/40 bg-surface-raised p-3 space-y-2">
+        <input
+          value={titolo}
+          onChange={(event) => setTitolo(event.target.value)}
+          className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        />
+        <textarea
+          value={testo}
+          onChange={(event) => setTesto(event.target.value)}
+          rows={4}
+          className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        />
+        <input
+          value={immagineUrl}
+          onChange={(event) => setImmagineUrl(event.target.value)}
+          placeholder="URL immagine"
+          className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          >
+            {saving ? "…" : "Salva"}
+          </button>
+          <button onClick={() => setEditing(false)} className="text-xs text-muted hover:underline">
+            Annulla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-accent/40 bg-surface-raised p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-foreground">{handout.titolo}</p>
+        {isDm && (
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              onClick={async () => {
+                await toggleHandoutVisible(handout.id);
+                onChanged();
+              }}
+              className="font-bold text-accent-strong hover:underline"
+            >
+              {handout.visibile ? "👁️ Nascondi" : "👁️ Rivela ai giocatori"}
+            </button>
+            <button onClick={() => setEditing(true)} className="text-muted hover:text-foreground">
+              Modifica
+            </button>
+            <button
+              onClick={async () => {
+                if (!window.confirm(`Eliminare "${handout.titolo}"?`)) return;
+                await deleteHandout(handout.id);
+                onDeleted();
+              }}
+              className="text-danger hover:underline"
+            >
+              Elimina
+            </button>
+          </div>
+        )}
+      </div>
+      {handout.immagineUrl && (
+        // URL arbitrario fornito dal master, non un asset locale ottimizzabile da next/image
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={handout.immagineUrl}
+          alt={handout.titolo}
+          className="max-w-full rounded-lg border border-edge"
+        />
+      )}
+      {handout.testo && (
+        <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{handout.testo}</p>
+      )}
+    </div>
   );
 }
 
