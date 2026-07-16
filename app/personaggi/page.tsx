@@ -40,6 +40,7 @@ import {
   weaponAbilityModifier,
   weaponAttackBonus,
   xpForNextLevel,
+  XP_PER_LEVEL,
   type Ability,
   type Character,
   type ClassEntry,
@@ -247,6 +248,20 @@ function CharacterSheet({
       caratteristiche: { ...character.caratteristiche, [ability]: value },
     });
 
+  // Se il livello di una classe viene alzato a mano (es. creando direttamente un personaggio
+  // di livello 5, non arrivandoci giocando), gli XP restano indietro e il personaggio mostra
+  // un mismatch permanente finché qualcuno non li corregge a mano. Li allinea da solo al minimo
+  // richiesto per quel livello — mai verso il basso: se il giocatore rimuove una classe o
+  // abbassa un livello, gli XP già accumulati restano quelli, non li perde per uno sbaglio di
+  // battitura. Le altre statistiche derivate (PF suggeriti, slot incantesimo, bonus competenza)
+  // seguono già il livello di classe direttamente, non gli XP — non serve altro.
+  const setClassi = (classi: ClassEntry[]) => {
+    const newLevel = totalLevel(classi);
+    const minXp = newLevel > 1 ? XP_PER_LEVEL[Math.min(20, newLevel) - 1] : 0;
+    const esperienza = character.esperienza < minXp ? minXp : character.esperienza;
+    onChange({ ...character, classi, esperienza });
+  };
+
   const clampInt = (value: string, min: number, max: number, fallback: number) => {
     const parsed = Number(value);
     if (Number.isNaN(parsed)) return fallback;
@@ -331,7 +346,7 @@ function CharacterSheet({
             </h2>
             <button
               onClick={() =>
-                set("classi", [...character.classi, { nome: "", livello: 1 }])
+                setClassi([...character.classi, { nome: "", livello: 1 }])
               }
               className="text-xs font-bold text-accent-strong hover:underline"
             >
@@ -344,14 +359,12 @@ function CharacterSheet({
               entry={entry}
               isPrimary={index === 0}
               onChange={(next) =>
-                set(
-                  "classi",
+                setClassi(
                   character.classi.map((c, i) => (i === index ? next : c)),
                 )
               }
               onRemove={() =>
-                set(
-                  "classi",
+                setClassi(
                   character.classi.filter((_, i) => i !== index),
                 )
               }
