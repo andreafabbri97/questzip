@@ -492,6 +492,86 @@ const REGOLE_WARNINGS: Record<string, string> = {
 // presuppone dati bilingue EN/IT con edizione (dal mirror 5e.tools), mentre "Regole" è
 // contenuto italiano-solo estratto via OCR da scansioni pure — niente switch di lingua, niente
 // filtro edizione, solo un elenco di sezioni con un badge esplicito sulla qualità del testo.
+const QUICK_REF_TOPICS: { titolo: string; voci: string[] }[] = [
+  {
+    titolo: "Azioni, bonus azioni, reazioni",
+    voci: [
+      "1 azione per turno.",
+      "1 bonus azione per turno — solo se qualcosa te ne concede una (talento, incantesimo, privilegio).",
+      "1 reazione per round — utilizzabile anche fuori dal proprio turno, si ricarica all'inizio del turno successivo.",
+      "Il movimento può essere diviso prima, dopo o durante un'azione.",
+    ],
+  },
+  {
+    titolo: "Copertura",
+    voci: [
+      "Mezza copertura: +2 CA e ai tiri salvezza su Destrezza.",
+      "Tre quarti di copertura: +5 CA e ai tiri salvezza su Destrezza.",
+      "Copertura totale: non può essere bersaglio diretto di un attacco o di un incantesimo.",
+    ],
+  },
+  {
+    titolo: "Visione e illuminazione",
+    voci: [
+      "Luce intensa: si vede normalmente.",
+      "Luce fioca (penombra): svantaggio alle prove di Saggezza (Percezione) basate sulla vista.",
+      "Oscurità: crea l'effetto della condizione Accecato per chi non ha scurovisione o altra vista speciale.",
+      "Scurovisione: vede nell'oscurità come se fosse luce fioca entro il raggio indicato (di solito in scala di grigi).",
+    ],
+  },
+  {
+    titolo: "Condizioni in sintesi",
+    voci: [
+      "Affascinato — non può attaccare o bersagliare con effetti nocivi chi lo affascina.",
+      "Afferrato — velocità 0, finisce se chi afferra è incapacitato o allontanato.",
+      "Accecato — fallisce prove basate sulla vista, svantaggio ad attaccare, vantaggio per chi lo attacca.",
+      "Assordato — fallisce prove basate sull'udito.",
+      "Avvelenato — svantaggio a tiri per colpire e prove di caratteristica.",
+      "Incapacitato — non può compiere azioni né reazioni.",
+      "Invisibile — vantaggio ad attaccare, svantaggio per chi lo attacca (a meno che non lo localizzi).",
+      "Paralizzato — incapacitato, fallisce TS Forza/Destrezza, colpi entro 1,5 m sono critici automatici.",
+      "Pietrificato — trasformato in pietra, incapacitato, resistenza a tutti i danni.",
+      "Prono — svantaggio ad attaccare, chi attacca in mischia ha vantaggio, a distanza svantaggio.",
+      "Spaventato — svantaggio a prove e attacchi mentre la fonte della paura è in vista, non può avvicinarsi ad essa.",
+      "Stordito — incapacitato, non può muoversi, fallisce TS Forza/Destrezza, chi lo attacca ha vantaggio.",
+      "Trattenuto — velocità 0, svantaggio ad attaccare, fallisce TS Destrezza, chi lo attacca ha vantaggio.",
+    ],
+  },
+];
+
+function QuickReference() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-accent/40 bg-surface p-4 space-y-3">
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <span className="text-sm font-bold text-accent-strong">⚡ Quick reference per il master</span>
+        <span className="text-xs text-muted">{open ? "Nascondi" : "Mostra"}</span>
+      </button>
+      {open && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {QUICK_REF_TOPICS.map((topic) => (
+            <div key={topic.titolo} className="rounded-lg border border-edge bg-surface-raised p-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-accent-strong mb-1.5">
+                {topic.titolo}
+              </p>
+              <ul className="space-y-1">
+                {topic.voci.map((voce, index) => (
+                  <li key={index} className="text-sm text-foreground leading-snug">
+                    • {voce}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RegoleSection() {
   const [sections, setSections] = useState<Awaited<ReturnType<typeof getRegoleIta>> | null>(null);
   const [fonte, setFonte] = useState<string>("tutte");
@@ -515,6 +595,8 @@ function RegoleSection() {
 
   return (
     <div className="space-y-4">
+      <QuickReference />
+
       {fonte !== "regole_base" && (
         <div className="rounded-lg border border-edge bg-surface-raised p-3 text-xs text-muted">
           {fonte === "tutte" ? (
