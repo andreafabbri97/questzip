@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IntField } from "@/components/int-field";
 import { formatModifier } from "@/lib/dnd";
 
 const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
@@ -103,14 +104,11 @@ export default function DicePage() {
             <span className="text-xs uppercase tracking-widest text-muted">
               Quanti dadi
             </span>
-            <input
-              type="number"
+            <IntField
               min={1}
               max={20}
               value={quantity}
-              onChange={(event) =>
-                setQuantity(Math.min(20, Math.max(1, Number(event.target.value) || 1)))
-              }
+              onChange={setQuantity}
               className="mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
             />
           </label>
@@ -118,12 +116,11 @@ export default function DicePage() {
             <span className="text-xs uppercase tracking-widest text-muted">
               Modificatore
             </span>
-            <input
-              type="number"
+            <IntField
               min={-20}
               max={20}
               value={modifier}
-              onChange={(event) => setModifier(Number(event.target.value) || 0)}
+              onChange={setModifier}
               className="mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
             />
           </label>

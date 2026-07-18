@@ -5,6 +5,7 @@ import { useSession, signIn } from "next-auth/react";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { claimXp, getMyCharacterInCampaign, syncCharacterToCampaign } from "@/app/actions/characters";
 import { getOggettiIta, getTalentiIta } from "@/app/actions/compendio-ita";
+import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
   ABILITY_CODE_TO_KEY,
@@ -262,12 +263,6 @@ function CharacterSheet({
     onChange({ ...character, classi, esperienza });
   };
 
-  const clampInt = (value: string, min: number, max: number, fallback: number) => {
-    const parsed = Number(value);
-    if (Number.isNaN(parsed)) return fallback;
-    return Math.min(max, Math.max(min, Math.trunc(parsed)));
-  };
-
   const inputClass =
     "mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground";
   const labelClass = "text-xs uppercase tracking-widest text-muted";
@@ -435,13 +430,11 @@ function CharacterSheet({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <label className="block">
             <span className={labelClass}>PF max</span>
-            <input
-              type="number"
+            <IntField
               min={1}
               max={999}
               value={character.hpMax}
-              onChange={(event) => {
-                const hpMax = clampInt(event.target.value, 1, 999, character.hpMax);
+              onChange={(hpMax) => {
                 onChange({
                   ...character,
                   hpMax,
@@ -453,43 +446,31 @@ function CharacterSheet({
           </label>
           <label className="block">
             <span className={labelClass}>PF temporanei</span>
-            <input
-              type="number"
+            <IntField
               min={0}
               max={999}
               value={character.hpTemporanei}
-              onChange={(event) =>
-                set("hpTemporanei", clampInt(event.target.value, 0, 999, character.hpTemporanei))
-              }
+              onChange={(value) => set("hpTemporanei", value)}
               className={inputClass}
             />
           </label>
           <label className="block">
             <span className={labelClass}>CA</span>
-            <input
-              type="number"
+            <IntField
               min={1}
               max={40}
               value={character.classeArmatura}
-              onChange={(event) =>
-                set(
-                  "classeArmatura",
-                  clampInt(event.target.value, 1, 40, character.classeArmatura),
-                )
-              }
+              onChange={(value) => set("classeArmatura", value)}
               className={inputClass}
             />
           </label>
           <label className="block">
             <span className={labelClass}>Velocità (m)</span>
-            <input
-              type="number"
+            <IntField
               min={0}
               max={60}
               value={character.velocita}
-              onChange={(event) =>
-                set("velocita", clampInt(event.target.value, 0, 60, character.velocita))
-              }
+              onChange={(value) => set("velocita", value)}
               className={inputClass}
             />
           </label>
@@ -528,7 +509,7 @@ function CharacterSheet({
       </section>
 
       <div className="mt-6 lg:mt-0">
-        <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} clampInt={clampInt} />
+        <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} />
       </div>
       </div>
 
@@ -827,17 +808,11 @@ function ClassRow({
         </div>
         <label className="block w-16 shrink-0">
           <span className="text-[10px] uppercase tracking-widest text-muted">Livello</span>
-          <input
-            type="number"
+          <IntField
             min={1}
             max={20}
             value={entry.livello}
-            onChange={(event) =>
-              onChange({
-                ...entry,
-                livello: Math.min(20, Math.max(1, Number(event.target.value) || 1)),
-              })
-            }
+            onChange={(livello) => onChange({ ...entry, livello })}
             className={`${rowInputClass} text-center`}
           />
         </label>
@@ -1162,18 +1137,11 @@ function XpTracker({
     <div className="flex items-center gap-3 flex-wrap">
       <label className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-widest text-muted">XP</span>
-        <input
-          type="number"
+        <IntField
           min={0}
           max={999999}
           value={character.esperienza}
-          onChange={(event) => {
-            const parsed = Number(event.target.value);
-            onChange({
-              ...character,
-              esperienza: Number.isNaN(parsed) ? character.esperienza : Math.max(0, Math.trunc(parsed)),
-            });
-          }}
+          onChange={(esperienza) => onChange({ ...character, esperienza })}
           className="w-24 rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground"
         />
       </label>
@@ -1416,17 +1384,10 @@ function InventorySection({
         {(["oro", "argento", "rame"] as const).map((moneta) => (
           <label key={moneta} className="block">
             <span className="text-[10px] uppercase tracking-widest text-muted capitalize">{moneta}</span>
-            <input
-              type="number"
+            <IntField
               min={0}
               value={character.monete[moneta]}
-              onChange={(event) => {
-                const parsed = Number(event.target.value);
-                setMonete({
-                  ...character.monete,
-                  [moneta]: Number.isNaN(parsed) ? 0 : Math.max(0, Math.trunc(parsed)),
-                });
-              }}
+              onChange={(value) => setMonete({ ...character.monete, [moneta]: value })}
               className="mt-1 w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
             />
           </label>
@@ -1451,20 +1412,16 @@ function InventorySection({
                     inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
                   />
                 </div>
-                <input
-                  type="number"
+                <IntField
                   min={1}
                   value={item.quantita}
-                  onChange={(event) => {
-                    const parsed = Number(event.target.value);
+                  onChange={(value) =>
                     setInventario(
                       character.inventario.map((i) =>
-                        i.id === item.id
-                          ? { ...i, quantita: Number.isNaN(parsed) ? 1 : Math.max(1, Math.trunc(parsed)) }
-                          : i,
+                        i.id === item.id ? { ...i, quantita: value } : i,
                       ),
-                    );
-                  }}
+                    )
+                  }
                   className="w-16 rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground text-center"
                 />
                 <button
@@ -1904,13 +1861,9 @@ function WeaponsSection({
                 </label>
                 <label className="block">
                   <span className="text-[10px] uppercase tracking-widest text-muted">Bonus extra</span>
-                  <input
-                    type="number"
+                  <IntField
                     value={weapon.bonusExtra}
-                    onChange={(event) => {
-                      const parsed = Number(event.target.value);
-                      updateWeapon(weapon.id, { bonusExtra: Number.isNaN(parsed) ? 0 : Math.trunc(parsed) });
-                    }}
+                    onChange={(value) => updateWeapon(weapon.id, { bonusExtra: value })}
                     className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
                   />
                 </label>
@@ -1992,21 +1945,17 @@ function SpellListSection({
                 inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
               />
             </div>
-            <input
-              type="number"
+            <IntField
               min={0}
               max={9}
               value={spell.livello}
-              onChange={(event) => {
-                const parsed = Number(event.target.value);
+              onChange={(value) =>
                 setIncantesimi(
                   character.incantesimi.map((s) =>
-                    s.id === spell.id
-                      ? { ...s, livello: Number.isNaN(parsed) ? 0 : Math.min(9, Math.max(0, Math.trunc(parsed))) }
-                      : s,
+                    s.id === spell.id ? { ...s, livello: value } : s,
                   ),
-                );
-              }}
+                )
+              }
               aria-label="Livello incantesimo"
               className="w-14 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground text-center"
             />
@@ -2180,12 +2129,10 @@ function AbilityScoreSection({
   character,
   onChange,
   setAbility,
-  clampInt,
 }: {
   character: Character;
   onChange: (character: Character) => void;
   setAbility: (ability: Ability, value: number) => void;
-  clampInt: (value: string, min: number, max: number, fallback: number) => number;
 }) {
   const [mode, setMode] = useState<GenMode>("manuale");
   const [pool, setPool] = useState<number[]>([...STANDARD_ARRAY]);
@@ -2294,14 +2241,11 @@ function AbilityScoreSection({
               </p>
 
               {mode === "manuale" && (
-                <input
-                  type="number"
+                <IntField
                   min={1}
                   max={30}
                   value={score}
-                  onChange={(event) =>
-                    setAbility(ability, clampInt(event.target.value, 1, 30, score))
-                  }
+                  onChange={(value) => setAbility(ability, value)}
                   className="mt-1 w-16 mx-auto block rounded-md border border-edge bg-surface px-2 py-1 text-center text-sm text-foreground"
                 />
               )}

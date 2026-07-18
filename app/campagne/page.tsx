@@ -19,6 +19,7 @@ import {
   stopJukebox,
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign, grantXp, grantXpToParty } from "@/app/actions/characters";
+import { IntField } from "@/components/int-field";
 import {
   createHandout,
   deleteHandout,
@@ -1489,13 +1490,10 @@ function RollTableEditor({
               placeholder="Es. Pozione di cura"
               className="flex-1 min-w-0 rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
             />
-            <input
-              type="number"
+            <IntField
               min={1}
               value={voce.peso}
-              onChange={(event) =>
-                updateRow(index, { peso: Math.max(1, Number(event.target.value) || 1) })
-              }
+              onChange={(value) => updateRow(index, { peso: value })}
               title="Peso (probabilità relativa)"
               className="w-14 rounded-md border border-edge bg-surface px-1.5 py-1.5 text-sm text-foreground text-center"
             />
@@ -1630,12 +1628,9 @@ function EncounterTracker({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   {isDm ? (
-                    <input
-                      type="number"
+                    <IntField
                       value={c.iniziativa}
-                      onChange={async (event) => {
-                        const value = Number(event.target.value);
-                        if (Number.isNaN(value)) return;
+                      onChange={async (value) => {
                         await updateCombatant(c.id, { iniziativa: value });
                         refresh();
                       }}
@@ -1799,40 +1794,36 @@ function EncounterDmControls({
         />
         <label className="flex items-center gap-1 text-xs text-muted">
           Iniz.
-          <input
-            type="number"
+          <IntField
             value={iniziativa}
-            onChange={(event) => setIniziativa(Number(event.target.value) || 0)}
+            onChange={setIniziativa}
             className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted">
           PF
-          <input
-            type="number"
+          <IntField
             min={1}
             value={hpMax}
-            onChange={(event) => setHpMax(Math.max(1, Number(event.target.value) || 1))}
+            onChange={setHpMax}
             className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted">
           Az. legg.
-          <input
-            type="number"
+          <IntField
             min={0}
             value={azioniLeggendarieMax}
-            onChange={(event) => setAzioniLeggendarieMax(Math.max(0, Number(event.target.value) || 0))}
+            onChange={setAzioniLeggendarieMax}
             className="w-12 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted">
           XP
-          <input
-            type="number"
+          <IntField
             min={0}
             value={xp}
-            onChange={(event) => setXp(Math.max(0, Number(event.target.value) || 0))}
+            onChange={setXp}
             className="w-16 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
@@ -1909,12 +1900,11 @@ function XpDistributor({
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-xs text-muted">
           XP a testa
-          <input
-            type="number"
+          <IntField
             min={0}
             value={perPlayer}
-            onChange={(event) => {
-              setPerPlayer(Math.max(0, Number(event.target.value) || 0));
+            onChange={(value) => {
+              setPerPlayer(value);
               setTouched(true);
               setGranted(false);
             }}
@@ -1972,11 +1962,10 @@ function GrantXpInline({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <input
-        type="number"
+      <IntField
         min={0}
         value={amount}
-        onChange={(event) => setAmount(Math.max(0, Number(event.target.value) || 0))}
+        onChange={setAmount}
         className="w-16 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-foreground text-center"
         placeholder="XP"
         autoFocus
@@ -2147,12 +2136,11 @@ function TreasureGenerator({ defaultCr }: { defaultCr: number }) {
         </div>
         <label className="flex items-center gap-1.5 text-xs text-muted">
           GS
-          <input
-            type="number"
+          <IntField
             min={0}
             max={30}
             value={cr}
-            onChange={(event) => setCr(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}
+            onChange={setCr}
             className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
@@ -2287,12 +2275,11 @@ function EncounterGenerator({
         <span className="text-[10px] uppercase tracking-widest text-muted mr-1">Party (livelli)</span>
         {levels.map((level, index) => (
           <span key={index} className="flex items-center gap-0.5">
-            <input
-              type="number"
+            <IntField
               min={1}
               max={20}
               value={level}
-              onChange={(event) => updateLevel(index, Number(event.target.value) || 1)}
+              onChange={(value) => updateLevel(index, value)}
               className="w-10 rounded-md border border-edge bg-surface-raised px-1 py-1 text-xs text-foreground text-center"
             />
             <button
@@ -2696,23 +2683,21 @@ function NewDungeonForm({
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted">
           Stanze min
-          <input
-            type="number"
+          <IntField
             min={1}
             max={40}
             value={minRooms}
-            onChange={(event) => setMinRooms(Number(event.target.value) || 1)}
+            onChange={setMinRooms}
             className="w-14 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
         <label className="flex items-center gap-1.5 text-xs text-muted">
           max
-          <input
-            type="number"
+          <IntField
             min={1}
             max={40}
             value={maxRooms}
-            onChange={(event) => setMaxRooms(Number(event.target.value) || 1)}
+            onChange={setMaxRooms}
             className="w-14 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
@@ -2858,23 +2843,21 @@ function NewBlankDungeonForm({
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted">
           Larghezza
-          <input
-            type="number"
+          <IntField
             min={8}
             max={60}
             value={width}
-            onChange={(event) => setWidth(Number(event.target.value) || 8)}
+            onChange={setWidth}
             className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
         <label className="flex items-center gap-1.5 text-xs text-muted">
           Altezza
-          <input
-            type="number"
+          <IntField
             min={8}
             max={60}
             value={height}
-            onChange={(event) => setHeight(Number(event.target.value) || 8)}
+            onChange={setHeight}
             className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
@@ -3871,23 +3854,21 @@ function NewRegionalMapForm({
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted">
           Larghezza
-          <input
-            type="number"
+          <IntField
             min={8}
             max={80}
             value={width}
-            onChange={(event) => setWidth(Number(event.target.value) || 8)}
+            onChange={setWidth}
             className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
         <label className="flex items-center gap-1.5 text-xs text-muted">
           Altezza
-          <input
-            type="number"
+          <IntField
             min={8}
             max={80}
             value={height}
-            onChange={(event) => setHeight(Number(event.target.value) || 8)}
+            onChange={setHeight}
             className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
           />
         </label>
