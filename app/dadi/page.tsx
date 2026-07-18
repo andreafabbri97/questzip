@@ -106,7 +106,7 @@ export default function DicePage() {
             </span>
             <IntField
               min={1}
-              max={20}
+              max={100}
               value={quantity}
               onChange={setQuantity}
               className="mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
