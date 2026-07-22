@@ -1774,13 +1774,11 @@ function EncounterDmControls({
         />
       </div>
 
-      {partyLevels.length > 0 && (
-        <EncounterGenerator
-          encounterId={encounter.id}
-          partyLevels={partyLevels}
-          onAdded={onChange}
-        />
-      )}
+      <EncounterGenerator
+        encounterId={encounter.id}
+        partyLevels={partyLevels}
+        onAdded={onChange}
+      />
       <TreasureGenerator
         defaultCr={partyLevels.length > 0 ? Math.round(partyLevels.reduce((a, b) => a + b, 0) / partyLevels.length) : 1}
       />
