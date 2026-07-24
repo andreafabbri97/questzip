@@ -3,6 +3,7 @@ import { Cinzel, Inter } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { AuthSessionProvider } from "@/components/session-provider";
+import { RealtimeProvider } from "@/components/realtime-provider";
 
 const display = Cinzel({
   variable: "--font-display",
@@ -45,10 +46,12 @@ export default function RootLayout({
     <html lang="it" className={`${display.variable} ${body.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <AuthSessionProvider>
-          <Nav />
-          <main className="flex-1 w-full max-w-5xl 2xl:max-w-[1600px] mx-auto px-4 pb-24 pt-6 sm:pb-10">
-            {children}
-          </main>
+          <RealtimeProvider>
+            <Nav />
+            <main className="flex-1 w-full max-w-5xl 2xl:max-w-[1600px] mx-auto px-4 pb-24 pt-6 sm:pb-10">
+              {children}
+            </main>
+          </RealtimeProvider>
         </AuthSessionProvider>
       </body>
     </html>

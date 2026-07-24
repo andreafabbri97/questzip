@@ -4,11 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
+import { NotificationBell } from "@/components/notification-bell";
 
 const links = [
   { href: "/", label: "Home", icon: "🏰" },
   { href: "/campagne", label: "Campagne", icon: "🗺️" },
   { href: "/personaggi", label: "Personaggi", icon: "🛡️" },
+  { href: "/chat", label: "Chat", icon: "💬" },
   { href: "/dadi", label: "Dadi", icon: "🎲" },
   { href: "/compendio", label: "Compendio", icon: "📖" },
 ];
@@ -44,14 +46,15 @@ export function Nav() {
               </Link>
             ))}
           </nav>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
+            <NotificationBell />
             <AccountButton />
           </div>
         </div>
       </header>
 
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-edge bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {links.map((link) => (
             <Link
               key={link.href}
