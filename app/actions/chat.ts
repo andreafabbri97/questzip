@@ -1,10 +1,10 @@
 "use server";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireMember, requireUserId } from "@/lib/campaign-auth";
 import { canonicalPair, requireFriendship } from "@/lib/social-auth";
-import { campaignChatMessages, directMessages } from "@/lib/db/schema";
+import { campaignChatMessages, campaignMembers, chatReadState, directMessages, friendships } from "@/lib/db/schema";
 import {
   broadcastCampaignChatMessage,
   broadcastCampaignChatMessageDeleted,
@@ -151,4 +151,64 @@ export async function deleteDirectMessage(messageId: string) {
   await db.delete(directMessages).where(eq(directMessages.id, messageId));
   const otherUserId = message.userIdLow === userId ? message.userIdHigh : message.userIdLow;
   await broadcastDirectMessageDeleted(userId, otherUserId, messageId);
+}
+
+// roomKey rispecchia esattamente il nome della stanza realtime (vedi lib/party.ts): "campaign-<id>"
+// o "dm-<userIdLow>-<userIdHigh>" — così il "non letto" si calcola senza una tabella per tipo.
+export async function markThreadRead(roomKey: string) {
+  const userId = await requireUserId();
+  await db
+    .insert(chatReadState)
+    .values({ userId, roomKey, lastReadAt: new Date() })
+    .onConflictDoUpdate({
+      target: [chatReadState.userId, chatReadState.roomKey],
+      set: { lastReadAt: new Date() },
+    });
+}
+
+// N+1 query deliberata: per un gruppo di poche persone/campagne è più semplice e leggibile di
+// un'aggregazione SQL, e il volume di dati non giustifica la complessità in più.
+export async function getUnreadThreadKeys(): Promise<string[]> {
+  const userId = await requireUserId();
+
+  const myCampaigns = await db
+    .select({ campaignId: campaignMembers.campaignId })
+    .from(campaignMembers)
+    .where(eq(campaignMembers.userId, userId));
+
+  const myFriendPairs = await db
+    .select({ userIdLow: friendships.userIdLow, userIdHigh: friendships.userIdHigh })
+    .from(friendships)
+    .where(or(eq(friendships.userIdLow, userId), eq(friendships.userIdHigh, userId)));
+
+  const readRows = await db.select().from(chatReadState).where(eq(chatReadState.userId, userId));
+  const readMap = new Map(readRows.map((r) => [r.roomKey, r.lastReadAt]));
+
+  const unread: string[] = [];
+
+  for (const { campaignId } of myCampaigns) {
+    const roomKey = `campaign-${campaignId}`;
+    const [latest] = await db
+      .select({ createdAt: campaignChatMessages.createdAt })
+      .from(campaignChatMessages)
+      .where(eq(campaignChatMessages.campaignId, campaignId))
+      .orderBy(desc(campaignChatMessages.createdAt))
+      .limit(1);
+    const lastRead = readMap.get(roomKey);
+    if (latest && (!lastRead || lastRead < latest.createdAt)) unread.push(roomKey);
+  }
+
+  for (const pair of myFriendPairs) {
+    const roomKey = `dm-${pair.userIdLow}-${pair.userIdHigh}`;
+    const [latest] = await db
+      .select({ createdAt: directMessages.createdAt })
+      .from(directMessages)
+      .where(and(eq(directMessages.userIdLow, pair.userIdLow), eq(directMessages.userIdHigh, pair.userIdHigh)))
+      .orderBy(desc(directMessages.createdAt))
+      .limit(1);
+    const lastRead = readMap.get(roomKey);
+    if (latest && (!lastRead || lastRead < latest.createdAt)) unread.push(roomKey);
+  }
+
+  return unread;
 }

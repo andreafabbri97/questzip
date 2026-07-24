@@ -6,9 +6,11 @@ import { getCampaign } from "@/app/actions/campaigns";
 import {
   deleteCampaignChatMessage,
   getCampaignChatMessages,
+  markThreadRead,
   sendCampaignChatMessage,
 } from "@/app/actions/chat";
 import { usePartyRoom } from "@/lib/use-party-room";
+import { useRealtime } from "@/components/realtime-provider";
 import { MessageList, type ChatMessageData } from "@/components/chat/message-list";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MentionModal } from "@/components/chat/mention-modal";
@@ -17,6 +19,8 @@ import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 export function CampaignChat({ campaignId }: { campaignId: string }) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
+  const { refreshUnread } = useRealtime();
+  const roomKey = `campaign-${campaignId}`;
 
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getCampaign>> | null>(null);
   const [messages, setMessages] = useState<ChatMessageData[] | null>(null);
@@ -44,9 +48,13 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
     getCampaignChatMessages(campaignId).then((rows) => {
       if (!cancelled) setMessages(rows);
     });
+    markThreadRead(roomKey).then(() => {
+      if (!cancelled) refreshUnread();
+    });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId]);
 
   // Stessa stanza "campaign-<id>" già usata da combattimento/jukebox quando la pagina Campagne è
@@ -56,6 +64,9 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
     const payload = data as { type?: string; message?: ChatMessageData; messageId?: string };
     if (payload?.type === "chat-message" && payload.message) {
       setMessages((prev) => (prev ? [...prev, payload.message as ChatMessageData] : prev));
+      // La thread è aperta proprio ora: segnala subito come letto invece di lasciare che il
+      // pallino resti acceso finché non la si riapre.
+      markThreadRead(roomKey).then(refreshUnread);
     }
     if (payload?.type === "chat-message-deleted" && payload.messageId) {
       const id = payload.messageId;

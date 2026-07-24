@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import {
   cancelFriendRequest,
@@ -14,6 +15,7 @@ import {
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { CampaignChat } from "@/components/chat/campaign-chat";
 import { DirectChat } from "@/components/chat/direct-chat";
+import { useRealtime } from "@/components/realtime-provider";
 
 type Tab = "messaggi" | "amici";
 type SelectedThread = { kind: "campaign"; id: string } | { kind: "dm"; id: string } | null;
@@ -77,6 +79,9 @@ function MessagesTab({
   onConsumeForceOpen: () => void;
 }) {
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const myUserId = session?.user?.id ?? null;
+  const { unreadRoomKeys } = useRealtime();
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
     null,
   );
@@ -110,11 +115,12 @@ function MessagesTab({
   const selectedFriend = selected?.kind === "dm" ? friends.find((f) => f.id === selected.id) : null;
 
   const threadButtonClass = (active: boolean) =>
-    `w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+    `w-full flex items-center justify-between gap-2 text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
       active
         ? "border-accent bg-accent/15 text-accent-strong"
         : "border-edge bg-surface text-foreground hover:border-accent/50"
     }`;
+  const UnreadDot = () => <span className="size-2 rounded-full bg-danger shrink-0" />;
 
   return (
     <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-4 lg:items-start">
@@ -130,7 +136,8 @@ function MessagesTab({
               onClick={() => setSelected({ kind: "campaign", id: c.id })}
               className={threadButtonClass(selected?.kind === "campaign" && selected.id === c.id)}
             >
-              🗺️ {c.nome}
+              <span className="truncate">🗺️ {c.nome}</span>
+              {unreadRoomKeys.has(`campaign-${c.id}`) && <UnreadDot />}
             </button>
           ))}
         </div>
@@ -141,15 +148,19 @@ function MessagesTab({
               Nessun amico ancora — cercalo dalla tab &quot;Amici&quot;.
             </p>
           )}
-          {friends.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setSelected({ kind: "dm", id: f.id })}
-              className={threadButtonClass(selected?.kind === "dm" && selected.id === f.id)}
-            >
-              💬 {f.name ?? "Utente"}
-            </button>
-          ))}
+          {friends.map((f) => {
+            const dmRoomKey = myUserId ? `dm-${[myUserId, f.id].sort().join("-")}` : null;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setSelected({ kind: "dm", id: f.id })}
+                className={threadButtonClass(selected?.kind === "dm" && selected.id === f.id)}
+              >
+                <span className="truncate">💬 {f.name ?? "Utente"}</span>
+                {dmRoomKey && unreadRoomKeys.has(dmRoomKey) && <UnreadDot />}
+              </button>
+            );
+          })}
         </div>
       </div>
 

@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { deleteDirectMessage, getDirectMessages, sendDirectMessage } from "@/app/actions/chat";
+import {
+  deleteDirectMessage,
+  getDirectMessages,
+  markThreadRead,
+  sendDirectMessage,
+} from "@/app/actions/chat";
 import { useRealtime } from "@/components/realtime-provider";
 import { MessageList, type ChatMessageData } from "@/components/chat/message-list";
 import { MessageComposer } from "@/components/chat/message-composer";
@@ -23,7 +28,11 @@ export function DirectChat({
 }) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
-  const { subscribe } = useRealtime();
+  const { subscribe, refreshUnread } = useRealtime();
+  // Duplica volutamente la stessa logica di ordinamento di canonicalPair (lib/social-auth.ts)
+  // invece di importarla: quel file importa lib/db (solo server), non va bene in un componente
+  // client — qui basta una riga.
+  const roomKey = userId ? `dm-${[userId, otherUserId].sort().join("-")}` : null;
 
   const [messages, setMessages] = useState<ChatMessageData[] | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
@@ -43,10 +52,16 @@ export function DirectChat({
     getDirectMessages(otherUserId).then((rows) => {
       if (!cancelled) setMessages(rows);
     });
+    if (roomKey) {
+      markThreadRead(roomKey).then(() => {
+        if (!cancelled) refreshUnread();
+      });
+    }
     return () => {
       cancelled = true;
     };
-  }, [otherUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otherUserId, roomKey]);
 
   useEffect(() => {
     // La stanza personale riceve TUTTE le DM dell'utente (con qualunque amico), non solo quelle
@@ -56,6 +71,9 @@ export function DirectChat({
       if (!message) return;
       if (message.authorId !== otherUserId && message.authorId !== userId) return;
       setMessages((prev) => (prev ? [...prev, message] : prev));
+      // La thread è aperta proprio ora: segnala subito come letto invece di lasciare il pallino
+      // acceso finché non la si riapre.
+      if (roomKey) markThreadRead(roomKey).then(refreshUnread);
     });
     const unsubscribeDeleted = subscribe("dm-message-deleted", (payload) => {
       const messageId = (payload as { messageId?: string }).messageId;
@@ -66,7 +84,10 @@ export function DirectChat({
       unsubscribeNew();
       unsubscribeDeleted();
     };
-  }, [subscribe, otherUserId, userId]);
+    // refreshUnread cambia riferimento ad ogni render di RealtimeProvider: includerlo
+    // ri-sottoscriverebbe ad ogni notifica in arrivo, inutilmente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscribe, otherUserId, userId, roomKey]);
 
   if (!messages || !userId) {
     return <p className="text-muted p-4">Caricamento…</p>;

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { NotificationBell } from "@/components/notification-bell";
 import { DiceModal } from "@/components/dice-modal";
+import { useRealtime } from "@/components/realtime-provider";
 
 type NavLink =
   | { kind: "link"; href: string; label: string; icon: string }
@@ -27,6 +28,8 @@ const links: NavLink[] = [
 export function Nav() {
   const pathname = usePathname();
   const [diceOpen, setDiceOpen] = useState(false);
+  const { unreadRoomKeys } = useRealtime();
+  const hasUnreadChat = unreadRoomKeys.size > 0;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -55,13 +58,16 @@ export function Nav() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-3 py-1.5 rounded-md transition-colors ${
+                  className={`relative px-3 py-1.5 rounded-md transition-colors ${
                     isActive(link.href)
                       ? "bg-surface-raised text-accent-strong"
                       : "text-muted hover:text-foreground"
                   }`}
                 >
                   {link.label}
+                  {link.href === "/chat" && hasUnreadChat && (
+                    <span className="absolute right-1 top-1 size-1.5 rounded-full bg-danger" />
+                  )}
                 </Link>
               ),
             )}
@@ -89,11 +95,16 @@ export function Nav() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex flex-col items-center gap-0.5 py-2 text-[11px] ${
+                className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] ${
                   isActive(link.href) ? "text-accent-strong" : "text-muted"
                 }`}
               >
-                <span className="text-lg leading-none">{link.icon}</span>
+                <span className="relative text-lg leading-none">
+                  {link.icon}
+                  {link.href === "/chat" && hasUnreadChat && (
+                    <span className="absolute -right-1 -top-0.5 size-1.5 rounded-full bg-danger" />
+                  )}
+                </span>
                 {link.label}
               </Link>
             ),
