@@ -78,6 +78,10 @@ function formatClassSummary(classi: ClassEntry[]): string {
     .join(" / ");
 }
 
+function rollDie(sides: number): number {
+  return Math.floor(Math.random() * sides) + 1;
+}
+
 function ExportImport({
   characters,
   onImport,
@@ -1199,6 +1203,11 @@ function LevelUpWizard({
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
   >(null);
+  const [hitDieFaces, setHitDieFaces] = useState<number | null>(null);
+  const [hpGain, setHpGain] = useState<number | null>(null);
+  const [asiMode, setAsiMode] = useState<"plus2" | "plus1x2" | "talento">("plus2");
+  const [asiAbilities, setAsiAbilities] = useState<Ability[]>([]);
+  const [asiFeat, setAsiFeat] = useState("");
 
   const level = totalLevel(character.classi);
   const derivedLevel = levelForXp(character.esperienza);
@@ -1206,6 +1215,19 @@ function LevelUpWizard({
 
   const targetClass = character.classi[classIndex];
   const newLevel = targetClass ? targetClass.livello + 1 : 1;
+  const isAsiLevel = ASI_LEVELS.includes(newLevel);
+  const conModifier = abilityModifier(character.caratteristiche.costituzione);
+  const averageHp = hitDieFaces ? Math.max(1, Math.floor(hitDieFaces / 2) + 1 + conModifier) : null;
+  const displayedHpGain = hpGain ?? averageHp ?? 0;
+
+  // il dado vita dipende dalla classe scelta nel dropdown (multiclasse): se il PG cambia classe
+  // a metà wizard un tiro già fatto per il dado vita precedente (es. d8) resterebbe appiccicato
+  // e verrebbe applicato come se fosse un tiro valido sul dado nuovo (es. d6).
+  const [hpGainClassIndex, setHpGainClassIndex] = useState(classIndex);
+  if (classIndex !== hpGainClassIndex) {
+    setHpGainClassIndex(classIndex);
+    setHpGain(null);
+  }
 
   useEffect(() => {
     if (!open || !targetClass) return;
@@ -1215,9 +1237,11 @@ function LevelUpWizard({
       const cls = data.classes.find((c) => c.name.toLowerCase() === canonicalClassName(targetClass.nome).toLowerCase());
       if (!cls) {
         setFeatures([]);
+        setHitDieFaces(null);
         return;
       }
       setFeatures(resolveClassFeatures(data, cls).filter((f) => f.level === newLevel));
+      setHitDieFaces(cls.hd?.faces ?? null);
     });
     return () => {
       cancelled = true;
@@ -1226,14 +1250,53 @@ function LevelUpWizard({
 
   if (!canLevelUp && !open) return null;
 
+  const chooseAsiMode = (mode: typeof asiMode) => {
+    setAsiMode(mode);
+    setAsiAbilities([]);
+  };
+
+  const toggleAsiAbility = (ability: Ability) => {
+    setAsiAbilities((prev) => {
+      if (prev.includes(ability)) return prev.filter((a) => a !== ability);
+      if (asiMode === "plus1x2") return prev.length >= 2 ? [...prev.slice(1), ability] : [...prev, ability];
+      return [ability];
+    });
+  };
+
+  const rollHitDie = () => {
+    if (!hitDieFaces) return;
+    setHpGain(Math.max(1, rollDie(hitDieFaces) + conModifier));
+  };
+
   const confirm = () => {
     if (!targetClass) return;
+    let caratteristiche = character.caratteristiche;
+    let talenti = character.talenti;
+    if (isAsiLevel) {
+      if (asiMode === "talento" && asiFeat.trim()) {
+        talenti = [...talenti, { id: crypto.randomUUID(), nome: asiFeat.trim() }];
+      } else if (asiMode !== "talento" && asiAbilities.length > 0) {
+        const bump = asiMode === "plus2" ? 2 : 1;
+        caratteristiche = { ...caratteristiche };
+        for (const ability of asiAbilities) {
+          caratteristiche[ability] = Math.min(20, caratteristiche[ability] + bump);
+        }
+      }
+    }
     onChange({
       ...character,
       classi: character.classi.map((c, i) => (i === classIndex ? { ...c, livello: newLevel } : c)),
+      hpMax: character.hpMax + displayedHpGain,
+      hpAttuali: character.hpAttuali + displayedHpGain,
+      caratteristiche,
+      talenti,
     });
     setOpen(false);
     setFeatures(null);
+    setHitDieFaces(null);
+    setHpGain(null);
+    setAsiAbilities([]);
+    setAsiFeat("");
   };
 
   return (
@@ -1270,11 +1333,92 @@ function LevelUpWizard({
               <span className="font-bold text-accent-strong">{newLevel}</span>.
             </p>
           )}
-          {ASI_LEVELS.includes(newLevel) && (
-            <p className="text-sm font-bold text-accent-strong">
-              ⭐ A questo livello ottieni un Aumento di Caratteristica (o un talento) — ricordati di
-              assegnarlo nella sezione Caratteristiche.
-            </p>
+          <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+            <p className="text-xs uppercase tracking-widest text-muted">Punti ferita guadagnati</p>
+            {hitDieFaces ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={rollHitDie}
+                    className="rounded-lg border border-edge px-2.5 py-1 text-xs font-bold text-foreground hover:border-accent transition-colors"
+                  >
+                    🎲 Tira (d{hitDieFaces}{formatModifier(conModifier)})
+                  </button>
+                  <button
+                    onClick={() => setHpGain(averageHp)}
+                    className="rounded-lg border border-edge px-2.5 py-1 text-xs font-bold text-foreground hover:border-accent transition-colors"
+                  >
+                    📊 Media ({averageHp})
+                  </button>
+                  <IntField
+                    min={1}
+                    max={100}
+                    value={displayedHpGain}
+                    onChange={setHpGain}
+                    aria-label="Punti ferita guadagnati"
+                    className="w-16 rounded-md border border-edge bg-surface-raised px-1.5 py-1 text-sm text-foreground text-center"
+                  />
+                </div>
+                <p className="text-xs text-muted">Aggiunti sia a PF max che a PF attuali quando confermi.</p>
+              </>
+            ) : (
+              <p className="text-xs text-muted">
+                Dado vita non trovato per questa classe — aggiorna i PF max a mano dopo aver confermato.
+              </p>
+            )}
+          </div>
+          {isAsiLevel && (
+            <div className="rounded-lg border border-accent/40 bg-surface p-3 space-y-2">
+              <p className="text-xs font-bold text-accent-strong">
+                ⭐ A questo livello ottieni un Aumento di Caratteristica (o un talento).
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { mode: "plus2" as const, label: "+2 a una caratteristica" },
+                    { mode: "plus1x2" as const, label: "+1 a due caratteristiche" },
+                    { mode: "talento" as const, label: "Talento" },
+                  ] satisfies { mode: typeof asiMode; label: string }[]
+                ).map((option) => (
+                  <button
+                    key={option.mode}
+                    onClick={() => chooseAsiMode(option.mode)}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${
+                      asiMode === option.mode
+                        ? "border-accent bg-accent/15 text-accent-strong"
+                        : "border-edge text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {asiMode === "talento" ? (
+                <Autocomplete
+                  value={asiFeat}
+                  onChange={setAsiFeat}
+                  loader={loadFeats}
+                  placeholder="Alert, Lucky, Tough…"
+                  inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+                />
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {ABILITIES.map((ability) => (
+                    <button
+                      key={ability}
+                      onClick={() => toggleAsiAbility(ability)}
+                      className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                        asiAbilities.includes(ability)
+                          ? "border-accent bg-accent/15 text-accent-strong"
+                          : "border-edge text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {ABILITY_LABELS[ability]} {character.caratteristiche[ability]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <div>
             <p className="text-xs uppercase tracking-widest text-muted mb-1">Nuovi privilegi</p>
@@ -1292,9 +1436,6 @@ function LevelUpWizard({
               </div>
             ))}
           </div>
-          <p className="text-sm text-muted">
-            Ricordati di aggiornare i Punti Ferita massimi con il calcolatore qui sopra dopo aver confermato.
-          </p>
           <div className="flex items-center gap-3">
             <button
               onClick={confirm}
@@ -1306,6 +1447,10 @@ function LevelUpWizard({
               onClick={() => {
                 setOpen(false);
                 setFeatures(null);
+                setHitDieFaces(null);
+                setHpGain(null);
+                setAsiAbilities([]);
+                setAsiFeat("");
               }}
               className="text-sm text-muted hover:underline"
             >
@@ -2369,6 +2514,14 @@ function SavingThrowsAndSkills({
     if (abilities.length > 0) onChange({ ...character, trsCompetenti: abilities });
   };
 
+  const [roll, setRoll] = useState<{ label: string; die: number; mod: number; total: number } | null>(
+    null,
+  );
+  const rollCheck = (label: string, mod: number) => {
+    const die = rollDie(20);
+    setRoll({ label, die, mod, total: die + mod });
+  };
+
   return (
     <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -2380,26 +2533,40 @@ function SavingThrowsAndSkills({
           Suggerisci dalla classe di origine
         </button>
       </div>
+      {roll && (
+        <p className="text-sm font-bold text-accent-strong">
+          🎲 {roll.label}: {roll.die} {formatModifier(roll.mod)} ={" "}
+          <span className="text-lg">{roll.total}</span>
+        </p>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {ABILITIES.map((ability) => {
           const proficient = character.trsCompetenti.includes(ability);
           const mod = savingThrowModifier(character.caratteristiche[ability], proficient, level);
           return (
-            <button
-              key={ability}
-              onClick={() => toggleSave(ability)}
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
-                proficient
-                  ? "border-accent bg-accent/10 text-accent-strong"
-                  : "border-edge bg-surface-raised text-muted hover:text-foreground"
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <span className={`size-2 rounded-full ${proficient ? "bg-accent" : "bg-edge"}`} />
-                {ABILITY_LABELS[ability]}
-              </span>
-              <span className="font-bold">{formatModifier(mod)}</span>
-            </button>
+            <div key={ability} className="flex items-stretch gap-1">
+              <button
+                onClick={() => toggleSave(ability)}
+                className={`flex flex-1 items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  proficient
+                    ? "border-accent bg-accent/10 text-accent-strong"
+                    : "border-edge bg-surface-raised text-muted hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <span className={`size-2 rounded-full ${proficient ? "bg-accent" : "bg-edge"}`} />
+                  {ABILITY_LABELS[ability]}
+                </span>
+                <span className="font-bold">{formatModifier(mod)}</span>
+              </button>
+              <button
+                onClick={() => rollCheck(ABILITY_LABELS[ability], mod)}
+                aria-label={`Tira salvezza su ${ABILITY_LABELS[ability]}`}
+                className="shrink-0 rounded-lg border border-edge px-2 text-muted hover:text-accent-strong hover:border-accent transition-colors"
+              >
+                🎲
+              </button>
+            </div>
           );
         })}
       </div>
@@ -2421,30 +2588,38 @@ function SavingThrowsAndSkills({
             level,
           );
           return (
-            <button
-              key={skill.nome}
-              onClick={() => cycleSkill(skill.nome)}
-              className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                esperto
-                  ? "border-accent bg-accent/15 text-accent-strong"
-                  : competente
-                    ? "border-accent/50 bg-accent/5 text-foreground"
-                    : "border-edge bg-surface-raised text-muted hover:text-foreground"
-              }`}
-            >
-              <span className="flex items-center gap-1.5 min-w-0">
-                <span
-                  className={`size-2 rounded-full shrink-0 ${
-                    esperto ? "bg-accent" : competente ? "bg-accent/60" : "bg-edge"
-                  }`}
-                />
-                <span className="truncate">{skill.nome}</span>
-                <span className="text-[10px] text-muted shrink-0">
-                  ({ABILITY_LABELS[skill.abilita].slice(0, 3)})
+            <div key={skill.nome} className="flex items-stretch gap-1">
+              <button
+                onClick={() => cycleSkill(skill.nome)}
+                className={`flex flex-1 min-w-0 items-center justify-between rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                  esperto
+                    ? "border-accent bg-accent/15 text-accent-strong"
+                    : competente
+                      ? "border-accent/50 bg-accent/5 text-foreground"
+                      : "border-edge bg-surface-raised text-muted hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className={`size-2 rounded-full shrink-0 ${
+                      esperto ? "bg-accent" : competente ? "bg-accent/60" : "bg-edge"
+                    }`}
+                  />
+                  <span className="truncate">{skill.nome}</span>
+                  <span className="text-[10px] text-muted shrink-0">
+                    ({ABILITY_LABELS[skill.abilita].slice(0, 3)})
+                  </span>
                 </span>
-              </span>
-              <span className="font-bold shrink-0">{formatModifier(mod)}</span>
-            </button>
+                <span className="font-bold shrink-0">{formatModifier(mod)}</span>
+              </button>
+              <button
+                onClick={() => rollCheck(skill.nome, mod)}
+                aria-label={`Tira ${skill.nome}`}
+                className="shrink-0 rounded-lg border border-edge px-2 text-muted hover:text-accent-strong hover:border-accent transition-colors"
+              >
+                🎲
+              </button>
+            </div>
           );
         })}
       </div>
