@@ -24,7 +24,7 @@ function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
-export default function DicePage() {
+export function DiceRoller() {
   const [die, setDie] = useState<number>(20);
   const [quantity, setQuantity] = useState(1);
   const [modifier, setModifier] = useState(0);
@@ -76,9 +76,7 @@ export default function DicePage() {
   const isFumble = latest && latest.die === 20 && latest.rolls[0] === 1;
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold text-accent-strong">Tira dadi</h1>
-
+    <div className="space-y-6">
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-5">
         <div>
           <p className="text-xs uppercase tracking-widest text-muted mb-2">Dado</p>
@@ -101,9 +99,7 @@ export default function DicePage() {
 
         <div className="grid grid-cols-2 gap-4">
           <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted">
-              Quanti dadi
-            </span>
+            <span className="text-xs uppercase tracking-widest text-muted">Quanti dadi</span>
             <IntField
               min={1}
               max={100}
@@ -113,9 +109,7 @@ export default function DicePage() {
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted">
-              Modificatore
-            </span>
+            <span className="text-xs uppercase tracking-widest text-muted">Modificatore</span>
             <IntField
               min={-20}
               max={20}
@@ -167,7 +161,11 @@ export default function DicePage() {
                 : "border-edge bg-surface"
           }`}
         >
-          <div className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"}`}>
+          <div
+            className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
+              isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
+            }`}
+          >
             {latest.total}
           </div>
           <p className="text-sm text-muted mt-2">
@@ -178,9 +176,7 @@ export default function DicePage() {
             [{latest.rolls.join(", ")}]
             {latest.discarded !== undefined && ` (scartato: ${latest.discarded})`}
           </p>
-          {isCrit && (
-            <p className="text-accent-strong font-bold mt-1">Colpo critico! ⚔️</p>
-          )}
+          {isCrit && <p className="text-accent-strong font-bold mt-1">Colpo critico! ⚔️</p>}
           {isFumble && <p className="text-danger font-bold mt-1">Fallimento critico… 💀</p>}
         </section>
       )}
@@ -190,15 +186,10 @@ export default function DicePage() {
           <h2 className="text-sm uppercase tracking-widest text-muted">Cronologia</h2>
           <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface">
             {history.slice(1).map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-center justify-between px-4 py-2 text-sm"
-              >
+              <li key={entry.id} className="flex items-center justify-between px-4 py-2 text-sm">
                 <span className="text-muted">
                   {entry.timestamp} ·{" "}
-                  {entry.quantity > 1
-                    ? `${entry.quantity}d${entry.die}`
-                    : `d${entry.die}`}
+                  {entry.quantity > 1 ? `${entry.quantity}d${entry.die}` : `d${entry.die}`}
                   {entry.modifier !== 0 && ` ${formatModifier(entry.modifier)}`}
                   {entry.mode !== "normale" && ` (${entry.mode})`}
                 </span>

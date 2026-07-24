@@ -10,7 +10,9 @@ import {
   deleteCampaign,
   deleteSessionNote,
   getCampaign,
+  getMyCampaignFriendsPicker,
   getMyCampaigns,
+  inviteFriendToCampaign,
   leaveCampaign,
   redeemInvite,
   removeMember,
@@ -464,6 +466,7 @@ function CampaignDetailView({
             {inviteLink}
           </div>
         )}
+        {isDm && <InviteFriendPicker campaignId={campaignId} />}
         <ul className="space-y-2">
           {detail.members.map((member) => (
             <li
@@ -953,6 +956,59 @@ function getYouTubeEmbedUrl(url: string): string | null {
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/,
   );
   return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1` : null;
+}
+
+function InviteFriendPicker({ campaignId }: { campaignId: string }) {
+  const [open, setOpen] = useState(false);
+  const [friends, setFriends] = useState<Awaited<ReturnType<typeof getMyCampaignFriendsPicker>> | null>(
+    null,
+  );
+  const [invited, setInvited] = useState<string[]>([]);
+
+  const load = () => {
+    setOpen((prev) => !prev);
+    if (!friends) getMyCampaignFriendsPicker(campaignId).then(setFriends);
+  };
+
+  const invite = async (friendUserId: string) => {
+    await inviteFriendToCampaign(campaignId, friendUserId);
+    setInvited((prev) => [...prev, friendUserId]);
+  };
+
+  return (
+    <div>
+      <button onClick={load} className="text-xs font-bold text-accent-strong hover:underline">
+        {open ? "Nascondi" : "+ Invita un amico"}
+      </button>
+      {open && (
+        <div className="mt-2 rounded-lg border border-edge bg-surface-raised p-2 space-y-1.5">
+          {!friends ? (
+            <p className="text-xs text-muted">Caricamento…</p>
+          ) : friends.length === 0 ? (
+            <p className="text-xs text-muted">
+              Nessun amico disponibile — cercali dalla tab Amici in Chat.
+            </p>
+          ) : (
+            friends.map((friend) => (
+              <div key={friend.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-foreground truncate">{friend.name ?? "Utente"}</span>
+                {invited.includes(friend.id) ? (
+                  <span className="text-xs text-muted shrink-0">✓ Invitato</span>
+                ) : (
+                  <button
+                    onClick={() => invite(friend.id)}
+                    className="text-xs font-bold text-accent-strong hover:underline shrink-0"
+                  >
+                    Invita
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function JukeboxPlayer({

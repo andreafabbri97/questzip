@@ -18,14 +18,6 @@ const sections = [
     ready: true,
   },
   {
-    href: "/dadi",
-    icon: "🎲",
-    title: "Tira dadi",
-    description:
-      "Tutti i dadi da d4 a d100, con modificatori, vantaggio/svantaggio e cronologia.",
-    ready: true,
-  },
-  {
     href: "/compendio",
     icon: "📖",
     title: "Compendio",
@@ -48,7 +40,7 @@ export default function Home() {
         </p>
       </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
         {sections.map((section) =>
           section.ready ? (
             <Link
@@ -82,7 +74,8 @@ export default function Home() {
 
       <p className="text-center text-xs text-muted">
         Le Campagne sono condivise in tempo reale fra master e giocatori. I Personaggi restano
-        sul tuo dispositivo — porti tu lo scatto in campagna quando vuoi sincronizzarlo.
+        sul tuo dispositivo — porti tu lo scatto in campagna quando vuoi sincronizzarlo. Il tiro
+        dadi 🎲 è sempre nella barra di navigazione: si apre senza uscire dalla pagina.
       </p>
     </div>
   );

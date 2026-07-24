@@ -1,13 +1,17 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
+import { requireFriendship } from "@/lib/social-auth";
+import { createNotification } from "@/lib/notifications";
 import {
+  campaignFriendInvites,
   campaignInvites,
   campaignMembers,
   campaignSessionNotes,
   campaigns,
+  friendships,
   users,
 } from "@/lib/db/schema";
 import { broadcastJukeboxChanged } from "@/lib/party";
@@ -97,6 +101,111 @@ export async function redeemInvite(code: string) {
       userId,
       role: "player",
     });
+  }
+  return invite.campaignId;
+}
+
+// Amici del master non ancora nella campagna e senza un invito già in sospeso — per il
+// selettore "invita un amico", in aggiunta al link/codice generico di createInvite (che resta
+// utile per chi non è ancora amico su QuestZip).
+export async function getMyCampaignFriendsPicker(campaignId: string) {
+  const userId = await requireUserId();
+  await requireDm(campaignId, userId);
+
+  const pairs = await db
+    .select({ userIdLow: friendships.userIdLow, userIdHigh: friendships.userIdHigh })
+    .from(friendships)
+    .where(or(eq(friendships.userIdLow, userId), eq(friendships.userIdHigh, userId)));
+  const friendIds = pairs.map((p) => (p.userIdLow === userId ? p.userIdHigh : p.userIdLow));
+  if (friendIds.length === 0) return [];
+
+  const existingMembers = await db
+    .select({ userId: campaignMembers.userId })
+    .from(campaignMembers)
+    .where(eq(campaignMembers.campaignId, campaignId));
+  const memberIds = new Set(existingMembers.map((m) => m.userId));
+
+  const pendingInvites = await db
+    .select({ userId: campaignFriendInvites.invitedUserId })
+    .from(campaignFriendInvites)
+    .where(
+      and(eq(campaignFriendInvites.campaignId, campaignId), eq(campaignFriendInvites.stato, "pending")),
+    );
+  const pendingIds = new Set(pendingInvites.map((i) => i.userId));
+
+  const eligibleIds = friendIds.filter((id) => !memberIds.has(id) && !pendingIds.has(id));
+  if (eligibleIds.length === 0) return [];
+
+  return db
+    .select({ id: users.id, name: users.name, image: users.image })
+    .from(users)
+    .where(inArray(users.id, eligibleIds));
+}
+
+export async function inviteFriendToCampaign(campaignId: string, friendUserId: string) {
+  const userId = await requireUserId();
+  await requireDm(campaignId, userId);
+  await requireFriendship(userId, friendUserId);
+
+  const [existingMember] = await db
+    .select()
+    .from(campaignMembers)
+    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, friendUserId)));
+  if (existingMember) throw new Error("È già membro della campagna.");
+
+  const [existingInvite] = await db
+    .select()
+    .from(campaignFriendInvites)
+    .where(
+      and(
+        eq(campaignFriendInvites.campaignId, campaignId),
+        eq(campaignFriendInvites.invitedUserId, friendUserId),
+        eq(campaignFriendInvites.stato, "pending"),
+      ),
+    );
+  if (existingInvite) return;
+
+  const [invite] = await db
+    .insert(campaignFriendInvites)
+    .values({ campaignId, invitedUserId: friendUserId, invitedBy: userId })
+    .returning();
+
+  const [campaign] = await db.select({ nome: campaigns.nome }).from(campaigns).where(eq(campaigns.id, campaignId));
+  const [inviter] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  await createNotification(friendUserId, "campaign_invite", {
+    inviteId: invite.id,
+    campaignId,
+    campaignNome: campaign?.nome ?? "",
+    inviterId: userId,
+    inviterName: inviter?.name ?? "Il master",
+  });
+}
+
+export async function respondToCampaignFriendInvite(inviteId: string, accept: boolean) {
+  const userId = await requireUserId();
+  const [invite] = await db
+    .select()
+    .from(campaignFriendInvites)
+    .where(eq(campaignFriendInvites.id, inviteId));
+  if (!invite) throw new Error("Invito non trovato.");
+  if (invite.invitedUserId !== userId) throw new Error("Non puoi rispondere a questo invito.");
+  if (invite.stato !== "pending") return null;
+
+  await db
+    .update(campaignFriendInvites)
+    .set({ stato: accept ? "accettato" : "rifiutato" })
+    .where(eq(campaignFriendInvites.id, inviteId));
+
+  if (accept) {
+    const [existing] = await db
+      .select()
+      .from(campaignMembers)
+      .where(
+        and(eq(campaignMembers.campaignId, invite.campaignId), eq(campaignMembers.userId, userId)),
+      );
+    if (!existing) {
+      await db.insert(campaignMembers).values({ campaignId: invite.campaignId, userId, role: "player" });
+    }
   }
   return invite.campaignId;
 }
