@@ -518,3 +518,151 @@ export function generateDungeon(config: DungeonConfig): DungeonData {
 
   return { width, height, cells, rooms };
 }
+
+// --- Generatore procedurale di scene esterne (stessa griglia/celle del dungeon, tema diverso) ---
+
+export type OutdoorBiome = "bosco" | "palude" | "pianura" | "rocciosa" | "costa";
+
+export interface OutdoorConfig {
+  width: number;
+  height: number;
+  biome: OutdoorBiome;
+}
+
+/** Fa crescere una chiazza organica da un seme, una cella alla volta verso un vicino libero —
+ * stesso spirito di `organicize` sopra (contorno irregolare, non geometrico) ma qui si parte da
+ * un singolo punto e si cresce solo in avanti, invece di erodere/far crescere un rettangolo. */
+function growPatch(
+  seedX: number,
+  seedY: number,
+  width: number,
+  height: number,
+  targetSize: number,
+): [number, number][] {
+  const set = new Set<string>([cellKey(seedX, seedY)]);
+  const frontier: [number, number][] = [[seedX, seedY]];
+
+  while (set.size < targetSize && frontier.length > 0) {
+    const frontierIndex = randInt(0, frontier.length - 1);
+    const [x, y] = frontier[frontierIndex];
+    const candidates = (
+      [
+        [x + 1, y],
+        [x - 1, y],
+        [x, y + 1],
+        [x, y - 1],
+      ] as [number, number][]
+    ).filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < width && ny < height && !set.has(cellKey(nx, ny)));
+
+    if (candidates.length === 0) {
+      frontier.splice(frontierIndex, 1);
+      continue;
+    }
+    const [nx, ny] = candidates[randInt(0, candidates.length - 1)];
+    set.add(cellKey(nx, ny));
+    frontier.push([nx, ny]);
+  }
+
+  return [...set].map((key) => key.split(",").map(Number) as [number, number]);
+}
+
+/** Riempie una fascia d'acqua lungo un bordo scelto a caso, con profondità che varia a random
+ * walk cella per cella (stesso principio dei corridoi "vaganti" sopra) per una costa frastagliata
+ * invece di una linea dritta. */
+function carveCoast(cells: CellType[][], width: number, height: number) {
+  const edge = (["top", "bottom", "left", "right"] as const)[randInt(0, 3)];
+  const horizontal = edge === "left" || edge === "right";
+  const length = horizontal ? height : width;
+  const maxDepth = Math.max(3, Math.floor((horizontal ? width : height) * 0.35));
+
+  let depth = randInt(Math.ceil(maxDepth * 0.5), maxDepth);
+  for (let i = 0; i < length; i++) {
+    depth = Math.max(2, Math.min(maxDepth, depth + randInt(-1, 1)));
+    for (let d = 0; d < depth; d++) {
+      if (horizontal) {
+        const x = edge === "left" ? d : width - 1 - d;
+        cells[i][x] = "water";
+      } else {
+        const y = edge === "top" ? d : height - 1 - d;
+        cells[y][i] = "water";
+      }
+    }
+  }
+}
+
+interface TerrainPatch {
+  type: CellType;
+  count: [number, number];
+  size: [number, number];
+}
+
+interface BiomeProfile {
+  base: CellType;
+  patches: TerrainPatch[];
+}
+
+const BIOME_PROFILES: Record<OutdoorBiome, BiomeProfile> = {
+  bosco: {
+    base: "grass",
+    patches: [
+      { type: "tree", count: [5, 8], size: [15, 40] },
+      { type: "water", count: [0, 1], size: [10, 25] },
+      { type: "rock", count: [1, 3], size: [3, 8] },
+    ],
+  },
+  palude: {
+    base: "grass",
+    patches: [
+      { type: "water", count: [6, 10], size: [10, 30] },
+      { type: "tree", count: [3, 5], size: [5, 12] },
+    ],
+  },
+  pianura: {
+    base: "grass",
+    patches: [
+      { type: "tree", count: [2, 4], size: [3, 8] },
+      { type: "water", count: [0, 1], size: [8, 20] },
+      { type: "rock", count: [0, 2], size: [2, 5] },
+    ],
+  },
+  rocciosa: {
+    base: "rock",
+    patches: [
+      { type: "grass", count: [4, 7], size: [10, 25] },
+      { type: "water", count: [0, 1], size: [5, 15] },
+    ],
+  },
+  costa: {
+    base: "grass",
+    patches: [
+      { type: "rock", count: [2, 4], size: [3, 10] },
+      { type: "tree", count: [1, 3], size: [3, 8] },
+    ],
+  },
+};
+
+/** Genera una scena esterna a tema (bioma): stessa griglia di celle del dungeon, nessuna stanza —
+ * resta comunque modificabile a mano dopo, esattamente come una tela vuota, perché è salvata
+ * negli stessi identici `cells`/`rooms` di `campaignDungeons`. */
+export function generateOutdoorScene(config: OutdoorConfig): DungeonData {
+  const { width, height, biome } = config;
+  const profile = BIOME_PROFILES[biome];
+  const cells: CellType[][] = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => profile.base),
+  );
+
+  if (biome === "costa") carveCoast(cells, width, height);
+
+  for (const patch of profile.patches) {
+    const count = randInt(patch.count[0], patch.count[1]);
+    for (let i = 0; i < count; i++) {
+      const size = randInt(patch.size[0], patch.size[1]);
+      const seedX = randInt(0, width - 1);
+      const seedY = randInt(0, height - 1);
+      const blob = growPatch(seedX, seedY, width, height, size);
+      for (const [x, y] of blob) cells[y][x] = patch.type;
+    }
+  }
+
+  return { width, height, cells, rooms: [] };
+}

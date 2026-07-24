@@ -6,10 +6,12 @@ import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
 import {
   generateDungeon,
+  generateOutdoorScene,
   type CellType,
   type DungeonConfig,
   type DungeonRoom,
   type MonsterToken,
+  type OutdoorConfig,
 } from "@/lib/dungeon";
 import { broadcastDungeonChanged, broadcastDungeonDeleted } from "@/lib/party";
 
@@ -24,6 +26,30 @@ export async function createDungeon(campaignId: string, nome: string, config: Du
       campaignId,
       createdBy: userId,
       nome: nome || `Dungeon ${new Date().toLocaleDateString("it-IT")}`,
+      width: data.width,
+      height: data.height,
+      cells: data.cells,
+      rooms: data.rooms,
+    })
+    .returning();
+  return dungeon;
+}
+
+export async function createOutdoorScene(campaignId: string, nome: string, config: OutdoorConfig) {
+  const userId = await requireUserId();
+  await requireDm(campaignId, userId);
+
+  const data = generateOutdoorScene({
+    ...config,
+    width: Math.min(60, Math.max(8, Math.round(config.width))),
+    height: Math.min(60, Math.max(8, Math.round(config.height))),
+  });
+  const [dungeon] = await db
+    .insert(campaignDungeons)
+    .values({
+      campaignId,
+      createdBy: userId,
+      nome: nome || `Scena ${new Date().toLocaleDateString("it-IT")}`,
       width: data.width,
       height: data.height,
       cells: data.cells,

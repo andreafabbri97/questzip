@@ -48,6 +48,7 @@ import {
   addMarker,
   createBlankDungeon,
   createDungeon,
+  createOutdoorScene,
   deleteDungeon,
   deleteMarker,
   getDungeon,
@@ -69,6 +70,7 @@ import type {
   DeadEndRemoval,
   DungeonConfig,
   MonsterToken,
+  OutdoorBiome,
   RoomDensity,
   RoomShape,
   StairsOption,
@@ -2494,7 +2496,7 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
   const [dungeons, setDungeons] = useState<DungeonListItem[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [active, setActive] = useState<DungeonFull | null>(null);
-  const [formMode, setFormMode] = useState<"none" | "generate" | "blank">("none");
+  const [formMode, setFormMode] = useState<"none" | "generate" | "outdoor" | "blank">("none");
 
   const refreshList = () => {
     getDungeonsForCampaign(campaignId).then(setDungeons);
@@ -2525,6 +2527,12 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
               {formMode === "generate" ? "Annulla" : "+ Genera dungeon"}
             </button>
             <button
+              onClick={() => setFormMode((prev) => (prev === "outdoor" ? "none" : "outdoor"))}
+              className="text-xs font-bold text-accent-strong hover:underline"
+            >
+              {formMode === "outdoor" ? "Annulla" : "+ Genera scena esterna"}
+            </button>
+            <button
               onClick={() => setFormMode((prev) => (prev === "blank" ? "none" : "blank"))}
               className="text-xs font-bold text-accent-strong hover:underline"
             >
@@ -2536,6 +2544,17 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
 
       {formMode === "generate" && isDm && (
         <NewDungeonForm
+          campaignId={campaignId}
+          onCreated={(dungeon) => {
+            setFormMode("none");
+            refreshList();
+            openDungeon(dungeon.id);
+          }}
+        />
+      )}
+
+      {formMode === "outdoor" && isDm && (
+        <NewOutdoorSceneForm
           campaignId={campaignId}
           onCreated={(dungeon) => {
             setFormMode("none");
@@ -2798,6 +2817,103 @@ function NewDungeonForm({
       >
         {generating ? "Genero…" : "🎲 Genera"}
       </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+const BIOME_LABELS: Record<OutdoorBiome, string> = {
+  bosco: "Bosco",
+  palude: "Palude",
+  pianura: "Pianura",
+  rocciosa: "Rocciosa",
+  costa: "Costa",
+};
+
+function NewOutdoorSceneForm({
+  campaignId,
+  onCreated,
+}: {
+  campaignId: string;
+  onCreated: (dungeon: { id: string }) => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [width, setWidth] = useState(30);
+  const [height, setHeight] = useState(20);
+  const [biome, setBiome] = useState<OutdoorBiome>("bosco");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generate = async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const dungeon = await createOutdoorScene(campaignId, nome.trim(), { width, height, biome });
+      setNome("");
+      onCreated(dungeon);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+      <input
+        value={nome}
+        onChange={(event) => setNome(event.target.value)}
+        placeholder="Nome (es. Imboscata sulla strada del bosco)"
+        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          Larghezza
+          <IntField
+            min={8}
+            max={60}
+            value={width}
+            onChange={setWidth}
+            className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          Altezza
+          <IntField
+            min={8}
+            max={60}
+            value={height}
+            onChange={setHeight}
+            className="w-16 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(BIOME_LABELS) as OutdoorBiome[]).map((option) => (
+            <button
+              key={option}
+              onClick={() => setBiome(option)}
+              className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                biome === option
+                  ? "border-accent bg-accent/15 text-accent-strong"
+                  : "border-edge bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              {BIOME_LABELS[option]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button
+        onClick={generate}
+        disabled={generating}
+        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+      >
+        {generating ? "Genero…" : "🎲 Genera"}
+      </button>
+      <p className="text-xs text-muted">
+        Genera una scena a tema, poi resta modificabile a mano con lo stesso pennello della tela
+        vuota (✏️ Modifica mappa) — esattamente come un dungeon generato.
+      </p>
       {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
