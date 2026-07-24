@@ -28,7 +28,7 @@ export function DirectChat({
 }) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
-  const { subscribe, refreshUnread } = useRealtime();
+  const { subscribe, refreshThreads } = useRealtime();
   // Duplica volutamente la stessa logica di ordinamento di canonicalPair (lib/social-auth.ts)
   // invece di importarla: quel file importa lib/db (solo server), non va bene in un componente
   // client — qui basta una riga.
@@ -69,7 +69,7 @@ export function DirectChat({
     });
     if (roomKey) {
       markThreadRead(roomKey).then(() => {
-        if (!cancelled) refreshUnread();
+        if (!cancelled) refreshThreads();
       });
     }
     return () => {
@@ -105,7 +105,7 @@ export function DirectChat({
       upsertMessage(message);
       // La thread è aperta proprio ora: segnala subito come letto invece di lasciare il pallino
       // acceso finché non la si riapre.
-      if (roomKey) markThreadRead(roomKey).then(refreshUnread);
+      if (roomKey) markThreadRead(roomKey).then(refreshThreads);
     });
     const unsubscribeDeleted = subscribe("dm-message-deleted", (payload) => {
       const messageId = (payload as { messageId?: string }).messageId;
@@ -116,7 +116,7 @@ export function DirectChat({
       unsubscribeNew();
       unsubscribeDeleted();
     };
-    // refreshUnread cambia riferimento ad ogni render di RealtimeProvider: includerlo
+    // refreshThreads cambia riferimento ad ogni render di RealtimeProvider: includerlo
     // ri-sottoscriverebbe ad ogni notifica in arrivo, inutilmente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribe, otherUserId, userId, roomKey]);

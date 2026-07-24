@@ -8,7 +8,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/app/actions/notifications";
-import { getUnreadThreadKeys } from "@/app/actions/chat";
+import { getChatThreadsSummary, type ThreadActivity } from "@/app/actions/chat";
 
 type NotificationRow = Awaited<ReturnType<typeof getMyNotifications>>[number];
 
@@ -21,12 +21,13 @@ interface RealtimeContextValue {
    * una seconda connessione — tutto passa dall'unica stanza personale "user-<id>" già aperta
    * qui. Usata dalle thread di chat aperte (fase 5/6). */
   subscribe: (type: string, handler: (payload: unknown) => void) => () => void;
-  /** roomKey ("campaign-<id>"/"dm-<a>-<b>") con messaggi non letti. Le DM si aggiornano in
-   * tempo reale (viaggiano sulla stessa stanza personale già aperta qui); la chat di campagna
-   * no — richiederebbe un socket per ogni campagna dell'utente, fuori scala per un badge —
-   * quindi si aggiorna quando si apre/lascia una thread o si ricarica la pagina. */
-  unreadRoomKeys: Set<string>;
-  refreshUnread: () => void;
+  /** roomKey ("campaign-<id>"/"dm-<a>-<b>") -> anteprima ultimo messaggio + conteggio non letti.
+   * Le DM si aggiornano in tempo reale (viaggiano sulla stessa stanza personale già aperta qui);
+   * la chat di campagna no — richiederebbe un socket per ogni campagna dell'utente, fuori scala
+   * solo per un'anteprima — quindi si aggiorna quando si apre/lascia una thread o si ricarica
+   * la pagina. */
+  threadActivity: Map<string, ThreadActivity>;
+  refreshThreads: () => void;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -46,11 +47,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const userId = session?.user?.id ?? null;
 
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const [unreadRoomKeys, setUnreadRoomKeys] = useState<Set<string>>(new Set());
+  const [threadActivity, setThreadActivity] = useState<Map<string, ThreadActivity>>(new Map());
   const subscribersRef = useRef(new Map<string, Set<(payload: unknown) => void>>());
 
-  const refreshUnread = () => {
-    getUnreadThreadKeys().then((keys) => setUnreadRoomKeys(new Set(keys)));
+  const refreshThreads = () => {
+    getChatThreadsSummary().then((rows) => {
+      setThreadActivity(new Map(rows.map((row) => [row.roomKey, row])));
+    });
   };
 
   useEffect(() => {
@@ -59,8 +62,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     getMyNotifications().then((rows) => {
       if (!cancelled) setNotifications(rows);
     });
-    getUnreadThreadKeys().then((keys) => {
-      if (!cancelled) setUnreadRoomKeys(new Set(keys));
+    getChatThreadsSummary().then((rows) => {
+      if (!cancelled) setThreadActivity(new Map(rows.map((row) => [row.roomKey, row])));
     });
     return () => {
       cancelled = true;
@@ -74,7 +77,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     setNotificationsForStatus(status);
     if (status !== "authenticated") {
       setNotifications([]);
-      setUnreadRoomKeys(new Set());
+      setThreadActivity(new Map());
     }
   }
 
@@ -82,18 +85,36 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const message = data as {
       type?: string;
       notification?: NotificationRow;
-      message?: { userIdLow?: string; userIdHigh?: string };
+      message?: { userIdLow?: string; userIdHigh?: string; testo?: string; authorId?: string; createdAt?: string };
     };
     if (!message?.type) return;
     if (message.type === "notification" && message.notification) {
       setNotifications((prev) => [message.notification as NotificationRow, ...prev]);
     }
     // Le DM viaggiano già su questa stessa stanza: se una thread aperta da qualche parte non è
-    // quella che ha appena ricevuto il messaggio, segnala subito il pallino — se invece è quella
-    // aperta, il componente DirectChat richiama refreshUnread() e lo toglie di nuovo a stretto giro.
+    // quella che ha appena ricevuto il messaggio, aggiorna subito anteprima+conteggio — se invece
+    // è quella aperta, il componente DirectChat richiama refreshThreads() e lo corregge a stretto
+    // giro (segnandola come letta).
     if (message.type === "dm-message" && message.message?.userIdLow && message.message.userIdHigh) {
       const roomKey = `dm-${message.message.userIdLow}-${message.message.userIdHigh}`;
-      setUnreadRoomKeys((prev) => new Set(prev).add(roomKey));
+      const incoming = message.message;
+      setThreadActivity((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(roomKey);
+        next.set(roomKey, {
+          roomKey,
+          unreadCount: (existing?.unreadCount ?? 0) + 1,
+          lastMessage: {
+            testo: incoming.testo ?? "",
+            authorId: incoming.authorId ?? "",
+            // Non arriva nel payload realtime, e nelle DM non serve comunque: il prefisso
+            // "Tu:"/niente nell'anteprima si decide solo confrontando authorId col mio id.
+            authorName: null,
+            createdAt: incoming.createdAt ? new Date(incoming.createdAt) : new Date(),
+          },
+        });
+        return next;
+      });
     }
     subscribersRef.current.get(message.type)?.forEach((handler) => handler(message));
   });
@@ -126,8 +147,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         markRead,
         markAllRead,
         subscribe,
-        unreadRoomKeys,
-        refreshUnread,
+        threadActivity,
+        refreshThreads,
       }}
     >
       {children}

@@ -114,10 +114,11 @@ export function Nav() {
 function ChatButton() {
   const pathname = usePathname();
   const { status } = useSession();
-  const { unreadRoomKeys } = useRealtime();
+  const { threadActivity } = useRealtime();
 
   if (status !== "authenticated") return null;
   const active = pathname.startsWith("/chat");
+  const totalUnread = [...threadActivity.values()].reduce((sum, t) => sum + t.unreadCount, 0);
 
   return (
     <Link
@@ -128,8 +129,10 @@ function ChatButton() {
       }`}
     >
       💬
-      {unreadRoomKeys.size > 0 && (
-        <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-danger border-2 border-background" />
+      {totalUnread > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-background bg-danger px-1 text-[9px] font-bold text-white">
+          {totalUnread > 9 ? "9+" : totalUnread}
+        </span>
       )}
     </Link>
   );

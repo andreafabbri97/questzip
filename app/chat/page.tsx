@@ -1,10 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { getFriendsAndRequests } from "@/app/actions/friends";
 import { getMyCampaigns } from "@/app/actions/campaigns";
+import type { ThreadActivity } from "@/app/actions/chat";
 import { CampaignChat } from "@/components/chat/campaign-chat";
 import { DirectChat } from "@/components/chat/direct-chat";
 import { FriendsTab } from "@/components/friends-tab";
@@ -12,6 +14,46 @@ import { useRealtime } from "@/components/realtime-provider";
 
 type Tab = "messaggi" | "amici";
 type SelectedThread = { kind: "campaign"; id: string } | { kind: "dm"; id: string } | null;
+
+type UnifiedThread =
+  | { kind: "campaign"; id: string; roomKey: string; nome: string }
+  | { kind: "dm"; id: string; roomKey: string; nome: string; image: string | null };
+
+// Stessa convenzione WhatsApp: oggi -> ora, ieri -> "Ieri", ultimi 6 giorni -> giorno della
+// settimana, oltre -> data breve.
+function formatThreadTime(date: Date | string): string {
+  const d = new Date(date);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Ieri";
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+  if (diffDays < 7) {
+    const label = d.toLocaleDateString("it-IT", { weekday: "long" });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+// Anteprima stile WhatsApp: nei gruppi (campagna) col nome di chi ha scritto, nelle DM no (è
+// ovvio chi sia, essendo una conversazione 1-a-1) — "Tu:" in entrambi i casi se l'ultimo l'ho
+// scritto io.
+function threadPreviewText(
+  thread: UnifiedThread,
+  lastMessage: ThreadActivity["lastMessage"],
+  myUserId: string | null,
+): string {
+  if (!lastMessage) return "Nessun messaggio ancora";
+  const mine = lastMessage.authorId === myUserId;
+  if (thread.kind === "campaign") {
+    const who = mine ? "Tu" : (lastMessage.authorName ?? "Qualcuno");
+    return `${who}: ${lastMessage.testo}`;
+  }
+  return mine ? `Tu: ${lastMessage.testo}` : lastMessage.testo;
+}
 
 export default function ChatPage() {
   return (
@@ -74,7 +116,7 @@ function MessagesTab({
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const myUserId = session?.user?.id ?? null;
-  const { unreadRoomKeys } = useRealtime();
+  const { threadActivity } = useRealtime();
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
     null,
   );
@@ -107,54 +149,96 @@ function MessagesTab({
 
   const selectedFriend = selected?.kind === "dm" ? friends.find((f) => f.id === selected.id) : null;
 
+  // Lista unica ordinata per attività più recente, gruppi e DM mescolati — è così che WhatsApp
+  // mostra le conversazioni, non in sezioni separate per tipo.
+  const threads: UnifiedThread[] = [
+    ...campaigns.map((c): UnifiedThread => ({
+      kind: "campaign",
+      id: c.id,
+      roomKey: `campaign-${c.id}`,
+      nome: c.nome,
+    })),
+    ...friends.map((f): UnifiedThread => ({
+      kind: "dm",
+      id: f.id,
+      roomKey: myUserId ? `dm-${[myUserId, f.id].sort().join("-")}` : `dm-${f.id}`,
+      nome: f.name ?? "Utente",
+      image: f.image,
+    })),
+  ].sort((a, b) => {
+    const aTime = threadActivity.get(a.roomKey)?.lastMessage?.createdAt;
+    const bTime = threadActivity.get(b.roomKey)?.lastMessage?.createdAt;
+    if (aTime && bTime) return new Date(bTime).getTime() - new Date(aTime).getTime();
+    if (aTime) return -1;
+    if (bTime) return 1;
+    return a.nome.localeCompare(b.nome);
+  });
+
   const threadButtonClass = (active: boolean) =>
-    `w-full flex items-center justify-between gap-2 text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+    `w-full flex items-center gap-2.5 text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
       active
         ? "border-accent bg-accent/15 text-accent-strong"
         : "border-edge bg-surface text-foreground hover:border-accent/50"
     }`;
-  const UnreadDot = () => <span className="size-2 rounded-full bg-danger shrink-0" />;
 
   return (
-    <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-4 lg:items-start">
-      <div className={selected ? "hidden lg:block space-y-4" : "space-y-4"}>
-        <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-widest text-muted px-1">Campagne</p>
-          {campaigns.length === 0 && (
-            <p className="text-xs text-muted px-1">Nessuna campagna ancora.</p>
-          )}
-          {campaigns.map((c) => (
+    <div className="lg:grid lg:grid-cols-[300px_1fr] lg:gap-4 lg:items-start">
+      <div className={selected ? "hidden lg:block space-y-1.5" : "space-y-1.5"}>
+        {threads.length === 0 && (
+          <p className="text-sm text-muted px-1 py-4 text-center">
+            Nessuna conversazione ancora — unisciti a una campagna o cerca un amico dalla tab
+            &quot;Amici&quot;.
+          </p>
+        )}
+        {threads.map((thread) => {
+          const activity = threadActivity.get(thread.roomKey);
+          const unread = activity?.unreadCount ?? 0;
+          const active =
+            selected?.kind === thread.kind && selected.id === thread.id;
+          return (
             <button
-              key={c.id}
-              onClick={() => setSelected({ kind: "campaign", id: c.id })}
-              className={threadButtonClass(selected?.kind === "campaign" && selected.id === c.id)}
+              key={thread.roomKey}
+              onClick={() => setSelected({ kind: thread.kind, id: thread.id })}
+              className={threadButtonClass(active)}
             >
-              <span className="truncate">🗺️ {c.nome}</span>
-              {unreadRoomKeys.has(`campaign-${c.id}`) && <UnreadDot />}
+              {thread.kind === "campaign" ? (
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-base">
+                  🗺️
+                </span>
+              ) : thread.image ? (
+                <Image
+                  src={thread.image}
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="size-9 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span className="size-9 shrink-0 rounded-full bg-surface-raised" />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate font-bold">{thread.nome}</span>
+                  {activity?.lastMessage && (
+                    <span className="shrink-0 text-[10px] text-muted">
+                      {formatThreadTime(activity.lastMessage.createdAt)}
+                    </span>
+                  )}
+                </span>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs text-muted">
+                    {threadPreviewText(thread, activity?.lastMessage ?? null, myUserId)}
+                  </span>
+                  {unread > 0 && (
+                    <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-background">
+                      {unread > 99 ? "99+" : unread}
+                    </span>
+                  )}
+                </span>
+              </span>
             </button>
-          ))}
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-widest text-muted px-1">Amici</p>
-          {friends.length === 0 && (
-            <p className="text-xs text-muted px-1">
-              Nessun amico ancora — cercalo dalla tab &quot;Amici&quot;.
-            </p>
-          )}
-          {friends.map((f) => {
-            const dmRoomKey = myUserId ? `dm-${[myUserId, f.id].sort().join("-")}` : null;
-            return (
-              <button
-                key={f.id}
-                onClick={() => setSelected({ kind: "dm", id: f.id })}
-                className={threadButtonClass(selected?.kind === "dm" && selected.id === f.id)}
-              >
-                <span className="truncate">💬 {f.name ?? "Utente"}</span>
-                {dmRoomKey && unreadRoomKeys.has(dmRoomKey) && <UnreadDot />}
-              </button>
-            );
-          })}
-        </div>
+          );
+        })}
       </div>
 
       <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>

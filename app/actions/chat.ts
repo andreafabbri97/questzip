@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, gt, ne, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireMember, requireUserId } from "@/lib/campaign-auth";
 import { canonicalPair, requireFriendship } from "@/lib/social-auth";
@@ -215,9 +215,22 @@ export async function markThreadRead(roomKey: string) {
     });
 }
 
-// N+1 query deliberata: per un gruppo di poche persone/campagne è più semplice e leggibile di
-// un'aggregazione SQL, e il volume di dati non giustifica la complessità in più.
-export async function getUnreadThreadKeys(): Promise<string[]> {
+export interface ThreadActivity {
+  roomKey: string;
+  // authorName solo per l'anteprima nella lista conversazioni in stile WhatsApp (i gruppi
+  // mostrano "Nome: testo") — null se non risolvibile (es. utente cancellato) o quando
+  // l'aggiornamento arriva dal realtime invece che da questa azione (vedi realtime-provider.tsx,
+  // lì non serve: nelle DM il prefisso "Tu:"/niente si decide solo con l'authorId).
+  lastMessage: { testo: string; authorId: string; authorName: string | null; createdAt: Date } | null;
+  unreadCount: number;
+}
+
+// N+1 query deliberata (due per thread, non più una: l'anteprima e il conteggio non letti sono
+// interrogazioni diverse) — per un gruppo di poche persone/campagne resta più semplice e
+// leggibile di un'aggregazione SQL, il volume di dati non giustifica la complessità in più.
+// Sostituisce la precedente getUnreadThreadKeys: oltre a "c'è qualcosa di non letto" serve anche
+// l'anteprima per la lista conversazioni in stile WhatsApp.
+export async function getChatThreadsSummary(): Promise<ThreadActivity[]> {
   const userId = await requireUserId();
 
   const myCampaigns = await db
@@ -233,31 +246,59 @@ export async function getUnreadThreadKeys(): Promise<string[]> {
   const readRows = await db.select().from(chatReadState).where(eq(chatReadState.userId, userId));
   const readMap = new Map(readRows.map((r) => [r.roomKey, r.lastReadAt]));
 
-  const unread: string[] = [];
+  const result: ThreadActivity[] = [];
 
   for (const { campaignId } of myCampaigns) {
     const roomKey = `campaign-${campaignId}`;
     const [latest] = await db
-      .select({ createdAt: campaignChatMessages.createdAt })
+      .select({
+        testo: campaignChatMessages.testo,
+        authorId: campaignChatMessages.authorId,
+        authorName: users.name,
+        createdAt: campaignChatMessages.createdAt,
+      })
       .from(campaignChatMessages)
+      .leftJoin(users, eq(campaignChatMessages.authorId, users.id))
       .where(eq(campaignChatMessages.campaignId, campaignId))
       .orderBy(desc(campaignChatMessages.createdAt))
       .limit(1);
     const lastRead = readMap.get(roomKey);
-    if (latest && (!lastRead || lastRead < latest.createdAt)) unread.push(roomKey);
+    const [{ unreadCount }] = await db
+      .select({ unreadCount: count() })
+      .from(campaignChatMessages)
+      .where(
+        lastRead
+          ? and(eq(campaignChatMessages.campaignId, campaignId), gt(campaignChatMessages.createdAt, lastRead))
+          : eq(campaignChatMessages.campaignId, campaignId),
+      );
+    result.push({ roomKey, lastMessage: latest ?? null, unreadCount: Number(unreadCount) });
   }
 
   for (const pair of myFriendPairs) {
     const roomKey = `dm-${pair.userIdLow}-${pair.userIdHigh}`;
+    const pairWhere = and(
+      eq(directMessages.userIdLow, pair.userIdLow),
+      eq(directMessages.userIdHigh, pair.userIdHigh),
+    );
     const [latest] = await db
-      .select({ createdAt: directMessages.createdAt })
+      .select({
+        testo: directMessages.testo,
+        authorId: directMessages.authorId,
+        authorName: users.name,
+        createdAt: directMessages.createdAt,
+      })
       .from(directMessages)
-      .where(and(eq(directMessages.userIdLow, pair.userIdLow), eq(directMessages.userIdHigh, pair.userIdHigh)))
+      .leftJoin(users, eq(directMessages.authorId, users.id))
+      .where(pairWhere)
       .orderBy(desc(directMessages.createdAt))
       .limit(1);
     const lastRead = readMap.get(roomKey);
-    if (latest && (!lastRead || lastRead < latest.createdAt)) unread.push(roomKey);
+    const [{ unreadCount }] = await db
+      .select({ unreadCount: count() })
+      .from(directMessages)
+      .where(lastRead ? and(pairWhere, gt(directMessages.createdAt, lastRead)) : pairWhere);
+    result.push({ roomKey, lastMessage: latest ?? null, unreadCount: Number(unreadCount) });
   }
 
-  return unread;
+  return result;
 }

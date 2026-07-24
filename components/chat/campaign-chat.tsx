@@ -19,7 +19,7 @@ import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 export function CampaignChat({ campaignId }: { campaignId: string }) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
-  const { refreshUnread } = useRealtime();
+  const { refreshThreads } = useRealtime();
   const roomKey = `campaign-${campaignId}`;
 
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getCampaign>> | null>(null);
@@ -67,7 +67,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
       if (!cancelled) setMessages(rows);
     });
     markThreadRead(roomKey).then(() => {
-      if (!cancelled) refreshUnread();
+      if (!cancelled) refreshThreads();
     });
     return () => {
       cancelled = true;
@@ -102,7 +102,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
       upsertMessage(payload.message);
       // La thread è aperta proprio ora: segnala subito come letto invece di lasciare che il
       // pallino resti acceso finché non la si riapre.
-      markThreadRead(roomKey).then(refreshUnread);
+      markThreadRead(roomKey).then(refreshThreads);
     }
     if (payload?.type === "chat-message-deleted" && payload.messageId) {
       const id = payload.messageId;
