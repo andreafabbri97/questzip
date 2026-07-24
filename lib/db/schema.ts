@@ -499,6 +499,24 @@ export const chatReadState = pgTable(
   (table) => [primaryKey({ columns: [table.userId, table.roomKey] })],
 );
 
+// Un utente può avere più sottoscrizioni (un browser/dispositivo ciascuna) — "endpoint" è
+// l'identificativo univoco assegnato dal browser al canale push, uniq per poter fare upsert alla
+// ri-sottoscrizione (stesse chiavi o rinnovate) invece di accumulare righe duplicate.
+export const pushSubscriptions = pgTable(
+  "push_subscription",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [unique("push_subscription_endpoint_unique").on(table.endpoint)],
+);
+
 // --- Compendio in italiano, estratto dai manuali ufficiali (vedi scripts/ita-compendio/) ---
 // Contenuto proprietario: mai esposto senza login (l'intero sito lo richiede, vedi proxy.ts).
 

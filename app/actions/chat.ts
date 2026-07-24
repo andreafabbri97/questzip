@@ -1,16 +1,31 @@
 "use server";
 
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, ne, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireMember, requireUserId } from "@/lib/campaign-auth";
 import { canonicalPair, requireFriendship } from "@/lib/social-auth";
-import { campaignChatMessages, campaignMembers, chatReadState, directMessages, friendships } from "@/lib/db/schema";
+import {
+  campaignChatMessages,
+  campaignMembers,
+  campaigns,
+  chatReadState,
+  directMessages,
+  friendships,
+  users,
+} from "@/lib/db/schema";
 import {
   broadcastCampaignChatMessage,
   broadcastCampaignChatMessageDeleted,
   broadcastDirectMessage,
   broadcastDirectMessageDeleted,
 } from "@/lib/party";
+import { sendPushToUser } from "@/lib/push";
+
+// Anteprima del testo mostrata nella notifica push — troncata, non l'intero messaggio (coerente
+// con una notifica OS, non un secondo posto dove leggere la chat per intero).
+function pushPreview(testo: string) {
+  return testo.length > 120 ? `${testo.slice(0, 117)}…` : testo;
+}
 
 // Nessuna paginazione vera in questo giro (proporzionato a un gruppo di poche persone, non un
 // server Discord): si carica sempre e solo la cronologia più recente.
@@ -64,6 +79,31 @@ export async function sendCampaignChatMessage(campaignId: string, testo: string,
     })
     .returning();
   await broadcastCampaignChatMessage(campaignId, message);
+
+  // Push OS a tutti i membri tranne l'autore — a differenza della campanella (solo eventi
+  // discreti, mai un ping per messaggio) qui ogni messaggio la genera: è il caso d'uso esplicito
+  // "voglio saperlo anche ad app chiusa". Chi ha già la chat aperta in primo piano non la vede
+  // comunque (soppressa lato service worker, vedi public/sw.js).
+  const [authorRow] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  const [campaignRow] = await db
+    .select({ nome: campaigns.nome })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId));
+  const recipients = await db
+    .select({ userId: campaignMembers.userId })
+    .from(campaignMembers)
+    .where(and(eq(campaignMembers.campaignId, campaignId), ne(campaignMembers.userId, userId)));
+  await Promise.all(
+    recipients.map((r) =>
+      sendPushToUser(r.userId, {
+        title: campaignRow?.nome ?? "Chat di campagna",
+        body: `${authorRow?.name ?? "Qualcuno"}: ${pushPreview(trimmed)}`,
+        url: `/chat?thread=campaign:${campaignId}`,
+        tag: `campaign-${campaignId}`,
+      }),
+    ),
+  );
+
   return message;
 }
 
@@ -135,6 +175,15 @@ export async function sendDirectMessage(otherUserId: string, testo: string, repl
     })
     .returning();
   await broadcastDirectMessage(userId, otherUserId, message);
+
+  const [authorRow] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  await sendPushToUser(otherUserId, {
+    title: authorRow?.name ?? "Nuovo messaggio",
+    body: pushPreview(trimmed),
+    url: `/chat?thread=dm:${userId}`,
+    tag: `dm-${userIdLow}-${userIdHigh}`,
+  });
+
   return message;
 }
 
