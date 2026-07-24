@@ -210,7 +210,12 @@ export function EntryDetail({
 }) {
   const meta = books?.get(entry.source);
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    // "@container": le griglie a più colonne qui sotto si adattano alla larghezza REALE di
+    // questo box (container query, Tailwind v4) invece che a quella dello schermo — senza
+    // questo, dentro un contenitore stretto (es. il modal delle menzioni in chat) su un monitor
+    // largo scatterebbero comunque i breakpoint pensati per la pagina Compendio a schermo
+    // intero, sfondando il box (bug segnalato dall'utente con screenshot).
+    <div className="@container rounded-xl border border-edge bg-surface p-5 space-y-4">
       <button onClick={onBack} className="text-sm text-muted hover:text-foreground lg:hidden">
         ← Risultati
       </button>
@@ -284,7 +289,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
         <p className="text-xs font-bold text-accent-strong">
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 @sm:grid-cols-3 @2xl:grid-cols-6 gap-3">
           <Stat label="Scuola" value={ufficiale.scuola} />
           <Stat label="Livello" value={ufficiale.livello === 0 ? "Trucchetto" : ufficiale.livello} />
           <Stat label="Tempo di lancio" value={ufficiale.tempoDiLancio} />
@@ -306,7 +311,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 @sm:grid-cols-3 @2xl:grid-cols-6 gap-3">
         <Stat label="Scuola" value={formatSchool(spell.school)} />
         <Stat label="Livello" value={spell.level === 0 ? "Trucchetto" : spell.level} />
         <Stat label="Tempo di lancio" value={formatTime(spell.time)} />
@@ -397,7 +402,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
           {[ufficiale.taglia, ufficiale.tipo].filter(Boolean).join(" ")}
           {ufficiale.allineamento ? `, ${ufficiale.allineamento}` : ""}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 @sm:grid-cols-4 @2xl:grid-cols-8 gap-3">
           <Stat label="CA" value={ufficiale.classeArmatura} />
           <Stat label="PF" value={ufficiale.puntiFerita} />
           <Stat label="Velocità" value={ufficiale.velocita} />
@@ -448,7 +453,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
         {formatSize(creature.size)} {formatCreatureType(creature.type)} ·{" "}
         {formatAlignment(creature.alignment)}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 @sm:grid-cols-4 @2xl:grid-cols-8 gap-3">
         <Stat label="CA" value={formatAC(creature.ac)} />
         <Stat label="PF" value={formatHP(creature.hp)} />
         <Stat label="Velocità" value={formatSpeed(creature.speed, language)} />
@@ -634,7 +639,7 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-4 2xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 @sm:grid-cols-4 @2xl:grid-cols-8 gap-3">
         <Stat label="Taglia" value={formatSize(race.size)} />
         <Stat label="Velocità" value={formatRaceSpeed(race.speed, language)} />
         <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(race.ability)} />
@@ -783,7 +788,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
         <p className="text-xs font-bold text-accent-strong">
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 @sm:grid-cols-3 @2xl:grid-cols-6 gap-3">
           <Stat label="Dado vita" value={ufficiale.dadoVita} />
           <Stat label="Armature" value={ufficiale.armature} />
           <Stat label="Armi" value={ufficiale.armi} />
@@ -835,7 +840,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 @sm:grid-cols-3 @2xl:grid-cols-6 gap-3">
         <Stat label="Dado vita" value={formatHitDie(cls.hd)} />
         <Stat
           label="Caratteristica incantatore"
