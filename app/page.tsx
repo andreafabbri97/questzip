@@ -73,11 +73,12 @@ export default function Home() {
       </section>
 
       <p className="text-center text-xs text-muted">
-        Le Campagne sono condivise in tempo reale fra master e giocatori. I Personaggi si salvano
-        da soli (nessun pulsante &quot;salva&quot;) e sono sincronizzati anche sul tuo account: li ritrovi
-        da qualsiasi dispositivo, anche se cambi telefono o svuoti il browser — porti tu lo scatto
-        in una campagna condivisa quando vuoi. Il tiro dadi 🎲 è sempre nella barra di
-        navigazione: si apre senza uscire dalla pagina.
+        Le Campagne sono condivise in tempo reale fra master e giocatori. I Personaggi hanno un
+        bottone &quot;Salva&quot; esplicito (avvisa se stai per uscire con modifiche non salvate,
+        come un documento) e sono sincronizzati anche sul tuo account: li ritrovi da qualsiasi
+        dispositivo, anche se cambi telefono o svuoti il browser — porti tu lo scatto in una
+        campagna condivisa quando vuoi. Il tiro dadi 🎲 è sempre nella barra di navigazione: si
+        apre senza uscire dalla pagina.
       </p>
     </div>
   );
