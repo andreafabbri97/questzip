@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import {
@@ -434,9 +435,17 @@ function CampaignDetailView({
       </div>
 
       <section className="rounded-xl border border-edge bg-surface p-5 space-y-2">
-        <h2 className="text-2xl font-display font-bold text-accent-strong">
-          {detail.campaign.nome}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-2xl font-display font-bold text-accent-strong">
+            {detail.campaign.nome}
+          </h2>
+          <Link
+            href={`/chat?thread=campaign:${campaignId}`}
+            className="shrink-0 text-xs font-bold text-accent-strong hover:underline"
+          >
+            💬 Apri chat →
+          </Link>
+        </div>
         {detail.campaign.descrizione && (
           <p className="text-sm text-muted">{detail.campaign.descrizione}</p>
         )}

@@ -441,6 +441,16 @@ export const campaignChatMessages = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     testo: text("testo").notNull(),
+    // Risposta in stile WhatsApp a un messaggio precedente: "replyToId" niente vincolo di chiave
+    // esterna (servirebbe solo per un eventuale salto "vai al messaggio originale" se è ancora
+    // nella cronologia caricata — un dettaglio di comodo, non un'invariante da imporre al
+    // database, ed evita la complicazione di una FK auto-referenziata sulla stessa tabella).
+    // Autore e testo citato sono invece uno SCATTO preso al momento dell'invio, non una join —
+    // così la citazione resta leggibile anche se l'originale viene poi cancellato o scorre fuori
+    // dalla finestra caricata.
+    replyToId: uuid("reply_to_id"),
+    replyToAuthorId: text("reply_to_author_id").references(() => users.id, { onDelete: "set null" }),
+    replyToTesto: text("reply_to_testo"),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
@@ -464,6 +474,9 @@ export const directMessages = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     testo: text("testo").notNull(),
+    replyToId: uuid("reply_to_id"),
+    replyToAuthorId: text("reply_to_author_id").references(() => users.id, { onDelete: "set null" }),
+    replyToTesto: text("reply_to_testo"),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => [

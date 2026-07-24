@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
   cancelFriendRequest,
@@ -10,14 +11,24 @@ import {
   searchUsers,
   sendFriendRequest,
 } from "@/app/actions/friends";
+import { getMyCampaigns } from "@/app/actions/campaigns";
+import { CampaignChat } from "@/components/chat/campaign-chat";
 
 type Tab = "messaggi" | "amici";
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<p className="text-muted">Caricamento…</p>}>
+      <ChatPageInner />
+    </Suspense>
+  );
+}
+
+function ChatPageInner() {
   const [tab, setTab] = useState<Tab>("messaggi");
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold text-accent-strong">Chat</h1>
 
       <div className="flex gap-1.5">
@@ -36,14 +47,72 @@ export default function ChatPage() {
         ))}
       </div>
 
-      {tab === "messaggi" ? (
-        <div className="rounded-xl border border-edge bg-surface p-5 text-sm text-muted">
-          Le chat di campagna e i messaggi diretti arrivano a breve — intanto puoi già cercare e
-          aggiungere amici dalla tab &quot;Amici&quot;.
-        </div>
-      ) : (
-        <FriendsTab />
-      )}
+      {tab === "messaggi" ? <MessagesTab /> : <FriendsTab />}
+    </div>
+  );
+}
+
+function MessagesTab() {
+  const searchParams = useSearchParams();
+  const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
+    null,
+  );
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getMyCampaigns().then(setCampaigns);
+  }, []);
+
+  // Preseleziona da ?thread=campaign:<id> (il link "Apri chat" nella pagina Campagne) — durante
+  // il render, non in un effetto, per non chiamare setState in modo sincrono nel suo corpo.
+  const threadParam = searchParams.get("thread");
+  const [appliedThreadParam, setAppliedThreadParam] = useState<string | null>(null);
+  if (threadParam && threadParam !== appliedThreadParam) {
+    setAppliedThreadParam(threadParam);
+    const [kind, id] = threadParam.split(":");
+    if (kind === "campaign" && id) setSelectedCampaignId(id);
+  }
+
+  if (!campaigns) return <p className="text-muted">Caricamento…</p>;
+
+  return (
+    <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-4 lg:items-start">
+      <div className={selectedCampaignId ? "hidden lg:block space-y-1.5" : "space-y-1.5"}>
+        {campaigns.length === 0 && (
+          <p className="text-sm text-muted">Nessuna campagna — creane una per iniziare a chattare.</p>
+        )}
+        {campaigns.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setSelectedCampaignId(c.id)}
+            className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+              selectedCampaignId === c.id
+                ? "border-accent bg-accent/15 text-accent-strong"
+                : "border-edge bg-surface text-foreground hover:border-accent/50"
+            }`}
+          >
+            🗺️ {c.nome}
+          </button>
+        ))}
+      </div>
+
+      <div className={selectedCampaignId ? "min-w-0" : "hidden lg:block min-w-0"}>
+        {selectedCampaignId ? (
+          <div className="rounded-xl border border-edge bg-surface overflow-hidden h-[70vh] flex flex-col">
+            <button
+              onClick={() => setSelectedCampaignId(null)}
+              className="lg:hidden text-sm text-muted hover:text-foreground px-3 pt-2 text-left shrink-0"
+            >
+              ← Conversazioni
+            </button>
+            <CampaignChat campaignId={selectedCampaignId} />
+          </div>
+        ) : (
+          <div className="hidden lg:flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">
+            <p>Seleziona una campagna per aprire la chat.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
