@@ -13,8 +13,10 @@ import {
 } from "@/app/actions/friends";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { CampaignChat } from "@/components/chat/campaign-chat";
+import { DirectChat } from "@/components/chat/direct-chat";
 
 type Tab = "messaggi" | "amici";
+type SelectedThread = { kind: "campaign"; id: string } | { kind: "dm"; id: string } | null;
 
 export default function ChatPage() {
   return (
@@ -26,6 +28,9 @@ export default function ChatPage() {
 
 function ChatPageInner() {
   const [tab, setTab] = useState<Tab>("messaggi");
+  // Sollevato qui (non dentro MessagesTab) così il bottone "Chatta" nella tab Amici può aprire
+  // una DM specifica cambiando anche tab, non solo selezione.
+  const [forceOpenDmUserId, setForceOpenDmUserId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-4xl mx-auto">
@@ -47,69 +52,131 @@ function ChatPageInner() {
         ))}
       </div>
 
-      {tab === "messaggi" ? <MessagesTab /> : <FriendsTab />}
+      {tab === "messaggi" ? (
+        <MessagesTab
+          forceOpenDmUserId={forceOpenDmUserId}
+          onConsumeForceOpen={() => setForceOpenDmUserId(null)}
+        />
+      ) : (
+        <FriendsTab
+          onChat={(friendId) => {
+            setForceOpenDmUserId(friendId);
+            setTab("messaggi");
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function MessagesTab() {
+function MessagesTab({
+  forceOpenDmUserId,
+  onConsumeForceOpen,
+}: {
+  forceOpenDmUserId: string | null;
+  onConsumeForceOpen: () => void;
+}) {
   const searchParams = useSearchParams();
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
     null,
   );
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [friends, setFriends] = useState<
+    Awaited<ReturnType<typeof getFriendsAndRequests>>["friends"] | null
+  >(null);
+  const [selected, setSelected] = useState<SelectedThread>(null);
 
   useEffect(() => {
     getMyCampaigns().then(setCampaigns);
+    getFriendsAndRequests().then((data) => setFriends(data.friends));
   }, []);
 
-  // Preseleziona da ?thread=campaign:<id> (il link "Apri chat" nella pagina Campagne) — durante
-  // il render, non in un effetto, per non chiamare setState in modo sincrono nel suo corpo.
+  // Preseleziona da ?thread=campaign:<id>|dm:<id> (link "Apri chat" da Campagne) o dal bottone
+  // "Chatta" nella tab Amici — sempre durante il render, mai in un effetto, per non chiamare
+  // setState in modo sincrono nel suo corpo (stesso pattern già consolidato in questo progetto).
   const threadParam = searchParams.get("thread");
   const [appliedThreadParam, setAppliedThreadParam] = useState<string | null>(null);
   if (threadParam && threadParam !== appliedThreadParam) {
     setAppliedThreadParam(threadParam);
     const [kind, id] = threadParam.split(":");
-    if (kind === "campaign" && id) setSelectedCampaignId(id);
+    if ((kind === "campaign" || kind === "dm") && id) setSelected({ kind, id });
+  }
+  if (forceOpenDmUserId && (!selected || selected.kind !== "dm" || selected.id !== forceOpenDmUserId)) {
+    setSelected({ kind: "dm", id: forceOpenDmUserId });
+    onConsumeForceOpen();
   }
 
-  if (!campaigns) return <p className="text-muted">Caricamento…</p>;
+  if (!campaigns || !friends) return <p className="text-muted">Caricamento…</p>;
+
+  const selectedFriend = selected?.kind === "dm" ? friends.find((f) => f.id === selected.id) : null;
+
+  const threadButtonClass = (active: boolean) =>
+    `w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+      active
+        ? "border-accent bg-accent/15 text-accent-strong"
+        : "border-edge bg-surface text-foreground hover:border-accent/50"
+    }`;
 
   return (
     <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-4 lg:items-start">
-      <div className={selectedCampaignId ? "hidden lg:block space-y-1.5" : "space-y-1.5"}>
-        {campaigns.length === 0 && (
-          <p className="text-sm text-muted">Nessuna campagna — creane una per iniziare a chattare.</p>
-        )}
-        {campaigns.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setSelectedCampaignId(c.id)}
-            className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-              selectedCampaignId === c.id
-                ? "border-accent bg-accent/15 text-accent-strong"
-                : "border-edge bg-surface text-foreground hover:border-accent/50"
-            }`}
-          >
-            🗺️ {c.nome}
-          </button>
-        ))}
+      <div className={selected ? "hidden lg:block space-y-4" : "space-y-4"}>
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-widest text-muted px-1">Campagne</p>
+          {campaigns.length === 0 && (
+            <p className="text-xs text-muted px-1">Nessuna campagna ancora.</p>
+          )}
+          {campaigns.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelected({ kind: "campaign", id: c.id })}
+              className={threadButtonClass(selected?.kind === "campaign" && selected.id === c.id)}
+            >
+              🗺️ {c.nome}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-widest text-muted px-1">Amici</p>
+          {friends.length === 0 && (
+            <p className="text-xs text-muted px-1">
+              Nessun amico ancora — cercalo dalla tab &quot;Amici&quot;.
+            </p>
+          )}
+          {friends.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setSelected({ kind: "dm", id: f.id })}
+              className={threadButtonClass(selected?.kind === "dm" && selected.id === f.id)}
+            >
+              💬 {f.name ?? "Utente"}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className={selectedCampaignId ? "min-w-0" : "hidden lg:block min-w-0"}>
-        {selectedCampaignId ? (
+      <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>
+        {selected ? (
           <div className="rounded-xl border border-edge bg-surface overflow-hidden h-[70vh] flex flex-col">
             <button
-              onClick={() => setSelectedCampaignId(null)}
+              onClick={() => setSelected(null)}
               className="lg:hidden text-sm text-muted hover:text-foreground px-3 pt-2 text-left shrink-0"
             >
               ← Conversazioni
             </button>
-            <CampaignChat campaignId={selectedCampaignId} />
+            {selected.kind === "campaign" ? (
+              <CampaignChat campaignId={selected.id} />
+            ) : selectedFriend ? (
+              <DirectChat
+                otherUserId={selectedFriend.id}
+                otherName={selectedFriend.name}
+                otherImage={selectedFriend.image}
+              />
+            ) : (
+              <p className="text-muted p-4">Amico non trovato.</p>
+            )}
           </div>
         ) : (
           <div className="hidden lg:flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">
-            <p>Seleziona una campagna per aprire la chat.</p>
+            <p>Seleziona una conversazione.</p>
           </div>
         )}
       </div>
@@ -122,7 +189,7 @@ function Avatar({ src, alt }: { src: string | null; alt: string }) {
   return <Image src={src} alt={alt} width={24} height={24} className="rounded-full shrink-0" />;
 }
 
-function FriendsTab() {
+function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof getFriendsAndRequests>> | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Awaited<ReturnType<typeof searchUsers>>>([]);
@@ -282,12 +349,20 @@ function FriendsTab() {
                   <Avatar src={f.image} alt="" />
                   <span className="truncate">{f.name ?? "Utente"}</span>
                 </span>
-                <button
-                  onClick={() => act(() => removeFriend(f.id))}
-                  className="text-xs text-muted hover:text-danger shrink-0"
-                >
-                  Rimuovi
-                </button>
+                <span className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => onChat(f.id)}
+                    className="text-xs font-bold text-accent-strong hover:underline"
+                  >
+                    💬 Chatta
+                  </button>
+                  <button
+                    onClick={() => act(() => removeFriend(f.id))}
+                    className="text-xs text-muted hover:text-danger"
+                  >
+                    Rimuovi
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
