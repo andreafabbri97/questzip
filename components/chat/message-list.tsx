@@ -23,10 +23,19 @@ interface ChatAuthor {
   image: string | null;
 }
 
+// Stessa identica dimensione/stile dell'avatar nel selettore conversazioni (app/chat/page.tsx) —
+// segnalato esplicitamente come "perfetto" lì, uniformato qui invece di avere due trattamenti
+// diversi per la stessa immagine.
 function Avatar({ src }: { src: string | null }) {
-  if (!src) return <span className="size-7 rounded-full bg-surface-raised shrink-0" />;
+  if (!src) return <span className="size-9 shrink-0 rounded-full bg-surface-raised" />;
   return (
-    <Image src={src} alt="" width={28} height={28} className="rounded-full shrink-0 object-cover" />
+    <Image
+      src={src}
+      alt=""
+      width={36}
+      height={36}
+      className="size-9 shrink-0 rounded-full object-cover"
+    />
   );
 }
 
@@ -117,7 +126,7 @@ export function MessageList({
                 grew && index === messages.length - 1 ? "animate-message-in" : ""
               }`}
             >
-              {!mine && (isFirstInGroup ? <Avatar src={author.image} /> : <span className="size-7 shrink-0" />)}
+              {!mine && (isFirstInGroup ? <Avatar src={author.image} /> : <span className="size-9 shrink-0" />)}
               <div className={`max-w-[80%] sm:max-w-[70%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
                 <div
                   className={`px-3 py-2 text-sm ${

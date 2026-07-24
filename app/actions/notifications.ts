@@ -5,14 +5,16 @@ import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/campaign-auth";
 import { notifications } from "@/lib/db/schema";
 
-export async function getMyNotifications() {
+// limit più basso di default per la tendina della campanella (solo un'anteprima); il centro
+// notifiche a pagina intera (/notifiche) chiama questa stessa azione con un limite più alto.
+export async function getMyNotifications(limit = 30) {
   const userId = await requireUserId();
   return db
     .select()
     .from(notifications)
     .where(eq(notifications.userId, userId))
     .orderBy(desc(notifications.createdAt))
-    .limit(30);
+    .limit(limit);
 }
 
 export async function markNotificationRead(id: string) {
