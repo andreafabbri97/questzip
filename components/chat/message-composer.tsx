@@ -24,6 +24,16 @@ export function MessageComposer({
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // La textarea cresce da sola scrivendo, fino al tetto imposto da max-h-32 in classa (128px) —
+  // reset a "auto" prima di rileggere scrollHeight, altrimenti il browser non farebbe mai
+  // RIMPICCIOLIRE l'altezza cancellando testo.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [text]);
+
   // "#" seguito da testo senza spazi, esattamente al cursore: è la query di menzione attiva.
   // hashIndex è la posizione del "#" nel testo, per poter sostituire esattamente quel tratto
   // quando l'utente sceglie un elemento dall'elenco.
@@ -139,9 +149,10 @@ export function MessageComposer({
         <button
           onClick={send}
           disabled={!text.trim()}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-2 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
+          aria-label="Invia"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-background transition-colors hover:bg-accent-strong disabled:opacity-40"
         >
-          Invia
+          <span className="text-lg leading-none">↑</span>
         </button>
       </div>
     </div>
