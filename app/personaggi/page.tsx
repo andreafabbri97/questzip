@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSession, signIn } from "next-auth/react";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { claimXp, getMyCharacterInCampaign, syncCharacterToCampaign } from "@/app/actions/characters";
@@ -148,45 +149,22 @@ type CloudStatus = "syncing" | "synced" | "error";
 export default function CharactersPage() {
   const { items, persist, loaded } = useLocalCollection("questzip:personaggi", characterSchema);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // Il localStorage resta la copia "veloce" (letta/scritta ad ogni tasto, invariato); questo
-  // stato riflette solo il backup in background sull'account — vedi app/actions/character-sync.ts.
+  // Il localStorage resta la copia "veloce" (scritta solo al salvataggio esplicito dalla scheda,
+  // vedi CharacterSheet); questo stato riflette solo il backup in background sull'account — vedi
+  // app/actions/character-sync.ts.
   const [cloudStatus, setCloudStatus] = useState<Record<string, CloudStatus>>({});
-  const syncTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const editing = items.find((character) => character.id === editingId) ?? null;
 
+  // Nessun debounce qui (a differenza di una prima versione di questa feature): da quando il
+  // salvataggio è diventato un'azione esplicita (bottone "Salva", non più ad ogni tasto) upsert()
+  // viene chiamato di rado, quindi si può spingere subito sul server senza rischiare una raffica
+  // di richieste di rete durante la digitazione.
   const pushRemote = (character: Character) => {
     setCloudStatus((prev) => ({ ...prev, [character.id]: "syncing" }));
     syncCharacterRemote(character)
       .then(() => setCloudStatus((prev) => ({ ...prev, [character.id]: "synced" })))
       .catch(() => setCloudStatus((prev) => ({ ...prev, [character.id]: "error" })));
-  };
-
-  // Debounced: un salvataggio di rete ad ogni tasto sarebbe troppo chiacchierone (a differenza
-  // del localStorage, gratis/istantaneo) — aspetta una breve pausa nella digitazione.
-  const scheduleSync = (character: Character) => {
-    const timers = syncTimers.current;
-    const existingTimer = timers.get(character.id);
-    if (existingTimer) clearTimeout(existingTimer);
-    timers.set(
-      character.id,
-      setTimeout(() => {
-        timers.delete(character.id);
-        pushRemote(character);
-      }, 800),
-    );
-  };
-
-  // Chiamato quando si lascia la scheda (torna alla lista): salta l'attesa del debounce invece
-  // di rischiare che l'ultima modifica resti solo in locale per qualche centinaio di ms in più.
-  const flushSync = (id: string) => {
-    const timers = syncTimers.current;
-    const timer = timers.get(id);
-    if (!timer) return;
-    clearTimeout(timer);
-    timers.delete(id);
-    const character = items.find((item) => item.id === id);
-    if (character) pushRemote(character);
   };
 
   // Riconciliazione col backup cloud, una sola volta all'apertura della pagina (non ad ogni
@@ -243,15 +221,10 @@ export default function CharactersPage() {
         ? items.map((item) => (item.id === stamped.id ? stamped : item))
         : [...items, stamped],
     );
-    scheduleSync(stamped);
+    pushRemote(stamped);
   };
 
   const remove = (id: string) => {
-    const timer = syncTimers.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      syncTimers.current.delete(id);
-    }
     persist(items.filter((item) => item.id !== id));
     setEditingId(null);
     deleteCharacterRemote(id).catch(() => {});
@@ -270,13 +243,11 @@ export default function CharactersPage() {
   if (editing) {
     return (
       <CharacterSheet
+        key={editing.id}
         character={editing}
-        onChange={upsert}
+        onSave={upsert}
         onDelete={() => remove(editing.id)}
-        onBack={() => {
-          flushSync(editing.id);
-          setEditingId(null);
-        }}
+        onBack={() => setEditingId(null)}
         cloudStatus={cloudStatus[editing.id]}
       />
     );
@@ -340,27 +311,124 @@ export default function CharactersPage() {
   );
 }
 
+// Riguarda solo il backup in background sull'account (vedi character-sync.ts), non il
+// salvataggio locale — quello ha il suo bottone "Salva" esplicito, testo diverso apposta per non
+// confondere le due cose.
 function CloudStatusBadge({ status }: { status?: CloudStatus }) {
   if (!status) return null;
   const label =
-    status === "syncing" ? "☁ Salvataggio…" : status === "synced" ? "☁ Salvato" : "⚠ Non salvato";
+    status === "syncing" ? "☁ Backup…" : status === "synced" ? "☁ Backup ok" : "⚠ Backup non riuscito";
   const color = status === "error" ? "text-danger" : "text-muted";
   return <span className={`text-[11px] ${color} shrink-0`}>{label}</span>;
 }
 
+function UnsavedChangesModal({
+  onSaveAndExit,
+  onDiscard,
+  onCancel,
+}: {
+  onSaveAndExit: () => void;
+  onDiscard: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 animate-overlay-in"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-xl border border-edge bg-background p-5 space-y-4 animate-modal-in"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="text-lg font-display font-bold text-accent-strong">Modifiche non salvate</h2>
+        <p className="text-sm text-muted">
+          Stai per uscire senza salvare le modifiche a questo personaggio. Cosa vuoi fare?
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onSaveAndExit}
+            className="rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          >
+            💾 Salva ed esci
+          </button>
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-edge px-4 py-2 text-sm text-foreground hover:border-accent/50 transition-colors"
+          >
+            Annulla
+          </button>
+          <button onClick={onDiscard} className="rounded-lg px-4 py-2 text-sm text-danger hover:underline">
+            Esci senza salvare
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function CharacterSheet({
-  character,
-  onChange,
+  character: persistedCharacter,
+  onSave,
   onDelete,
   onBack,
   cloudStatus,
 }: {
   character: Character;
-  onChange: (character: Character) => void;
+  onSave: (character: Character) => void;
   onDelete: () => void;
   onBack: () => void;
   cloudStatus?: CloudStatus;
 }) {
+  // Bozza locale, non ancora scritta in localStorage/account finché non si preme "Salva" —
+  // stile documento (Word/Excel): si può modificare liberamente e poi scegliere se tenere o
+  // buttare le modifiche, invece del vecchio comportamento "ogni tasto salva subito".
+  // "character"/"onChange" qui sotto oscurano di proposito i nomi della prop/funzione originali:
+  // tutto il resto del componente (set/setAbility/setClassi/applyDamage/applyHeal e ogni sezione
+  // figlia che riceve character+onChange) resta invariato, perché continua a risolvere questi
+  // stessi due nomi — solo ora puntano allo stato locale invece che al salvataggio immediato.
+  const [character, setCharacterState] = useState(persistedCharacter);
+  const [dirty, setDirty] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+
+  const onChange = (next: Character) => {
+    setCharacterState(next);
+    setDirty(true);
+  };
+
+  // Il modal sotto copre l'uscita "in app" (bottone Indietro); questo copre chiusura
+  // tab/refresh/ricarica, che il modal non può intercettare (l'evento del browser sì).
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  const handleSave = () => {
+    onSave(character);
+    setDirty(false);
+  };
+
+  const handleBack = () => {
+    if (dirty) {
+      setShowExitModal(true);
+    } else {
+      onBack();
+    }
+  };
+
   const set = <K extends keyof Character>(key: K, value: Character[K]) =>
     onChange({ ...character, [key]: value });
 
@@ -414,11 +482,25 @@ function CharacterSheet({
 
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
-      <div className="flex items-center justify-between gap-3">
-        <button onClick={onBack} className="text-sm text-muted hover:text-foreground shrink-0">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button onClick={handleBack} className="text-sm text-muted hover:text-foreground shrink-0">
           ← Personaggi
         </button>
-        <CloudStatusBadge status={cloudStatus} />
+        <div className="flex items-center gap-2 min-w-0">
+          <CloudStatusBadge status={cloudStatus} />
+          <button
+            onClick={handleSave}
+            disabled={!dirty}
+            title={dirty ? "Salva le modifiche" : "Nessuna modifica da salvare"}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+              dirty
+                ? "bg-accent text-background hover:bg-accent-strong"
+                : "border border-edge text-muted opacity-60 cursor-default"
+            }`}
+          >
+            💾 Salva
+          </button>
+        </div>
         <button
           onClick={() => {
             if (window.confirm(`Eliminare ${character.nome || "il personaggio"}?`)) {
@@ -430,6 +512,21 @@ function CharacterSheet({
           Elimina
         </button>
       </div>
+
+      {showExitModal && (
+        <UnsavedChangesModal
+          onSaveAndExit={() => {
+            handleSave();
+            setShowExitModal(false);
+            onBack();
+          }}
+          onDiscard={() => {
+            setShowExitModal(false);
+            onBack();
+          }}
+          onCancel={() => setShowExitModal(false)}
+        />
+      )}
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
         <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
