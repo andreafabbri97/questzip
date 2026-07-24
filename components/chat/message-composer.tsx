@@ -112,7 +112,11 @@ export function MessageComposer({
               onClick={() => pickMention(candidate)}
               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface transition-colors"
             >
-              <span className="text-foreground truncate">{candidate.name}</span>
+              <span className="text-foreground truncate">
+                {candidate.nameIta && candidate.nameIta !== candidate.name
+                  ? `${candidate.nameIta} (${candidate.name})`
+                  : candidate.name}
+              </span>
               <span className="text-[10px] uppercase tracking-widest text-muted shrink-0">
                 {MENTION_KIND_LABELS[candidate.kind]}
               </span>

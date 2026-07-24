@@ -555,6 +555,13 @@ export const compendioItaIncantesimi = pgTable("compendio_ita_incantesimo", {
   durata: text("durata").notNull(),
   descrizione: text("descrizione").notNull(),
   fonte: text("fonte").notNull(),
+  // Nome/fonte dell'entry inglese corrispondente (5etools) — null se non abbinata. Riempito una
+  // tantum da scripts/ita-compendio/match-english-names.mjs (stessa logica di abbinamento già
+  // usata dal vivo in lib/fivetools/compendio-detail.tsx, spostata offline), serve solo per far
+  // funzionare la ricerca delle menzioni in chat anche digitando il nome italiano — non
+  // influenza in nessun modo il resto del Compendio.
+  nomeInglese: text("nome_inglese"),
+  fonteInglese: text("fonte_inglese"),
 });
 
 export const compendioItaMostri = pgTable("compendio_ita_mostro", {
@@ -585,6 +592,9 @@ export const compendioItaMostri = pgTable("compendio_ita_mostro", {
   reazioni: text("reazioni").notNull().default(""),
   numericSuspect: boolean("numeric_suspect").notNull().default(false),
   fonte: text("fonte").notNull(),
+  // Vedi commento su compendioItaIncantesimi.nomeInglese.
+  nomeInglese: text("nome_inglese"),
+  fonteInglese: text("fonte_inglese"),
 });
 
 interface RazzaTratto {
@@ -601,6 +611,9 @@ export const compendioItaRazze = pgTable("compendio_ita_razza", {
     .$type<{ nome: string; tratti: RazzaTratto[] }[]>()
     .notNull(),
   fonte: text("fonte").notNull(),
+  // Vedi commento su compendioItaIncantesimi.nomeInglese.
+  nomeInglese: text("nome_inglese"),
+  fonteInglese: text("fonte_inglese"),
 });
 
 interface ClasseLivello {
@@ -622,6 +635,9 @@ export const compendioItaClassi = pgTable("compendio_ita_classe", {
   equipaggiamento: text("equipaggiamento"),
   tabellaLivelli: jsonb("tabella_livelli").$type<Record<string, ClasseLivello>>().notNull(),
   fonte: text("fonte").notNull(),
+  // Vedi commento su compendioItaIncantesimi.nomeInglese.
+  nomeInglese: text("nome_inglese"),
+  fonteInglese: text("fonte_inglese"),
 });
 
 // Regole generali/lore (non incantesimi/mostri/razze/classi): "Regole principali" e "Guida
@@ -651,6 +667,9 @@ export const compendioItaOggetti = pgTable("compendio_ita_oggetto", {
   sintonia: boolean("sintonia").notNull().default(false),
   descrizione: text("descrizione").notNull(),
   fonte: text("fonte").notNull(),
+  // Vedi commento su compendioItaIncantesimi.nomeInglese.
+  nomeInglese: text("nome_inglese"),
+  fonteInglese: text("fonte_inglese"),
 });
 
 // Talenti (Feats) dal capitolo "Talenti" del Manuale del Giocatore italiano — testo digitale
@@ -661,4 +680,7 @@ export const compendioItaTalenti = pgTable("compendio_ita_talento", {
   prerequisito: text("prerequisito").notNull().default(""),
   descrizione: text("descrizione").notNull(),
   fonte: text("fonte").notNull(),
+  // Vedi commento su compendioItaIncantesimi.nomeInglese.
+  nomeInglese: text("nome_inglese"),
+  fonteInglese: text("fonte_inglese"),
 });
