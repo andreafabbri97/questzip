@@ -6,6 +6,8 @@ import { deleteDirectMessage, getDirectMessages, sendDirectMessage } from "@/app
 import { useRealtime } from "@/components/realtime-provider";
 import { MessageList, type ChatMessageData } from "@/components/chat/message-list";
 import { MessageComposer } from "@/components/chat/message-composer";
+import { MentionModal } from "@/components/chat/mention-modal";
+import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 
 /** A differenza di CampaignChat non apre un socket proprio: le DM viaggiano sulla stessa stanza
  * personale "user-<id>" già aperta una volta sola da RealtimeProvider per notifiche/badge — qui
@@ -25,6 +27,7 @@ export function DirectChat({
 
   const [messages, setMessages] = useState<ChatMessageData[] | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
+  const [openMention, setOpenMention] = useState<ParsedMentionToken | null>(null);
   const [error, setError] = useState("");
 
   const [loadedFor, setLoadedFor] = useState(otherUserId);
@@ -105,6 +108,7 @@ export function DirectChat({
         resolveAuthor={resolveAuthor}
         onReply={setReplyTo}
         onDelete={remove}
+        onOpenMention={setOpenMention}
       />
       {error && <p className="px-3 text-xs text-danger shrink-0">{error}</p>}
       <MessageComposer
@@ -116,6 +120,7 @@ export function DirectChat({
         onCancelReply={() => setReplyTo(null)}
         onSend={send}
       />
+      <MentionModal mention={openMention} onClose={() => setOpenMention(null)} />
     </div>
   );
 }

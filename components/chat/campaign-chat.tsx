@@ -11,6 +11,8 @@ import {
 import { usePartyRoom } from "@/lib/use-party-room";
 import { MessageList, type ChatMessageData } from "@/components/chat/message-list";
 import { MessageComposer } from "@/components/chat/message-composer";
+import { MentionModal } from "@/components/chat/mention-modal";
+import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 
 export function CampaignChat({ campaignId }: { campaignId: string }) {
   const { data: session } = useSession();
@@ -19,6 +21,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getCampaign>> | null>(null);
   const [messages, setMessages] = useState<ChatMessageData[] | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
+  const [openMention, setOpenMention] = useState<ParsedMentionToken | null>(null);
   const [error, setError] = useState("");
 
   // Cambiare campagna deve svuotare subito la vista precedente (niente messaggi vecchi mostrati
@@ -99,6 +102,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
         resolveAuthor={resolveAuthor}
         onReply={setReplyTo}
         onDelete={remove}
+        onOpenMention={setOpenMention}
       />
       {error && <p className="px-3 text-xs text-danger shrink-0">{error}</p>}
       <MessageComposer
@@ -110,6 +114,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
         onCancelReply={() => setReplyTo(null)}
         onSend={send}
       />
+      <MentionModal mention={openMention} onClose={() => setOpenMention(null)} />
     </div>
   );
 }

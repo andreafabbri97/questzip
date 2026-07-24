@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import Image from "next/image";
+import { MentionText } from "@/components/chat/mention-text";
+import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 
 export interface ChatMessageData {
   id: string;
@@ -34,6 +36,7 @@ export function MessageList({
   resolveAuthor,
   onReply,
   onDelete,
+  onOpenMention,
 }: {
   messages: ChatMessageData[];
   currentUserId: string;
@@ -41,6 +44,7 @@ export function MessageList({
   resolveAuthor: (userId: string) => ChatAuthor;
   onReply: (message: ChatMessageData) => void;
   onDelete: (messageId: string) => void;
+  onOpenMention: (mention: ParsedMentionToken) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +81,9 @@ export function MessageList({
                     <p className="truncate text-muted">{message.replyToTesto}</p>
                   </div>
                 )}
-                <p className="whitespace-pre-wrap text-foreground">{message.testo}</p>
+                <p className="whitespace-pre-wrap text-foreground">
+                  <MentionText testo={message.testo} onOpenMention={onOpenMention} />
+                </p>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-muted mt-0.5 px-1">
                 <span>
