@@ -5,23 +5,40 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { getMyCharacters } from "@/app/actions/character-sync";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { FriendsTab } from "@/components/friends-tab";
 import { PushToggle } from "@/components/push-toggle";
-import { characterSchema } from "@/lib/dnd";
+import { type Character, characterSchema } from "@/lib/dnd";
 import { useLocalCollection } from "@/lib/storage";
 
 export default function ProfiloPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { items: characters, loaded } = useLocalCollection("questzip:personaggi", characterSchema);
+  const { items: localCharacters, loaded } = useLocalCollection(
+    "questzip:personaggi",
+    characterSchema,
+  );
+  const [remoteCharacters, setRemoteCharacters] = useState<Character[] | null>(null);
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
     null,
   );
 
   useEffect(() => {
     getMyCampaigns().then(setCampaigns);
+    getMyCharacters().then((rows) => setRemoteCharacters(rows.map((r) => r.dataJson)));
   }, []);
+
+  // Unione locale+cloud per id — un dispositivo nuovo (localStorage vuoto) deve comunque vedere i
+  // personaggi già sincronizzati da un altro dispositivo, non solo "nessun personaggio ancora".
+  // Sola lettura qui: la riconciliazione vera (chi vince fra le due copie) resta in /personaggi.
+  const characters = (() => {
+    const byId = new Map(localCharacters.map((c) => [c.id, c]));
+    for (const remote of remoteCharacters ?? []) {
+      if (!byId.has(remote.id)) byId.set(remote.id, remote);
+    }
+    return [...byId.values()];
+  })();
 
   if (status === "loading") return <p className="text-muted">Caricamento…</p>;
   if (!session?.user) return <p className="text-muted">Devi accedere per vedere il tuo profilo.</p>;
@@ -51,7 +68,7 @@ export default function ProfiloPage() {
             Vai →
           </Link>
         </div>
-        {!loaded ? (
+        {!loaded || !remoteCharacters ? (
           <p className="text-sm text-muted">Caricamento…</p>
         ) : characters.length === 0 ? (
           <p className="text-sm text-muted">Nessun personaggio creato ancora.</p>

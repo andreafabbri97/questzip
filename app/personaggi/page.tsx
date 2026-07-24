@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { claimXp, getMyCharacterInCampaign, syncCharacterToCampaign } from "@/app/actions/characters";
+import {
+  deleteCharacterRemote,
+  getMyCharacters,
+  syncCharacterRemote,
+} from "@/app/actions/character-sync";
 import { getOggettiIta, getTalentiIta } from "@/app/actions/compendio-ita";
 import { IntField } from "@/components/int-field";
 import {
@@ -138,24 +143,118 @@ function ExportImport({
   );
 }
 
+type CloudStatus = "syncing" | "synced" | "error";
+
 export default function CharactersPage() {
   const { items, persist, loaded } = useLocalCollection("questzip:personaggi", characterSchema);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Il localStorage resta la copia "veloce" (letta/scritta ad ogni tasto, invariato); questo
+  // stato riflette solo il backup in background sull'account — vedi app/actions/character-sync.ts.
+  const [cloudStatus, setCloudStatus] = useState<Record<string, CloudStatus>>({});
+  const syncTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const editing = items.find((character) => character.id === editingId) ?? null;
 
-  const upsert = (character: Character) => {
-    const exists = items.some((item) => item.id === character.id);
-    persist(
-      exists
-        ? items.map((item) => (item.id === character.id ? character : item))
-        : [...items, character],
+  const pushRemote = (character: Character) => {
+    setCloudStatus((prev) => ({ ...prev, [character.id]: "syncing" }));
+    syncCharacterRemote(character)
+      .then(() => setCloudStatus((prev) => ({ ...prev, [character.id]: "synced" })))
+      .catch(() => setCloudStatus((prev) => ({ ...prev, [character.id]: "error" })));
+  };
+
+  // Debounced: un salvataggio di rete ad ogni tasto sarebbe troppo chiacchierone (a differenza
+  // del localStorage, gratis/istantaneo) — aspetta una breve pausa nella digitazione.
+  const scheduleSync = (character: Character) => {
+    const timers = syncTimers.current;
+    const existingTimer = timers.get(character.id);
+    if (existingTimer) clearTimeout(existingTimer);
+    timers.set(
+      character.id,
+      setTimeout(() => {
+        timers.delete(character.id);
+        pushRemote(character);
+      }, 800),
     );
   };
 
+  // Chiamato quando si lascia la scheda (torna alla lista): salta l'attesa del debounce invece
+  // di rischiare che l'ultima modifica resti solo in locale per qualche centinaio di ms in più.
+  const flushSync = (id: string) => {
+    const timers = syncTimers.current;
+    const timer = timers.get(id);
+    if (!timer) return;
+    clearTimeout(timer);
+    timers.delete(id);
+    const character = items.find((item) => item.id === id);
+    if (character) pushRemote(character);
+  };
+
+  // Riconciliazione col backup cloud, una sola volta all'apertura della pagina (non ad ogni
+  // cambio di "items", altrimenti ogni tasto ririchiamerebbe getMyCharacters()): i personaggi
+  // presenti solo sul server (creati/modificati da un altro dispositivo) vengono importati in
+  // locale, quelli presenti solo in locale vengono spinti sul server, e per chi esiste in
+  // entrambi vince la copia con "aggiornatoAl" più recente — proporzionato: un personaggio non è
+  // mai modificato da due persone insieme, a differenza di una campagna condivisa.
+  useEffect(() => {
+    if (!loaded) return;
+    let cancelled = false;
+    getMyCharacters().then((remote) => {
+      if (cancelled) return;
+      const remoteMap = new Map(remote.map((r) => [r.id, r]));
+      const localIds = new Set(items.map((c) => c.id));
+      const toPush: Character[] = [];
+      let changed = false;
+
+      let merged = items.map((local) => {
+        const remoteRow = remoteMap.get(local.id);
+        if (!remoteRow) {
+          toPush.push(local);
+          return local;
+        }
+        if (local.aggiornatoAl >= remoteRow.aggiornatoAl) {
+          if (local.aggiornatoAl > remoteRow.aggiornatoAl) toPush.push(local);
+          return local;
+        }
+        changed = true;
+        return remoteRow.dataJson;
+      });
+
+      for (const [id, row] of remoteMap) {
+        if (!localIds.has(id)) {
+          merged = [...merged, row.dataJson];
+          changed = true;
+        }
+      }
+
+      if (changed) persist(merged);
+      toPush.forEach(pushRemote);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
+  const upsert = (character: Character) => {
+    const stamped = { ...character, aggiornatoAl: Date.now() };
+    const exists = items.some((item) => item.id === stamped.id);
+    persist(
+      exists
+        ? items.map((item) => (item.id === stamped.id ? stamped : item))
+        : [...items, stamped],
+    );
+    scheduleSync(stamped);
+  };
+
   const remove = (id: string) => {
+    const timer = syncTimers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      syncTimers.current.delete(id);
+    }
     persist(items.filter((item) => item.id !== id));
     setEditingId(null);
+    deleteCharacterRemote(id).catch(() => {});
   };
 
   const create = () => {
@@ -174,7 +273,11 @@ export default function CharactersPage() {
         character={editing}
         onChange={upsert}
         onDelete={() => remove(editing.id)}
-        onBack={() => setEditingId(null)}
+        onBack={() => {
+          flushSync(editing.id);
+          setEditingId(null);
+        }}
+        cloudStatus={cloudStatus[editing.id]}
       />
     );
   }
@@ -193,7 +296,11 @@ export default function CharactersPage() {
 
       <ExportImport
         characters={items}
-        onImport={(imported) => persist([...items, ...imported])}
+        onImport={(imported) => {
+          const stamped = imported.map((c) => ({ ...c, aggiornatoAl: Date.now() }));
+          persist([...items, ...stamped]);
+          stamped.forEach(pushRemote);
+        }}
       />
 
       {items.length === 0 ? (
@@ -233,16 +340,26 @@ export default function CharactersPage() {
   );
 }
 
+function CloudStatusBadge({ status }: { status?: CloudStatus }) {
+  if (!status) return null;
+  const label =
+    status === "syncing" ? "☁ Salvataggio…" : status === "synced" ? "☁ Salvato" : "⚠ Non salvato";
+  const color = status === "error" ? "text-danger" : "text-muted";
+  return <span className={`text-[11px] ${color} shrink-0`}>{label}</span>;
+}
+
 function CharacterSheet({
   character,
   onChange,
   onDelete,
   onBack,
+  cloudStatus,
 }: {
   character: Character;
   onChange: (character: Character) => void;
   onDelete: () => void;
   onBack: () => void;
+  cloudStatus?: CloudStatus;
 }) {
   const set = <K extends keyof Character>(key: K, value: Character[K]) =>
     onChange({ ...character, [key]: value });
@@ -297,17 +414,18 @@ function CharacterSheet({
 
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
+      <div className="flex items-center justify-between gap-3">
+        <button onClick={onBack} className="text-sm text-muted hover:text-foreground shrink-0">
           ← Personaggi
         </button>
+        <CloudStatusBadge status={cloudStatus} />
         <button
           onClick={() => {
             if (window.confirm(`Eliminare ${character.nome || "il personaggio"}?`)) {
               onDelete();
             }
           }}
-          className="text-sm text-danger hover:underline"
+          className="text-sm text-danger hover:underline shrink-0"
         >
           Elimina
         </button>

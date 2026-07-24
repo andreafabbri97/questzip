@@ -13,7 +13,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
-import type { Ability, ClassEntry } from "@/lib/dnd";
+import type { Ability, Character, ClassEntry } from "@/lib/dnd";
 import type { CellType, DungeonRoom, MonsterToken } from "@/lib/dungeon";
 import type { RegionalMarker, TerrainType } from "@/lib/regional-map";
 
@@ -273,6 +273,29 @@ export const campaignCharacters = pgTable(
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => [unique().on(table.campaignId, table.userId)],
+);
+
+// Backup personale su account dell'intera scheda Personaggio — NON va confusa con
+// campaignCharacters sopra: quella è uno scatto parziale condiviso con una campagna specifica
+// (poche colonne, un master lo vede), questa è la scheda COMPLETA (jsonb 1:1 con characterSchema
+// di lib/dnd.ts) di proprietà del solo utente, indipendente da qualunque campagna — esiste solo
+// per non perderla se il dispositivo si perde/localStorage viene cancellato. La sorgente "veloce"
+// resta il localStorage del browser (letto/scritto ad ogni tasto); questa tabella viene
+// aggiornata in background con un piccolo debounce (vedi app/actions/character-sync.ts).
+export const characters = pgTable(
+  "character",
+  {
+    // Stesso id generato dal client (crypto.randomUUID(), lib/dnd.ts newCharacter()) — deve
+    // combaciare fra localStorage e riga DB per poter fare la riconciliazione per id.
+    id: uuid("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    dataJson: jsonb("data_json").$type<Character>().notNull(),
+    aggiornatoAl: timestamp("aggiornato_al", { mode: "date" }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [index("character_user_idx").on(table.userId)],
 );
 
 // Un solo combattimento attivo per campagna alla volta (campaignId unique): il master lo avvia,

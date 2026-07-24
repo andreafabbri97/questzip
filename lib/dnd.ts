@@ -202,6 +202,10 @@ export const characterSchema = z.object({
   armi: z.array(weaponSchema).default([]),
   talenti: z.array(knownFeatSchema).default([]),
   note: z.string().default(""),
+  // Timestamp (epoch ms) dell'ultima modifica — non mostrato in UI, serve solo al backup su
+  // account (vedi app/actions/character-sync.ts) per capire, fra la copia locale e quella sul
+  // server, quale delle due è la più recente in caso di modifiche fatte da due dispositivi.
+  aggiornatoAl: z.number().default(() => Date.now()),
 });
 
 export type Character = z.infer<typeof characterSchema>;
@@ -298,6 +302,7 @@ export function newCharacter(): Character {
     armi: [],
     talenti: [],
     note: "",
+    aggiornatoAl: Date.now(),
   };
 }
 
