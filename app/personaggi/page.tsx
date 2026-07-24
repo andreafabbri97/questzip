@@ -263,6 +263,30 @@ function CharacterSheet({
     onChange({ ...character, classi, esperienza });
   };
 
+  const [hpAmount, setHpAmount] = useState(1);
+
+  // Il danno consuma prima i PF temporanei e solo l'eccedenza intacca i PF veri (regola RAW) —
+  // la cura invece non li ripristina mai (i temporanei non si "curano", si riassegnano da capo).
+  const applyDamage = () => {
+    const fromTemp = Math.min(character.hpTemporanei, hpAmount);
+    const remaining = hpAmount - fromTemp;
+    onChange({
+      ...character,
+      hpTemporanei: character.hpTemporanei - fromTemp,
+      hpAttuali: Math.max(0, character.hpAttuali - remaining),
+    });
+  };
+
+  const applyHeal = () => {
+    const hpAttuali = Math.min(character.hpMax, character.hpAttuali + hpAmount);
+    // recuperare anche un solo punto ferita azzera i tiri salvezza contro la morte (regola RAW)
+    const resetDeathSaves =
+      character.hpAttuali <= 0 && hpAttuali > 0
+        ? { tiriMorteSuccessi: 0, tiriMorteFallimenti: 0 }
+        : {};
+    onChange({ ...character, hpAttuali, ...resetDeathSaves });
+  };
+
   const inputClass =
     "mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground";
   const labelClass = "text-xs uppercase tracking-widest text-muted";
@@ -384,14 +408,7 @@ function CharacterSheet({
         <h2 className="text-sm uppercase tracking-widest text-muted mb-4">
           Punti ferita e difesa
         </h2>
-        <div className="flex items-center justify-center gap-3 mb-5">
-          <button
-            onClick={() => set("hpAttuali", character.hpAttuali - 1)}
-            className="size-11 rounded-full border border-edge bg-surface-raised text-danger text-xl font-bold hover:border-danger transition-colors"
-            aria-label="Togli un punto ferita"
-          >
-            −
-          </button>
+        <div className="flex flex-col items-center gap-3 mb-5">
           <div className="text-center min-w-28">
             <div
               className={`text-4xl font-display font-bold ${
@@ -410,21 +427,29 @@ function CharacterSheet({
             </div>
             <p className="text-xs text-muted">punti ferita</p>
           </div>
-          <button
-            onClick={() => {
-              const hpAttuali = Math.min(character.hpMax, character.hpAttuali + 1);
-              // recuperare anche un solo punto ferita azzera i tiri salvezza contro la morte (regola RAW)
-              const resetDeathSaves =
-                character.hpAttuali <= 0 && hpAttuali > 0
-                  ? { tiriMorteSuccessi: 0, tiriMorteFallimenti: 0 }
-                  : {};
-              onChange({ ...character, hpAttuali, ...resetDeathSaves });
-            }}
-            className="size-11 rounded-full border border-edge bg-surface-raised text-accent-strong text-xl font-bold hover:border-accent transition-colors"
-            aria-label="Aggiungi un punto ferita"
-          >
-            +
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={applyDamage}
+              className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-sm font-bold text-danger hover:border-danger transition-colors"
+              aria-label="Applica danno"
+            >
+              − Danno
+            </button>
+            <IntField
+              min={1}
+              value={hpAmount}
+              onChange={setHpAmount}
+              aria-label="Quantità danno o cura"
+              className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1.5 text-sm text-foreground text-center"
+            />
+            <button
+              onClick={applyHeal}
+              className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-sm font-bold text-accent-strong hover:border-accent transition-colors"
+              aria-label="Applica cura"
+            >
+              + Cura
+            </button>
+          </div>
         </div>
         {character.hpAttuali <= 0 && <DeathSaves character={character} onChange={onChange} />}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
