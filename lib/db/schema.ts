@@ -10,6 +10,7 @@ import {
   jsonb,
   unique,
   boolean,
+  index,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 import type { Ability, ClassEntry } from "@/lib/dnd";
@@ -343,6 +344,147 @@ export const campaignMembersRelations = relations(campaignMembers, ({ one }) => 
   }),
   user: one(users, { fields: [campaignMembers.userId], references: [users.id] }),
 }));
+
+// --- Amici, notifiche, chat (di campagna e diretta) ---
+
+export const friendRequestStatusEnum = pgEnum("friend_request_status", [
+  "pending",
+  "accettata",
+  "rifiutata",
+]);
+
+export const friendRequests = pgTable("friend_request", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  richiedenteId: text("richiedente_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  destinatarioId: text("destinatario_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stato: friendRequestStatusEnum("stato").notNull().default("pending"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// Relazione di amicizia effettiva, separata dallo storico richieste (stesso principio già usato
+// per campaignInvites/campaignMembers): PK composita su una coppia di userId in ordine
+// alfabetico (userIdLow < userIdHigh, calcolato in JS prima di ogni lettura/scrittura) così
+// "sono amici" e "lista amici" restano lookup diretti, senza dover controllare OR su due colonne.
+export const friendships = pgTable(
+  "friendship",
+  {
+    userIdLow: text("user_id_low")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userIdHigh: text("user_id_high")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userIdLow, table.userIdHigh] })],
+);
+
+export const campaignFriendInviteStatusEnum = pgEnum("campaign_friend_invite_status", [
+  "pending",
+  "accettato",
+  "rifiutato",
+]);
+
+// Invito mirato a un amico specifico, in aggiunta al link/codice generico di campaignInvites
+// (che resta invariato — utile per chi non è ancora amico su QuestZip). Solo il master può
+// crearlo, stessa regola già in vigore per createInvite.
+export const campaignFriendInvites = pgTable("campaign_friend_invite", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  invitedUserId: text("invited_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  invitedBy: text("invited_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stato: campaignFriendInviteStatusEnum("stato").notNull().default("pending"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "friend_request",
+  "friend_accepted",
+  "campaign_invite",
+]);
+
+// Solo eventi discreti e poco frequenti (richieste amicizia, inviti campagna) — i messaggi di
+// chat NON generano una riga qui (sarebbe troppo rumoroso), il "non letto" per la chat si conta
+// a parte in chatReadState.
+export const notifications = pgTable("notification", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tipo: notificationTypeEnum("tipo").notNull(),
+  datiJson: jsonb("dati_json").$type<Record<string, unknown>>().notNull(),
+  letta: boolean("letta").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// Prima tabella di questo schema con un indice esplicito: a differenza delle altre (lette per
+// intero, poche righe per campagna), la chat è un feed ad alto volume con scroll-back paginato —
+// ogni lettura filtra per campagna e ordina per data, un caso da manuale per un indice composito.
+export const campaignChatMessages = pgTable(
+  "campaign_chat_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    testo: text("testo").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("campaign_chat_message_campaign_created_idx").on(table.campaignId, table.createdAt),
+  ],
+);
+
+// Messaggi diretti 1-a-1 tra amici, stessa convenzione di coppia ordinata di friendships (evita
+// di dover interrogare "userIdA=X OR userIdB=X" ovunque).
+export const directMessages = pgTable(
+  "direct_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userIdLow: text("user_id_low")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userIdHigh: text("user_id_high")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    testo: text("testo").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("direct_message_pair_created_idx").on(table.userIdLow, table.userIdHigh, table.createdAt),
+  ],
+);
+
+// Ultima lettura di un utente per una "stanza" di chat (campagna o DM) — roomKey rispecchia
+// esattamente il nome della stanza realtime (vedi lib/party.ts), es. "campaign-<id>" o
+// "dm-<userIdLow>-<userIdHigh>", per calcolare i badge "non letti" senza una tabella per tipo.
+export const chatReadState = pgTable(
+  "chat_read_state",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roomKey: text("room_key").notNull(),
+    lastReadAt: timestamp("last_read_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.roomKey] })],
+);
 
 // --- Compendio in italiano, estratto dai manuali ufficiali (vedi scripts/ita-compendio/) ---
 // Contenuto proprietario: mai esposto senza login (l'intero sito lo richiede, vedi proxy.ts).

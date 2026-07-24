@@ -8,8 +8,11 @@ interface Env {
 
 interface RoomTokenPayload {
   userId: string;
-  campaignId: string;
-  role: "dm" | "player";
+  // Assenti per una stanza personale ("user-<userId>": notifiche/DM) — presenti solo per le
+  // stanze legate a una campagna ("campaign-<id>"/"dungeon-<id>"). Il DO non li legge/branch mai
+  // (solo li mette in connection.setState()), quindi non serve una union discriminata qui.
+  campaignId?: string;
+  role?: "dm" | "player";
   room: string;
 }
 

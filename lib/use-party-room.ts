@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import PartySocket from "partysocket";
 
-type PartyRoomArgs = { kind: "combat"; campaignId: string } | { kind: "dungeon"; dungeonId: string };
+type PartyRoomArgs =
+  | { kind: "combat"; campaignId: string }
+  | { kind: "dungeon"; dungeonId: string }
+  | { kind: "user"; userId: string };
 
 // Apre (se NEXT_PUBLIC_PARTYKIT_HOST è configurato) una connessione realtime alla Durable
 // Object su Cloudflare per la stanza indicata, previa richiesta di un token firmato che
@@ -20,7 +23,9 @@ export function usePartyRoom(args: PartyRoomArgs | null, onMessage: (data: unkno
   const key = args
     ? args.kind === "combat"
       ? `combat:${args.campaignId}`
-      : `dungeon:${args.dungeonId}`
+      : args.kind === "dungeon"
+        ? `dungeon:${args.dungeonId}`
+        : `user:${args.userId}`
     : null;
 
   useEffect(() => {

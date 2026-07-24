@@ -28,6 +28,19 @@ export async function POST(request: Request) {
 
   try {
     const userId = await requireUserId();
+
+    // Stanza personale (notifiche + messaggi diretti): non è legata a nessuna campagna, quindi
+    // l'unico controllo che serve è "sei tu" — la stanza è letteralmente il proprio id, non c'è
+    // membership da verificare. Nessun campaignId/role nel token (vedi RoomTokenPayload).
+    if (kind === "user") {
+      const room = `user-${userId}`;
+      const token = await new SignJWT({ userId, room })
+        .setProtectedHeader({ alg: "HS256" })
+        .setExpirationTime("2h")
+        .sign(new TextEncoder().encode(secret));
+      return NextResponse.json({ token, room });
+    }
+
     let room: string;
     let resolvedCampaignId: string;
 
