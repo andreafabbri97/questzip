@@ -6,6 +6,7 @@ import { FlagIcon } from "@/components/flag-icon";
 import { MENTION_KIND_LOADERS } from "@/lib/fivetools/mention-search";
 import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 import { EntryDetail, type Entry, type Language } from "@/lib/fivetools/compendio-detail";
+import type { CompendiumKind } from "@/lib/fivetools/data";
 
 const CLOSE_ANIMATION_MS = 150;
 
@@ -20,7 +21,13 @@ export function MentionModal({
   mention: ParsedMentionToken | null;
   onClose: () => void;
 }) {
-  const [entry, setEntry] = useState<Entry | null>(null);
+  // kind+entry tenuti in UN SOLO stato apposta: "mention" (prop) cambia in modo indipendente da
+  // questo stato, e nel giro di render in cui passa a null la reazione al cambiamento (vedi
+  // sotto) non è ancora avvenuta nella stessa chiamata — leggere mention.kind separatamente da
+  // "entry" nel JSX poteva quindi capitare con entry ancora valorizzato ma mention già null,
+  // "Cannot read properties of null (reading 'kind')". Un solo stato che li porta sempre insieme
+  // elimina la classe di bug alla radice, non solo il sintomo.
+  const [loaded, setLoaded] = useState<{ kind: CompendiumKind; entry: Entry } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [language, setLanguage] = useState<Language>("it");
 
@@ -42,19 +49,20 @@ export function MentionModal({
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   if (mentionKey !== loadedKey) {
     setLoadedKey(mentionKey);
-    setEntry(null);
+    setLoaded(null);
     setNotFound(false);
   }
 
   useEffect(() => {
     if (!mention) return;
     let cancelled = false;
-    MENTION_KIND_LOADERS[mention.kind]().then((entries) => {
+    const kind = mention.kind;
+    MENTION_KIND_LOADERS[kind]().then((entries) => {
       if (cancelled) return;
       const found =
         entries.find((e) => e.name === mention.name && e.source === mention.source) ??
         entries.find((e) => e.name === mention.name);
-      if (found) setEntry(found as Entry);
+      if (found) setLoaded({ kind, entry: found as Entry });
       else setNotFound(true);
     });
     return () => {
@@ -115,8 +123,14 @@ export function MentionModal({
           </div>
         </div>
         <div className="overflow-y-auto p-1">
-          {entry ? (
-            <EntryDetail kind={mention!.kind} entry={entry} books={null} language={language} onBack={onClose} />
+          {loaded ? (
+            <EntryDetail
+              kind={loaded.kind}
+              entry={loaded.entry}
+              books={null}
+              language={language}
+              onBack={onClose}
+            />
           ) : notFound ? (
             <p className="p-4 text-sm text-muted">Elemento non trovato nel Compendio.</p>
           ) : (
