@@ -14,11 +14,23 @@ const NOTIFICATION_LABELS: Record<string, (dati: Record<string, unknown>) => str
     `${String(dati.inviterName ?? "Il master")} ti ha invitato nella campagna "${String(dati.campaignNome ?? "")}".`,
 };
 
+const CLOSE_ANIMATION_MS = 120;
+
 export function NotificationBell() {
   const { status } = useSession();
   const { notifications, unreadCount, markRead, markAllRead } = useRealtime();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // "rendered" resta true un istante dopo che "open" passa a false, per lasciar giocare
+  // l'animazione di chiusura della tendina invece di farla sparire di scatto.
+  const [rendered, setRendered] = useState(false);
+  if (open && !rendered) setRendered(true);
+  useEffect(() => {
+    if (open) return;
+    const timeout = setTimeout(() => setRendered(false), CLOSE_ANIMATION_MS);
+    return () => clearTimeout(timeout);
+  }, [open]);
 
   // Click-fuori-per-chiudere via listener globale invece di un overlay "fixed inset-0": un
   // overlay fixed annidato dentro l'header (che ha backdrop-blur) resterebbe confinato al suo
@@ -51,8 +63,12 @@ export function NotificationBell() {
           </span>
         )}
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-30 w-72 max-h-96 overflow-y-auto rounded-lg border border-edge bg-surface-raised shadow-lg">
+      {rendered && (
+        <div
+          className={`absolute right-0 top-full mt-2 z-30 w-72 max-h-96 overflow-y-auto rounded-lg border border-edge bg-surface-raised shadow-lg origin-top-right ${
+            open ? "animate-dropdown-in" : "animate-dropdown-out"
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-edge px-3 py-2">
             <span className="text-xs font-bold uppercase tracking-widest text-muted">Notifiche</span>
             {unreadCount > 0 && (

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { NotificationBell } from "@/components/notification-bell";
 import { DiceModal } from "@/components/dice-modal";
 import { useRealtime } from "@/components/realtime-provider";
@@ -16,11 +16,12 @@ type NavLink =
 // "Dadi" non è una pagina: apre il tiro dadi in un modal sopra qualunque pagina tu stia
 // guardando, senza navigare via da lì — vive nella stessa barra di navigazione degli altri
 // (mobile e desktop), solo che il suo click apre un modal invece di seguire un link.
+// "Chat" invece vive come icona in alto a fianco della campanella (vedi ChatButton sotto), non
+// più in questo elenco — un solo punto d'accesso invece di uno nella barra E uno nell'header.
 const links: NavLink[] = [
   { kind: "link", href: "/", label: "Home", icon: "🏰" },
   { kind: "link", href: "/campagne", label: "Campagne", icon: "🗺️" },
   { kind: "link", href: "/personaggi", label: "Personaggi", icon: "🛡️" },
-  { kind: "link", href: "/chat", label: "Chat", icon: "💬" },
   { kind: "dice", label: "Dadi", icon: "🎲" },
   { kind: "link", href: "/compendio", label: "Compendio", icon: "📖" },
 ];
@@ -28,8 +29,6 @@ const links: NavLink[] = [
 export function Nav() {
   const pathname = usePathname();
   const [diceOpen, setDiceOpen] = useState(false);
-  const { unreadRoomKeys } = useRealtime();
-  const hasUnreadChat = unreadRoomKeys.size > 0;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -65,14 +64,12 @@ export function Nav() {
                   }`}
                 >
                   {link.label}
-                  {link.href === "/chat" && hasUnreadChat && (
-                    <span className="absolute right-1 top-1 size-1.5 rounded-full bg-danger" />
-                  )}
                 </Link>
               ),
             )}
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-4">
+            <ChatButton />
             <NotificationBell />
             <AccountButton />
           </div>
@@ -80,7 +77,7 @@ export function Nav() {
       </header>
 
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-edge bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-5">
           {links.map((link) =>
             link.kind === "dice" ? (
               <button
@@ -99,12 +96,7 @@ export function Nav() {
                   isActive(link.href) ? "text-accent-strong" : "text-muted"
                 }`}
               >
-                <span className="relative text-lg leading-none">
-                  {link.icon}
-                  {link.href === "/chat" && hasUnreadChat && (
-                    <span className="absolute -right-1 -top-0.5 size-1.5 rounded-full bg-danger" />
-                  )}
-                </span>
+                <span className="relative text-lg leading-none">{link.icon}</span>
                 {link.label}
               </Link>
             ),
@@ -114,6 +106,32 @@ export function Nav() {
 
       <DiceModal open={diceOpen} onClose={() => setDiceOpen(false)} />
     </>
+  );
+}
+
+// Icona in header a fianco della campanella (stesso trattamento visivo) invece di una voce di
+// testo in nav — un solo punto d'accesso alla Chat, non più duplicato fra header e barra mobile.
+function ChatButton() {
+  const pathname = usePathname();
+  const { status } = useSession();
+  const { unreadRoomKeys } = useRealtime();
+
+  if (status !== "authenticated") return null;
+  const active = pathname.startsWith("/chat");
+
+  return (
+    <Link
+      href="/chat"
+      aria-label="Chat"
+      className={`relative text-lg transition-colors ${
+        active ? "text-accent-strong" : "text-muted hover:text-foreground"
+      }`}
+    >
+      💬
+      {unreadRoomKeys.size > 0 && (
+        <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-danger border-2 border-background" />
+      )}
+    </Link>
   );
 }
 
@@ -134,10 +152,10 @@ function AccountButton() {
   }
 
   return (
-    <button
-      onClick={() => signOut()}
+    <Link
+      href="/profilo"
       className="flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
-      title="Esci"
+      title="Il tuo profilo"
     >
       {session.user.image && (
         <Image
@@ -149,6 +167,6 @@ function AccountButton() {
         />
       )}
       <span className="hidden md:inline">{session.user.name}</span>
-    </button>
+    </Link>
   );
 }
