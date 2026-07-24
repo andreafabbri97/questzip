@@ -2835,7 +2835,7 @@ function NewBlankDungeonForm({
       <input
         value={nome}
         onChange={(event) => setNome(event.target.value)}
-        placeholder="Nome (es. Cripta sotto la torre)"
+        placeholder="Nome (es. Cripta sotto la torre, Radura nel bosco…)"
         className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <div className="flex flex-wrap items-center gap-3">
@@ -2868,7 +2868,9 @@ function NewBlankDungeonForm({
         </button>
       </div>
       <p className="text-xs text-muted">
-        Crea una griglia vuota da disegnare a mano (pennello muri/pavimento/porte + punti d&apos;interesse).
+        Crea una griglia vuota da disegnare a mano: pennello per interni (muri/pavimento/porte) o
+        per esterni (erba/alberi/acqua/roccia), più punti d&apos;interesse — stessi token, fog of
+        war e aggiornamenti in tempo reale del dungeon, solo un altro tema grafico.
       </p>
       {error && <p className="text-xs text-danger">{error}</p>}
     </div>
@@ -2880,7 +2882,14 @@ const BRUSH_LABELS: Record<CellType, string> = {
   wall: "Muro",
   door: "Porta",
   corridor: "Pavimento",
+  grass: "Erba",
+  tree: "Albero",
+  water: "Acqua",
+  rock: "Roccia",
 };
+
+const INDOOR_BRUSHES: CellType[] = ["floor", "wall", "door"];
+const OUTDOOR_BRUSHES: CellType[] = ["grass", "tree", "water", "rock"];
 
 function DungeonViewer({
   dungeon,
@@ -3108,7 +3117,25 @@ function DungeonViewer({
           {editMode && (
             <>
               <div className="flex gap-1">
-                {(["floor", "wall", "door"] as CellType[]).map((option) => (
+                {INDOOR_BRUSHES.map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => {
+                      setBrush(option);
+                      setMarkerMode(false);
+                    }}
+                    className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                      !markerMode && brush === option
+                        ? "border-accent bg-accent/15 text-accent-strong"
+                        : "border-edge bg-surface text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {BRUSH_LABELS[option]}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1 pl-1 border-l border-edge">
+                {OUTDOOR_BRUSHES.map((option) => (
                   <button
                     key={option}
                     onClick={() => {
@@ -3316,6 +3343,10 @@ const CELL_FILL: Record<CellType, string | null> = {
   floor: "#241f1a",
   corridor: "#2a241e",
   door: "#e0a83e",
+  grass: "#4f6b3a",
+  tree: "#1f3320",
+  water: "#2b5d7a",
+  rock: "#5a534a",
 };
 
 interface DungeonToken {

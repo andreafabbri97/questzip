@@ -5,7 +5,11 @@
 // vera (cerchio/poligono con lati dritti): la forma è rasterizzata su celle solo per riusare lo
 // stesso sistema di corridoi/porte/connettività già collaudato, ma il disegno usa la forma reale.
 
-export type CellType = "wall" | "floor" | "door" | "corridor";
+// "wall"/"floor"/"door"/"corridor" sono le celle da interno (dungeon), usate anche dal
+// generatore procedurale. "grass"/"tree"/"water"/"rock" sono celle da esterno, disponibili
+// solo nel pennello della tela vuota (il generatore procedurale resta solo dungeon) — stesso
+// identico motore a griglia (token, fog of war, note stanza), solo altri colori/nomi.
+export type CellType = "wall" | "floor" | "door" | "corridor" | "grass" | "tree" | "water" | "rock";
 export type RoomShape = "rectangular" | "organic" | "circular" | "polygonal";
 export type RoomDensity = "sparse" | "scattered" | "dense" | "symmetric";
 export type CorridorStyle = "straight" | "errant" | "labyrinth";
