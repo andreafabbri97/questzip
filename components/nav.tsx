@@ -163,7 +163,7 @@ function AccountButton() {
           alt=""
           width={24}
           height={24}
-          className="rounded-full"
+          className="rounded-full object-cover"
         />
       )}
       <span className="hidden md:inline">{session.user.name}</span>

@@ -40,6 +40,24 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
     setError("");
   }
 
+  // Aggiunge/aggiorna un messaggio senza mai duplicarlo — usato sia quando arriva l'eco realtime
+  // sia quando si conferma un invio ottimistico: se un messaggio con lo stesso id (vero) è già in
+  // lista (l'eco può arrivare prima O dopo la risposta del server action, l'ordine non è
+  // garantito) lo aggiorna sul posto, altrimenti sostituisce la bolla temporanea indicata da
+  // tempId (se ancora presente) o lo accoda.
+  const upsertMessage = (message: ChatMessageData, tempId?: string) => {
+    setMessages((prev) => {
+      if (!prev) return prev;
+      if (prev.some((m) => m.id === message.id)) {
+        return prev.map((m) => (m.id === message.id ? message : m));
+      }
+      if (tempId && prev.some((m) => m.id === tempId)) {
+        return prev.map((m) => (m.id === tempId ? message : m));
+      }
+      return [...prev, message];
+    });
+  };
+
   useEffect(() => {
     let cancelled = false;
     getCampaign(campaignId).then((d) => {
@@ -57,13 +75,31 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId]);
 
+  // Rete di sicurezza indipendente dal realtime: se si torna su questa scheda dopo un po' (es.
+  // cambio app sul telefono), riallinea la cronologia — unisce col locale invece di sostituirlo
+  // di netto, per non far sparire un eventuale messaggio ancora in fase di invio.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      getCampaignChatMessages(campaignId).then((rows) => {
+        setMessages((prev) => {
+          const serverIds = new Set(rows.map((r) => r.id));
+          const pendingLocal = (prev ?? []).filter((m) => m.status && !serverIds.has(m.id));
+          return [...rows, ...pendingLocal];
+        });
+      });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [campaignId]);
+
   // Stessa stanza "campaign-<id>" già usata da combattimento/jukebox quando la pagina Campagne è
   // aperta — qui siamo su /chat, una pagina diversa, quindi apriamo la nostra connessione, ma il
   // nome stanza (e quindi i messaggi che riceviamo) è lo stesso.
   usePartyRoom({ kind: "combat", campaignId }, (data) => {
     const payload = data as { type?: string; message?: ChatMessageData; messageId?: string };
     if (payload?.type === "chat-message" && payload.message) {
-      setMessages((prev) => (prev ? [...prev, payload.message as ChatMessageData] : prev));
+      upsertMessage(payload.message);
       // La thread è aperta proprio ora: segnala subito come letto invece di lasciare che il
       // pallino resti acceso finché non la si riapre.
       markThreadRead(roomKey).then(refreshUnread);
@@ -82,12 +118,36 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
   const resolveAuthor = (id: string) => memberMap.get(id) ?? { name: null, image: null };
   const isDm = detail.myRole === "dm";
 
+  // Invio ottimistico: la bolla compare SUBITO (come WhatsApp), non solo quando arriva l'eco
+  // realtime — così il mittente vede il proprio messaggio a prescindere da eventuali intoppi
+  // della connessione realtime, invece di dover ricaricare la pagina per vederlo.
   const send = async (testo: string) => {
     setError("");
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const currentReplyTo = replyTo;
+    const optimistic: ChatMessageData = {
+      id: tempId,
+      authorId: userId,
+      testo,
+      replyToId: currentReplyTo?.id ?? null,
+      replyToAuthorId: currentReplyTo?.authorId ?? null,
+      replyToTesto: currentReplyTo?.testo ?? null,
+      createdAt: new Date(),
+      status: "sending",
+    };
+    setMessages((prev) => (prev ? [...prev, optimistic] : prev));
+    setReplyTo(null);
     try {
-      await sendCampaignChatMessage(campaignId, testo, replyTo?.id);
-      setReplyTo(null);
+      const real = await sendCampaignChatMessage(campaignId, testo, currentReplyTo?.id);
+      if (real) {
+        upsertMessage(real, tempId);
+      } else {
+        setMessages((prev) => prev?.filter((m) => m.id !== tempId) ?? prev);
+      }
     } catch (err) {
+      setMessages((prev) =>
+        prev?.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)) ?? prev,
+      );
       setError((err as Error).message);
     }
   };

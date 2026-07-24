@@ -52,7 +52,7 @@ export default function ProfiloPage() {
             alt=""
             width={56}
             height={56}
-            className="rounded-full"
+            className="rounded-full object-cover"
           />
         )}
         <div className="min-w-0">

@@ -13,6 +13,9 @@ export interface ChatMessageData {
   replyToAuthorId: string | null;
   replyToTesto: string | null;
   createdAt: Date | string;
+  // Solo per bolle ottimistiche non ancora confermate dal server (vedi campaign-chat.tsx/
+  // direct-chat.tsx) — mai presente su un messaggio caricato dal server o arrivato via realtime.
+  status?: "sending" | "failed";
 }
 
 interface ChatAuthor {
@@ -22,7 +25,9 @@ interface ChatAuthor {
 
 function Avatar({ src }: { src: string | null }) {
   if (!src) return <span className="size-7 rounded-full bg-surface-raised shrink-0" />;
-  return <Image src={src} alt="" width={28} height={28} className="rounded-full shrink-0" />;
+  return (
+    <Image src={src} alt="" width={28} height={28} className="rounded-full shrink-0 object-cover" />
+  );
 }
 
 /** Feed messaggi condiviso fra chat di campagna e DM (fase 5/6) — non sa nulla di come i
@@ -92,6 +97,12 @@ export function MessageList({
                     minute: "2-digit",
                   })}
                 </span>
+                {message.status === "sending" && <span title="Invio in corso…">🕒</span>}
+                {message.status === "failed" && (
+                  <span className="text-danger" title="Messaggio non inviato">
+                    ⚠ non inviato
+                  </span>
+                )}
                 <button onClick={() => onReply(message)} className="hover:text-foreground">
                   Rispondi
                 </button>

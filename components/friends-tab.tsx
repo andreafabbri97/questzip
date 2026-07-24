@@ -13,7 +13,15 @@ import {
 
 function Avatar({ src, alt }: { src: string | null; alt: string }) {
   if (!src) return <span className="size-6 rounded-full bg-surface-raised shrink-0" />;
-  return <Image src={src} alt={alt} width={24} height={24} className="rounded-full shrink-0" />;
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={24}
+      height={24}
+      className="rounded-full shrink-0 object-cover"
+    />
+  );
 }
 
 /** Ricerca/richieste/lista amici — condiviso fra l'hub /chat (tab "Amici", per trovare con chi
