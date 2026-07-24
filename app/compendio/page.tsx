@@ -538,6 +538,30 @@ const QUICK_REF_TOPICS: { titolo: string; voci: string[] }[] = [
       "Trattenuto — velocità 0, svantaggio ad attaccare, fallisce TS Destrezza, chi lo attacca ha vantaggio.",
     ],
   },
+  {
+    titolo: "Cadute",
+    voci: [
+      "1d6 danni contundenti ogni 3 metri caduti, fino a un massimo di 20d6.",
+      "Alla fine della caduta la creatura finisce prona, a meno che i danni subiti non siano 0.",
+    ],
+  },
+  {
+    titolo: "Combattimento subacqueo",
+    voci: [
+      "Senza velocità natatoria, nuotare costa metà movimento a meno di una prova di Atletica riuscita.",
+      "Attacchi in mischia senza un'arma adatta (pugnale, giavellotto, lancia, tridente, spada corta): svantaggio.",
+      "Attacchi a distanza: falliscono automaticamente oltre la gittata normale, svantaggio entro la gittata — eccetto balestre, fionde e armi da lancio come lance/giavellotti.",
+      "Creature e oggetti completamente immersi ottengono resistenza ai danni da fuoco.",
+    ],
+  },
+  {
+    titolo: "Salire su un avversario più grande",
+    voci: [
+      "Come parte del movimento, spendendo metà velocità: prova contrapposta (Atletica o Acrobazia a scelta di chi sale) contro l'Atletica del bersaglio.",
+      "Se riesce, chi sale occupa lo spazio della creatura più grande e si muove con essa.",
+      "Il bersaglio può usare un'azione (prova di Atletica o Acrobazia contrapposta) per disarcionarlo.",
+    ],
+  },
 ];
 
 function QuickReference() {
