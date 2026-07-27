@@ -47,6 +47,17 @@ export class CampaignRoom extends Server<Env> {
     connection.setState({ userId: payload.userId, role: payload.role });
   }
 
+  // Unici tipi che un CLIENT può generare direttamente via WebSocket (relay immediato, prima
+  // ancora che il rilascio del token lo persista su Postgres) — il trascinamento dei segnalini
+  // sulla lavagna dungeon. Qualunque altro tipo (messaggi di chat, notifiche, "è cambiato
+  // qualcosa" per combattimento/dungeon/jukebox) deve arrivare SOLO dal path server-autenticato
+  // onRequest (verificato con x-party-secret) — senza questo filtro, un membro della stanza
+  // poteva forgiare a mano un messaggio WebSocket con type:"chat-message" e un authorId a piacere
+  // e farlo passare per un messaggio reale di un altro membro (il broadcast qui sotto sovrascrive
+  // solo lo userId in cima all'oggetto, mai letto dal client di chat, che si fida invece di
+  // message.authorId annidato dentro il payload).
+  private static readonly CLIENT_RELAY_TYPES = new Set(["move", "remove"]);
+
   onMessage(connection: Connection, message: string) {
     // Relay per la lavagna condivisa: un giocatore muove il proprio token, tutti gli
     // altri client connessi ricevono l'evento. userId preso dalla connessione verificata
@@ -59,6 +70,7 @@ export class CampaignRoom extends Server<Env> {
     } catch {
       return;
     }
+    if (typeof parsed.type !== "string" || !CampaignRoom.CLIENT_RELAY_TYPES.has(parsed.type)) return;
     this.broadcast(JSON.stringify({ ...parsed, userId: state.userId }), [connection.id]);
   }
 

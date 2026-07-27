@@ -109,13 +109,18 @@ export async function getDungeon(dungeonId: string) {
 
   // Fog attiva e non sei il master: nascondi anche lato server ciò che il client nasconderebbe
   // comunque, così un giocatore che ispeziona il traffico di rete non legge note di stanze/
-  // mostri non ancora rivelati — la sola UI non basta a proteggerli.
+  // mostri non ancora rivelati — la sola UI non basta a proteggerli. Il NOME della stanza
+  // (label) va azzerato come encounter/reward: nessun uso legittimo lo richiede finché è
+  // nascosta. Forma/posizione (cells/centerX/centerY/vectorShape) restano invece intenzionalmente
+  // — il client disegna comunque una sagoma scura piena per le stanze non rivelate (si vede "che
+  // c'è qualcosa qui", non cosa), design deliberato di questa fog of war, non una svista: senza
+  // questi campi la sagoma sparirebbe e la mappa mostrerebbe un buco al posto della stanza.
   const revealedSet = new Set(dungeon.revealedRooms);
   const hiddenCellKeys = new Set<string>();
   const rooms = dungeon.rooms.map((room) => {
     if (revealedSet.has(room.id)) return room;
     for (const [x, y] of room.cells) hiddenCellKeys.add(`${x},${y}`);
-    return { ...room, encounter: "", reward: "" };
+    return { ...room, label: "", encounter: "", reward: "" };
   });
   const cells = dungeon.cells.map((row, y) =>
     row.map((cell, x) => (hiddenCellKeys.has(`${x},${y}`) ? "wall" : cell)),
