@@ -17,6 +17,7 @@ import {
   leaveCampaign,
   redeemInvite,
   removeMember,
+  revokeInvite,
   setJukeboxTrack,
   setMemberRole,
   stopJukebox,
@@ -356,6 +357,7 @@ function CampaignDetailView({
   );
   const [error, setError] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteText, setNoteText] = useState("");
 
@@ -386,7 +388,15 @@ function CampaignDetailView({
 
   const generateInvite = async () => {
     const code = await createInvite(campaignId);
+    setInviteCode(code);
     setInviteLink(`${window.location.origin}/campagne?invite=${code}`);
+  };
+
+  const revokeCurrentInvite = async () => {
+    if (!inviteCode) return;
+    await revokeInvite(campaignId, inviteCode);
+    setInviteCode(null);
+    setInviteLink(null);
   };
 
   const addNote = async () => {
@@ -471,8 +481,14 @@ function CampaignDetailView({
           )}
         </div>
         {inviteLink && (
-          <div className="rounded-lg border border-edge bg-surface-raised p-2 text-xs text-muted break-all">
-            {inviteLink}
+          <div className="flex items-center gap-2 rounded-lg border border-edge bg-surface-raised p-2 text-xs text-muted">
+            <span className="break-all flex-1">{inviteLink}</span>
+            <button
+              onClick={revokeCurrentInvite}
+              className="shrink-0 font-bold text-danger hover:underline"
+            >
+              Revoca
+            </button>
           </div>
         )}
         {isDm && <InviteFriendPicker campaignId={campaignId} />}
@@ -633,6 +649,7 @@ function CampaignDetailView({
                     {(isDm || note.authorId === userId) && (
                       <button
                         onClick={async () => {
+                          if (!window.confirm(`Eliminare la nota "${note.titolo}"?`)) return;
                           await deleteSessionNote(note.id);
                           refresh();
                         }}

@@ -76,11 +76,24 @@ export async function getCampaign(campaignId: string) {
 export async function createInvite(campaignId: string) {
   const userId = await requireUserId();
   await requireDm(campaignId, userId);
+  // Senza una scadenza il link resta valido per sempre — chiunque lo trovi (screenshot vecchio,
+  // link condiviso per sbaglio in un posto pubblico) può ancora unirsi a distanza di anni. Una
+  // settimana è ampia per il caso d'uso reale (invitare qualcuno alla prossima sessione) senza
+  // lasciare un accesso a tempo indeterminato aperto.
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const [invite] = await db
     .insert(campaignInvites)
-    .values({ campaignId, createdBy: userId })
+    .values({ campaignId, createdBy: userId, expiresAt })
     .returning();
   return invite.code;
+}
+
+export async function revokeInvite(campaignId: string, code: string) {
+  const userId = await requireUserId();
+  await requireDm(campaignId, userId);
+  await db
+    .delete(campaignInvites)
+    .where(and(eq(campaignInvites.campaignId, campaignId), eq(campaignInvites.code, code)));
 }
 
 export async function redeemInvite(code: string) {
@@ -210,6 +223,18 @@ export async function respondToCampaignFriendInvite(inviteId: string, accept: bo
   return invite.campaignId;
 }
 
+// Il ruolo "dm" è l'UNICA chiave usata da requireDm — a differenza di ownerId (usato solo per
+// abbandonare/eliminare la campagna), non c'è nessun percorso di recupero se il master resta a
+// zero: nessuno potrebbe più promuovere nessuno, un blocco permanente senza intervento manuale
+// sul database. Va quindi impedito prima che possa succedere, non corretto dopo.
+async function countDms(campaignId: string) {
+  const rows = await db
+    .select({ userId: campaignMembers.userId })
+    .from(campaignMembers)
+    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.role, "dm")));
+  return rows.length;
+}
+
 export async function setMemberRole(
   campaignId: string,
   targetUserId: string,
@@ -217,6 +242,17 @@ export async function setMemberRole(
 ) {
   const userId = await requireUserId();
   await requireDm(campaignId, userId);
+  if (role === "player") {
+    const [target] = await db
+      .select({ role: campaignMembers.role })
+      .from(campaignMembers)
+      .where(
+        and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, targetUserId)),
+      );
+    if (target?.role === "dm" && (await countDms(campaignId)) <= 1) {
+      throw new Error("Non puoi togliere l'ultimo master della campagna.");
+    }
+  }
   await db
     .update(campaignMembers)
     .set({ role })
@@ -228,6 +264,15 @@ export async function setMemberRole(
 export async function removeMember(campaignId: string, targetUserId: string) {
   const userId = await requireUserId();
   await requireDm(campaignId, userId);
+  const [target] = await db
+    .select({ role: campaignMembers.role })
+    .from(campaignMembers)
+    .where(
+      and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, targetUserId)),
+    );
+  if (target?.role === "dm" && (await countDms(campaignId)) <= 1) {
+    throw new Error("Non puoi rimuovere l'ultimo master della campagna.");
+  }
   await db
     .delete(campaignMembers)
     .where(
