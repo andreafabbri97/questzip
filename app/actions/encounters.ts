@@ -36,12 +36,20 @@ async function getSortedCombatantIds(encounterId: string) {
 async function realignCurrentTurn(encounterId: string, oldTurn: number, oldOrder: string[]) {
   const currentId = oldOrder[oldTurn] ?? null;
   const newOrder = await getSortedCombatantIds(encounterId);
-  const nextTurnIndex =
-    newOrder.length === 0
-      ? 0
-      : currentId !== null && newOrder.includes(currentId)
-        ? newOrder.indexOf(currentId)
-        : Math.min(oldTurn, newOrder.length - 1);
+  let nextTurnIndex: number;
+  if (newOrder.length === 0) {
+    nextTurnIndex = 0;
+  } else if (currentId !== null && newOrder.includes(currentId)) {
+    nextTurnIndex = newOrder.indexOf(currentId);
+  } else {
+    // Chi era di turno non c'è più (rimosso proprio ora) — il turno passa a chi occupava la
+    // posizione successiva nell'ordine PRECEDENTE. Se era l'ultimo, quella posizione successiva è
+    // un giro nuovo (indice 0), non l'ultimo indice valido rimasto: senza questo caso, rimuovere
+    // chi è sia "di turno" sia ultimo in iniziativa incastrava il turno sul penultimo invece di
+    // ripartire dall'inizio, come fa "Prossimo turno" in questo stesso identico scenario.
+    const wasLast = oldTurn >= oldOrder.length - 1;
+    nextTurnIndex = wasLast ? 0 : Math.min(oldTurn, newOrder.length - 1);
+  }
   await db
     .update(campaignEncounters)
     .set({ currentTurn: nextTurnIndex })
