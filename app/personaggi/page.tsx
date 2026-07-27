@@ -421,6 +421,18 @@ function CharacterSheet({
     setDirty(false);
   };
 
+  // Solo per il reclamo XP (vedi CampaignSync più sotto): a differenza di ogni altra modifica
+  // qui, che resta bozza scartabile finché non si preme "Salva", claimXp azzera SUBITO lo XP in
+  // sospeso lato server, un effetto reale e irreversibile — lasciarlo come bozza locale vorrebbe
+  // dire che chiudere la scheda senza salvare perde quello XP per sempre, già consumato sul
+  // server ma mai arrivato sulla scheda. Salva quindi subito l'intero stato corrente (comprese
+  // eventuali altre modifiche non ancora salvate), non solo il delta di XP.
+  const saveNow = (next: Character) => {
+    setCharacterState(next);
+    onSave(next);
+    setDirty(false);
+  };
+
   const handleBack = () => {
     if (dirty) {
       setShowExitModal(true);
@@ -620,7 +632,7 @@ function CharacterSheet({
         </section>
       </div>
 
-      <CampaignSync character={character} onChange={onChange} />
+      <CampaignSync character={character} onSaveNow={saveNow} />
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="rounded-xl border border-edge bg-surface p-5">
@@ -797,10 +809,10 @@ function CharacterSheet({
 
 function CampaignSync({
   character,
-  onChange,
+  onSaveNow,
 }: {
   character: Character;
-  onChange: (character: Character) => void;
+  onSaveNow: (character: Character) => void;
 }) {
   const { status } = useSession();
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getMyCampaigns>> | null>(
@@ -847,7 +859,7 @@ function CampaignSync({
           const newLevel = Math.min(20, levelForXp(newXp));
           if (newLevel > classi[0].livello) classi = [{ ...classi[0], livello: newLevel }];
         }
-        onChange({ ...character, esperienza: newXp, classi });
+        onSaveNow({ ...character, esperienza: newXp, classi });
       }
       setPendingXp(0);
     } finally {

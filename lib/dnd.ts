@@ -255,7 +255,11 @@ export function formatModifier(mod: number): string {
 }
 
 export function proficiencyBonus(level: number): number {
-  return 2 + Math.floor((level - 1) / 4);
+  // Le regole RAW non vanno oltre livello 20 — l'editor di classi limita ogni singola classe a
+  // max 20 (vedi ClassRow in app/personaggi/page.tsx) ma non la SOMMA in multiclasse, quindi un
+  // totale più alto è raggiungibile. Stesso approccio già usato per gli slot incantesimo
+  // (FULL_CASTER_SLOTS): oltre il tetto si resta fermi al valore di livello 20, non si estrapola.
+  return 2 + Math.floor((Math.min(20, level) - 1) / 4);
 }
 
 export function newCharacter(): Character {

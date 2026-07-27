@@ -149,16 +149,26 @@ export async function grantXpToParty(
 
 export async function claimXp(campaignId: string) {
   const userId = await requireUserId();
-  const [row] = await db
-    .select({ xpInSospeso: campaignCharacters.xpInSospeso, xpAutoLevel: campaignCharacters.xpAutoLevel })
-    .from(campaignCharacters)
-    .where(and(eq(campaignCharacters.campaignId, campaignId), eq(campaignCharacters.userId, userId)));
-  if (!row || row.xpInSospeso <= 0) return { amount: 0, autoLevelUp: false };
+  // Un SELECT seguito da un UPDATE separato lascerebbe una finestra in cui il master può
+  // depositare altro XP in sospeso fra la lettura e l'azzeramento — quell'importo verrebbe perso
+  // silenziosamente, azzerato insieme al resto senza mai essere restituito al giocatore. Riletto
+  // e azzerato nella stessa istruzione (FOR UPDATE blocca la riga per la durata della query),
+  // niente finestra in cui un deposito concorrente possa infilarsi.
+  const result = await db.execute<{ xp_in_sospeso: number; xp_auto_level: boolean }>(sql`
+    WITH claimed AS (
+      SELECT xp_in_sospeso, xp_auto_level
+      FROM campaign_character
+      WHERE campaign_id = ${campaignId} AND user_id = ${userId}
+      FOR UPDATE
+    )
+    UPDATE campaign_character
+    SET xp_in_sospeso = 0
+    FROM claimed
+    WHERE campaign_character.campaign_id = ${campaignId} AND campaign_character.user_id = ${userId}
+    RETURNING claimed.xp_in_sospeso, claimed.xp_auto_level
+  `);
+  const row = result.rows[0];
+  if (!row || row.xp_in_sospeso <= 0) return { amount: 0, autoLevelUp: false };
 
-  await db
-    .update(campaignCharacters)
-    .set({ xpInSospeso: 0 })
-    .where(and(eq(campaignCharacters.campaignId, campaignId), eq(campaignCharacters.userId, userId)));
-
-  return { amount: row.xpInSospeso, autoLevelUp: row.xpAutoLevel };
+  return { amount: row.xp_in_sospeso, autoLevelUp: row.xp_auto_level };
 }
