@@ -1,5 +1,6 @@
 "use server";
 
+import { ne } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import {
@@ -39,7 +40,10 @@ export async function getClassiIta() {
 
 export async function getRegoleIta() {
   await requireAuth();
-  return db.select().from(compendioItaRegole);
+  // "oggetti_magici" era OCR di 8 pagine di flavor text inglese di qualità troppo bassa per
+  // essere utile (screenshot di un lettore, non una scansione vera) — il catalogo oggetti magici
+  // vero vive già pulito nel tab Oggetti magici, questa fonte era solo rumore.
+  return db.select().from(compendioItaRegole).where(ne(compendioItaRegole.fonte, "oggetti_magici"));
 }
 
 export async function getOggettiIta() {

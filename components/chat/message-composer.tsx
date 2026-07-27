@@ -6,53 +6,104 @@ import {
   searchMentionCandidates,
   type MentionCandidate,
 } from "@/lib/fivetools/mention-search";
-import { encodeMentionToken } from "@/lib/fivetools/mention-token";
+import { MENTION_CHIP_CLASS, encodeMentionToken, type ParsedMentionToken } from "@/lib/fivetools/mention-token";
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Una chip menzione è un nodo NON editabile dentro il div contenteditable — il browser la tratta
+// già come un'unica unità per il cursore/Backspace (comportamento nativo, nessuna gestione a
+// mano necessaria), e porta con sé tipo+fonte come data-attribute, invece di doverli ritrovare
+// per nome al momento dell'invio (l'ambiguità che aveva la vecchia versione a solo testo: due
+// candidati con lo stesso nome visualizzato ma fonte diversa sarebbero stati indistinguibili).
+function createMentionChip(candidate: { name: string; kind: MentionCandidate["kind"]; source: string }) {
+  const span = document.createElement("span");
+  span.contentEditable = "false";
+  span.className = MENTION_CHIP_CLASS;
+  span.dataset.mentionName = candidate.name;
+  span.dataset.mentionKind = candidate.kind;
+  span.dataset.mentionSource = candidate.source;
+  span.textContent = `#${candidate.name}`;
+  return span;
+}
+
+// Ricostruisce il testo grezzo del messaggio (coi token #{Nome|tipo|fonte}) leggendo i nodi
+// figli dell'editor invece di tenere un secondo stato React in parallelo — un contenteditable
+// "controllato" da React fa saltare il cursore ad ogni render, quindi il DOM resta l'unica fonte
+// di verità e lo si legge solo quando serve (qui, e per rilevare "#query" durante la digitazione).
+function serializeEditor(root: HTMLElement): string {
+  let out = "";
+  for (const node of Array.from(root.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.textContent ?? "";
+    } else if (node instanceof HTMLElement && node.dataset.mentionName) {
+      out += encodeMentionToken(
+        node.dataset.mentionName,
+        node.dataset.mentionKind as MentionCandidate["kind"],
+        node.dataset.mentionSource ?? "",
+      );
+    } else if (node.nodeName === "BR") {
+      out += "\n";
+    } else {
+      out += node.textContent ?? "";
+    }
+  }
+  return out;
+}
+
+// "#" seguito da testo senza spazi, esattamente al cursore — stessa query di prima, ma letta dal
+// nodo di testo del DOM invece che da una stringa React, dato che qui il contenuto vive solo nel
+// contenteditable. Il cursore non può mai trovarsi DENTRO una chip (contentEditable=false), quindi
+// il testo del nodo corrente basta: una chip precedente delimita già il nodo di testo in corso.
+function detectMentionQuery(
+  root: HTMLElement,
+): { node: Text; matchStart: number; caretOffset: number; query: string } | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (!root.contains(range.startContainer) || range.startContainer.nodeType !== Node.TEXT_NODE) {
+    return null;
+  }
+  const node = range.startContainer as Text;
+  const before = node.data.slice(0, range.startOffset);
+  const match = before.match(/#([^\s#]*)$/);
+  if (!match) return null;
+  return { node, matchStart: range.startOffset - match[0].length, caretOffset: range.startOffset, query: match[1] };
+}
+
+function insertLineBreakAtCaret() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const br = document.createElement("br");
+  range.insertNode(br);
+  range.setStartAfter(br);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 export function MessageComposer({
   replyTo,
   onCancelReply,
   onSend,
+  onOpenMention,
 }: {
   replyTo: { author: string; testo: string } | null;
   onCancelReply: () => void;
   onSend: (testo: string) => void;
+  onOpenMention: (mention: ParsedMentionToken) => void;
 }) {
-  const [text, setText] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [hasContent, setHasContent] = useState(false);
 
-  // La textarea cresce da sola scrivendo, fino al tetto imposto da max-h-32 in classa (128px) —
-  // reset a "auto" prima di rileggere scrollHeight, altrimenti il browser non farebbe mai
-  // RIMPICCIOLIRE l'altezza cancellando testo.
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
-  }, [text]);
-
-  // "#" seguito da testo senza spazi, esattamente al cursore: è la query di menzione attiva.
-  // hashIndex è la posizione del "#" nel testo, per poter sostituire esattamente quel tratto
-  // quando l'utente sceglie un elemento dall'elenco.
-  const [mentionQuery, setMentionQuery] = useState<{ hashIndex: number; query: string } | null>(
-    null,
-  );
+  // "#" seguito da testo senza spazi, esattamente al cursore — la query di menzione attiva.
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionResults, setMentionResults] = useState<MentionCandidate[]>([]);
-  // Nome → (tipo, fonte) scelti dall'autocomplete in QUESTO messaggio non ancora inviato. Solo le
-  // menzioni scelte da qui diventano chip cliccabili al momento dell'invio — scrivere "#Nome" a
-  // mano senza passare dall'elenco resta testo semplice, come su Slack/Discord/FB.
-  const [selectedMentions, setSelectedMentions] = useState<Map<string, { kind: MentionCandidate["kind"]; source: string }>>(
-    new Map(),
-  );
 
   useEffect(() => {
     // searchMentionCandidates ritorna [] subito per una query vuota (senza caricare tutte le
     // categorie) — non serve un ramo sincrono a parte per "svuota i risultati".
     let cancelled = false;
-    searchMentionCandidates(mentionQuery?.query ?? "").then((results) => {
+    searchMentionCandidates(mentionQuery ?? "").then((results) => {
       if (!cancelled) setMentionResults(results);
     });
     return () => {
@@ -60,56 +111,98 @@ export function MessageComposer({
     };
   }, [mentionQuery]);
 
-  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = event.target.value;
-    setText(value);
-    const cursor = event.target.selectionStart ?? value.length;
-    const match = value.slice(0, cursor).match(/#([^\s#]*)$/);
-    setMentionQuery(match ? { hashIndex: cursor - match[0].length, query: match[1] } : null);
+  const handleInput = () => {
+    const root = editorRef.current;
+    if (!root) return;
+    setHasContent((root.textContent ?? "").trim().length > 0);
+    const ctx = detectMentionQuery(root);
+    setMentionQuery(ctx?.query ?? null);
   };
 
+  // mousedown (non click) con preventDefault: un click su un bottone del menu sposterebbe il
+  // focus/la selezione fuori dal contenteditable PRIMA che il nostro handler possa leggere dove
+  // si trovava il cursore — prevenendo il default sul mousedown la selezione resta esattamente
+  // dov'era, quindi detectMentionQuery richiamato qui sotto la trova ancora valida.
   const pickMention = (candidate: MentionCandidate) => {
-    if (!mentionQuery) return;
-    const before = text.slice(0, mentionQuery.hashIndex);
-    const after = text.slice(mentionQuery.hashIndex + 1 + mentionQuery.query.length);
-    const inserted = `#${candidate.name} `;
-    setText(before + inserted + after);
-    setSelectedMentions((prev) =>
-      new Map(prev).set(candidate.name, { kind: candidate.kind, source: candidate.source }),
-    );
+    const root = editorRef.current;
+    if (!root) return;
+    const ctx = detectMentionQuery(root);
+    if (!ctx) return;
+    const before = ctx.node.data.slice(0, ctx.matchStart);
+    const after = ctx.node.data.slice(ctx.caretOffset);
+    const chip = createMentionChip(candidate);
+    const spaceAfter = document.createTextNode(` ${after}`);
+    ctx.node.data = before;
+    ctx.node.parentNode?.insertBefore(chip, ctx.node.nextSibling);
+    ctx.node.parentNode?.insertBefore(spaceAfter, chip.nextSibling);
+
+    const range = document.createRange();
+    range.setStart(spaceAfter, 1);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    root.focus();
     setMentionQuery(null);
     setMentionResults([]);
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.focus();
-      const pos = before.length + inserted.length;
-      el.setSelectionRange(pos, pos);
+    setHasContent(true);
+  };
+
+  const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const chip = (event.target as HTMLElement).closest<HTMLElement>("[data-mention-name]");
+    if (!chip) return;
+    event.preventDefault();
+    onOpenMention({
+      name: chip.dataset.mentionName!,
+      kind: chip.dataset.mentionKind as MentionCandidate["kind"],
+      source: chip.dataset.mentionSource!,
     });
   };
 
+  // Forza l'incolla a solo testo semplice — oltre a evitare che formattazione estranea finisca
+  // nel messaggio, impedisce anche che un incolla porti dentro per sbaglio (o di proposito) uno
+  // span con gli stessi data-attribute di una chip: serializeEditor si fiderebbe ciecamente di
+  // qualunque nodo con data-mention-name, quindi solo testo semplice in ingresso lo esclude a monte.
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const text = event.clipboardData.getData("text/plain");
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    handleInput();
+  };
+
   const send = () => {
-    const trimmed = text.trim();
+    const root = editorRef.current;
+    if (!root) return;
+    const trimmed = serializeEditor(root).trim();
     if (!trimmed) return;
-    let encoded = trimmed;
-    for (const [name, { kind, source }] of selectedMentions) {
-      const pattern = new RegExp(`#${escapeRegExp(name)}\\b`, "g");
-      encoded = encoded.replace(pattern, encodeMentionToken(name, kind, source));
-    }
-    onSend(encoded);
-    setText("");
-    setSelectedMentions(new Map());
+    onSend(trimmed);
+    root.textContent = "";
+    setHasContent(false);
     setMentionQuery(null);
+    setMentionResults([]);
   };
 
   return (
     <div className="border-t border-edge p-3 space-y-2 shrink-0 relative">
-      {mentionQuery && mentionResults.length > 0 && (
+      {mentionQuery !== null && mentionResults.length > 0 && (
         <div className="absolute bottom-full left-3 right-3 mb-1 rounded-lg border border-edge bg-surface-raised shadow-lg max-h-48 overflow-y-auto">
           {mentionResults.map((candidate) => (
             <button
               key={`${candidate.kind}-${candidate.name}-${candidate.source}`}
-              onClick={() => pickMention(candidate)}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                pickMention(candidate);
+              }}
               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface transition-colors"
             >
               <span className="text-foreground truncate">
@@ -136,23 +229,27 @@ export function MessageComposer({
         </div>
       )}
       <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleChange}
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleInput}
+          onClick={handleEditorClick}
+          onPaste={handlePaste}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              send();
-            }
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            if (event.shiftKey) insertLineBreakAtCaret();
+            else send();
           }}
-          placeholder="Scrivi un messaggio… usa # per citare il Compendio"
-          rows={1}
-          className="flex-1 resize-none rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground max-h-32"
+          data-placeholder="Scrivi un messaggio… usa # per citare il Compendio"
+          className={`flex-1 min-h-9 max-h-32 overflow-y-auto resize-none rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground whitespace-pre-wrap break-words focus:outline-none focus:border-accent/50 ${
+            hasContent ? "" : "before:content-[attr(data-placeholder)] before:text-muted"
+          }`}
         />
         <button
           onClick={send}
-          disabled={!text.trim()}
+          disabled={!hasContent}
           aria-label="Invia"
           className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-background transition-colors hover:bg-accent-strong disabled:opacity-40"
         >

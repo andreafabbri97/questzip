@@ -6,6 +6,12 @@ export interface ParsedMentionToken {
   source: string;
 }
 
+// Stile della chip "#Nome" — condiviso fra MentionText (messaggi già inviati) e MessageComposer
+// (mentre si scrive, vedi lì): un'unica costante invece di due copie della stessa stringa di
+// classi, per non rischiare che finiscano per divergere silenziosamente nel tempo.
+export const MENTION_CHIP_CLASS =
+  "inline rounded bg-accent/20 px-1 font-bold text-accent-strong hover:bg-accent/30 transition-colors cursor-pointer";
+
 // Il testo del messaggio contiene direttamente questo token grezzo, es. "#{Fireball|incantesimi|xphb}"
 // — mostrato all'utente come chip pulito "#Fireball". Il disambiguatore (tipo+fonte) è nel testo
 // stesso, non in una colonna a parte: un'unica fonte di verità, zero rischio di disallineamento

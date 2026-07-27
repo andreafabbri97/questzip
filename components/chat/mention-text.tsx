@@ -1,6 +1,10 @@
 "use client";
 
-import { splitMessageWithMentions, type ParsedMentionToken } from "@/lib/fivetools/mention-token";
+import {
+  MENTION_CHIP_CLASS,
+  splitMessageWithMentions,
+  type ParsedMentionToken,
+} from "@/lib/fivetools/mention-token";
 
 export function MentionText({
   testo,
@@ -16,11 +20,7 @@ export function MentionText({
         typeof part === "string" ? (
           <span key={index}>{part}</span>
         ) : (
-          <button
-            key={index}
-            onClick={() => onOpenMention(part)}
-            className="inline rounded bg-accent/20 px-1 font-bold text-accent-strong hover:bg-accent/30 transition-colors"
-          >
+          <button key={index} onClick={() => onOpenMention(part)} className={MENTION_CHIP_CLASS}>
             #{part.name}
           </button>
         ),

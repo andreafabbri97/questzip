@@ -406,14 +406,11 @@ export default function CompendiumPage() {
 const REGOLE_FONTI: Record<string, string> = {
   regole_base: "Regole Principali",
   costa_spada: "Costa della Spada",
-  oggetti_magici: "Oggetti Magici (EN)",
 };
 
 const REGOLE_WARNINGS: Record<string, string> = {
   costa_spada:
     "estratta via OCR da scansioni (non un vero testo digitale come il resto del compendio): può contenere errori di riconoscimento. Utile per una ricerca rapida, non garantita parola per parola.",
-  oggetti_magici:
-    "estratta via OCR da un PDF privato di qualità ancora più bassa (sembra uno screenshot di un lettore, non una vera scansione) ed è in INGLESE, non tradotta: aspettati più errori del solito. Le schede dei singoli oggetti magici non sono incluse qui — sono già nel tab Oggetti, in versione pulita e completa; questa sezione ha solo il testo di ambientazione/consigli per il master attorno agli oggetti.",
 };
 
 // Sezione a sé, fuori dal sistema kind/Entry/LOADERS del resto del Compendio: quel sistema
@@ -563,7 +560,7 @@ function RegoleSection() {
       )}
 
       <div className="flex flex-wrap gap-2">
-        {(["tutte", "regole_base", "costa_spada", "oggetti_magici"] as const).map((f) => (
+        {(["tutte", "regole_base", "costa_spada"] as const).map((f) => (
           <button
             key={f}
             onClick={() => {
@@ -632,10 +629,6 @@ function RegoleSection() {
                 {selectedSection.fonte === "regole_base" ? (
                   <span className="shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-accent-strong">
                     ✓ Verificato
-                  </span>
-                ) : selectedSection.fonte === "oggetti_magici" ? (
-                  <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">
-                    📷 OCR · EN
                   </span>
                 ) : (
                   <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted">

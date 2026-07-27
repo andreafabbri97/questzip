@@ -224,6 +224,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
         }
         onCancelReply={() => setReplyTo(null)}
         onSend={send}
+        onOpenMention={setOpenMention}
       />
       <MentionModal mention={openMention} onClose={() => setOpenMention(null)} />
     </div>
