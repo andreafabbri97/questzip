@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   deleteDirectMessage,
@@ -13,6 +13,11 @@ import { MessageList, type ChatMessageData } from "@/components/chat/message-lis
 import { MessageComposer } from "@/components/chat/message-composer";
 import { MentionModal } from "@/components/chat/mention-modal";
 import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
+
+// Vedi lo stesso helper in campaign-chat.tsx.
+function messageSignature(m: { authorId: string; testo: string; replyToId: string | null }) {
+  return `${m.authorId} ${m.testo} ${m.replyToId ?? ""}`;
+}
 
 /** A differenza di CampaignChat non apre un socket proprio: le DM viaggiano sulla stessa stanza
  * personale "user-<id>" già aperta una volta sola da RealtimeProvider per notifiche/badge — qui
@@ -39,6 +44,10 @@ export function DirectChat({
   const [openMention, setOpenMention] = useState<ParsedMentionToken | null>(null);
   const [error, setError] = useState("");
 
+  // Vedi lo stesso helper in campaign-chat.tsx: coda FIFO signature->tempId per riconciliare
+  // l'eco realtime del proprio messaggio anche se arriva prima della risposta del server action.
+  const pendingRef = useRef(new Map<string, string[]>());
+
   const [loadedFor, setLoadedFor] = useState(otherUserId);
   if (otherUserId !== loadedFor) {
     setLoadedFor(otherUserId);
@@ -47,16 +56,29 @@ export function DirectChat({
     setError("");
   }
 
-  // Vedi lo stesso helper in campaign-chat.tsx: evita bolle duplicate quando l'eco realtime e la
-  // risposta del server action alla propria sendDirectMessage arrivano in ordine imprevedibile.
+  // Stesso cambio-conversazione di sopra, ma un ref non si può leggere/scrivere durante il
+  // render (vedi campaign-chat.tsx) — va in un effetto a parte.
+  useEffect(() => {
+    pendingRef.current.clear();
+  }, [otherUserId]);
+
   const upsertMessage = (message: ChatMessageData, tempId?: string) => {
+    let resolvedTempId = tempId;
+    if (!resolvedTempId) {
+      const sig = messageSignature(message);
+      const queue = pendingRef.current.get(sig);
+      if (queue && queue.length > 0) {
+        resolvedTempId = queue.shift();
+        if (queue.length === 0) pendingRef.current.delete(sig);
+      }
+    }
     setMessages((prev) => {
       if (!prev) return prev;
       if (prev.some((m) => m.id === message.id)) {
         return prev.map((m) => (m.id === message.id ? message : m));
       }
-      if (tempId && prev.some((m) => m.id === tempId)) {
-        return prev.map((m) => (m.id === tempId ? message : m));
+      if (resolvedTempId && prev.some((m) => m.id === resolvedTempId)) {
+        return prev.map((m) => (m.id === resolvedTempId ? message : m));
       }
       return [...prev, message];
     });
@@ -68,9 +90,11 @@ export function DirectChat({
       if (!cancelled) setMessages(rows);
     });
     if (roomKey) {
-      markThreadRead(roomKey).then(() => {
-        if (!cancelled) refreshThreads();
-      });
+      markThreadRead(roomKey)
+        .then(() => {
+          if (!cancelled) refreshThreads();
+        })
+        .catch(() => {});
     }
     return () => {
       cancelled = true;
@@ -105,7 +129,7 @@ export function DirectChat({
       upsertMessage(message);
       // La thread è aperta proprio ora: segnala subito come letto invece di lasciare il pallino
       // acceso finché non la si riapre.
-      if (roomKey) markThreadRead(roomKey).then(refreshThreads);
+      if (roomKey) markThreadRead(roomKey).then(refreshThreads).catch(() => {});
     });
     const unsubscribeDeleted = subscribe("dm-message-deleted", (payload) => {
       const messageId = (payload as { messageId?: string }).messageId;
@@ -136,7 +160,10 @@ export function DirectChat({
     setError("");
     if (!userId) return;
     const tempId = `temp-${crypto.randomUUID()}`;
-    const currentReplyTo = replyTo;
+    // Rispondere a un messaggio non ancora confermato (id temporaneo) farebbe fallire l'insert
+    // lato server sul cast della colonna uuid — non dovrebbe arrivare qui (message-list.tsx
+    // nasconde "Rispondi" sui messaggi con status), ma si ignora comunque per sicurezza.
+    const currentReplyTo = replyTo && !replyTo.status ? replyTo : null;
     const optimistic: ChatMessageData = {
       id: tempId,
       authorId: userId,
@@ -147,6 +174,11 @@ export function DirectChat({
       createdAt: new Date(),
       status: "sending",
     };
+    const sig = messageSignature(optimistic);
+    const queue = pendingRef.current.get(sig) ?? [];
+    queue.push(tempId);
+    pendingRef.current.set(sig, queue);
+
     setMessages((prev) => (prev ? [...prev, optimistic] : prev));
     setReplyTo(null);
     try {

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { getFriendsAndRequests } from "@/app/actions/friends";
 import { getMyCampaigns } from "@/app/actions/campaigns";
@@ -113,6 +113,7 @@ function MessagesTab({
   forceOpenDmUserId: string | null;
   onConsumeForceOpen: () => void;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const myUserId = session?.user?.id ?? null;
@@ -144,6 +145,19 @@ function MessagesTab({
     setSelected({ kind: "dm", id: forceOpenDmUserId });
     onConsumeForceOpen();
   }
+
+  // Tiene l'URL sincronizzato con la thread aperta — non solo per il deep link in ingresso, ma
+  // anche per la SOPPRESSIONE delle notifiche push: il service worker (public/sw.js) decide se
+  // una push va mostrata confrontando l'URL della scheda col payload — senza questo, aprire una
+  // chat cliccando nella lista lasciava l'URL fermo a "/chat" e la soppressione non scattava mai.
+  // In un effetto (non durante il render, a differenza di setSelected sopra): router.replace ha
+  // un effetto collaterale vero sulla cronologia del browser, non è un semplice setState.
+  useEffect(() => {
+    const next = selected ? `/chat?thread=${selected.kind}:${selected.id}` : "/chat";
+    if (`${window.location.pathname}${window.location.search}` === next) return;
+    router.replace(next, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   if (!campaigns || !friends) return <p className="text-muted">Caricamento…</p>;
 

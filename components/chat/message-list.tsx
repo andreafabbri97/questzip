@@ -164,9 +164,14 @@ export function MessageList({
                       ⚠ non inviato
                     </span>
                   )}
-                  <button onClick={() => onReply(message)} className="hover:text-foreground">
-                    Rispondi
-                  </button>
+                  {/* Nascosto sui messaggi non ancora confermati (id temporaneo, non un vero
+                      uuid): rispondere a uno di questi farebbe fallire l'invio lato server sul
+                      cast della colonna uuid. */}
+                  {!message.status && (
+                    <button onClick={() => onReply(message)} className="hover:text-foreground">
+                      Rispondi
+                    </button>
+                  )}
                   {canDelete(message) && (
                     <button onClick={() => onDelete(message.id)} className="hover:text-danger">
                       Elimina
