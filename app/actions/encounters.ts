@@ -20,6 +20,34 @@ async function requireDmForEncounter(encounterId: string, userId: string) {
   return encounter;
 }
 
+async function getSortedCombatantIds(encounterId: string) {
+  const rows = await db
+    .select({ id: encounterCombatants.id })
+    .from(encounterCombatants)
+    .where(eq(encounterCombatants.encounterId, encounterId))
+    .orderBy(desc(encounterCombatants.iniziativa), asc(encounterCombatants.createdAt));
+  return rows.map((r) => r.id);
+}
+
+// currentTurn è un indice nell'ordine di iniziativa, non un id — aggiungere, rimuovere o
+// riordinare (cambio iniziativa a combattimento in corso) sposta chi occupa quella posizione.
+// Senza riallineamento l'indicatore "è il turno di" resta sull'indice numerico e finisce per
+// puntare silenziosamente a un combattente diverso da quello che stava davvero agendo.
+async function realignCurrentTurn(encounterId: string, oldTurn: number, oldOrder: string[]) {
+  const currentId = oldOrder[oldTurn] ?? null;
+  const newOrder = await getSortedCombatantIds(encounterId);
+  const nextTurnIndex =
+    newOrder.length === 0
+      ? 0
+      : currentId !== null && newOrder.includes(currentId)
+        ? newOrder.indexOf(currentId)
+        : Math.min(oldTurn, newOrder.length - 1);
+  await db
+    .update(campaignEncounters)
+    .set({ currentTurn: nextTurnIndex })
+    .where(eq(campaignEncounters.id, encounterId));
+}
+
 export async function getActiveEncounter(campaignId: string) {
   const userId = await requireUserId();
   await requireMember(campaignId, userId);
@@ -74,6 +102,7 @@ export async function addCombatant(
 ) {
   const userId = await requireUserId();
   const encounter = await requireDmForEncounter(encounterId, userId);
+  const oldOrder = await getSortedCombatantIds(encounterId);
   await db.insert(encounterCombatants).values({
     encounterId,
     nome: combatant.nome,
@@ -84,12 +113,13 @@ export async function addCombatant(
     azioniLeggendarieMax: combatant.azioniLeggendarieMax ?? 0,
     xp: combatant.xp ?? 0,
   });
+  await realignCurrentTurn(encounterId, encounter.currentTurn, oldOrder);
   await broadcastEncounterChanged(encounter.campaignId);
 }
 
 export async function addPartyToEncounter(encounterId: string, campaignId: string) {
   const userId = await requireUserId();
-  await requireDmForEncounter(encounterId, userId);
+  const encounter = await requireDmForEncounter(encounterId, userId);
 
   const [party, already] = await Promise.all([
     db.select().from(campaignCharacters).where(eq(campaignCharacters.campaignId, campaignId)),
@@ -102,6 +132,7 @@ export async function addPartyToEncounter(encounterId: string, campaignId: strin
   const toAdd = party.filter((pc) => !alreadyUserIds.has(pc.userId));
   if (toAdd.length === 0) return;
 
+  const oldOrder = await getSortedCombatantIds(encounterId);
   await db.insert(encounterCombatants).values(
     toAdd.map((pc) => ({
       encounterId,
@@ -113,6 +144,7 @@ export async function addPartyToEncounter(encounterId: string, campaignId: strin
       isPg: true,
     })),
   );
+  await realignCurrentTurn(encounterId, encounter.currentTurn, oldOrder);
   await broadcastEncounterChanged(campaignId);
 }
 
@@ -138,7 +170,12 @@ export async function updateCombatant(
     .where(eq(encounterCombatants.id, combatantId));
   if (!combatant) throw new Error("Combattente non trovato.");
   const encounter = await requireDmForEncounter(combatant.encounterId, userId);
+  // Solo un cambio di iniziativa altera l'ordine di turno — evita una query di riallineamento
+  // in più per gli aggiornamenti frequenti che non lo toccano (HP, condizioni, tiri morte...).
+  const oldOrder =
+    values.iniziativa !== undefined ? await getSortedCombatantIds(combatant.encounterId) : null;
   await db.update(encounterCombatants).set(values).where(eq(encounterCombatants.id, combatantId));
+  if (oldOrder) await realignCurrentTurn(combatant.encounterId, encounter.currentTurn, oldOrder);
   await broadcastEncounterChanged(encounter.campaignId);
 }
 
@@ -150,7 +187,9 @@ export async function removeCombatant(combatantId: string) {
     .where(eq(encounterCombatants.id, combatantId));
   if (!combatant) return;
   const encounter = await requireDmForEncounter(combatant.encounterId, userId);
+  const oldOrder = await getSortedCombatantIds(combatant.encounterId);
   await db.delete(encounterCombatants).where(eq(encounterCombatants.id, combatantId));
+  await realignCurrentTurn(combatant.encounterId, encounter.currentTurn, oldOrder);
   await broadcastEncounterChanged(encounter.campaignId);
 }
 
