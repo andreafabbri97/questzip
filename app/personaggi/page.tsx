@@ -2460,6 +2460,20 @@ function HitPointCalculator({
   onApply: (hpMax: number) => void;
 }) {
   const [hitDice, setHitDice] = useState<number[]>([]);
+
+  // hitDice è indicizzato per POSIZIONE nell'array (ClassEntry non ha un id stabile) — se una
+  // classe viene rimossa o riordinata nella sezione "Classi" qui sopra mentre questo calcolatore
+  // ha già dei dadi scelti, le posizioni si disallineano: il dado scelto per la classe rimossa
+  // finirebbe silenziosamente attribuito a quella successiva. Si azzera la selezione ogni volta
+  // che cambia l'elenco dei nomi di classe, invece di tenere scelte ormai riferite a posizioni
+  // che non corrispondono più alle stesse classi.
+  const classSignature = character.classi.map((c) => c.nome).join("|");
+  const [loadedSignature, setLoadedSignature] = useState(classSignature);
+  if (classSignature !== loadedSignature) {
+    setLoadedSignature(classSignature);
+    setHitDice([]);
+  }
+
   const conModifier = abilityModifier(character.caratteristiche.costituzione);
 
   const suggested = calculateMulticlassHitPoints(
