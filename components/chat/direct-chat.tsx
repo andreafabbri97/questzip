@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
   deleteDirectMessage,
@@ -208,7 +209,12 @@ export function DirectChat({
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-edge px-3 py-2 shrink-0">
-        <p className="text-sm font-bold text-foreground">💬 {otherName ?? "Utente"}</p>
+        <Link
+          href={`/profilo/${otherUserId}`}
+          className="text-sm font-bold text-foreground hover:text-accent-strong transition-colors"
+        >
+          💬 {otherName ?? "Utente"}
+        </Link>
       </div>
       <MessageList
         messages={messages}

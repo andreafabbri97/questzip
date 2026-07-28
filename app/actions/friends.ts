@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/campaign-auth";
 import { canonicalPair } from "@/lib/social-auth";
 import { createNotification } from "@/lib/notifications";
-import { friendRequests, friendships, users } from "@/lib/db/schema";
+import { campaignMembers, campaigns, friendRequests, friendships, users } from "@/lib/db/schema";
 
 export async function searchUsers(query: string) {
   const userId = await requireUserId();
@@ -60,6 +60,46 @@ export async function getFriendsAndRequests() {
     .where(and(eq(friendRequests.richiedenteId, userId), eq(friendRequests.stato, "pending")));
 
   return { friends, incoming, outgoing };
+}
+
+// Profilo pubblico di un altro utente (click su un amico o un membro di campagna) — stesso
+// livello di riservatezza già in uso per searchUsers (nome/foto visibili a chiunque sia loggato,
+// coerente con un gruppo piccolo e conosciuto): niente di privato come personaggi/campagne NON
+// condivise, solo nome/foto, se siete amici e le campagne che avete effettivamente in comune.
+export async function getPublicProfile(userId: string) {
+  const viewerId = await requireUserId();
+  const [user] = await db
+    .select({ id: users.id, name: users.name, image: users.image })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!user) return null;
+
+  let isFriend = false;
+  if (viewerId !== userId) {
+    const [userIdLow, userIdHigh] = canonicalPair(viewerId, userId);
+    const [friendshipRow] = await db
+      .select()
+      .from(friendships)
+      .where(and(eq(friendships.userIdLow, userIdLow), eq(friendships.userIdHigh, userIdHigh)));
+    isFriend = !!friendshipRow;
+  }
+
+  const myCampaignRows = await db
+    .select({ campaignId: campaignMembers.campaignId })
+    .from(campaignMembers)
+    .where(eq(campaignMembers.userId, viewerId));
+  const myCampaignIds = myCampaignRows.map((r) => r.campaignId);
+  const sharedCampaigns = myCampaignIds.length
+    ? await db
+        .select({ id: campaigns.id, nome: campaigns.nome })
+        .from(campaignMembers)
+        .innerJoin(campaigns, eq(campaigns.id, campaignMembers.campaignId))
+        .where(
+          and(eq(campaignMembers.userId, userId), inArray(campaignMembers.campaignId, myCampaignIds)),
+        )
+    : [];
+
+  return { id: user.id, name: user.name, image: user.image, isFriend, sharedCampaigns };
 }
 
 async function finalizeFriendship(userA: string, userB: string) {

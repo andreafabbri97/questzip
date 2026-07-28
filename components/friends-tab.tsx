@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   cancelFriendRequest,
   getFriendsAndRequests,
@@ -90,10 +91,13 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
                 key={u.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2"
               >
-                <span className="flex items-center gap-2 min-w-0">
+                <Link
+                  href={`/profilo/${u.id}`}
+                  className="flex items-center gap-2 min-w-0 hover:text-accent-strong transition-colors"
+                >
                   <Avatar src={u.image} alt="" />
                   <span className="truncate text-sm text-foreground">{u.name ?? u.email}</span>
-                </span>
+                </Link>
                 {friendIds.has(u.id) ? (
                   <span className="text-xs text-muted shrink-0">Già amici</span>
                 ) : outgoingIds.has(u.id) ? (
@@ -123,10 +127,13 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
                 key={r.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2"
               >
-                <span className="flex items-center gap-2 min-w-0 text-sm text-foreground">
+                <Link
+                  href={`/profilo/${r.fromUserId}`}
+                  className="flex items-center gap-2 min-w-0 text-sm text-foreground hover:text-accent-strong transition-colors"
+                >
                   <Avatar src={r.fromImage} alt="" />
                   <span className="truncate">{r.fromName ?? "Utente"}</span>
-                </span>
+                </Link>
                 <span className="flex gap-2 shrink-0">
                   <button
                     onClick={() => act(() => respondToFriendRequest(r.id, true))}
@@ -156,10 +163,13 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
                 key={r.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2"
               >
-                <span className="flex items-center gap-2 min-w-0 text-sm text-foreground">
+                <Link
+                  href={`/profilo/${r.toUserId}`}
+                  className="flex items-center gap-2 min-w-0 text-sm text-foreground hover:text-accent-strong transition-colors"
+                >
                   <Avatar src={r.toImage} alt="" />
                   <span className="truncate">{r.toName ?? "Utente"}</span>
-                </span>
+                </Link>
                 <button
                   onClick={() => act(() => cancelFriendRequest(r.id))}
                   className="text-xs text-muted hover:text-danger shrink-0"
@@ -183,10 +193,13 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
                 key={f.id}
                 className="flex items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2"
               >
-                <span className="flex items-center gap-2 min-w-0 text-sm text-foreground">
+                <Link
+                  href={`/profilo/${f.id}`}
+                  className="flex items-center gap-2 min-w-0 text-sm text-foreground hover:text-accent-strong transition-colors"
+                >
                   <Avatar src={f.image} alt="" />
                   <span className="truncate">{f.name ?? "Utente"}</span>
-                </span>
+                </Link>
                 <span className="flex items-center gap-3 shrink-0">
                   <button
                     onClick={() => onChat(f.id)}

@@ -498,9 +498,18 @@ function CampaignDetailView({
               key={member.userId}
               className="flex items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2"
             >
-              <span className="text-sm text-foreground truncate">
-                {member.name ?? member.email}
-              </span>
+              {member.userId === userId ? (
+                <span className="text-sm text-foreground truncate">
+                  {member.name ?? member.email}
+                </span>
+              ) : (
+                <Link
+                  href={`/profilo/${member.userId}`}
+                  className="text-sm text-foreground truncate hover:text-accent-strong transition-colors"
+                >
+                  {member.name ?? member.email}
+                </Link>
+              )}
               <div className="flex items-center gap-2 shrink-0">
                 {isDm && member.userId !== userId ? (
                   <>
