@@ -184,7 +184,7 @@ function CampaignsPageInner() {
         </p>
         <button
           onClick={() => signIn("google")}
-          className="rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
         >
           Accedi con Google
         </button>
@@ -211,7 +211,7 @@ function CampaignsPageInner() {
 
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-accent-strong">Campagne</h1>
+      <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Campagne</h1>
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -240,7 +240,7 @@ function CampaignsPageInner() {
             <li key={campaign.id}>
               <button
                 onClick={() => setOpenId(campaign.id)}
-                className="w-full h-full text-left rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
+                className="w-full h-full text-left card-elevated rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-foreground">{campaign.nome}</span>
@@ -298,7 +298,7 @@ function CreateOrJoin({
 
   return (
     <div className="grid sm:grid-cols-2 gap-4">
-      <section className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-4 space-y-2">
         <h2 className="text-xs uppercase tracking-widest text-muted">Nuova campagna</h2>
         <input
           value={nome}
@@ -315,13 +315,13 @@ function CreateOrJoin({
         />
         <button
           onClick={create}
-          className="w-full rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          className="w-full glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
         >
           Crea (diventi il master)
         </button>
       </section>
 
-      <section className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-4 space-y-2">
         <h2 className="text-xs uppercase tracking-widest text-muted">Unisciti con un invito</h2>
         <input
           value={code}
@@ -444,7 +444,7 @@ function CampaignDetailView({
         )}
       </div>
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-2">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-2">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-2xl font-display font-bold text-accent-strong">
             {detail.campaign.nome}
@@ -468,7 +468,7 @@ function CampaignDetailView({
       <RollTablesSection campaignId={campaignId} isDm={isDm} />
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm uppercase tracking-widest text-muted">Membri</h2>
           {isDm && (
@@ -537,7 +537,7 @@ function CampaignDetailView({
         </ul>
       </section>
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
         <h2 className="text-sm uppercase tracking-widest text-muted">Party</h2>
         {!party || party.length === 0 ? (
           <p className="text-sm text-muted">
@@ -612,7 +612,7 @@ function CampaignDetailView({
 
       <RegionalMapSection campaignId={campaignId} isDm={isDm} />
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
         <h2 className="text-sm uppercase tracking-widest text-muted">Diario delle sessioni</h2>
         <div className="space-y-2">
           <input
@@ -630,7 +630,7 @@ function CampaignDetailView({
           />
           <button
             onClick={addNote}
-            className="rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
           >
             Aggiungi al diario
           </button>
@@ -1065,7 +1065,7 @@ function JukeboxPlayer({
   const embedUrl = campaign.jukeboxUrl ? getYouTubeEmbedUrl(campaign.jukeboxUrl) : null;
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-4 space-y-2">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <span className="text-xs uppercase tracking-widest text-muted">🎵 Jukebox</span>
         {isDm && (
@@ -1101,7 +1101,7 @@ function JukeboxPlayer({
               setTitolo("");
               onChanged();
             }}
-            className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors"
           >
             Imposta
           </button>
@@ -1118,7 +1118,7 @@ function JukeboxPlayer({
               {!playing && (
                 <button
                   onClick={() => setPlaying(true)}
-                  className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+                  className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
                 >
                   ▶ Riproduci per me
                 </button>
@@ -1183,7 +1183,7 @@ function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boole
   if (handouts.length === 0 && !isDm) return null;
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">📜 Handout</h2>
         {isDm && (
@@ -1216,7 +1216,7 @@ function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boole
               onClick={() => setSelected(selected?.id === h.id ? null : h)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
                 selected?.id === h.id
-                  ? "border-accent bg-accent/15 text-accent-strong"
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface-raised text-muted hover:text-foreground"
               } ${isDm && !h.visibile ? "opacity-60" : ""}`}
             >
@@ -1295,7 +1295,7 @@ function NewHandoutForm({
       <button
         onClick={create}
         disabled={creating || !titolo.trim()}
-        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
       >
         {creating ? "Creo…" : "Crea (nascosto ai giocatori)"}
       </button>
@@ -1355,7 +1355,7 @@ function HandoutDetail({
           <button
             onClick={save}
             disabled={saving}
-            className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
           >
             {saving ? "…" : "Salva"}
           </button>
@@ -1447,7 +1447,7 @@ function RollTablesSection({ campaignId, isDm }: { campaignId: string; isDm: boo
   };
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">🎲 Tabelle personalizzate</h2>
         {isDm && (
@@ -1598,7 +1598,7 @@ function RollTableEditor({
         <button
           onClick={save}
           disabled={saving}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
         >
           {saving ? "…" : "Salva"}
         </button>
@@ -1911,7 +1911,7 @@ function EncounterDmControls({
         </label>
         <button
           onClick={add}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
         >
           Aggiungi
         </button>
@@ -2004,7 +2004,7 @@ function XpDistributor({
         <button
           onClick={grant}
           disabled={granting || perPlayer <= 0 || participantUserIds.length === 0}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
         >
           {granting ? "Assegno…" : granted ? "✓ Assegnato" : "Assegna XP"}
         </button>
@@ -2597,7 +2597,7 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
   if (dungeons === null) return null;
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">🗺️ Dungeon</h2>
         {isDm && (
@@ -2667,7 +2667,7 @@ function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm: boolea
               onClick={() => openDungeon(d.id)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
                 activeId === d.id
-                  ? "border-accent bg-accent/15 text-accent-strong"
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface-raised text-muted hover:text-foreground"
               }`}
             >
@@ -2807,7 +2807,7 @@ function NewDungeonForm({
               onClick={() => setShape(option)}
               className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                 shape === option
-                  ? "border-accent bg-accent/15 text-accent-strong"
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface text-muted hover:text-foreground"
               }`}
             >
@@ -2827,7 +2827,7 @@ function NewDungeonForm({
                 onClick={() => setDensity(option)}
                 className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                   density === option
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface text-muted hover:text-foreground"
                 }`}
               >
@@ -2845,7 +2845,7 @@ function NewDungeonForm({
                 onClick={() => setCorridorStyle(option)}
                 className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                   corridorStyle === option
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface text-muted hover:text-foreground"
                 }`}
               >
@@ -2863,7 +2863,7 @@ function NewDungeonForm({
                 onClick={() => setRemoveDeadends(option)}
                 className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                   removeDeadends === option
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface text-muted hover:text-foreground"
                 }`}
               >
@@ -2881,7 +2881,7 @@ function NewDungeonForm({
                 onClick={() => setStairs(option)}
                 className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                   stairs === option
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface text-muted hover:text-foreground"
                 }`}
               >
@@ -2895,7 +2895,7 @@ function NewDungeonForm({
       <button
         onClick={generate}
         disabled={generating}
-        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
       >
         {generating ? "Genero…" : "🎲 Genera"}
       </button>
@@ -2976,7 +2976,7 @@ function NewOutdoorSceneForm({
               onClick={() => setBiome(option)}
               className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                 biome === option
-                  ? "border-accent bg-accent/15 text-accent-strong"
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface text-muted hover:text-foreground"
               }`}
             >
@@ -2988,7 +2988,7 @@ function NewOutdoorSceneForm({
       <button
         onClick={generate}
         disabled={generating}
-        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
       >
         {generating ? "Genero…" : "🎲 Genera"}
       </button>
@@ -3060,7 +3060,7 @@ function NewBlankDungeonForm({
         <button
           onClick={create}
           disabled={creating}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
         >
           {creating ? "Creo…" : "✏️ Crea tela vuota"}
         </button>
@@ -3306,7 +3306,7 @@ function DungeonViewer({
             }}
             className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
               editMode
-                ? "border-accent bg-accent/15 text-accent-strong"
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                 : "border-edge bg-surface text-muted hover:text-foreground"
             }`}
           >
@@ -3324,7 +3324,7 @@ function DungeonViewer({
                     }}
                     className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                       !markerMode && brush === option
-                        ? "border-accent bg-accent/15 text-accent-strong"
+                        ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                         : "border-edge bg-surface text-muted hover:text-foreground"
                     }`}
                   >
@@ -3342,7 +3342,7 @@ function DungeonViewer({
                     }}
                     className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                       !markerMode && brush === option
-                        ? "border-accent bg-accent/15 text-accent-strong"
+                        ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                         : "border-edge bg-surface text-muted hover:text-foreground"
                     }`}
                   >
@@ -3354,7 +3354,7 @@ function DungeonViewer({
                 onClick={() => setMarkerMode((prev) => !prev)}
                 className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
                   markerMode
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface text-muted hover:text-foreground"
                 }`}
               >
@@ -3394,7 +3394,7 @@ function DungeonViewer({
             }}
             className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
               monsterMode
-                ? "border-accent bg-accent/15 text-accent-strong"
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                 : "border-edge bg-surface text-muted hover:text-foreground"
             }`}
           >
@@ -3528,7 +3528,7 @@ function RoomNotesEditor({
       <button
         onClick={save}
         disabled={saving}
-        className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
       >
         {saving ? "…" : "Salva"}
       </button>
@@ -3982,7 +3982,7 @@ function RegionalMapSection({ campaignId, isDm }: { campaignId: string; isDm: bo
   if (maps === null) return null;
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">🗺️ Mappa regionale</h2>
         {isDm && (
@@ -4016,7 +4016,7 @@ function RegionalMapSection({ campaignId, isDm }: { campaignId: string; isDm: bo
               onClick={() => openMap(m.id)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
                 activeId === m.id
-                  ? "border-accent bg-accent/15 text-accent-strong"
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface-raised text-muted hover:text-foreground"
               }`}
             >
@@ -4102,7 +4102,7 @@ function NewRegionalMapForm({
         <button
           onClick={create}
           disabled={creating}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
         >
           {creating ? "Creo…" : "Crea mappa vuota"}
         </button>
@@ -4201,7 +4201,7 @@ function RegionalMapViewer({
             }}
             className={`rounded-lg border px-2.5 py-1.5 font-bold transition-colors ${
               editMode
-                ? "border-accent bg-accent/15 text-accent-strong"
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                 : "border-edge bg-surface-raised text-muted hover:text-foreground"
             }`}
           >
@@ -4214,7 +4214,7 @@ function RegionalMapViewer({
             }}
             className={`rounded-lg border px-2.5 py-1.5 font-bold transition-colors ${
               markerMode
-                ? "border-accent bg-accent/15 text-accent-strong"
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                 : "border-edge bg-surface-raised text-muted hover:text-foreground"
             }`}
           >

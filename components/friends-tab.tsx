@@ -75,7 +75,7 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <h2 className="text-sm uppercase tracking-widest text-muted">Cerca amici</h2>
         <input
           value={query}
@@ -115,7 +115,7 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
       </section>
 
       {data.incoming.length > 0 && (
-        <section className="rounded-xl border border-edge bg-surface p-5 space-y-2">
+        <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-2">
           <h2 className="text-sm uppercase tracking-widest text-muted">Richieste ricevute</h2>
           <ul className="space-y-1.5">
             {data.incoming.map((r) => (
@@ -148,7 +148,7 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
       )}
 
       {data.outgoing.length > 0 && (
-        <section className="rounded-xl border border-edge bg-surface p-5 space-y-2">
+        <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-2">
           <h2 className="text-sm uppercase tracking-widest text-muted">Richieste inviate</h2>
           <ul className="space-y-1.5">
             {data.outgoing.map((r) => (
@@ -172,7 +172,7 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
         </section>
       )}
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-2">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-2">
         <h2 className="text-sm uppercase tracking-widest text-muted">I tuoi amici</h2>
         {data.friends.length === 0 ? (
           <p className="text-sm text-muted">Nessun amico ancora — cercalo qui sopra.</p>

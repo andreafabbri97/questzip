@@ -71,7 +71,7 @@ function ChatPageInner() {
 
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-accent-strong">Chat</h1>
+      <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Chat</h1>
 
       <div className="flex gap-1.5">
         {(["messaggi", "amici"] as Tab[]).map((t) => (
@@ -80,7 +80,7 @@ function ChatPageInner() {
             onClick={() => setTab(t)}
             className={`rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors ${
               tab === t
-                ? "border-accent bg-accent/15 text-accent-strong"
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                 : "border-edge text-muted hover:text-foreground"
             }`}
           >
@@ -191,7 +191,7 @@ function MessagesTab({
   const threadButtonClass = (active: boolean) =>
     `w-full flex items-center gap-2.5 text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${
       active
-        ? "border-accent bg-accent/15 text-accent-strong"
+        ? "glow-accent border-accent bg-accent/15 text-accent-strong"
         : "border-edge bg-surface text-foreground hover:border-accent/50"
     }`;
 

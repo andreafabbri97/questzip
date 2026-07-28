@@ -61,7 +61,7 @@ export default function ProfiloPage() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm uppercase tracking-widest text-muted">🛡️ I tuoi personaggi</h2>
           <Link href="/personaggi" className="text-xs font-bold text-accent-strong hover:underline">
@@ -90,7 +90,7 @@ export default function ProfiloPage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm uppercase tracking-widest text-muted">🗺️ Le tue campagne</h2>
           <Link href="/campagne" className="text-xs font-bold text-accent-strong hover:underline">
@@ -123,7 +123,7 @@ export default function ProfiloPage() {
         <FriendsTab onChat={(friendId) => router.push(`/chat?thread=dm:${friendId}`)} />
       </section>
 
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <h2 className="text-sm uppercase tracking-widest text-muted">🔔 Notifiche push</h2>
         <PushToggle />
       </section>

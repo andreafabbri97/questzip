@@ -178,7 +178,7 @@ export default function CompendiumPage() {
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-6xl 2xl:max-w-[1500px] mx-auto">
       <div>
-        <h1 className="text-3xl font-bold text-accent-strong">Compendio</h1>
+        <h1 className="heading-ornate text-4xl font-bold text-accent-strong">Compendio</h1>
         <p className="text-sm text-muted mt-1">
           Contenuto completo (non solo SRD) via il mirror dati di{" "}
           <a
@@ -206,10 +206,10 @@ export default function CompendiumPage() {
               setPage(0);
               setSortMode("nome");
             }}
-            className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+            className={`card-elevated-hover rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
               !showRegole && kind === tab.kind
-                ? "border-accent bg-accent/15 text-accent-strong"
-                : "border-edge bg-surface-raised text-muted hover:text-foreground"
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+                : "border-edge bg-surface-raised text-muted hover:text-foreground hover:border-accent/40"
             }`}
           >
             <span className="mr-1.5">{tab.icon}</span>
@@ -218,10 +218,10 @@ export default function CompendiumPage() {
         ))}
         <button
           onClick={() => setShowRegole(true)}
-          className={`rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+          className={`card-elevated-hover rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
             showRegole
-              ? "border-accent bg-accent/15 text-accent-strong"
-              : "border-edge bg-surface-raised text-muted hover:text-foreground"
+              ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+              : "border-edge bg-surface-raised text-muted hover:text-foreground hover:border-accent/40"
           }`}
         >
           <span className="mr-1.5">📚</span>
@@ -245,9 +245,9 @@ export default function CompendiumPage() {
                   setSelected(null);
                   setPage(0);
                 }}
-                className={`rounded-lg border py-1.5 text-xs font-bold transition-colors ${
+                className={`rounded-lg border py-1.5 text-xs font-bold transition-all ${
                   edition === option.value
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted hover:text-foreground"
                 }`}
               >
@@ -265,9 +265,9 @@ export default function CompendiumPage() {
                 key={lang}
                 onClick={() => setLanguage(lang)}
                 title={lang === "en" ? "Inglese (originale)" : "Italiano (traduzione automatica)"}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors ${
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-all ${
                   language === lang
-                    ? "border-accent bg-accent/15"
+                    ? "glow-accent border-accent bg-accent/15"
                     : "border-edge bg-surface-raised hover:border-accent/50"
                 }`}
               >
@@ -294,9 +294,9 @@ export default function CompendiumPage() {
                   setSortMode(option.value);
                   setPage(0);
                 }}
-                className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
                   sortMode === option.value
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted hover:text-foreground"
                 }`}
               >
@@ -312,16 +312,21 @@ export default function CompendiumPage() {
         </p>
       )}
 
-      <input
-        value={query}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setSelected(null);
-          setPage(0);
-        }}
-        placeholder="Cerca (in inglese o italiano)…"
-        className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
-      />
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+          🔍
+        </span>
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSelected(null);
+            setPage(0);
+          }}
+          placeholder="Cerca (in inglese o italiano)…"
+          className="w-full rounded-lg border border-edge bg-surface-raised pl-10 pr-3 py-2.5 text-foreground transition-shadow focus:outline-none focus:border-accent/60 focus:glow-accent"
+        />
+      </div>
 
       <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] lg:gap-6 lg:items-start">
         <div className={selected ? "hidden lg:block space-y-2" : "space-y-2"}>
@@ -336,15 +341,15 @@ export default function CompendiumPage() {
           {!loadingCategory && categoryData && categoryData.length > 0 && results.length === 0 && (
             <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
           )}
-          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
+          <ul className="card-elevated divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
             {results.map((entry) => (
               <li key={`${entry.source}-${entry.name}`}>
                 <button
                   onClick={() => setSelected(entry)}
-                  className={`w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3 ${
+                  className={`w-full text-left px-4 py-3 transition-all flex items-center justify-between gap-3 ${
                     selected && selected.source === entry.source && selected.name === entry.name
                       ? "lg:bg-surface-raised lg:border-l-2 lg:border-accent"
-                      : ""
+                      : "hover:bg-surface-raised hover:pl-5"
                   }`}
                 >
                   <span className="min-w-0 font-bold text-foreground">
@@ -491,7 +496,7 @@ const QUICK_REF_TOPICS: { titolo: string; voci: string[] }[] = [
 function QuickReference() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-accent/40 bg-surface p-4 space-y-3">
+    <div className="card-elevated rounded-xl border border-accent/40 bg-surface p-4 space-y-3">
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="w-full flex items-center justify-between text-left"
@@ -502,7 +507,10 @@ function QuickReference() {
       {open && (
         <div className="grid sm:grid-cols-2 gap-4">
           {QUICK_REF_TOPICS.map((topic) => (
-            <div key={topic.titolo} className="rounded-lg border border-edge bg-surface-raised p-3">
+            <div
+              key={topic.titolo}
+              className="card-elevated-hover rounded-lg border border-edge bg-surface-raised p-3"
+            >
               <p className="text-xs font-bold uppercase tracking-widest text-accent-strong mb-1.5">
                 {topic.titolo}
               </p>
@@ -567,10 +575,10 @@ function RegoleSection() {
               setFonte(f);
               setSelected(null);
             }}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+            className={`card-elevated-hover rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
               fonte === f
-                ? "border-accent bg-accent/15 text-accent-strong"
-                : "border-edge bg-surface-raised text-muted hover:text-foreground"
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+                : "border-edge bg-surface-raised text-muted hover:text-foreground hover:border-accent/40"
             }`}
           >
             {f === "tutte" ? "Tutte le fonti" : REGOLE_FONTI[f]}
@@ -578,15 +586,20 @@ function RegoleSection() {
         ))}
       </div>
 
-      <input
-        value={query}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setSelected(null);
-        }}
-        placeholder="Cerca nel testo…"
-        className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
-      />
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+          🔍
+        </span>
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSelected(null);
+          }}
+          placeholder="Cerca nel testo…"
+          className="w-full rounded-lg border border-edge bg-surface-raised pl-10 pr-3 py-2.5 text-foreground transition-shadow focus:outline-none focus:border-accent/60 focus:glow-accent"
+        />
+      </div>
 
       <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] lg:gap-6 lg:items-start">
         <div className={selectedSection ? "hidden lg:block space-y-2" : "space-y-2"}>
@@ -596,13 +609,15 @@ function RegoleSection() {
           {sections && filtered.length === 0 && (
             <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
           )}
-          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
+          <ul className="card-elevated divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
             {filtered.map((s) => (
               <li key={s.id}>
                 <button
                   onClick={() => setSelected(s.id)}
-                  className={`w-full text-left px-4 py-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3 ${
-                    selected === s.id ? "lg:bg-surface-raised lg:border-l-2 lg:border-accent" : ""
+                  className={`w-full text-left px-4 py-3 transition-all flex items-center justify-between gap-3 ${
+                    selected === s.id
+                      ? "lg:bg-surface-raised lg:border-l-2 lg:border-accent"
+                      : "hover:bg-surface-raised hover:pl-5"
                   }`}
                 >
                   <span className="min-w-0 font-bold text-foreground">{s.titolo}</span>
@@ -617,7 +632,7 @@ function RegoleSection() {
 
         <div className={selectedSection ? "min-w-0" : "hidden lg:block min-w-0"}>
           {selectedSection ? (
-            <div className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+            <div className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
               <button
                 onClick={() => setSelected(null)}
                 className="lg:hidden text-sm text-muted hover:text-foreground"

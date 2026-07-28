@@ -39,7 +39,7 @@ export default function NotifichePage() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold text-accent-strong">🔔 Notifiche</h1>
+        <h1 className="heading-ornate text-3xl font-bold text-accent-strong">🔔 Notifiche</h1>
         {unreadCount > 0 && (
           <button
             onClick={markAllRead}

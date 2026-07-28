@@ -31,7 +31,7 @@ export default function Home() {
   return (
     <div className="space-y-10">
       <section className="text-center pt-8 sm:pt-14 space-y-4">
-        <h1 className="text-4xl sm:text-5xl font-bold text-accent-strong">
+        <h1 className="heading-ornate text-4xl sm:text-5xl font-bold text-accent-strong">
           QuestZip
         </h1>
         <p className="text-muted max-w-xl mx-auto text-balance">
@@ -46,9 +46,11 @@ export default function Home() {
             <Link
               key={section.title}
               href={section.href}
-              className="group rounded-xl border border-edge bg-surface p-5 transition-colors hover:border-accent/50 hover:bg-surface-raised"
+              className="group card-elevated card-elevated-hover rounded-xl border border-edge bg-surface p-5 transition-colors hover:border-accent/50 hover:bg-surface-raised"
             >
-              <div className="text-3xl mb-3">{section.icon}</div>
+              <div className="text-3xl mb-3 transition-transform group-hover:scale-110">
+                {section.icon}
+              </div>
               <h2 className="text-lg font-bold text-foreground group-hover:text-accent-strong transition-colors">
                 {section.title}
               </h2>

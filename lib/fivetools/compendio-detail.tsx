@@ -186,7 +186,9 @@ export function SourceBadge({ source, books }: { source: string; books: Map<stri
   return (
     <span
       className={`text-[10px] font-bold rounded-full px-2 py-0.5 border ${
-        edition === "2024" ? "border-accent text-accent-strong" : "border-edge text-muted"
+        edition === "2024"
+          ? "border-accent bg-accent/15 text-accent-strong"
+          : "border-edge text-muted"
       }`}
       title={meta?.name ?? source}
     >
@@ -215,12 +217,12 @@ export function EntryDetail({
     // questo, dentro un contenitore stretto (es. il modal delle menzioni in chat) su un monitor
     // largo scatterebbero comunque i breakpoint pensati per la pagina Compendio a schermo
     // intero, sfondando il box (bug segnalato dall'utente con screenshot).
-    <div className="@container rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <div className="card-elevated @container rounded-xl border border-edge bg-surface p-5 space-y-4">
       <button onClick={onBack} className="text-sm text-muted hover:text-foreground lg:hidden">
         ← Risultati
       </button>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-2xl font-display font-bold text-accent-strong">
+        <h2 className="heading-ornate text-2xl font-display font-bold text-accent-strong">
           <DualName text={entry.name} />
         </h2>
         <SourceBadge source={entry.source} books={books} />

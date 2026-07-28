@@ -77,7 +77,7 @@ export function DiceRoller() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-edge bg-surface p-5 space-y-5">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-5">
         <div>
           <p className="text-xs uppercase tracking-widest text-muted mb-2">Dado</p>
           <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
@@ -87,7 +87,7 @@ export function DiceRoller() {
                 onClick={() => setDie(sides)}
                 className={`rounded-lg border py-2 text-sm font-bold transition-colors ${
                   die === sides
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted hover:text-foreground"
                 }`}
               >
@@ -132,7 +132,7 @@ export function DiceRoller() {
                 onClick={() => setMode(value)}
                 className={`rounded-lg border py-2 text-sm capitalize transition-colors disabled:opacity-40 ${
                   mode === value && modeEnabled
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted enabled:hover:text-foreground"
                 }`}
               >

@@ -35,11 +35,11 @@ export function Nav() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-edge bg-background/85 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-edge bg-background/85 backdrop-blur shadow-[0_4px_20px_-8px_rgba(0,0,0,0.6)]">
         <div className="max-w-5xl 2xl:max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/icon.svg" alt="" width={28} height={28} />
-            <span className="font-display text-lg font-bold tracking-wide text-accent-strong">
+            <span className="heading-ornate font-display text-lg font-bold tracking-wide text-accent-strong">
               QuestZip
             </span>
           </Link>
@@ -49,7 +49,7 @@ export function Nav() {
                 <button
                   key="dice"
                   onClick={() => setDiceOpen(true)}
-                  className="px-3 py-1.5 rounded-md transition-colors text-muted hover:text-foreground"
+                  className="px-3 py-1.5 rounded-md transition-colors text-muted hover:text-foreground hover:bg-surface-raised/60"
                 >
                   {link.label}
                 </button>
@@ -57,10 +57,10 @@ export function Nav() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`relative px-3 py-1.5 rounded-md transition-colors ${
+                  className={`relative px-3 py-1.5 rounded-md transition-all ${
                     isActive(link.href)
-                      ? "bg-surface-raised text-accent-strong"
-                      : "text-muted hover:text-foreground"
+                      ? "glow-accent bg-accent/10 text-accent-strong"
+                      : "text-muted hover:text-foreground hover:bg-surface-raised/60"
                   }`}
                 >
                   {link.label}
@@ -76,7 +76,7 @@ export function Nav() {
         </div>
       </header>
 
-      <nav className="sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-edge bg-background/95 backdrop-blur">
+      <nav className="sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-edge bg-background/95 backdrop-blur shadow-[0_-4px_20px_-8px_rgba(0,0,0,0.6)]">
         <div className="grid grid-cols-5">
           {links.map((link) =>
             link.kind === "dice" ? (

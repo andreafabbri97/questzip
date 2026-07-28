@@ -256,10 +256,10 @@ export default function CharactersPage() {
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-accent-strong">Personaggi</h1>
+        <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Personaggi</h1>
         <button
           onClick={create}
-          className="rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
         >
           + Nuovo
         </button>
@@ -285,7 +285,7 @@ export default function CharactersPage() {
             <li key={character.id}>
               <button
                 onClick={() => setEditingId(character.id)}
-                className="w-full h-full text-left rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
+                className="w-full h-full text-left card-elevated rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-foreground">
@@ -355,7 +355,7 @@ function UnsavedChangesModal({
         <div className="flex flex-col gap-2">
           <button
             onClick={onSaveAndExit}
-            className="rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
           >
             💾 Salva ed esci
           </button>
@@ -541,7 +541,7 @@ function CharacterSheet({
       )}
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-        <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+        <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
           <label className="block">
             <span className={labelClass}>Nome</span>
             <input
@@ -589,7 +589,7 @@ function CharacterSheet({
           <BackgroundTraits background={character.background} />
         </section>
 
-        <section className="rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
+        <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
           <div className="flex items-center justify-between">
             <h2 className="text-sm uppercase tracking-widest text-muted">
               Classi {character.classi.length > 1 && "(multiclasse)"}
@@ -635,7 +635,7 @@ function CharacterSheet({
       <CampaignSync character={character} onSaveNow={saveNow} />
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-      <section className="rounded-xl border border-edge bg-surface p-5">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
         <h2 className="text-sm uppercase tracking-widest text-muted mb-4">
           Punti ferita e difesa
         </h2>
@@ -791,7 +791,7 @@ function CharacterSheet({
 
       <SpellListSection character={character} onChange={onChange} />
 
-      <section className="rounded-xl border border-edge bg-surface p-5">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
         <label className="block">
           <span className={labelClass}>Note</span>
           <textarea
@@ -907,7 +907,7 @@ function CampaignSync({
   };
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-4 space-y-2">
       {pendingXp > 0 && (
         <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg border border-accent-strong bg-accent/10 px-3 py-2">
           <span className="text-sm text-foreground">
@@ -941,7 +941,7 @@ function CampaignSync({
         <button
           onClick={sync}
           disabled={syncing}
-          className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
         >
           {syncing ? "…" : "Sincronizza"}
         </button>
@@ -1247,7 +1247,7 @@ function ClassFeaturesSection({ character }: { character: Character }) {
   );
   if (classNames.length === 0) return null;
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <h2 className="text-sm uppercase tracking-widest text-muted">Privilegi di classe</h2>
       {classNames.map((name) => (
         <ClassFeaturesToggle key={name} className={name} />
@@ -1324,7 +1324,7 @@ function RaceTraits({ razza }: { razza: string }) {
   if (!razza.trim() || race === null) return null;
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
       <button
         onClick={() => setShowTraits((prev) => !prev)}
         className="text-xs font-bold text-accent-strong hover:underline"
@@ -1612,7 +1612,7 @@ function LevelUpWizard({
                     onClick={() => chooseAsiMode(option.mode)}
                     className={`rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${
                       asiMode === option.mode
-                        ? "border-accent bg-accent/15 text-accent-strong"
+                        ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                         : "border-edge text-muted hover:text-foreground"
                     }`}
                   >
@@ -1636,7 +1636,7 @@ function LevelUpWizard({
                       onClick={() => toggleAsiAbility(ability)}
                       className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                         asiAbilities.includes(ability)
-                          ? "border-accent bg-accent/15 text-accent-strong"
+                          ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                           : "border-edge text-muted hover:text-foreground"
                       }`}
                     >
@@ -1704,7 +1704,7 @@ function PersonalitySection({
     "mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground";
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
       <button
         onClick={() => setExpanded((prev) => !prev)}
         className="text-sm uppercase tracking-widest text-muted hover:text-foreground transition-colors"
@@ -1769,7 +1769,7 @@ function InventorySection({
     setInventario([...character.inventario, { id: crypto.randomUUID(), nome: "", quantita: 1, note: "" }]);
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">Equipaggiamento</h2>
         <button onClick={addItem} className="text-xs font-bold text-accent-strong hover:underline">
@@ -1946,7 +1946,7 @@ function ChipToggle({
               onClick={() => onToggle(opt)}
               className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                 active
-                  ? "border-accent bg-accent/15 text-accent-strong"
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface-raised text-muted hover:text-foreground"
               }`}
             >
@@ -1976,7 +1976,7 @@ function LanguagesAndResistancesSection({
   };
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
       <h2 className="text-sm uppercase tracking-widest text-muted">Lingue e resistenze</h2>
       <ChipToggle
         label="Lingue conosciute"
@@ -2021,7 +2021,7 @@ function ActiveConditionsSection({
   };
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-2">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-2">
       <h2 className="text-sm uppercase tracking-widest text-muted">Condizioni attive</h2>
       <p className="text-xs text-muted">
         Per condizioni che durano oltre un singolo combattimento (es. una maledizione). Durante un
@@ -2050,7 +2050,7 @@ function TalentiSection({
     setTalenti([...character.talenti, { id: crypto.randomUUID(), nome: "" }]);
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">Talenti</h2>
         <button onClick={addTalento} className="text-xs font-bold text-accent-strong hover:underline">
@@ -2185,7 +2185,7 @@ function WeaponsSection({
     setArmi(character.armi.map((weapon) => (weapon.id === id ? { ...weapon, ...patch } : weapon)));
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">Armi e attacchi</h2>
         <button onClick={addWeapon} className="text-xs font-bold text-accent-strong hover:underline">
@@ -2316,7 +2316,7 @@ function SpellListSection({
     ]);
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-muted">Incantesimi conosciuti</h2>
         <button onClick={addSpell} className="text-xs font-bold text-accent-strong hover:underline">
@@ -2593,7 +2593,7 @@ function AbilityScoreSection({
   const usedIndexes = new Set(Object.values(assignment));
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm uppercase tracking-widest text-muted">Caratteristiche</h2>
         <div className="flex gap-1.5 flex-wrap">
@@ -2603,7 +2603,7 @@ function AbilityScoreSection({
               onClick={() => switchMode(m)}
               className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
                 mode === m
-                  ? "border-accent bg-accent/15 text-accent-strong"
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge text-muted hover:text-foreground"
               }`}
             >
@@ -2764,7 +2764,7 @@ function SavingThrowsAndSkills({
   };
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm uppercase tracking-widest text-muted">Tiri salvezza</h2>
         <button
@@ -2834,7 +2834,7 @@ function SavingThrowsAndSkills({
                 onClick={() => cycleSkill(skill.nome)}
                 className={`flex flex-1 min-w-0 items-center justify-between rounded-lg border px-3 py-1.5 text-sm transition-colors ${
                   esperto
-                    ? "border-accent bg-accent/15 text-accent-strong"
+                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : competente
                       ? "border-accent/50 bg-accent/5 text-foreground"
                       : "border-edge bg-surface-raised text-muted hover:text-foreground"
@@ -2943,7 +2943,7 @@ function SpellSlotsSection({
   const shortRest = () => onChange({ ...character, slotPattoUsati: 0 });
 
   return (
-    <section className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm uppercase tracking-widest text-muted">Slot incantesimi</h2>
         <div className="flex gap-3">
