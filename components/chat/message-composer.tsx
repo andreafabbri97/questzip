@@ -8,6 +8,11 @@ import {
 } from "@/lib/fivetools/mention-search";
 import { MENTION_CHIP_CLASS, encodeMentionToken, type ParsedMentionToken } from "@/lib/fivetools/mention-token";
 
+// Zero-width space (non un nodo di testo vuoto) usato come ancora del cursore dopo un <br> — vedi
+// insertLineBreakAtCaret più sotto per il perché. Rimosso qui in serializeEditor prima che il
+// testo venga considerato quello scritto davvero dall'utente.
+const CARET_ANCHOR = "​";
+
 // Una chip menzione è un nodo NON editabile dentro il div contenteditable — il browser la tratta
 // già come un'unica unità per il cursore/Backspace (comportamento nativo, nessuna gestione a
 // mano necessaria), e porta con sé tipo+fonte come data-attribute, invece di doverli ritrovare
@@ -45,7 +50,11 @@ function serializeEditor(root: HTMLElement): string {
       out += node.textContent ?? "";
     }
   }
-  return out;
+  // Il browser converte a volte lo spazio digitato subito dopo una chip in uno spazio "non
+  // divisibile" (U+00A0, per non farlo collassare secondo le regole HTML) — invisibile ma un
+  // carattere diverso da uno spazio normale (verificato col test Playwright sopra). Normalizzato
+  // qui, l'utente non ha mai scelto consapevolmente un carattere speciale.
+  return out.replaceAll(CARET_ANCHOR, "").replaceAll(" ", " ");
 }
 
 // "#" seguito da testo senza spazi, esattamente al cursore — stessa query di prima, ma letta dal
@@ -68,6 +77,11 @@ function detectMentionQuery(
   return { node, matchStart: range.startOffset - match[0].length, caretOffset: range.startOffset, query: match[1] };
 }
 
+// Verificato con un test Playwright reale (emulazione mobile, Pixel 7 e iPhone 14): con un nodo
+// di testo VUOTO come ancora, Chromium fa atterrare il testo digitato subito dopo PRIMA del <br>
+// invece che dopo (probabile pulizia interna dei nodi di testo vuoti in un contenteditable) — un
+// carattere invisibile ma non-vuoto (CARET_ANCHOR) risolve, stesso trucco usato dagli editor di
+// testo ricco (Slate, Draft.js) per lo stesso identico problema.
 function insertLineBreakAtCaret() {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return;
@@ -75,7 +89,9 @@ function insertLineBreakAtCaret() {
   range.deleteContents();
   const br = document.createElement("br");
   range.insertNode(br);
-  range.setStartAfter(br);
+  const anchor = document.createTextNode(CARET_ANCHOR);
+  br.parentNode?.insertBefore(anchor, br.nextSibling);
+  range.setStart(anchor, 0);
   range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
