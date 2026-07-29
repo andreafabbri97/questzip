@@ -125,9 +125,15 @@ export async function addCombatant(
   await broadcastEncounterChanged(encounter.campaignId);
 }
 
-export async function addPartyToEncounter(encounterId: string, campaignId: string) {
+export async function addPartyToEncounter(encounterId: string) {
   const userId = await requireUserId();
   const encounter = await requireDmForEncounter(encounterId, userId);
+  // campaignId preso da encounter (già verificato da requireDmForEncounter), MAI da un parametro
+  // passato dal chiamante — un secondo campaignId fornito a parte avrebbe permesso di importare
+  // nel proprio encounter il party sincronizzato di una campagna diversa, anche una a cui non si
+  // è più membri, dato che l'id campagna compare in chiaro nell'URL della chat e resta noto per
+  // sempre a chi ci è stato anche una volta.
+  const campaignId = encounter.campaignId;
 
   const [party, already] = await Promise.all([
     db.select().from(campaignCharacters).where(eq(campaignCharacters.campaignId, campaignId)),

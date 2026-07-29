@@ -1,4 +1,6 @@
-import type { CompendiumKind } from "@/lib/fivetools/data";
+import { COMPENDIUM_KINDS, type CompendiumKind } from "@/lib/fivetools/data";
+
+const VALID_KINDS = new Set<string>(COMPENDIUM_KINDS);
 
 export interface ParsedMentionToken {
   name: string;
@@ -22,11 +24,17 @@ export function encodeMentionToken(name: string, kind: CompendiumKind, source: s
   return `#{${name}|${kind}|${source}}`;
 }
 
+// Il token può arrivare da un messaggio scritto da chiunque, non solo da una chip scelta
+// dall'autocomplete — niente vieta di digitarlo a mano con un "kind" inventato. Un token con kind
+// non valido viene mostrato come testo semplice (il "#{...}" grezzo) invece che come chip
+// cliccabile: senza questo controllo, cliccarla avrebbe fatto crashare MentionModal (kind
+// sconosciuto in MENTION_KIND_LOADERS, nessun error boundary a contenere il danno).
 export function splitMessageWithMentions(testo: string): (string | ParsedMentionToken)[] {
   const parts: (string | ParsedMentionToken)[] = [];
   let lastIndex = 0;
   for (const match of testo.matchAll(MENTION_TOKEN_RE)) {
     if (match.index === undefined) continue;
+    if (!VALID_KINDS.has(match[2])) continue;
     if (match.index > lastIndex) parts.push(testo.slice(lastIndex, match.index));
     parts.push({ name: match[1], kind: match[2] as CompendiumKind, source: match[3] });
     lastIndex = match.index + match[0].length;

@@ -192,6 +192,37 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
     }
   };
 
+  // Ritenta l'invio di una bolla "failed", riusando lo stesso id temporaneo (torna "sending" sul
+  // posto invece di sparire e ricomparire) — il messaggio non è mai arrivato al server la prima
+  // volta, quindi non c'è nulla da "aggiornare" lì, è un invio nuovo a tutti gli effetti.
+  const retry = async (message: ChatMessageData) => {
+    setError("");
+    const tempId = message.id;
+    setMessages(
+      (prev) => prev?.map((m) => (m.id === tempId ? { ...m, status: "sending" as const } : m)) ?? prev,
+    );
+    const sig = messageSignature(message);
+    const queue = pendingRef.current.get(sig) ?? [];
+    queue.push(tempId);
+    pendingRef.current.set(sig, queue);
+    try {
+      const real = await sendCampaignChatMessage(campaignId, message.testo, message.replyToId ?? undefined);
+      if (real) upsertMessage(real, tempId);
+      else setMessages((prev) => prev?.filter((m) => m.id !== tempId) ?? prev);
+    } catch (err) {
+      setMessages(
+        (prev) => prev?.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)) ?? prev,
+      );
+      setError((err as Error).message);
+    }
+  };
+
+  // Una bolla "failed" non è mai arrivata al server — rimuoverla è un'operazione puramente
+  // locale, non una server action (a differenza di "Elimina" su un messaggio confermato).
+  const dismissFailed = (messageId: string) => {
+    setMessages((prev) => prev?.filter((m) => m.id !== messageId) ?? prev);
+  };
+
   const remove = async (messageId: string) => {
     setError("");
     try {
@@ -213,6 +244,8 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
         resolveAuthor={resolveAuthor}
         onReply={setReplyTo}
         onDelete={remove}
+        onRetry={retry}
+        onDismissFailed={dismissFailed}
         onOpenMention={setOpenMention}
       />
       {error && <p className="px-3 text-xs text-danger shrink-0">{error}</p>}

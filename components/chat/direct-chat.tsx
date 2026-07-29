@@ -197,6 +197,36 @@ export function DirectChat({
     }
   };
 
+  // Ritenta l'invio di una bolla "failed", riusando lo stesso id temporaneo — vedi lo stesso
+  // helper in campaign-chat.tsx.
+  const retry = async (message: ChatMessageData) => {
+    setError("");
+    if (!userId) return;
+    const tempId = message.id;
+    setMessages(
+      (prev) => prev?.map((m) => (m.id === tempId ? { ...m, status: "sending" as const } : m)) ?? prev,
+    );
+    const sig = messageSignature(message);
+    const queue = pendingRef.current.get(sig) ?? [];
+    queue.push(tempId);
+    pendingRef.current.set(sig, queue);
+    try {
+      const real = await sendDirectMessage(otherUserId, message.testo, message.replyToId ?? undefined);
+      if (real) upsertMessage(real, tempId);
+      else setMessages((prev) => prev?.filter((m) => m.id !== tempId) ?? prev);
+    } catch (err) {
+      setMessages(
+        (prev) => prev?.map((m) => (m.id === tempId ? { ...m, status: "failed" as const } : m)) ?? prev,
+      );
+      setError((err as Error).message);
+    }
+  };
+
+  // Una bolla "failed" non è mai arrivata al server — rimuoverla è puramente locale.
+  const dismissFailed = (messageId: string) => {
+    setMessages((prev) => prev?.filter((m) => m.id !== messageId) ?? prev);
+  };
+
   const remove = async (messageId: string) => {
     setError("");
     try {
@@ -223,6 +253,8 @@ export function DirectChat({
         resolveAuthor={resolveAuthor}
         onReply={setReplyTo}
         onDelete={remove}
+        onRetry={retry}
+        onDismissFailed={dismissFailed}
         onOpenMention={setOpenMention}
       />
       {error && <p className="px-3 text-xs text-danger shrink-0">{error}</p>}

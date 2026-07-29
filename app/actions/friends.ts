@@ -11,8 +11,11 @@ export async function searchUsers(query: string) {
   const userId = await requireUserId();
   const q = query.trim();
   if (q.length < 2) return [];
+  // La ricerca funziona anche per email (comodo se non ricordi il nome esatto di qualcuno), ma
+  // l'email non va MAI restituita nei risultati — coerente con la scelta già fatta in
+  // getPublicProfile di non esporre dati personali oltre a nome/foto a chiunque sia loggato.
   return db
-    .select({ id: users.id, name: users.name, image: users.image, email: users.email })
+    .select({ id: users.id, name: users.name, image: users.image })
     .from(users)
     .where(
       and(ne(users.id, userId), or(ilike(users.name, `%${q}%`), ilike(users.email, `%${q}%`))),

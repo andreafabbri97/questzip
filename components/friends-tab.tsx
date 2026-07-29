@@ -96,7 +96,7 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
                   className="flex items-center gap-2 min-w-0 hover:text-accent-strong transition-colors"
                 >
                   <Avatar src={u.image} alt="" />
-                  <span className="truncate text-sm text-foreground">{u.name ?? u.email}</span>
+                  <span className="truncate text-sm text-foreground">{u.name ?? "Utente"}</span>
                 </Link>
                 {friendIds.has(u.id) ? (
                   <span className="text-xs text-muted shrink-0">Già amici</span>

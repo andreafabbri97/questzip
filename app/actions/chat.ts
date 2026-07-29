@@ -49,7 +49,10 @@ export async function sendCampaignChatMessage(campaignId: string, testo: string,
   const userId = await requireUserId();
   await requireMember(campaignId, userId);
 
-  const trimmed = testo.trim();
+  // Tetto generoso (non i pochi caratteri di un nome campagna): un messaggio di chat può
+  // legittimamente contenere diversi token #{Nome|tipo|fonte}, un limite troppo stretto
+  // rischierebbe di tagliarne uno a metà.
+  const trimmed = testo.trim().slice(0, 4000);
   if (!trimmed) return null;
 
   // Scatto di autore/testo del messaggio a cui si risponde, preso ORA — non una join, così la
@@ -57,10 +60,13 @@ export async function sendCampaignChatMessage(campaignId: string, testo: string,
   let replyToAuthorId: string | null = null;
   let replyToTesto: string | null = null;
   if (replyToId) {
+    // Il messaggio citato deve appartenere a QUESTA campagna, non solo esistere da qualche parte
+    // — senza questo filtro, un id di messaggio visto in passato (es. prima di essere rimossi
+    // dalla campagna) resterebbe utilizzabile come citazione anche dopo la revoca dell'accesso.
     const [original] = await db
       .select({ authorId: campaignChatMessages.authorId, testo: campaignChatMessages.testo })
       .from(campaignChatMessages)
-      .where(eq(campaignChatMessages.id, replyToId));
+      .where(and(eq(campaignChatMessages.id, replyToId), eq(campaignChatMessages.campaignId, campaignId)));
     if (original) {
       replyToAuthorId = original.authorId;
       replyToTesto = original.testo;
@@ -145,23 +151,33 @@ export async function sendDirectMessage(otherUserId: string, testo: string, repl
   const userId = await requireUserId();
   await requireFriendship(userId, otherUserId);
 
-  const trimmed = testo.trim();
+  const trimmed = testo.trim().slice(0, 4000);
   if (!trimmed) return null;
+
+  const [userIdLow, userIdHigh] = canonicalPair(userId, otherUserId);
 
   let replyToAuthorId: string | null = null;
   let replyToTesto: string | null = null;
   if (replyToId) {
+    // Il messaggio citato deve appartenere a QUESTA conversazione (stessa coppia utenti), non
+    // solo esistere da qualche parte — senza questo filtro, un id di messaggio visto in passato
+    // in una DM resterebbe citabile anche dopo la fine dell'amicizia.
     const [original] = await db
       .select({ authorId: directMessages.authorId, testo: directMessages.testo })
       .from(directMessages)
-      .where(eq(directMessages.id, replyToId));
+      .where(
+        and(
+          eq(directMessages.id, replyToId),
+          eq(directMessages.userIdLow, userIdLow),
+          eq(directMessages.userIdHigh, userIdHigh),
+        ),
+      );
     if (original) {
       replyToAuthorId = original.authorId;
       replyToTesto = original.testo;
     }
   }
 
-  const [userIdLow, userIdHigh] = canonicalPair(userId, otherUserId);
   const [message] = await db
     .insert(directMessages)
     .values({

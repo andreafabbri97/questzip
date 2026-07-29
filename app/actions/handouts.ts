@@ -33,9 +33,9 @@ export async function createHandout(
     .values({
       campaignId,
       createdBy: userId,
-      titolo: titolo.trim() || "Senza titolo",
-      testo,
-      immagineUrl: immagineUrl.trim() || null,
+      titolo: (titolo.trim() || "Senza titolo").slice(0, 100),
+      testo: testo.slice(0, 10000),
+      immagineUrl: immagineUrl.trim().slice(0, 2000) || null,
     })
     .returning();
   return handout;
@@ -56,9 +56,9 @@ export async function updateHandout(
   await db
     .update(campaignHandouts)
     .set({
-      titolo: values.titolo.trim() || "Senza titolo",
-      testo: values.testo,
-      immagineUrl: values.immagineUrl.trim() || null,
+      titolo: (values.titolo.trim() || "Senza titolo").slice(0, 100),
+      testo: values.testo.slice(0, 10000),
+      immagineUrl: values.immagineUrl.trim().slice(0, 2000) || null,
     })
     .where(eq(campaignHandouts.id, handoutId));
 }

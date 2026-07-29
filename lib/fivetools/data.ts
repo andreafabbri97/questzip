@@ -1,15 +1,21 @@
 import { RAW_BASE } from "@/lib/fivetools/books";
 import type { FiveEntry } from "@/lib/fivetools/entries";
 
-export type CompendiumKind =
-  | "incantesimi"
-  | "mostri"
-  | "oggetti"
-  | "razze"
-  | "talenti"
-  | "background"
-  | "condizioni"
-  | "classi";
+// Array (non solo il tipo) apposta: serve anche a runtime per validare un CompendiumKind che
+// arriva da fuori TypeScript — es. un token menzione #{Nome|kind|fonte} scritto a mano dentro un
+// messaggio di chat, dove un cast "as CompendiumKind" da solo non basta a fermare un valore
+// inventato (vedi lib/fivetools/mention-token.ts).
+export const COMPENDIUM_KINDS = [
+  "incantesimi",
+  "mostri",
+  "oggetti",
+  "razze",
+  "talenti",
+  "background",
+  "condizioni",
+  "classi",
+] as const;
+export type CompendiumKind = (typeof COMPENDIUM_KINDS)[number];
 export type EditionFilter = "2014" | "2024" | "entrambe";
 
 // Tutti i libri con contenuto incantesimi (17 file, ~1.5 MB totali).

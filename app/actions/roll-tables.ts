@@ -20,7 +20,12 @@ export async function createRollTable(campaignId: string, nome: string) {
   await requireDm(campaignId, userId);
   const [table] = await db
     .insert(campaignRollTables)
-    .values({ campaignId, createdBy: userId, nome: nome.trim() || "Tabella senza nome", voci: [] })
+    .values({
+      campaignId,
+      createdBy: userId,
+      nome: (nome.trim() || "Tabella senza nome").slice(0, 100),
+      voci: [],
+    })
     .returning();
   return table;
 }
@@ -34,9 +39,12 @@ export async function updateRollTable(tableId: string, nome: string, voci: RollT
   if (!table) throw new Error("Tabella non trovata.");
   await requireDm(table.campaignId, userId);
 
+  const cappedVoci = voci
+    .slice(0, 200)
+    .map((v) => ({ ...v, testo: v.testo.slice(0, 300) }));
   await db
     .update(campaignRollTables)
-    .set({ nome: nome.trim() || "Tabella senza nome", voci })
+    .set({ nome: (nome.trim() || "Tabella senza nome").slice(0, 100), voci: cappedVoci })
     .where(eq(campaignRollTables.id, tableId));
 }
 

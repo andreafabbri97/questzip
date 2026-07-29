@@ -18,9 +18,12 @@ import { broadcastJukeboxChanged } from "@/lib/party";
 
 export async function createCampaign(nome: string, descrizione: string) {
   const userId = await requireUserId();
+  // Le colonne testo di Postgres non hanno un limite intrinseco (a differenza di varchar(n)) —
+  // un tetto qui evita che un nome/descrizione enorme finisca ovunque venga mostrato (liste,
+  // header, link condivisi) senza nessun controllo a monte.
   const [campaign] = await db
     .insert(campaigns)
-    .values({ nome, descrizione, ownerId: userId })
+    .values({ nome: nome.trim().slice(0, 100), descrizione: descrizione.trim().slice(0, 2000), ownerId: userId })
     .returning();
   await db.insert(campaignMembers).values({
     campaignId: campaign.id,

@@ -70,6 +70,8 @@ export function MessageList({
   resolveAuthor,
   onReply,
   onDelete,
+  onRetry,
+  onDismissFailed,
   onOpenMention,
 }: {
   messages: ChatMessageData[];
@@ -78,6 +80,8 @@ export function MessageList({
   resolveAuthor: (userId: string) => ChatAuthor;
   onReply: (message: ChatMessageData) => void;
   onDelete: (messageId: string) => void;
+  onRetry: (message: ChatMessageData) => void;
+  onDismissFailed: (messageId: string) => void;
   onOpenMention: (mention: ParsedMentionToken) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -172,10 +176,28 @@ export function MessageList({
                       Rispondi
                     </button>
                   )}
-                  {canDelete(message) && (
+                  {/* "Elimina" chiama una server action con l'id del messaggio — su una bolla
+                      ancora "sending"/"failed" quell'id è temporaneo (non un vero uuid), la
+                      query fallirebbe con un errore Postgres grezzo invece di rimuoverla. Una
+                      bolla "failed" ha invece Riprova/Rimuovi, puramente locali (il messaggio
+                      non è mai arrivato al server, niente da cancellare lì). */}
+                  {!message.status && canDelete(message) && (
                     <button onClick={() => onDelete(message.id)} className="hover:text-danger">
                       Elimina
                     </button>
+                  )}
+                  {message.status === "failed" && (
+                    <>
+                      <button onClick={() => onRetry(message)} className="hover:text-foreground">
+                        Riprova
+                      </button>
+                      <button
+                        onClick={() => onDismissFailed(message.id)}
+                        className="hover:text-danger"
+                      >
+                        Rimuovi
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

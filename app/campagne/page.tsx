@@ -1850,7 +1850,7 @@ function EncounterDmControls({
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={async () => {
-            await addPartyToEncounter(encounter.id, campaignId);
+            await addPartyToEncounter(encounter.id);
             onChange();
           }}
           className="text-xs font-bold rounded-lg border border-edge px-2 py-1.5 text-foreground hover:border-accent transition-colors"
