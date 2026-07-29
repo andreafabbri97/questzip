@@ -181,10 +181,17 @@ export async function inviteFriendToCampaign(campaignId: string, friendUserId: s
     );
   if (existingInvite) return;
 
-  const [invite] = await db
-    .insert(campaignFriendInvites)
-    .values({ campaignId, invitedUserId: friendUserId, invitedBy: userId })
-    .returning();
+  let invite: typeof campaignFriendInvites.$inferSelect;
+  try {
+    [invite] = await db
+      .insert(campaignFriendInvites)
+      .values({ campaignId, invitedUserId: friendUserId, invitedBy: userId })
+      .returning();
+  } catch {
+    // Vinto dal vincolo unico parziale (due chiamate quasi simultanee) — equivale al ramo
+    // "existingInvite" sopra, l'invito pendente esiste già.
+    return;
+  }
 
   const [campaign] = await db.select({ nome: campaigns.nome }).from(campaigns).where(eq(campaigns.id, campaignId));
   const [inviter] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));

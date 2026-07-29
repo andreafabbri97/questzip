@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -9,6 +9,7 @@ import {
   pgEnum,
   jsonb,
   unique,
+  uniqueIndex,
   boolean,
   index,
 } from "drizzle-orm/pg-core";
@@ -376,17 +377,30 @@ export const friendRequestStatusEnum = pgEnum("friend_request_status", [
   "rifiutata",
 ]);
 
-export const friendRequests = pgTable("friend_request", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  richiedenteId: text("richiedente_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  destinatarioId: text("destinatario_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  stato: friendRequestStatusEnum("stato").notNull().default("pending"),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+export const friendRequests = pgTable(
+  "friend_request",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    richiedenteId: text("richiedente_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    destinatarioId: text("destinatario_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    stato: friendRequestStatusEnum("stato").notNull().default("pending"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Solo per lo stato "pending" (indice parziale): due richieste accettate/rifiutate in
+    // passato fra la stessa coppia restano nello storico senza problemi, è solo UNA richiesta
+    // pendente per coppia che non ha senso duplicare — sendFriendRequest fa un controllo "esiste
+    // già?" seguito da un insert separato, non atomico: senza questo vincolo, due chiamate quasi
+    // simultanee passano entrambe il controllo e inseriscono due righe pending distinte.
+    uniqueIndex("friend_request_pending_pair_idx")
+      .on(table.richiedenteId, table.destinatarioId)
+      .where(sql`${table.stato} = 'pending'`),
+  ],
+);
 
 // Relazione di amicizia effettiva, separata dallo storico richieste (stesso principio già usato
 // per campaignInvites/campaignMembers): PK composita su una coppia di userId in ordine
@@ -415,20 +429,30 @@ export const campaignFriendInviteStatusEnum = pgEnum("campaign_friend_invite_sta
 // Invito mirato a un amico specifico, in aggiunta al link/codice generico di campaignInvites
 // (che resta invariato — utile per chi non è ancora amico su QuestZip). Solo il master può
 // crearlo, stessa regola già in vigore per createInvite.
-export const campaignFriendInvites = pgTable("campaign_friend_invite", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  campaignId: uuid("campaign_id")
-    .notNull()
-    .references(() => campaigns.id, { onDelete: "cascade" }),
-  invitedUserId: text("invited_user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  invitedBy: text("invited_by")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  stato: campaignFriendInviteStatusEnum("stato").notNull().default("pending"),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+export const campaignFriendInvites = pgTable(
+  "campaign_friend_invite",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    invitedUserId: text("invited_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    invitedBy: text("invited_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    stato: campaignFriendInviteStatusEnum("stato").notNull().default("pending"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Stesso principio di friend_request_pending_pair_idx sopra — inviteFriendToCampaign fa lo
+    // stesso controllo "esiste già?" non atomico seguito da un insert separato.
+    uniqueIndex("campaign_friend_invite_pending_idx")
+      .on(table.campaignId, table.invitedUserId)
+      .where(sql`${table.stato} = 'pending'`),
+  ],
+);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
   "friend_request",

@@ -158,7 +158,15 @@ export async function sendFriendRequest(targetUserId: string) {
     );
   if (existingOutgoing) return;
 
-  await db.insert(friendRequests).values({ richiedenteId: userId, destinatarioId: targetUserId });
+  try {
+    await db.insert(friendRequests).values({ richiedenteId: userId, destinatarioId: targetUserId });
+  } catch {
+    // Vinto dal vincolo unico parziale su (richiedente, destinatario) pending — due chiamate
+    // quasi simultanee (doppio tap, due schede aperte) hanno superato entrambe il controllo
+    // "existingOutgoing" qui sopra prima che la prima riga fosse scritta: equivale esattamente
+    // a quel ramo, la richiesta pendente esiste già, niente da fare.
+    return;
+  }
   await createNotification(targetUserId, "friend_request", { fromUserId: userId, fromName: myName });
 }
 
