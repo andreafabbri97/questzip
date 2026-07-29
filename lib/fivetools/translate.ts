@@ -38,6 +38,61 @@ const KNOWN_IT_TO_EN: Record<string, string> = Object.fromEntries(
   Object.entries(KNOWN_EN_TO_IT).map(([en, it]) => [it.toLowerCase(), en]),
 );
 
+// Correzioni aggiuntive SOLO per la ricerca IT->EN nell'autocompletamento di Personaggi (armi,
+// oggetti, incantesimi, background, talenti) — verificate una per una contro il catalogo reale
+// 5etools (script throwaway, non nel repo) prima di aggiungerle, non indovinate. Coprono due tipi
+// di errore di Google Translate: termini omografi in inglese (es. "spada"->"spade", il seme delle
+// carte, invece di "sword") e terminologia D&D non letterale (es. "ragnatela"->"spiderweb" invece
+// di "web", il nome ufficiale dell'incantesimo). Elenco piccolo e mirato ai termini più comuni,
+// non un dizionario esaustivo per l'intero compendio (centinaia di incantesimi/oggetti restano
+// sulla sola traduzione automatica — stessa scelta già presa altrove in questo progetto quando il
+// costo di un dizionario a mano non è proporzionato alla cardinalità del set).
+const KNOWN_IT_TO_EN_EXTRA: Record<string, string> = {
+  // armi
+  spada: "sword",
+  spadone: "sword",
+  accetta: "axe",
+  maglio: "maul",
+  roncone: "glaive",
+  stiletto: "dagger",
+  fioretto: "rapier",
+  "arco lungo": "longbow",
+  "arco corto": "shortbow",
+  "piccone da guerra": "pick",
+  // oggetti
+  otre: "waterskin",
+  scala: "ladder",
+  manette: "manacles",
+  grimaldello: "thieves",
+  "pozione di guarigione": "potion of healing",
+  // incantesimi
+  "dardo di fuoco": "fire bolt",
+  "cura ferite": "cure wounds",
+  velocità: "haste",
+  "tocco gelido": "chill touch",
+  "individuazione del magico": "detect magic",
+  "parola di guarigione": "healing word",
+  "armatura magica": "mage armor",
+  ragnatela: "web",
+  "immobilizzare persone": "hold person",
+  "passo velato": "misty step",
+  "contro incantesimo": "counterspell",
+  "porta dimensionale": "dimension door",
+  "nube mefitica": "stinking cloud",
+  // background
+  "eroe del popolo": "folk hero",
+  forestiero: "outlander",
+  saggio: "sage",
+  "artigiano di gilda": "guild artisan",
+  monello: "urchin",
+  // talenti
+  atletico: "athlete",
+  duro: "tough",
+  "tiratore scelto": "sharpshooter",
+  schermitore: "duelist",
+  guardiano: "sentinel",
+};
+
 let cache: Record<string, string> | null = null;
 
 function loadCache(): Record<string, string> {
@@ -73,7 +128,7 @@ export async function translateText(
     if (known) return known;
   }
   if (source === "it" && target === "en") {
-    const known = KNOWN_IT_TO_EN[trimmed.toLowerCase()];
+    const known = KNOWN_IT_TO_EN[trimmed.toLowerCase()] ?? KNOWN_IT_TO_EN_EXTRA[trimmed.toLowerCase()];
     if (known) return known;
   }
 

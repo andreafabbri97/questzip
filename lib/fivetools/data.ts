@@ -232,6 +232,7 @@ export function loadCreatures(): Promise<RawCreature[]> {
 }
 
 let itemsPromise: Promise<RawItem[]> | null = null;
+/** Solo oggetti MAGICI (rarità reale) — usato dal tab "Oggetti magici" del Compendio. */
 export function loadItems(): Promise<RawItem[]> {
   if (!itemsPromise) {
     itemsPromise = fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) =>
@@ -239,6 +240,28 @@ export function loadItems(): Promise<RawItem[]> {
     );
   }
   return itemsPromise;
+}
+
+interface BaseItemsFile {
+  baseitem: RawItem[];
+}
+
+let inventoryItemsPromise: Promise<RawItem[]> | null = null;
+/**
+ * Oggetti magici + oggetti/armi/armature comuni ("mundane"), per l'Inventario nella scheda
+ * Personaggio (non il Compendio, che resta filtrato ai soli magici via loadItems). Le armi/armature
+ * base (Spada lunga, Torcia, Corda...) vivono in items-base.json, un file SEPARATO da items.json:
+ * senza unirlo, l'Inventario non trovava nemmeno gli oggetti più comuni citati nel suo stesso
+ * placeholder ("torcia…").
+ */
+export function loadInventoryItems(): Promise<RawItem[]> {
+  if (!inventoryItemsPromise) {
+    inventoryItemsPromise = Promise.all([
+      fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) => file?.item ?? []),
+      fetchJson<BaseItemsFile>(`${RAW_BASE}/items-base.json`).then((file) => file?.baseitem ?? []),
+    ]).then(([items, baseItems]) => [...items, ...baseItems]);
+  }
+  return inventoryItemsPromise;
 }
 
 let racesPromise: Promise<RawRace[]> | null = null;

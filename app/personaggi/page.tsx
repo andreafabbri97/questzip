@@ -66,7 +66,7 @@ import {
   loadBackgrounds,
   loadClassData,
   loadFeats,
-  loadItems,
+  loadInventoryItems,
   loadRaces,
   loadSpells,
   resolveClassFeatures,
@@ -2050,7 +2050,7 @@ function InventorySection({
                         character.inventario.map((i) => (i.id === item.id ? { ...i, nome } : i)),
                       )
                     }
-                    loader={loadItems}
+                    loader={loadInventoryItems}
                     placeholder="Pozione di Guarigione, Spada +1, torcia…"
                     inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
                   />
@@ -2128,7 +2128,7 @@ function InventoryItemInfo({ nome }: { nome: string }) {
   );
 
   useEffect(() => {
-    loadItems().then(setItems);
+    loadInventoryItems().then(setItems);
   }, []);
 
   const match = items?.find((i) => i.name.toLowerCase() === nome.trim().toLowerCase()) ?? null;
@@ -2161,7 +2161,7 @@ function InventoryItemInfo({ nome }: { nome: string }) {
         onClick={() => setShowInfo((prev) => !prev)}
         className="text-xs font-bold text-accent-strong hover:underline"
       >
-        {[rarity, attunement].filter(Boolean).join(" · ") || "Oggetto magico"}
+        {[rarity, attunement].filter(Boolean).join(" · ") || "Dettagli"}
         {" — "}
         {showInfo ? "Nascondi" : "Come funziona"}
       </button>
