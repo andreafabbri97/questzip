@@ -21,6 +21,8 @@ import {
   DAMAGE_TYPES,
   LANGUAGES,
   POINT_BUY_BUDGET,
+  RECUPERO_LABELS,
+  RECUPERO_OPTIONS,
   SKILLS,
   STANDARD_ARRAY,
   abilityModifier,
@@ -54,6 +56,7 @@ import {
   type InventoryItem,
   type KnownFeat,
   type KnownSpell,
+  type LimitedFeature,
   type Weapon,
 } from "@/lib/dnd";
 import { useLocalCollection } from "@/lib/storage";
@@ -398,6 +401,13 @@ function CharacterSheet({
   const [character, setCharacterState] = useState(persistedCharacter);
   const [dirty, setDirty] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
+  // Tab ispirati a Roll20 (la piattaforma più diffusa) e alla scheda cartacea di riferimento
+  // dell'utente: "Combattimento" di default, tutto il resto un click di distanza invece che più
+  // in basso nello stesso scroll — durante il gioco vero serve solo la prima, il resto si legge
+  // una volta sola in fase di creazione/level up.
+  const [tab, setTab] = useState<"combattimento" | "incantesimi" | "inventario" | "tratti" | "info">(
+    "combattimento",
+  );
 
   const onChange = (next: Character) => {
     setCharacterState(next);
@@ -540,269 +550,356 @@ function CharacterSheet({
         />
       )}
 
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-        <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
-          <label className="block">
-            <span className={labelClass}>Nome</span>
-            <input
-              value={character.nome}
-              onChange={(event) => set("nome", event.target.value)}
-              placeholder="Es. Thorin Scudodiquercia"
-              className={`${inputClass} text-lg font-bold`}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Razza</span>
-            <Autocomplete
-              value={character.razza}
-              onChange={(value) => set("razza", value)}
-              loader={loadRaces}
-              placeholder="Elf, Dwarf, Halfling…"
-              inputClassName={inputClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Allineamento</span>
-            <select
-              value={character.allineamento}
-              onChange={(event) => set("allineamento", event.target.value)}
-              className={inputClass}
-            >
-              <option value="">— non scelto —</option>
-              {ALIGNMENTS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className={labelClass}>Background</span>
-            <Autocomplete
-              value={character.background}
-              onChange={(value) => set("background", value)}
-              loader={loadBackgrounds}
-              placeholder="Acolyte, Soldier, Sage…"
-              inputClassName={inputClass}
-            />
-          </label>
-          <BackgroundTraits background={character.background} />
-        </section>
-
-        <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm uppercase tracking-widest text-muted">
-              Classi {character.classi.length > 1 && "(multiclasse)"}
-            </h2>
-            <button
-              onClick={() =>
-                setClassi([...character.classi, { nome: "", livello: 1 }])
-              }
-              className="text-xs font-bold text-accent-strong hover:underline"
-            >
-              + Aggiungi classe
-            </button>
-          </div>
-          {character.classi.map((entry, index) => (
-            <ClassRow
-              key={index}
-              entry={entry}
-              isPrimary={index === 0}
-              onChange={(next) =>
-                setClassi(
-                  character.classi.map((c, i) => (i === index ? next : c)),
-                )
-              }
-              onRemove={() =>
-                setClassi(
-                  character.classi.filter((_, i) => i !== index),
-                )
-              }
-              canRemove={character.classi.length > 1}
-            />
-          ))}
-          <p className="text-sm text-muted">
-            Livello totale {totalLevel(character.classi)} · Bonus di competenza:{" "}
-            <span className="font-bold text-accent-strong">
-              {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
-            </span>
-          </p>
-          <XpTracker character={character} onChange={onChange} />
-          <LevelUpWizard character={character} onChange={onChange} />
-        </section>
-      </div>
-
-      <CampaignSync character={character} onSaveNow={saveNow} />
-
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-      <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
-        <h2 className="text-sm uppercase tracking-widest text-muted mb-4">
-          Punti ferita e difesa
-        </h2>
-        <div className="flex flex-col items-center gap-3 mb-5">
-          <div className="text-center min-w-28">
-            <div
-              className={`text-4xl font-display font-bold ${
-                character.hpAttuali <= 0
-                  ? "text-danger"
-                  : character.hpAttuali <= character.hpMax / 2
-                    ? "text-accent"
-                    : "text-foreground"
-              }`}
-            >
-              {character.hpAttuali}
-              <span className="text-lg text-muted"> / {character.hpMax}</span>
-              {character.hpTemporanei > 0 && (
-                <span className="text-lg text-accent-strong"> +{character.hpTemporanei}</span>
-              )}
-            </div>
-            <p className="text-xs text-muted">punti ferita</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={applyDamage}
-              className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-sm font-bold text-danger hover:border-danger transition-colors"
-              aria-label="Applica danno"
-            >
-              − Danno
-            </button>
-            <IntField
-              min={1}
-              value={hpAmount}
-              onChange={setHpAmount}
-              aria-label="Quantità danno o cura"
-              className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1.5 text-sm text-foreground text-center"
-            />
-            <button
-              onClick={applyHeal}
-              className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-sm font-bold text-accent-strong hover:border-accent transition-colors"
-              aria-label="Applica cura"
-            >
-              + Cura
-            </button>
-          </div>
-        </div>
-        {character.hpAttuali <= 0 && <DeathSaves character={character} onChange={onChange} />}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <label className="block">
-            <span className={labelClass}>PF max</span>
-            <IntField
-              min={1}
-              max={999}
-              value={character.hpMax}
-              onChange={(hpMax) => {
-                onChange({
-                  ...character,
-                  hpMax,
-                  hpAttuali: Math.min(character.hpAttuali, hpMax),
-                });
-              }}
-              className={inputClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>PF temporanei</span>
-            <IntField
-              min={0}
-              max={999}
-              value={character.hpTemporanei}
-              onChange={(value) => set("hpTemporanei", value)}
-              className={inputClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>CA</span>
-            <IntField
-              min={1}
-              max={40}
-              value={character.classeArmatura}
-              onChange={(value) => set("classeArmatura", value)}
-              className={inputClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Velocità (m)</span>
-            <IntField
-              min={0}
-              max={60}
-              value={character.velocita}
-              onChange={(value) => set("velocita", value)}
-              className={inputClass}
-            />
-          </label>
-        </div>
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
-            <span className={labelClass}>Iniziativa</span>
-            <p className="text-lg font-bold text-foreground">
-              {formatModifier(abilityModifier(character.caratteristiche.destrezza))}
-            </p>
-          </div>
-          <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
-            <span className={labelClass}>Percezione passiva</span>
-            <p className="text-lg font-bold text-foreground">
-              {passivePerception(
-                character.caratteristiche.saggezza,
-                character.abilitaCompetenti.includes("Percezione"),
-                character.abilitaEsperte.includes("Percezione"),
-                totalLevel(character.classi),
-              )}
-            </p>
-          </div>
-        </div>
-        <HitPointCalculator
-          character={character}
-          onApply={(hpMax) =>
-            onChange({
-              ...character,
-              hpMax,
-              hpAttuali: hpMax,
-              tiriMorteSuccessi: 0,
-              tiriMorteFallimenti: 0,
-            })
-          }
-        />
-      </section>
-
-      <div className="mt-6 lg:mt-0">
-        <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} />
-      </div>
-      </div>
-
-      <SavingThrowsAndSkills character={character} onChange={onChange} />
-
-      <ActiveConditionsSection character={character} onChange={onChange} />
-
-      <RaceTraits razza={character.razza} />
-
-      <ClassFeaturesSection character={character} />
-
-      <TalentiSection character={character} onChange={onChange} />
-
-      <LanguagesAndResistancesSection character={character} onChange={onChange} />
-
-      <PersonalitySection character={character} onChange={onChange} />
-
-      <InventorySection character={character} onChange={onChange} />
-
-      <WeaponsSection character={character} onChange={onChange} />
-
-      <SpellSlotsSection character={character} onChange={onChange} />
-
-      <SpellListSection character={character} onChange={onChange} />
-
-      <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
-        <label className="block">
-          <span className={labelClass}>Note</span>
-          <textarea
-            value={character.note}
-            onChange={(event) => set("note", event.target.value)}
-            placeholder="Retroscena, alleati, altri dettagli…"
-            rows={5}
-            className={inputClass}
+      {/* Identità sempre visibile a prescindere dal tab aperto — stesso principio della banda
+          col nome ripetuta su ogni pagina della scheda cartacea di riferimento: durante il gioco
+          non deve mai servire cambiare tab solo per ricordarsi di chi è questa scheda. */}
+      <div className="card-elevated flex items-center gap-3 rounded-xl border border-edge bg-surface px-4 py-3">
+        {character.ritrattoUrl ? (
+          // URL arbitrario fornito dal giocatore, non un asset locale ottimizzabile da next/image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={character.ritrattoUrl}
+            alt=""
+            className="size-12 shrink-0 rounded-full border border-edge object-cover"
           />
-        </label>
-      </section>
+        ) : (
+          <span className="size-12 shrink-0 rounded-full bg-surface-raised" />
+        )}
+        <div className="min-w-0">
+          <p className="heading-ornate truncate text-lg font-bold text-foreground">
+            {character.nome || "Senza nome"}
+          </p>
+          <p className="truncate text-xs text-muted">
+            {[character.razza, formatClassSummary(character.classi)].filter(Boolean).join(" · ") ||
+              "—"}{" "}
+            · Livello {totalLevel(character.classi)}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["combattimento", "⚔️ Combattimento"],
+            ["incantesimi", "✨ Incantesimi"],
+            ["inventario", "🎒 Inventario"],
+            ["tratti", "📖 Tratti & Talenti"],
+            ["info", "📜 Info & Personalità"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setTab(value)}
+            className={`card-elevated-hover rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+              tab === value
+                ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+                : "border-edge bg-surface-raised text-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "combattimento" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <InspirationToggle character={character} onChange={onChange} />
+            <HitDiceTracker character={character} onChange={onChange} />
+            <div className="rounded-lg border border-edge bg-surface-raised p-2 text-center">
+              <span className={labelClass}>Affaticamento</span>
+              <IntField
+                min={0}
+                max={6}
+                value={character.affaticamento}
+                onChange={(value) => set("affaticamento", value)}
+                className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground text-center"
+              />
+            </div>
+          </div>
+
+          <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+            <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
+              <h2 className="text-sm uppercase tracking-widest text-muted mb-4">
+                Punti ferita e difesa
+              </h2>
+              <div className="flex flex-col items-center gap-3 mb-5">
+                <div className="text-center min-w-28">
+                  <div
+                    className={`text-4xl font-display font-bold ${
+                      character.hpAttuali <= 0
+                        ? "text-danger"
+                        : character.hpAttuali <= character.hpMax / 2
+                          ? "text-accent"
+                          : "text-foreground"
+                    }`}
+                  >
+                    {character.hpAttuali}
+                    <span className="text-lg text-muted"> / {character.hpMax}</span>
+                    {character.hpTemporanei > 0 && (
+                      <span className="text-lg text-accent-strong"> +{character.hpTemporanei}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted">punti ferita</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={applyDamage}
+                    className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-sm font-bold text-danger hover:border-danger transition-colors"
+                    aria-label="Applica danno"
+                  >
+                    − Danno
+                  </button>
+                  <IntField
+                    min={1}
+                    value={hpAmount}
+                    onChange={setHpAmount}
+                    aria-label="Quantità danno o cura"
+                    className="w-14 rounded-md border border-edge bg-surface-raised px-1.5 py-1.5 text-sm text-foreground text-center"
+                  />
+                  <button
+                    onClick={applyHeal}
+                    className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-sm font-bold text-accent-strong hover:border-accent transition-colors"
+                    aria-label="Applica cura"
+                  >
+                    + Cura
+                  </button>
+                </div>
+              </div>
+              {character.hpAttuali <= 0 && <DeathSaves character={character} onChange={onChange} />}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <label className="block">
+                  <span className={labelClass}>PF max</span>
+                  <IntField
+                    min={1}
+                    max={999}
+                    value={character.hpMax}
+                    onChange={(hpMax) => {
+                      onChange({
+                        ...character,
+                        hpMax,
+                        hpAttuali: Math.min(character.hpAttuali, hpMax),
+                      });
+                    }}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className={labelClass}>PF temporanei</span>
+                  <IntField
+                    min={0}
+                    max={999}
+                    value={character.hpTemporanei}
+                    onChange={(value) => set("hpTemporanei", value)}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className={labelClass}>CA</span>
+                  <IntField
+                    min={1}
+                    max={40}
+                    value={character.classeArmatura}
+                    onChange={(value) => set("classeArmatura", value)}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <span className={labelClass}>Velocità (m)</span>
+                  <IntField
+                    min={0}
+                    max={60}
+                    value={character.velocita}
+                    onChange={(value) => set("velocita", value)}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+                  <span className={labelClass}>Iniziativa</span>
+                  <p className="text-lg font-bold text-foreground">
+                    {formatModifier(abilityModifier(character.caratteristiche.destrezza))}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+                  <span className={labelClass}>Percezione passiva</span>
+                  <p className="text-lg font-bold text-foreground">
+                    {passivePerception(
+                      character.caratteristiche.saggezza,
+                      character.abilitaCompetenti.includes("Percezione"),
+                      character.abilitaEsperte.includes("Percezione"),
+                      totalLevel(character.classi),
+                    )}
+                  </p>
+                </div>
+              </div>
+              <HitPointCalculator
+                character={character}
+                onApply={(hpMax) =>
+                  onChange({
+                    ...character,
+                    hpMax,
+                    hpAttuali: hpMax,
+                    tiriMorteSuccessi: 0,
+                    tiriMorteFallimenti: 0,
+                  })
+                }
+              />
+            </section>
+
+            <div className="mt-6 lg:mt-0">
+              <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} />
+            </div>
+          </div>
+
+          <SavingThrowsAndSkills character={character} onChange={onChange} />
+
+          <ActiveConditionsSection character={character} onChange={onChange} />
+
+          <WeaponsSection character={character} onChange={onChange} />
+
+          <LimitedFeaturesSection character={character} onChange={onChange} />
+        </div>
+      )}
+
+      {tab === "incantesimi" && (
+        <div className="space-y-6">
+          <SpellSlotsSection character={character} onChange={onChange} />
+          <SpellListSection character={character} onChange={onChange} />
+        </div>
+      )}
+
+      {tab === "inventario" && (
+        <div className="space-y-6">
+          <InventorySection character={character} onChange={onChange} />
+          <AttunedItemsSection character={character} onChange={onChange} />
+        </div>
+      )}
+
+      {tab === "tratti" && (
+        <div className="space-y-6">
+          <RaceTraits razza={character.razza} />
+          <ClassFeaturesSection character={character} />
+          <TalentiSection character={character} onChange={onChange} />
+          <LanguagesAndResistancesSection character={character} onChange={onChange} />
+        </div>
+      )}
+
+      {tab === "info" && (
+        <div className="space-y-6">
+          <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+            <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
+              <label className="block">
+                <span className={labelClass}>Nome</span>
+                <input
+                  value={character.nome}
+                  onChange={(event) => set("nome", event.target.value)}
+                  placeholder="Es. Thorin Scudodiquercia"
+                  className={`${inputClass} text-lg font-bold`}
+                />
+              </label>
+              <label className="block">
+                <span className={labelClass}>Razza</span>
+                <Autocomplete
+                  value={character.razza}
+                  onChange={(value) => set("razza", value)}
+                  loader={loadRaces}
+                  placeholder="Elf, Dwarf, Halfling…"
+                  inputClassName={inputClass}
+                />
+              </label>
+              <label className="block">
+                <span className={labelClass}>Allineamento</span>
+                <select
+                  value={character.allineamento}
+                  onChange={(event) => set("allineamento", event.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— non scelto —</option>
+                  {ALIGNMENTS.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className={labelClass}>Background</span>
+                <Autocomplete
+                  value={character.background}
+                  onChange={(value) => set("background", value)}
+                  loader={loadBackgrounds}
+                  placeholder="Acolyte, Soldier, Sage…"
+                  inputClassName={inputClass}
+                />
+              </label>
+              <BackgroundTraits background={character.background} />
+            </section>
+
+            <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm uppercase tracking-widest text-muted">
+                  Classi {character.classi.length > 1 && "(multiclasse)"}
+                </h2>
+                <button
+                  onClick={() =>
+                    setClassi([...character.classi, { nome: "", livello: 1 }])
+                  }
+                  className="text-xs font-bold text-accent-strong hover:underline"
+                >
+                  + Aggiungi classe
+                </button>
+              </div>
+              {character.classi.map((entry, index) => (
+                <ClassRow
+                  key={index}
+                  entry={entry}
+                  isPrimary={index === 0}
+                  onChange={(next) =>
+                    setClassi(
+                      character.classi.map((c, i) => (i === index ? next : c)),
+                    )
+                  }
+                  onRemove={() =>
+                    setClassi(
+                      character.classi.filter((_, i) => i !== index),
+                    )
+                  }
+                  canRemove={character.classi.length > 1}
+                />
+              ))}
+              <p className="text-sm text-muted">
+                Livello totale {totalLevel(character.classi)} · Bonus di competenza:{" "}
+                <span className="font-bold text-accent-strong">
+                  {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
+                </span>
+              </p>
+              <XpTracker character={character} onChange={onChange} />
+              <LevelUpWizard character={character} onChange={onChange} />
+            </section>
+          </div>
+
+          <CampaignSync character={character} onSaveNow={saveNow} />
+
+          <PersonalitySection character={character} onChange={onChange} />
+
+          <PhysicalDescriptionSection character={character} onChange={onChange} />
+
+          <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
+            <label className="block">
+              <span className={labelClass}>Note</span>
+              <textarea
+                value={character.note}
+                onChange={(event) => set("note", event.target.value)}
+                placeholder="Retroscena, alleati, altri dettagli…"
+                rows={5}
+                className={inputClass}
+              />
+            </label>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -1749,6 +1846,15 @@ function PersonalitySection({
               className={fieldClass}
             />
           </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted">Nemici</span>
+            <textarea
+              value={character.nemici}
+              onChange={(event) => set("nemici", event.target.value)}
+              rows={3}
+              className={fieldClass}
+            />
+          </label>
         </div>
       )}
     </section>
@@ -2525,6 +2631,288 @@ function HitPointCalculator({
         Applica a PF max
       </button>
     </div>
+  );
+}
+
+function InspirationToggle({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  return (
+    <button
+      onClick={() => onChange({ ...character, ispirazione: !character.ispirazione })}
+      className={`card-elevated-hover flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-bold transition-colors ${
+        character.ispirazione
+          ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+          : "border-edge bg-surface-raised text-muted hover:text-foreground"
+      }`}
+    >
+      <span className="text-lg leading-none">{character.ispirazione ? "⭐" : "☆"}</span>
+      Ispirazione
+    </button>
+  );
+}
+
+function HitDiceTracker({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  // Il TOTALE dei dadi vita coincide sempre col livello totale (regola RAW), a prescindere dal
+  // mix di classi — solo il TIPO di dado differisce per classe, qui non tracciato perché servirebbe
+  // salvarlo per ogni riga di classe (oggi assente da ClassEntry) solo per questo scopo.
+  const totale = totalLevel(character.classi);
+  const usati = Math.min(character.dadiVitaUsati, totale);
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-2 text-center">
+      <p className="text-[10px] uppercase tracking-widest text-muted">Dadi Vita</p>
+      <div className="flex items-center justify-center gap-1 mt-1">
+        <button
+          onClick={() => onChange({ ...character, dadiVitaUsati: usati + 1 })}
+          disabled={usati >= totale}
+          className="size-6 rounded-full border border-edge text-danger disabled:opacity-30"
+          aria-label="Spendi un dado vita (riposo breve)"
+        >
+          −
+        </button>
+        <span className="w-14 text-sm font-bold text-foreground">
+          {totale - usati}/{totale}
+        </span>
+        <button
+          onClick={() =>
+            // Riposo lungo: recupera metà del totale (arrotondato per eccesso), regola RAW.
+            onChange({ ...character, dadiVitaUsati: Math.max(0, usati - Math.ceil(totale / 2)) })
+          }
+          disabled={usati <= 0}
+          className="rounded-full border border-edge px-2 text-[10px] font-bold text-accent-strong disabled:opacity-30"
+          aria-label="Riposo lungo: recupera metà dei dadi vita"
+        >
+          riposo lungo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AttunedItemsSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const items = character.oggettiArmonizzati;
+  const setItems = (next: string[]) => onChange({ ...character, oggettiArmonizzati: next });
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        {/* Il tetto di 3 è una regola RAW fissa, non una preferenza — per questo il bottone
+            "+ Aggiungi" sparisce del tutto oltre 3 invece di limitarsi a disabilitarlo. */}
+        <span className="text-[10px] uppercase tracking-widest text-muted">
+          Oggetti magici armonizzati
+        </span>
+        <span className="text-xs text-muted">{items.length}/3</span>
+      </div>
+      {items.map((nome, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <input
+            value={nome}
+            onChange={(event) =>
+              setItems(items.map((v, i) => (i === index ? event.target.value : v)))
+            }
+            placeholder="Nome oggetto"
+            className="input-focus flex-1 rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground"
+          />
+          <button
+            onClick={() => setItems(items.filter((_, i) => i !== index))}
+            className="text-muted hover:text-danger text-sm shrink-0"
+            aria-label="Rimuovi oggetto armonizzato"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      {items.length < 3 && (
+        <button
+          onClick={() => setItems([...items, ""])}
+          className="text-xs font-bold text-accent-strong hover:underline"
+        >
+          + Aggiungi
+        </button>
+      )}
+    </div>
+  );
+}
+
+function LimitedFeaturesSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const features = character.privilegiLimitati;
+  const setFeatures = (next: LimitedFeature[]) =>
+    onChange({ ...character, privilegiLimitati: next });
+  const updateFeature = (id: string, patch: Partial<LimitedFeature>) =>
+    setFeatures(features.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+
+  return (
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">
+          ⚡ Privilegi a usi limitati
+        </h2>
+        <button
+          onClick={() =>
+            setFeatures([
+              ...features,
+              { id: crypto.randomUUID(), nome: "", usiMax: 1, usiUsati: 0, recupero: "riposoLungo" },
+            ])
+          }
+          className="text-xs font-bold text-accent-strong hover:underline"
+        >
+          + Aggiungi
+        </button>
+      </div>
+      {features.length === 0 ? (
+        <p className="text-sm text-muted">
+          Nessuno — es. Rabbia, Canalizzare Divinità, Punti Ki, Ispirazione Bardica…
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {features.map((f) => (
+            <li
+              key={f.id}
+              className="rounded-lg border border-edge bg-surface-raised p-3 flex flex-wrap items-center gap-3"
+            >
+              <input
+                value={f.nome}
+                onChange={(event) => updateFeature(f.id, { nome: event.target.value })}
+                placeholder="Nome (es. Rabbia)"
+                className="input-focus flex-1 min-w-[140px] rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+              />
+              <label className="flex items-center gap-1.5 text-xs text-muted shrink-0">
+                Max
+                <IntField
+                  min={1}
+                  max={99}
+                  value={f.usiMax}
+                  onChange={(value) =>
+                    updateFeature(f.id, { usiMax: value, usiUsati: Math.min(f.usiUsati, value) })
+                  }
+                  className="w-12 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+                />
+              </label>
+              <select
+                value={f.recupero}
+                onChange={(event) =>
+                  updateFeature(f.id, {
+                    recupero: event.target.value as LimitedFeature["recupero"],
+                  })
+                }
+                className="shrink-0 rounded-md border border-edge bg-surface px-1.5 py-1 text-xs text-foreground"
+              >
+                {RECUPERO_OPTIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {RECUPERO_LABELS[r]}
+                  </option>
+                ))}
+              </select>
+              <SlotCounter
+                label="Usi"
+                max={f.usiMax}
+                used={f.usiUsati}
+                onChange={(used) => updateFeature(f.id, { usiUsati: used })}
+              />
+              <button
+                onClick={() => setFeatures(features.filter((x) => x.id !== f.id))}
+                className="text-muted hover:text-danger text-sm shrink-0"
+                aria-label={`Rimuovi ${f.nome || "privilegio"}`}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function PhysicalDescriptionSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const set = <K extends keyof Character>(key: K, value: Character[K]) =>
+    onChange({ ...character, [key]: value });
+  const fieldClass =
+    "input-focus mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground";
+
+  return (
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
+      <button
+        onClick={() => setExpanded((prev) => !prev)}
+        className="text-sm uppercase tracking-widest text-muted hover:text-foreground transition-colors"
+      >
+        Aspetto {expanded ? "▲" : "▼"}
+      </button>
+      {expanded && (
+        <div className="mt-3 space-y-3 border-t border-edge pt-3">
+          {character.ritrattoUrl && (
+            // URL arbitrario fornito dal giocatore, non un asset locale ottimizzabile da next/image
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={character.ritrattoUrl}
+              alt={character.nome}
+              className="max-h-64 rounded-lg border border-edge mx-auto"
+            />
+          )}
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-muted">
+              URL ritratto (opzionale)
+            </span>
+            <input
+              value={character.ritrattoUrl}
+              onChange={(event) => set("ritrattoUrl", event.target.value)}
+              placeholder="https://…"
+              className={fieldClass}
+            />
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {(
+              [
+                ["eta", "Età"],
+                ["altezza", "Altezza"],
+                ["peso", "Peso"],
+                ["occhi", "Occhi"],
+                ["carnagione", "Carnagione"],
+                ["capelli", "Capelli"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="block">
+                <span className="text-[10px] uppercase tracking-widest text-muted">{label}</span>
+                <input
+                  value={character[key]}
+                  onChange={(event) => set(key, event.target.value)}
+                  className={fieldClass}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

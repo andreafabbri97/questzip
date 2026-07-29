@@ -96,6 +96,25 @@ export const weaponSchema = z.object({
 });
 export type Weapon = z.infer<typeof weaponSchema>;
 
+// Privilegio/tratto a usi limitati (es. Rabbia 3/riposo lungo, Canalizzare Divinità 1/riposo
+// breve) — sulla scheda cartacea di riferimento dell'utente è una tabella con nome/ricarica/
+// totale/usi, la domanda più comune al tavolo ("quante Rabbie mi restano?") altrimenti risolta
+// solo tenendo il conto a mente o su un foglio a parte.
+export const RECUPERO_OPTIONS = ["riposoBreve", "riposoLungo", "alba"] as const;
+export const RECUPERO_LABELS: Record<(typeof RECUPERO_OPTIONS)[number], string> = {
+  riposoBreve: "Riposo breve",
+  riposoLungo: "Riposo lungo",
+  alba: "Alba",
+};
+export const limitedFeatureSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  usiMax: z.number().int().min(1).default(1),
+  usiUsati: z.number().int().min(0).default(0),
+  recupero: z.enum(RECUPERO_OPTIONS).default("riposoLungo"),
+});
+export type LimitedFeature = z.infer<typeof limitedFeatureSchema>;
+
 export const knownFeatSchema = z.object({
   id: z.string(),
   nome: z.string(),
@@ -185,6 +204,29 @@ export const characterSchema = z.object({
   legami: z.string().default(""),
   ideali: z.string().default(""),
   difetti: z.string().default(""),
+  nemici: z.string().default(""),
+  // Aspetto fisico — presente sulla scheda cartacea di riferimento (pagina 2, riquadro insieme
+  // al ritratto), qui campi tutti testo libero (l'età di un elfo o un non-morto non è sempre un
+  // numero) invece di forzare un formato specifico.
+  eta: z.string().default(""),
+  altezza: z.string().default(""),
+  peso: z.string().default(""),
+  occhi: z.string().default(""),
+  carnagione: z.string().default(""),
+  capelli: z.string().default(""),
+  ritrattoUrl: z.string().default(""),
+  ispirazione: z.boolean().default(false),
+  // Dadi vita TOTALI derivano dal livello di classe (totalLevel), qui serve solo tenere il conto
+  // di quanti sono già stati spesi (si spendono ai riposi brevi, si recuperano — metà del totale,
+  // arrotondato per eccesso — a un riposo lungo).
+  dadiVitaUsati: z.number().int().min(0).default(0),
+  // Livelli di esaurimento RAW (0-6, il 6° è la morte) — oggi finiva genericamente nelle
+  // "condizioni attive" come voce di testo, senza un contatore numerico dedicato.
+  affaticamento: z.number().int().min(0).max(6).default(0),
+  // Nomi degli oggetti magici richiedenti sintonia attualmente armonizzati — il limite di 3 è
+  // una regola RAW fissa, non configurabile.
+  oggettiArmonizzati: z.array(z.string()).default([]),
+  privilegiLimitati: z.array(limitedFeatureSchema).default([]),
   linguaggi: z.array(z.string()).default([]),
   resistenze: z.array(z.string()).default([]),
   immunita: z.array(z.string()).default([]),
@@ -295,6 +337,19 @@ export function newCharacter(): Character {
     legami: "",
     ideali: "",
     difetti: "",
+    nemici: "",
+    eta: "",
+    altezza: "",
+    peso: "",
+    occhi: "",
+    carnagione: "",
+    capelli: "",
+    ritrattoUrl: "",
+    ispirazione: false,
+    dadiVitaUsati: 0,
+    affaticamento: 0,
+    oggettiArmonizzati: [],
+    privilegiLimitati: [],
     linguaggi: [],
     resistenze: [],
     immunita: [],
