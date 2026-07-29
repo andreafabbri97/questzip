@@ -210,7 +210,7 @@ function CampaignsPageInner() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
       <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Campagne</h1>
 
       {error && <p className="text-sm text-danger">{error}</p>}
@@ -235,7 +235,7 @@ function CampaignsPageInner() {
           <p>Nessuna campagna ancora. L&apos;avventura ti aspetta!</p>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {campaigns.map((campaign) => (
             <li key={campaign.id}>
               <button

@@ -70,7 +70,7 @@ function ChatPageInner() {
   const [forceOpenDmUserId, setForceOpenDmUserId] = useState<string | null>(null);
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
       <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Chat</h1>
 
       <div className="flex gap-1.5">

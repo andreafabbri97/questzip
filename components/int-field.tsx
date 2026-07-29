@@ -7,6 +7,9 @@ type IntFieldProps = {
   onChange: (value: number) => void;
   min?: number;
   max?: number;
+  // Per i pochi campi dove ha senso un peso frazionario (es. kg di un oggetto d'inventario) —
+  // di default il campo resta intero per tutti gli altri ~30 usi nel sito (PF, CA, livelli...).
+  decimal?: boolean;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type" | "min" | "max">;
 
 /**
@@ -17,7 +20,15 @@ type IntFieldProps = {
  * range, segnalato in rosso) e viene clampato solo alla conferma (blur/invio); se non è un
  * numero valido alla conferma, torna all'ultimo valore valido.
  */
-export function IntField({ value, onChange, min, max, className = "", ...rest }: IntFieldProps) {
+export function IntField({
+  value,
+  onChange,
+  min,
+  max,
+  decimal = false,
+  className = "",
+  ...rest
+}: IntFieldProps) {
   const [text, setText] = useState(String(value));
   const [dirty, setDirty] = useState(false);
 
@@ -25,16 +36,19 @@ export function IntField({ value, onChange, min, max, className = "", ...rest }:
     setText(String(value));
   }
 
+  const isValidNumber = (n: number) => (decimal ? Number.isFinite(n) : Number.isInteger(n));
+  const pattern = decimal ? /^-?\d*\.?\d*$/ : /^-?\d*$/;
+
   const parsed = text.trim() === "" ? NaN : Number(text);
   const isValid =
     !Number.isNaN(parsed) &&
-    Number.isInteger(parsed) &&
+    isValidNumber(parsed) &&
     (min === undefined || parsed >= min) &&
     (max === undefined || parsed <= max);
 
   const commit = () => {
     setDirty(false);
-    if (Number.isNaN(parsed) || !Number.isInteger(parsed)) {
+    if (Number.isNaN(parsed) || !isValidNumber(parsed)) {
       setText(String(value));
       return;
     }
@@ -46,17 +60,17 @@ export function IntField({ value, onChange, min, max, className = "", ...rest }:
   return (
     <input
       type="text"
-      inputMode={min !== undefined && min >= 0 ? "numeric" : "text"}
+      inputMode={decimal ? "decimal" : min !== undefined && min >= 0 ? "numeric" : "text"}
       value={text}
       onChange={(event) => {
         const next = event.target.value;
-        if (!/^-?\d*$/.test(next)) return;
+        if (!pattern.test(next)) return;
         setDirty(true);
         setText(next);
         const n = Number(next);
         if (
           next.trim() !== "" &&
-          Number.isInteger(n) &&
+          isValidNumber(n) &&
           (min === undefined || n >= min) &&
           (max === undefined || n <= max)
         ) {

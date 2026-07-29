@@ -259,7 +259,7 @@ export default function CharactersPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Personaggi</h1>
         <button
@@ -285,7 +285,7 @@ export default function CharactersPage() {
           <p>Nessun personaggio ancora. Crea il tuo primo eroe!</p>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((character) => (
             <li key={character.id}>
               <button
@@ -557,7 +557,7 @@ function CharacterSheet({
   const labelClass = "text-xs uppercase tracking-widest text-muted";
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <button onClick={handleBack} className="text-sm text-muted hover:text-foreground shrink-0">
           ← Personaggi
@@ -831,11 +831,14 @@ function CharacterSheet({
 
           <SavingThrowsAndSkills character={character} onChange={onChange} />
 
-          <ActiveConditionsSection character={character} onChange={onChange} />
-
           <WeaponsSection character={character} onChange={onChange} />
 
-          <LimitedFeaturesSection character={character} onChange={onChange} />
+          <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+            <ActiveConditionsSection character={character} onChange={onChange} />
+            <div className="mt-6 lg:mt-0">
+              <LimitedFeaturesSection character={character} onChange={onChange} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -2023,6 +2026,7 @@ function InventorySection({
             </span>
             <IntField
               min={0}
+              decimal
               value={character.pesoMassimo}
               onChange={setPesoMassimo}
               className="w-20 rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground text-center"
@@ -2081,6 +2085,7 @@ function InventorySection({
                 </span>
                 <IntField
                   min={0}
+                  decimal
                   value={item.peso}
                   onChange={(value) =>
                     setInventario(
