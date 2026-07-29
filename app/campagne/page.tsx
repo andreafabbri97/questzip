@@ -601,7 +601,13 @@ function CampaignDetailView({
                         </span>
                       )}
                     </p>
-                    {isDm && <GrantXpInline campaignId={campaignId} targetUserId={pc.userId} />}
+                    {isDm && (
+                      <GrantXpInline
+                        campaignId={campaignId}
+                        targetUserId={pc.userId}
+                        onGranted={refresh}
+                      />
+                    )}
                   </div>
                 </li>
               );
@@ -615,6 +621,7 @@ function CampaignDetailView({
         campaignId={campaignId}
         isDm={isDm}
         partyLevels={(party ?? []).map((pc) => totalLevel(pc.classi))}
+        onXpGranted={refresh}
       />
 
       <DungeonSection campaignId={campaignId} isDm={isDm} />
@@ -1181,7 +1188,12 @@ type Handout = Awaited<ReturnType<typeof getHandoutsForCampaign>>[number];
 function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boolean }) {
   const [handouts, setHandouts] = useState<Handout[] | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [selected, setSelected] = useState<Handout | null>(null);
+  // Solo l'id, non uno snapshot dell'intero handout — derivato di nuovo da "handouts" ad ogni
+  // render (subito sotto), così dopo un salvataggio/toggle visibilità che richiama refresh() il
+  // pannello di dettaglio mostra i dati appena aggiornati invece di restare bloccato sulla
+  // versione di quando è stato aperto (stesso pattern già usato correttamente in
+  // DungeonSection/RegionalMapSection, che ri-fetchano l'oggetto attivo per id).
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const refresh = () => {
     getHandoutsForCampaign(campaignId).then(setHandouts);
@@ -1190,6 +1202,8 @@ function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boole
 
   if (handouts === null) return null;
   if (handouts.length === 0 && !isDm) return null;
+
+  const selected = handouts.find((h) => h.id === selectedId) ?? null;
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -1222,9 +1236,9 @@ function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boole
           {handouts.map((h) => (
             <button
               key={h.id}
-              onClick={() => setSelected(selected?.id === h.id ? null : h)}
+              onClick={() => setSelectedId(selectedId === h.id ? null : h.id)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
-                selected?.id === h.id
+                selectedId === h.id
                   ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface-raised text-muted hover:text-foreground"
               } ${isDm && !h.visibile ? "opacity-60" : ""}`}
@@ -1245,7 +1259,7 @@ function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boole
             refresh();
           }}
           onDeleted={() => {
-            setSelected(null);
+            setSelectedId(null);
             refresh();
           }}
         />
@@ -1633,10 +1647,12 @@ function EncounterTracker({
   campaignId,
   isDm,
   partyLevels,
+  onXpGranted,
 }: {
   campaignId: string;
   isDm: boolean;
   partyLevels: number[];
+  onXpGranted: () => void;
 }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof getActiveEncounter>>>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1674,7 +1690,7 @@ function EncounterTracker({
   const { encounter, combatants } = data;
 
   return (
-    <section className="rounded-xl border border-accent/40 bg-surface p-5 space-y-3">
+    <section className="card-elevated rounded-xl border border-accent/40 bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-widest text-accent-strong">
           ⚔️ Combattimento — Round {encounter.round}
@@ -1686,7 +1702,7 @@ function EncounterTracker({
                 await nextTurn(encounter.id);
                 refresh();
               }}
-              className="text-xs font-bold rounded-lg border border-edge px-2 py-1 text-foreground hover:border-accent transition-colors"
+              className="text-xs font-bold rounded-lg border border-edge px-3 py-1.5 text-foreground hover:border-accent transition-colors"
             >
               Prossimo turno →
             </button>
@@ -1810,6 +1826,7 @@ function EncounterTracker({
           partyLevels={partyLevels}
           combatants={combatants}
           onChange={refresh}
+          onXpGranted={onXpGranted}
         />
       )}
       {error && <p className="text-xs text-danger">{error}</p>}
@@ -1823,12 +1840,14 @@ function EncounterDmControls({
   partyLevels,
   combatants,
   onChange,
+  onXpGranted,
 }: {
   encounter: { id: string };
   campaignId: string;
   partyLevels: number[];
   combatants: Combatant[];
   onChange: () => void;
+  onXpGranted: () => void;
 }) {
   const [nome, setNome] = useState("");
   const [iniziativa, setIniziativa] = useState(10);
@@ -1926,7 +1945,7 @@ function EncounterDmControls({
         </button>
       </div>
 
-      <XpDistributor campaignId={campaignId} combatants={combatants} />
+      <XpDistributor campaignId={campaignId} combatants={combatants} onGranted={onXpGranted} />
     </div>
   );
 }
@@ -1934,9 +1953,11 @@ function EncounterDmControls({
 function XpDistributor({
   campaignId,
   combatants,
+  onGranted,
 }: {
   campaignId: string;
   combatants: Combatant[];
+  onGranted: () => void;
 }) {
   const monsterXp = combatants.filter((c) => !c.isPg).reduce((sum, c) => sum + c.xp, 0);
   // solo i PG davvero collegati a un personaggio sincronizzato possono ricevere XP (vedi
@@ -1974,6 +1995,7 @@ function XpDistributor({
     try {
       await grantXpToParty(campaignId, perPlayer, autoLevelUp, participantUserIds);
       setGranted(true);
+      onGranted();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -2030,9 +2052,11 @@ function XpDistributor({
 function GrantXpInline({
   campaignId,
   targetUserId,
+  onGranted,
 }: {
   campaignId: string;
   targetUserId: string;
+  onGranted: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(0);
@@ -2078,6 +2102,7 @@ function GrantXpInline({
             await grantXp(campaignId, targetUserId, amount, autoLevelUp);
             setOpen(false);
             setAmount(0);
+            onGranted();
           } catch (err) {
             setError((err as Error).message);
           } finally {
@@ -4285,7 +4310,13 @@ function RegionalMapViewer({
       />
 
       {selectedMarker && (
-        <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+        // key sul marcatore selezionato: la textarea sotto è non controllata (defaultValue), che
+        // regge finché il marcatore è quello che era mentre si scrive. Cliccando direttamente su
+        // un marcatore diverso mentre il pannello è già aperto, senza il key React riuserebbe lo
+        // stesso nodo textarea col vecchio testo — un blur a quel punto avrebbe salvato le note
+        // stantie del marcatore precedente sopra quelle del marcatore nuovo, silenziosamente
+        // (stesso pattern già corretto per RoomNotesEditor nel dungeon, qui era mancato).
+        <div key={selectedMarker.id} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-bold text-foreground">
               {selectedMarker.icona} {selectedMarker.label}
