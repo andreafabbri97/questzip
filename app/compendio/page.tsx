@@ -324,7 +324,7 @@ export default function CompendiumPage() {
             setPage(0);
           }}
           placeholder="Cerca (in inglese o italiano)…"
-          className="w-full rounded-lg border border-edge bg-surface-raised pl-10 pr-3 py-2.5 text-foreground transition-shadow focus:outline-none focus:border-accent/60 focus:glow-accent"
+          className="input-focus w-full rounded-lg border border-edge bg-surface-raised pl-10 pr-3 py-2.5 text-foreground"
         />
       </div>
 
@@ -597,7 +597,7 @@ function RegoleSection() {
             setSelected(null);
           }}
           placeholder="Cerca nel testo…"
-          className="w-full rounded-lg border border-edge bg-surface-raised pl-10 pr-3 py-2.5 text-foreground transition-shadow focus:outline-none focus:border-accent/60 focus:glow-accent"
+          className="input-focus w-full rounded-lg border border-edge bg-surface-raised pl-10 pr-3 py-2.5 text-foreground"
         />
       </div>
 

@@ -82,7 +82,7 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Nome o email…"
-          className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
+          className="input-focus w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
         />
         {results.length > 0 && (
           <ul className="space-y-1.5">

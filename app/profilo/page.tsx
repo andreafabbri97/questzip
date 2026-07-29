@@ -46,7 +46,7 @@ export default function ProfiloPage() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center gap-4">
-        {session.user.image && (
+        {session.user.image ? (
           <Image
             src={session.user.image}
             alt=""
@@ -54,9 +54,13 @@ export default function ProfiloPage() {
             height={56}
             className="rounded-full object-cover"
           />
+        ) : (
+          <span className="size-14 rounded-full bg-surface-raised shrink-0" />
         )}
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-accent-strong truncate">{session.user.name}</h1>
+          <h1 className="heading-ornate text-2xl font-bold text-accent-strong truncate">
+            {session.user.name}
+          </h1>
           <p className="text-sm text-muted truncate">{session.user.email}</p>
         </div>
       </div>

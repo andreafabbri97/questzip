@@ -89,7 +89,7 @@ export function MentionModal({
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
+        className={`card-elevated w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
           mention ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}

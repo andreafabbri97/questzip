@@ -345,7 +345,7 @@ function UnsavedChangesModal({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-xl border border-edge bg-background p-5 space-y-4 animate-modal-in"
+        className="card-elevated w-full max-w-sm rounded-xl border border-edge bg-background p-5 space-y-4 animate-modal-in"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 className="text-lg font-display font-bold text-accent-strong">Modifiche non salvate</h2>
@@ -489,7 +489,7 @@ function CharacterSheet({
   };
 
   const inputClass =
-    "mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground";
+    "input-focus mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground";
   const labelClass = "text-xs uppercase tracking-widest text-muted";
 
   return (
@@ -952,7 +952,7 @@ function CampaignSync({
         )}
         {error && <span className="text-xs text-danger">{error}</span>}
       </div>
-      <p className="text-xs text-muted">
+      <p className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-xs text-muted">
         ⚠️ Non è automatico: il gruppo vede uno scatto del personaggio al momento della
         sincronizzazione. Se lo modifichi dopo, premi di nuovo &ldquo;Sincronizza&rdquo; per aggiornarlo.
       </p>
@@ -1044,7 +1044,7 @@ function ClassRow({
   canRemove: boolean;
 }) {
   const rowInputClass =
-    "mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground";
+    "input-focus mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground";
 
   return (
     <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">

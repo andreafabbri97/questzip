@@ -67,7 +67,7 @@ export function IntField({ value, onChange, min, max, className = "", ...rest }:
       onKeyDown={(event) => {
         if (event.key === "Enter") (event.target as HTMLInputElement).blur();
       }}
-      className={`${className} ${!isValid ? "border-danger! text-danger!" : ""}`}
+      className={`input-focus ${className} ${!isValid ? "border-danger! text-danger!" : ""}`}
       {...rest}
     />
   );

@@ -259,7 +259,7 @@ export function MessageComposer({
             else send();
           }}
           data-placeholder="Scrivi un messaggio… usa # per citare il Compendio"
-          className={`flex-1 min-h-9 max-h-32 overflow-y-auto resize-none rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground whitespace-pre-wrap break-words focus:outline-none focus:border-accent/50 ${
+          className={`input-focus flex-1 min-h-9 max-h-32 overflow-y-auto resize-none rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground whitespace-pre-wrap break-words ${
             hasContent ? "" : "before:content-[attr(data-placeholder)] before:text-muted"
           }`}
         />

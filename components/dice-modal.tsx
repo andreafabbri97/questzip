@@ -40,7 +40,7 @@ export function DiceModal({ open, onClose }: { open: boolean; onClose: () => voi
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-md rounded-xl border border-edge bg-background p-5 space-y-4 ${
+        className={`card-elevated w-full max-w-md rounded-xl border border-edge bg-background p-5 space-y-4 ${
           open ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}

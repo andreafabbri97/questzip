@@ -85,7 +85,7 @@ export function DiceRoller() {
               <button
                 key={sides}
                 onClick={() => setDie(sides)}
-                className={`rounded-lg border py-2 text-sm font-bold transition-colors ${
+                className={`card-elevated-hover rounded-lg border py-2 text-sm font-bold transition-colors ${
                   die === sides
                     ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted hover:text-foreground"
@@ -130,7 +130,7 @@ export function DiceRoller() {
                 key={value}
                 disabled={!modeEnabled}
                 onClick={() => setMode(value)}
-                className={`rounded-lg border py-2 text-sm capitalize transition-colors disabled:opacity-40 ${
+                className={`card-elevated-hover rounded-lg border py-2 text-sm capitalize transition-colors disabled:opacity-40 ${
                   mode === value && modeEnabled
                     ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted enabled:hover:text-foreground"

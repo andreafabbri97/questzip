@@ -244,7 +244,13 @@ function CampaignsPageInner() {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-foreground">{campaign.nome}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-widest rounded-full border border-edge px-2 py-0.5 text-muted">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-widest rounded-full border px-2 py-0.5 ${
+                      campaign.role === "dm"
+                        ? "border-accent/40 bg-accent/15 text-accent-strong"
+                        : "border-edge text-muted"
+                    }`}
+                  >
                     {campaign.role === "dm" ? "Master" : "Giocatore"}
                   </span>
                 </div>
@@ -536,7 +542,13 @@ function CampaignDetailView({
                     </button>
                   </>
                 ) : (
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-widest rounded-full border px-2 py-0.5 ${
+                      member.role === "dm"
+                        ? "border-accent/40 bg-accent/15 text-accent-strong"
+                        : "border-edge text-muted"
+                    }`}
+                  >
                     {member.role === "dm" ? "Master" : "Giocatore"}
                   </span>
                 )}
@@ -562,7 +574,7 @@ function CampaignDetailView({
               return (
                 <li
                   key={pc.userId}
-                  className="rounded-lg border border-edge bg-surface-raised p-3"
+                  className="card-elevated rounded-lg border border-edge bg-surface-raised p-3"
                 >
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
@@ -635,14 +647,14 @@ function CampaignDetailView({
             value={noteTitle}
             onChange={(event) => setNoteTitle(event.target.value)}
             placeholder="Titolo (es. Sessione 3 — La cripta)"
-            className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
+            className="input-focus w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
           />
           <textarea
             value={noteText}
             onChange={(event) => setNoteText(event.target.value)}
             placeholder="Cosa è successo in questa sessione?"
             rows={3}
-            className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
+            className="input-focus w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
           />
           <button
             onClick={addNote}
@@ -1237,7 +1249,7 @@ function HandoutsSection({ campaignId, isDm }: { campaignId: string; isDm: boole
             <button
               key={h.id}
               onClick={() => setSelectedId(selectedId === h.id ? null : h.id)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+              className={`card-elevated-hover rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
                 selectedId === h.id
                   ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                   : "border-edge bg-surface-raised text-muted hover:text-foreground"
@@ -1300,20 +1312,20 @@ function NewHandoutForm({
         value={titolo}
         onChange={(event) => setTitolo(event.target.value)}
         placeholder="Titolo (es. Lettera del Re)"
-        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <textarea
         value={testo}
         onChange={(event) => setTesto(event.target.value)}
         placeholder="Testo…"
         rows={3}
-        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <input
         value={immagineUrl}
         onChange={(event) => setImmagineUrl(event.target.value)}
         placeholder="URL immagine (opzionale)"
-        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <button
         onClick={create}
@@ -1360,19 +1372,19 @@ function HandoutDetail({
         <input
           value={titolo}
           onChange={(event) => setTitolo(event.target.value)}
-          className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+          className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
         />
         <textarea
           value={testo}
           onChange={(event) => setTesto(event.target.value)}
           rows={4}
-          className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+          className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
         />
         <input
           value={immagineUrl}
           onChange={(event) => setImmagineUrl(event.target.value)}
           placeholder="URL immagine"
-          className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+          className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
         />
         <div className="flex items-center gap-2">
           <button
@@ -1728,9 +1740,9 @@ function EncounterTracker({
           {combatants.map((c, index) => (
             <li
               key={c.id}
-              className={`rounded-lg border px-3 py-2 space-y-1.5 transition-colors duration-300 ${
+              className={`card-elevated rounded-lg border px-3 py-2 space-y-1.5 transition-colors duration-300 ${
                 index === encounter.currentTurn
-                  ? "border-accent bg-accent/10"
+                  ? "glow-accent border-accent bg-accent/10"
                   : "border-edge bg-surface-raised"
               }`}
             >
@@ -1762,7 +1774,7 @@ function EncounterTracker({
                         await updateCombatant(c.id, { hpAttuali: Math.max(0, c.hpAttuali - 1) });
                         refresh();
                       }}
-                      className="size-6 rounded border border-edge text-danger text-xs transition-transform active:scale-90"
+                      className="size-8 rounded border border-edge text-danger text-sm transition-transform active:scale-90"
                       aria-label="Togli un punto ferita"
                     >
                       −
@@ -1780,7 +1792,7 @@ function EncounterTracker({
                         });
                         refresh();
                       }}
-                      className="size-6 rounded border border-edge text-accent-strong text-xs transition-transform active:scale-90"
+                      className="size-8 rounded border border-edge text-accent-strong text-sm transition-transform active:scale-90"
                       aria-label="Aggiungi un punto ferita"
                     >
                       +
@@ -2811,7 +2823,7 @@ function NewDungeonForm({
         value={nome}
         onChange={(event) => setNome(event.target.value)}
         placeholder="Nome (es. Cripta sotto la torre)"
-        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted">
@@ -2980,7 +2992,7 @@ function NewOutdoorSceneForm({
         value={nome}
         onChange={(event) => setNome(event.target.value)}
         placeholder="Nome (es. Imboscata sulla strada del bosco)"
-        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted">
@@ -3068,7 +3080,7 @@ function NewBlankDungeonForm({
         value={nome}
         onChange={(event) => setNome(event.target.value)}
         placeholder="Nome (es. Cripta sotto la torre, Radura nel bosco…)"
-        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted">
@@ -3546,7 +3558,7 @@ function RoomNotesEditor({
           onChange={(event) => setEncounter(event.target.value)}
           rows={2}
           placeholder="Es. 2 goblin in agguato dietro le casse"
-          className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+          className="mt-1 input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
         />
       </label>
       <label className="block">
@@ -3556,7 +3568,7 @@ function RoomNotesEditor({
           onChange={(event) => setReward(event.target.value)}
           rows={2}
           placeholder="Es. Pozione di cura, 20 mo"
-          className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+          className="mt-1 input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
         />
       </label>
       <button
@@ -4110,7 +4122,7 @@ function NewRegionalMapForm({
         value={nome}
         onChange={(event) => setNome(event.target.value)}
         placeholder="Nome (es. Regno di Valdoria)"
-        className="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-xs text-muted">

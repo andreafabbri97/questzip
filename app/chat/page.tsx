@@ -78,7 +78,7 @@ function ChatPageInner() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors ${
+            className={`card-elevated-hover rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors ${
               tab === t
                 ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                 : "border-edge text-muted hover:text-foreground"
@@ -199,10 +199,13 @@ function MessagesTab({
     <div className="lg:grid lg:grid-cols-[300px_1fr] lg:gap-4 lg:items-start">
       <div className={selected ? "hidden lg:block space-y-1.5" : "space-y-1.5"}>
         {threads.length === 0 && (
-          <p className="text-sm text-muted px-1 py-4 text-center">
-            Nessuna conversazione ancora — unisciti a una campagna o cerca un amico dalla tab
-            &quot;Amici&quot;.
-          </p>
+          <div className="rounded-xl border border-dashed border-edge bg-surface/50 p-10 text-center text-muted">
+            <p className="text-4xl mb-3">💬</p>
+            <p>
+              Nessuna conversazione ancora — unisciti a una campagna o cerca un amico dalla tab
+              &quot;Amici&quot;.
+            </p>
+          </div>
         )}
         {threads.map((thread) => {
           const activity = threadActivity.get(thread.roomKey);

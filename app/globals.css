@@ -72,6 +72,23 @@ h3 {
     0 0 20px -4px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
+/* Stesso trattamento della ricerca nel Compendio (bordo + bagliore dorato al focus, non il
+   contorno di default del browser), raccolto in una sola classe invece di tre focus: separate —
+   il Compendio era rimasto l'unico posto in tutta l'app con questo trattamento, tutti gli altri
+   input avevano solo lo stile nativo del browser. */
+@utility input-focus {
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+  &:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 0 20px -4px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+}
+
 /* Sottile rifinitura sui titoli in stile "insegna da taverna" — un filo di profondità invece del
    testo piatto, coerente col resto del tema oro/ambra. */
 .heading-ornate {
