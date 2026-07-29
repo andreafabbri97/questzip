@@ -73,6 +73,10 @@ export const inventoryItemSchema = z.object({
   nome: z.string(),
   quantita: z.number().int().min(1).default(1),
   note: z.string().default(""),
+  // Peso per singola unità in kg (moltiplicato per quantita per il peso totale della riga) —
+  // 0 di default, un oggetto senza peso specificato non conta nell'ingombro invece di far
+  // sembrare il personaggio sovraccarico per un dato mai compilato.
+  peso: z.number().min(0).default(0),
 });
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 
@@ -223,10 +227,19 @@ export const characterSchema = z.object({
   // Livelli di esaurimento RAW (0-6, il 6° è la morte) — oggi finiva genericamente nelle
   // "condizioni attive" come voce di testo, senza un contatore numerico dedicato.
   affaticamento: z.number().int().min(0).max(6).default(0),
+  // Meccanica homebrew specifica della campagna dell'utente (non RAW) — tetto e testo degli
+  // effetti presi dalla tabella "Livelli di Follia" fornita direttamente dall'utente, vedi
+  // LIVELLO_FOLLIA_EFFETTI più sotto.
+  livelloFollia: z.number().int().min(0).max(6).default(0),
   // Nomi degli oggetti magici richiedenti sintonia attualmente armonizzati — il limite di 3 è
   // una regola RAW fissa, non configurabile.
   oggettiArmonizzati: z.array(z.string()).default([]),
   privilegiLimitati: z.array(limitedFeatureSchema).default([]),
+  // Peso massimo trasportabile in kg — suggerito da Forza×7,5 (vedi carryingCapacityKg) ma
+  // sempre un campo modificabile a mano, mai ricalcolato in automatico ad ogni variazione di
+  // Forza: un giocatore potrebbe volerlo scostare dal suggerimento (talento, oggetto magico,
+  // house rule) senza vederselo silenziosamente sovrascritto alla prima modifica successiva.
+  pesoMassimo: z.number().min(0).default(0),
   linguaggi: z.array(z.string()).default([]),
   resistenze: z.array(z.string()).default([]),
   immunita: z.array(z.string()).default([]),
@@ -304,6 +317,24 @@ export function proficiencyBonus(level: number): number {
   return 2 + Math.floor((Math.min(20, level) - 1) / 4);
 }
 
+// Testo dell'effetto per ciascun livello di follia — tabella fornita direttamente dall'utente
+// (regola homebrew della sua campagna, non presente nei manuali ufficiali).
+export const LIVELLO_FOLLIA_EFFETTI: Record<number, string> = {
+  1: "Svantaggio sulle prove di abilità mentale e sugli incantesimi.",
+  2: "Paura di creature, luoghi e oggetti casuali decisi dal DM.",
+  3: "Svantaggio su tiri per colpire, prove di abilità e tiri salvezza.",
+  4: "Ogni ora: TS Saggezza CD 12 o pazzia a breve termine per 1d10 minuti.",
+  5: "Paralizzato mentalmente. Se resti al livello 5 dopo 1d4 giorni, sali al 6.",
+  6: "Pazzia permanente — il personaggio passa sotto il controllo del DM.",
+};
+
+// Capacità di carico in kg = Forza × 7,5 (valore indicato dall'utente per la sua campagna,
+// leggermente diverso dall'arrotondamento RAW più comune) — solo un SUGGERIMENTO mostrato in UI,
+// il campo pesoMassimo resta sempre modificabile a mano.
+export function carryingCapacityKg(forza: number): number {
+  return Math.round(forza * 7.5);
+}
+
 export function newCharacter(): Character {
   return {
     id: crypto.randomUUID(),
@@ -350,6 +381,8 @@ export function newCharacter(): Character {
     affaticamento: 0,
     oggettiArmonizzati: [],
     privilegiLimitati: [],
+    livelloFollia: 0,
+    pesoMassimo: 0,
     linguaggi: [],
     resistenze: [],
     immunita: [],

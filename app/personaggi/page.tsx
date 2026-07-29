@@ -20,6 +20,7 @@ import {
   CONDIZIONI_5E,
   DAMAGE_TYPES,
   LANGUAGES,
+  LIVELLO_FOLLIA_EFFETTI,
   POINT_BUY_BUDGET,
   RECUPERO_LABELS,
   RECUPERO_OPTIONS,
@@ -28,6 +29,7 @@ import {
   abilityModifier,
   calculateMulticlassHitPoints,
   canonicalClassName,
+  carryingCapacityKg,
   characterSchema,
   formatModifier,
   levelForXp,
@@ -616,7 +618,22 @@ function CharacterSheet({
                 className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground text-center"
               />
             </div>
+            <div className="rounded-lg border border-edge bg-surface-raised p-2 text-center">
+              <span className={labelClass}>Livello di Follia</span>
+              <IntField
+                min={0}
+                max={6}
+                value={character.livelloFollia}
+                onChange={(value) => set("livelloFollia", value)}
+                className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground text-center"
+              />
+            </div>
           </div>
+          {character.livelloFollia > 0 && (
+            <p className="text-xs text-danger -mt-3">
+              Follia {character.livelloFollia}: {LIVELLO_FOLLIA_EFFETTI[character.livelloFollia]}
+            </p>
+          )}
 
           <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
             <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
@@ -1870,9 +1887,20 @@ function InventorySection({
 }) {
   const setInventario = (inventario: InventoryItem[]) => onChange({ ...character, inventario });
   const setMonete = (monete: Character["monete"]) => onChange({ ...character, monete });
+  const setPesoMassimo = (pesoMassimo: number) => onChange({ ...character, pesoMassimo });
 
   const addItem = () =>
-    setInventario([...character.inventario, { id: crypto.randomUUID(), nome: "", quantita: 1, note: "" }]);
+    setInventario([
+      ...character.inventario,
+      { id: crypto.randomUUID(), nome: "", quantita: 1, note: "", peso: 0 },
+    ]);
+
+  const pesoTrasportato = character.inventario.reduce(
+    (sum, item) => sum + item.peso * item.quantita,
+    0,
+  );
+  const pesoSuggerito = carryingCapacityKg(character.caratteristiche.forza);
+  const sovraccarico = character.pesoMassimo > 0 && pesoTrasportato > character.pesoMassimo;
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -1895,6 +1923,35 @@ function InventorySection({
             />
           </label>
         ))}
+      </div>
+
+      <div className="rounded-lg border border-edge bg-surface-raised p-2.5 space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted">Peso trasportato</span>
+          <span className={`font-bold ${sovraccarico ? "text-danger" : "text-foreground"}`}>
+            {pesoTrasportato} / {character.pesoMassimo || "—"} kg
+          </span>
+        </div>
+        {sovraccarico && <p className="text-xs text-danger">Sovraccarico! Velocità ridotta.</p>}
+        <div className="flex items-center gap-2">
+          <label className="flex-1 flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">
+              Peso max
+            </span>
+            <IntField
+              min={0}
+              value={character.pesoMassimo}
+              onChange={setPesoMassimo}
+              className="w-20 rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground text-center"
+            />
+          </label>
+          <button
+            onClick={() => setPesoMassimo(pesoSuggerito)}
+            className="text-xs font-bold text-accent-strong hover:underline whitespace-nowrap"
+          >
+            Suggerisci da Forza ({pesoSuggerito} kg)
+          </button>
+        </div>
       </div>
 
       {character.inventario.length > 0 && (
@@ -1935,6 +1992,22 @@ function InventorySection({
                   ×
                 </button>
               </div>
+              <label className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">
+                  Peso unitario
+                </span>
+                <IntField
+                  min={0}
+                  value={item.peso}
+                  onChange={(value) =>
+                    setInventario(
+                      character.inventario.map((i) => (i.id === item.id ? { ...i, peso: value } : i)),
+                    )
+                  }
+                  className="w-16 rounded-md border border-edge bg-surface px-2 py-1 text-xs text-foreground text-center"
+                />
+                <span className="text-[10px] text-muted">kg</span>
+              </label>
               <InventoryItemInfo nome={item.nome} />
             </div>
           ))}

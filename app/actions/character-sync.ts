@@ -9,8 +9,10 @@ import type { Character } from "@/lib/dnd";
 // Backup personale su account — NON va confuso con app/actions/characters.ts (quello gestisce lo
 // scatto condiviso con una campagna specifica). Qui c'è la scheda intera, di proprietà del solo
 // utente, indipendente da qualunque campagna: esiste solo per non perderla se il dispositivo
-// cambia o il localStorage viene svuotato. Vedi components/character-cloud-sync.tsx per come
-// viene richiamato (debounced ad ogni modifica, riconciliato all'apertura della pagina).
+// cambia o il localStorage viene svuotato. Richiamato da app/personaggi/page.tsx: subito ad ogni
+// salvataggio esplicito (non più debounced — da quando il salvataggio è diventato un'azione
+// esplicita, non c'è più un tasto premuto ogni volta da ammortizzare), e riconciliato con la
+// copia locale all'apertura della pagina.
 
 export async function getMyCharacters() {
   const userId = await requireUserId();
