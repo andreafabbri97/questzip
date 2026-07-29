@@ -31,6 +31,13 @@ const KNOWN_EN_TO_IT: Record<string, string> = {
   artificer: "Artefice",
 };
 
+// Direzione IT->EN dello stesso elenco fisso sopra — serve per la ricerca nell'autocompletamento
+// quando l'utente digita il nome della classe in italiano (es. "ladro" cerca "rogue"): Google
+// Translate da solo può sbagliare termine (es. "ladro" -> "thief" invece di "rogue").
+const KNOWN_IT_TO_EN: Record<string, string> = Object.fromEntries(
+  Object.entries(KNOWN_EN_TO_IT).map(([en, it]) => [it.toLowerCase(), en]),
+);
+
 let cache: Record<string, string> | null = null;
 
 function loadCache(): Record<string, string> {
@@ -63,6 +70,10 @@ export async function translateText(
 
   if (source === "en" && target === "it") {
     const known = KNOWN_EN_TO_IT[trimmed.toLowerCase()];
+    if (known) return known;
+  }
+  if (source === "it" && target === "en") {
+    const known = KNOWN_IT_TO_EN[trimmed.toLowerCase()];
     if (known) return known;
   }
 

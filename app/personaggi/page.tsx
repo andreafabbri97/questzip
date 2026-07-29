@@ -78,7 +78,7 @@ import {
   type RawSubclass,
 } from "@/lib/fivetools/data";
 import { RenderEntries } from "@/lib/fivetools/entries";
-import { useTranslatedText } from "@/lib/fivetools/translate";
+import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 
 const loadClassNames = () => loadClassData().then((data) => data.classes);
 
@@ -1154,11 +1154,35 @@ function Autocomplete<T extends { name: string; source: string }>({
   }, [loader]);
 
   const query = value.trim().toLowerCase();
+
+  // Il catalogo (5etools) ha solo nomi inglesi — cercare "elfo"/"ladro" contro "elf"/"rogue" non
+  // trova nulla. Traduciamo la query IT->EN (debounced, con cache su translateText) e la usiamo
+  // come filtro aggiuntivo, così l'autocompletamento funziona anche digitando in italiano senza
+  // dover tradurre centinaia di opzioni ad ogni tasto.
+  const [itQuery, setItQuery] = useState<{ query: string; en: string } | null>(null);
+  useEffect(() => {
+    if (query.length < 2) return;
+    const timer = setTimeout(() => {
+      translateText(query, "it", "en").then((result) => {
+        if (result) setItQuery({ query, en: result.trim().toLowerCase() });
+      });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const translatedQuery = itQuery && itQuery.query === query && itQuery.en !== query ? itQuery.en : null;
+
   const suggestions =
     options && query.length >= 2
       ? Array.from(
           new Map(
-            options.filter((o) => o.name.toLowerCase().includes(query)).map((o) => [o.name, o]),
+            options
+              .filter(
+                (o) =>
+                  o.name.toLowerCase().includes(query) ||
+                  (translatedQuery && o.name.toLowerCase().includes(translatedQuery)),
+              )
+              .map((o) => [o.name, o]),
           ).values(),
         ).slice(0, 8)
       : [];
