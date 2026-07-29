@@ -380,6 +380,57 @@ function UnsavedChangesModal({
   );
 }
 
+function DeleteCharacterModal({
+  characterName,
+  onConfirm,
+  onCancel,
+}: {
+  characterName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 animate-overlay-in"
+      onClick={onCancel}
+    >
+      <div
+        className="card-elevated w-full max-w-sm rounded-xl border border-edge bg-background p-5 space-y-4 animate-modal-in"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="text-lg font-display font-bold text-danger">Eliminare il personaggio?</h2>
+        <p className="text-sm text-muted">
+          <span className="font-bold text-foreground">{characterName || "Questo personaggio"}</span>{" "}
+          verrà eliminato definitivamente, incluso il backup sul tuo account. Non si può annullare.
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onConfirm}
+            className="rounded-lg bg-danger text-background font-bold px-4 py-2 text-sm hover:opacity-90 transition-opacity"
+          >
+            Elimina definitivamente
+          </button>
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-edge px-4 py-2 text-sm text-foreground hover:border-accent/50 transition-colors"
+          >
+            Annulla
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function CharacterSheet({
   character: persistedCharacter,
   onSave,
@@ -403,6 +454,7 @@ function CharacterSheet({
   const [character, setCharacterState] = useState(persistedCharacter);
   const [dirty, setDirty] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   // Tab ispirati a Roll20 (la piattaforma più diffusa) e alla scheda cartacea di riferimento
   // dell'utente: "Combattimento" di default, tutto il resto un click di distanza invece che più
   // in basso nello stesso scroll — durante il gioco vero serve solo la prima, il resto si legge
@@ -526,16 +578,23 @@ function CharacterSheet({
           </button>
         </div>
         <button
-          onClick={() => {
-            if (window.confirm(`Eliminare ${character.nome || "il personaggio"}?`)) {
-              onDelete();
-            }
-          }}
-          className="text-sm text-danger hover:underline shrink-0"
+          onClick={() => setShowDeleteModal(true)}
+          className="card-elevated-hover flex items-center gap-1.5 rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-bold text-danger transition-colors hover:border-danger hover:bg-danger/10 shrink-0"
         >
-          Elimina
+          🗑️ Elimina
         </button>
       </div>
+
+      {showDeleteModal && (
+        <DeleteCharacterModal
+          characterName={character.nome}
+          onConfirm={() => {
+            setShowDeleteModal(false);
+            onDelete();
+          }}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
 
       {showExitModal && (
         <UnsavedChangesModal
