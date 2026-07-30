@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRealtime } from "@/components/realtime-provider";
 import { respondToCampaignFriendInvite } from "@/app/actions/campaigns";
 import { respondToFriendRequest } from "@/app/actions/friends";
@@ -29,6 +30,16 @@ export const NOTIFICATION_LABELS: Record<string, (dati: Record<string, unknown>)
     `Hai ricevuto ${String(dati.xp ?? "")} XP in "${String(dati.campaignNome ?? "")}".`,
 };
 
+// Stessa destinazione della push OS corrispondente (vedi PUSH_CONTENT in lib/notifications.ts) —
+// cliccare una notifica nel centro notifiche porta nello stesso posto in cui porterebbe la push.
+const NOTIFICATION_URLS: Record<string, string> = {
+  friend_request: "/profilo",
+  friend_accepted: "/profilo",
+  campaign_invite: "/campagne",
+  campaign_invite_response: "/campagne",
+  xp_granted: "/personaggi",
+};
+
 /** Riga di notifica condivisa fra la tendina della campanella e /notifiche (centro notifiche a
  * pagina intera) — stesso rendering, incluse le azioni Accetta/Rifiuta inline per inviti
  * campagna e richieste di amicizia. Una volta agita, la notifica viene ELIMINATA (onDelete)
@@ -47,6 +58,7 @@ export function NotificationItem({
   const icon = NOTIFICATION_ICONS[notification.tipo]?.(notification.datiJson) ?? "🔔";
   const label = NOTIFICATION_LABELS[notification.tipo]?.(notification.datiJson) ?? notification.tipo;
   const dateLabel = formatRelativeTime(notification.createdAt);
+  const href = NOTIFICATION_URLS[notification.tipo] ?? null;
 
   const inviteId =
     notification.tipo === "campaign_invite" ? String(notification.datiJson.inviteId ?? "") : "";
@@ -85,7 +97,13 @@ export function NotificationItem({
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <p>{label}</p>
+          {href ? (
+            <Link href={href} className="block hover:underline">
+              {label}
+            </Link>
+          ) : (
+            <p>{label}</p>
+          )}
           <p className="text-[10px] text-muted mt-0.5 font-normal">{dateLabel}</p>
           <div className="flex gap-3 mt-1.5">
             <button
@@ -109,21 +127,37 @@ export function NotificationItem({
     );
   }
 
+  const rowContent = (
+    <>
+      <span className="shrink-0 text-base leading-none" aria-hidden>
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        {label}
+        <p className="text-[10px] text-muted mt-0.5 font-normal">{dateLabel}</p>
+      </span>
+    </>
+  );
+
   return (
     <div
       className={`flex items-start gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-surface ${
         notification.letta ? "text-muted" : "text-foreground font-bold"
       }`}
     >
-      <button onClick={onRead} className="flex min-w-0 flex-1 items-start gap-2.5 text-left">
-        <span className="shrink-0 text-base leading-none" aria-hidden>
-          {icon}
-        </span>
-        <span className="min-w-0 flex-1">
-          {label}
-          <p className="text-[10px] text-muted mt-0.5 font-normal">{dateLabel}</p>
-        </span>
-      </button>
+      {href ? (
+        <Link
+          href={href}
+          onClick={onRead}
+          className="flex min-w-0 flex-1 items-start gap-2.5 text-left"
+        >
+          {rowContent}
+        </Link>
+      ) : (
+        <button onClick={onRead} className="flex min-w-0 flex-1 items-start gap-2.5 text-left">
+          {rowContent}
+        </button>
+      )}
       {deleteButton}
     </div>
   );
