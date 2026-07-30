@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
 import {
+  computeVisibleCells,
   generateDungeon,
   generateOutdoorScene,
   type CellType,
@@ -109,25 +110,39 @@ export async function getDungeon(dungeonId: string) {
 
   // Fog attiva e non sei il master: nascondi anche lato server ciò che il client nasconderebbe
   // comunque, così un giocatore che ispeziona il traffico di rete non legge note di stanze/
-  // mostri non ancora rivelati — la sola UI non basta a proteggerli. Il NOME della stanza
-  // (label) va azzerato come encounter/reward: nessun uso legittimo lo richiede finché è
-  // nascosta. Forma/posizione (cells/centerX/centerY/vectorShape) restano invece intenzionalmente
-  // — il client disegna comunque una sagoma scura piena per le stanze non rivelate (si vede "che
-  // c'è qualcosa qui", non cosa), design deliberato di questa fog of war, non una svista: senza
-  // questi campi la sagoma sparirebbe e la mappa mostrerebbe un buco al posto della stanza.
+  // mostri fuori dalla visuale attuale del party — la sola UI non basta a proteggerli. Visibile
+  // = luce dinamica automatica (linea di vista + raggio di scurovisione dai token giocatore,
+  // vedi computeVisibleCells) UNITA alle stanze rivelate a mano dal master (evento narrativo
+  // indipendente dalla posizione dei token, es. una visione). Il NOME della stanza (label) va
+  // azzerato come encounter/reward quando è fuori da entrambe: nessun uso legittimo lo richiede
+  // finché è nascosta. Forma/posizione (cells/centerX/centerY/vectorShape) restano invece
+  // intenzionalmente — il client disegna comunque una sagoma scura piena per le stanze non
+  // visibili (si vede "che c'è qualcosa qui", non cosa), design deliberato di questa fog of war.
+  const playerPositions = await db
+    .select({ x: dungeonTokens.x, y: dungeonTokens.y })
+    .from(dungeonTokens)
+    .where(eq(dungeonTokens.dungeonId, dungeonId));
+  const autoVisible = computeVisibleCells(dungeon.cells, playerPositions);
+
   const revealedSet = new Set(dungeon.revealedRooms);
-  const hiddenCellKeys = new Set<string>();
+  const manuallyRevealedCellKeys = new Set<string>();
+  for (const room of dungeon.rooms) {
+    if (revealedSet.has(room.id)) {
+      for (const [x, y] of room.cells) manuallyRevealedCellKeys.add(`${x},${y}`);
+    }
+  }
+  const isCellVisible = (x: number, y: number) =>
+    autoVisible.has(`${x},${y}`) || manuallyRevealedCellKeys.has(`${x},${y}`);
+
   const rooms = dungeon.rooms.map((room) => {
-    if (revealedSet.has(room.id)) return room;
-    for (const [x, y] of room.cells) hiddenCellKeys.add(`${x},${y}`);
+    const roomVisible = revealedSet.has(room.id) || room.cells.some(([x, y]) => autoVisible.has(`${x},${y}`));
+    if (roomVisible) return room;
     return { ...room, label: "", encounter: "", reward: "" };
   });
   const cells = dungeon.cells.map((row, y) =>
-    row.map((cell, x) => (hiddenCellKeys.has(`${x},${y}`) ? "wall" : cell)),
+    row.map((cell, x) => (isCellVisible(x, y) ? cell : "wall")),
   );
-  const monsterTokens = dungeon.monsterTokens.filter(
-    (m) => !hiddenCellKeys.has(`${m.x},${m.y}`),
-  );
+  const monsterTokens = dungeon.monsterTokens.filter((m) => isCellVisible(m.x, m.y));
 
   return { ...dungeon, rooms, cells, monsterTokens };
 }

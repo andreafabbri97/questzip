@@ -56,7 +56,23 @@ export class CampaignRoom extends Server<Env> {
   // e farlo passare per un messaggio reale di un altro membro (il broadcast qui sotto sovrascrive
   // solo lo userId in cima all'oggetto, mai letto dal client di chat, che si fida invece di
   // message.authorId annidato dentro il payload).
-  private static readonly CLIENT_RELAY_TYPES = new Set(["move", "remove"]);
+  //
+  // voice-join/voice-leave/voice-signal: segnalazione WebRTC per la chat vocale P2P (offerte/
+  // risposte/candidati ICE) — contenuto innocuo (solo metadati di connessione, mai testo/identità
+  // da falsificare in modo dannoso), stesso livello di fiducia già accettato per move/remove: un
+  // membro già autenticato della stanza può al più disturbare l'instaurazione di UNA chiamata
+  // vocale, non impersonare un altro utente altrove nell'app.
+  //
+  // template: area d'effetto (cerchio/cono/linea) disegnata sulla mappa — effimera, mai scritta
+  // su database, stesso principio di "contenuto a bassa fiducia" di move/remove.
+  private static readonly CLIENT_RELAY_TYPES = new Set([
+    "move",
+    "remove",
+    "voice-join",
+    "voice-leave",
+    "voice-signal",
+    "template",
+  ]);
 
   onMessage(connection: Connection, message: string) {
     // Relay per la lavagna condivisa: un giocatore muove il proprio token, tutti gli

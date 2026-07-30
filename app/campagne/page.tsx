@@ -68,16 +68,20 @@ import {
   updateRoomNotes,
   upsertMyToken,
 } from "@/app/actions/dungeons";
-import type {
-  CellType,
-  CorridorStyle,
-  DeadEndRemoval,
-  DungeonConfig,
-  MonsterToken,
-  OutdoorBiome,
-  RoomDensity,
-  RoomShape,
-  StairsOption,
+import {
+  computeVisibleCells,
+  pointInTemplate,
+  type AoeTemplate,
+  type CellType,
+  type CorridorStyle,
+  type DeadEndRemoval,
+  type DungeonConfig,
+  type MonsterToken,
+  type OutdoorBiome,
+  type RoomDensity,
+  type RoomShape,
+  type StairsOption,
+  type TemplateShape,
 } from "@/lib/dungeon";
 import {
   addRegionalMarker,
@@ -100,6 +104,7 @@ import {
 import { loadCreatures, loadItems, type RawCreature, type RawItem } from "@/lib/fivetools/data";
 import { generateName, NAME_RACES, type NameRace } from "@/lib/names";
 import { usePartyRoom } from "@/lib/use-party-room";
+import { useVoiceChat } from "@/lib/use-voice-chat";
 import {
   abilityModifier,
   adjustedEncounterXp,
@@ -468,6 +473,8 @@ function CampaignDetailView({
       </section>
 
       <JukeboxPlayer campaignId={campaignId} isDm={isDm} campaign={detail.campaign} onChanged={refresh} />
+
+      <VoiceChatPanel campaignId={campaignId} myUserId={userId} members={detail.members} />
 
       <HandoutsSection campaignId={campaignId} isDm={isDm} />
 
@@ -1190,6 +1197,86 @@ function JukeboxPlayer({
         </div>
       ) : (
         isDm && <p className="text-sm text-muted">Nessun brano impostato.</p>
+      )}
+    </section>
+  );
+}
+
+function VoiceChatPanel({
+  campaignId,
+  myUserId,
+  members,
+}: {
+  campaignId: string;
+  myUserId: string | null;
+  members: CampaignDetail["members"];
+}) {
+  const { inCall, muted, participants, join, leave, toggleMute } = useVoiceChat(
+    campaignId,
+    myUserId,
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const nameFor = (userId: string) =>
+    members.find((m) => m.userId === userId)?.name ?? "Qualcuno";
+
+  return (
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-4 space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <span className="text-xs uppercase tracking-widest text-muted">🎙️ Chat vocale</span>
+        {inCall ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleMute}
+              className="rounded-lg border border-edge px-3 py-1.5 text-xs text-foreground hover:border-accent transition-colors"
+            >
+              {muted ? "🔇 Riattiva mic" : "🎤 Silenzia"}
+            </button>
+            <button
+              onClick={leave}
+              className="rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-bold text-danger hover:border-danger hover:bg-danger/10 transition-colors"
+            >
+              Esci
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setError(null);
+              join().catch(() => {
+                setError("Non riesco ad accedere al microfono — controlla i permessi del browser.");
+              });
+            }}
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+          >
+            Entra
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-danger">{error}</p>}
+      {inCall && (
+        <p className="text-sm text-muted">
+          {participants.size === 0
+            ? "Sei solo per ora — aspetta che qualcun altro entri."
+            : `Con te: ${Array.from(participants.keys()).map(nameFor).join(", ")}`}
+        </p>
+      )}
+      <p className="text-[10px] text-muted">
+        Audio diretto tra browser (nessun server in mezzo) — funziona meglio se siete già tutti
+        nella pagina della campagna.
+      </p>
+      {Array.from(participants.values()).map(
+        (participant) =>
+          participant.stream && (
+            <audio
+              key={participant.userId}
+              autoPlay
+              className="hidden"
+              ref={(el) => {
+                if (el) el.srcObject = participant.stream;
+              }}
+            />
+          ),
       )}
     </section>
   );
@@ -3175,10 +3262,31 @@ function DungeonViewer({
     getDungeonTokens(dungeon.id).then(setRawTokens);
   }, [dungeon.id]);
 
+  const [templateShape, setTemplateShape] = useState<TemplateShape | null>(null);
+  const [activeTemplates, setActiveTemplates] = useState<
+    { id: number; template: AoeTemplate; hits: string[] }[]
+  >([]);
+  const templateIdRef = useRef(0);
+
+  // Effimero apposta (mai scritto su database): un template resta visibile ~6 secondi e poi
+  // scompare da solo, come lo strumento di misurazione di Roll20 — non serve un modo per
+  // rimuoverlo a mano.
+  const addTemplate = (template: AoeTemplate, hits: string[]) => {
+    const id = templateIdRef.current++;
+    setActiveTemplates((prev) => [...prev, { id, template, hits }]);
+    setTimeout(() => setActiveTemplates((prev) => prev.filter((t) => t.id !== id)), 6000);
+  };
+
   const fetchingNewTokenRef = useRef(false);
   const { send } = usePartyRoom({ kind: "dungeon", dungeonId: dungeon.id }, (message) => {
     const msg = message as
-      | { type?: string; userId?: string; x?: number; y?: number }
+      | (Partial<AoeTemplate> & {
+          type?: string;
+          userId?: string;
+          x?: number;
+          y?: number;
+          hits?: string[];
+        })
       | null;
     if (!msg?.type) return;
 
@@ -3192,6 +3300,20 @@ function DungeonViewer({
     }
     if (msg.type === "remove" && msg.userId) {
       setRawTokens((prev) => prev.filter((t) => t.userId !== msg.userId));
+      return;
+    }
+    if (
+      msg.type === "template" &&
+      msg.shape &&
+      typeof msg.originX === "number" &&
+      typeof msg.originY === "number" &&
+      typeof msg.size === "number" &&
+      typeof msg.angle === "number"
+    ) {
+      addTemplate(
+        { shape: msg.shape, originX: msg.originX, originY: msg.originY, size: msg.size, angle: msg.angle },
+        msg.hits ?? [],
+      );
       return;
     }
     if (msg.type !== "move" || !msg.userId || typeof msg.x !== "number" || typeof msg.y !== "number") return;
@@ -3223,6 +3345,19 @@ function DungeonViewer({
     color: tokenColor(t.userId),
     isMe: t.userId === myUserId,
   }));
+
+  const handleTemplateDrawn = (template: AoeTemplate) => {
+    const hitTokens = tokens
+      .filter((t) => pointInTemplate(template, Math.floor(t.x), Math.floor(t.y)))
+      .map((t) => (t.isMe ? "tu" : t.label));
+    const hitMonsters = dungeon.monsterTokens
+      .filter((m) => pointInTemplate(template, m.x, m.y))
+      .map((m) => m.nome);
+    const hits = [...hitTokens, ...hitMonsters];
+    addTemplate(template, hits);
+    send({ type: "template", ...template, hits });
+    setTemplateShape(null);
+  };
 
   const handleTokenDrag = (x: number, y: number) => {
     send({ type: "move", x, y });
@@ -3338,6 +3473,36 @@ function DungeonViewer({
             <button onClick={placeMyToken} className="font-bold text-accent-strong hover:underline">
               🧭 Metti il mio token in mappa
             </button>
+          )}
+        </div>
+      )}
+
+      {myUserId && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-edge bg-surface-raised p-2">
+          <span className="text-xs uppercase tracking-widest text-muted">📐 Area d&apos;effetto</span>
+          {(
+            [
+              { shape: "circle" as const, label: "⭕ Cerchio" },
+              { shape: "cone" as const, label: "🔺 Cono" },
+              { shape: "line" as const, label: "📏 Linea" },
+            ]
+          ).map((option) => (
+            <button
+              key={option.shape}
+              onClick={() => setTemplateShape((prev) => (prev === option.shape ? null : option.shape))}
+              className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                templateShape === option.shape
+                  ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+                  : "border-edge bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+          {templateShape && (
+            <span className="text-[10px] text-muted">
+              trascina sulla mappa dall&apos;origine verso la direzione desiderata
+            </span>
           )}
         </div>
       )}
@@ -3477,7 +3642,22 @@ function DungeonViewer({
         onPlaceMonster={placeMonster}
         onMoveMonster={moveMonster}
         onRemoveMonster={removeMonster}
+        templateShape={templateShape}
+        onTemplateDrawn={handleTemplateDrawn}
+        activeTemplates={activeTemplates.map((t) => t.template)}
       />
+      {activeTemplates.length > 0 && (
+        <div className="space-y-1">
+          {activeTemplates.map((t) => (
+            <p key={t.id} className="text-xs text-accent-strong">
+              🎯{" "}
+              {t.template.shape === "circle" ? "Cerchio" : t.template.shape === "cone" ? "Cono" : "Linea"}
+              {" — "}
+              {t.hits.length > 0 ? `colpisce: ${t.hits.join(", ")}` : "non colpisce nessuno"}
+            </p>
+          ))}
+        </div>
+      )}
       {selectedRoom && isDm && !editMode && (
         <RoomNotesEditor
           key={selectedRoom.id}
@@ -3492,11 +3672,12 @@ function DungeonViewer({
           }}
         />
       )}
-      {selectedRoom &&
-        !isDm &&
-        (!dungeon.fogOfWar || dungeon.revealedRooms.includes(selectedRoom.id)) && (
-          <p className="text-sm text-muted">Stanza {selectedRoom.label}.</p>
-        )}
+      {selectedRoom && !isDm && (
+        // DungeonMap non genera mai un click su una stanza nascosta (vedi handleClick lì),
+        // quindi se siamo qui la stanza era visibile al momento della selezione — niente da
+        // ricontrollare.
+        <p className="text-sm text-muted">Stanza {selectedRoom.label}.</p>
+      )}
     </div>
   );
 }
@@ -3614,6 +3795,41 @@ function tokenInitials(name: string | null): string {
   return parts.length > 1 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : name.slice(0, 2).toUpperCase();
 }
 
+// Disegna un template area d'effetto (cerchio/cono/linea) — usata sia per l'anteprima live
+// mentre lo si trascina (semitrasparente, bordo ambra) sia per quelli già finalizzati e
+// condivisi con tutta la stanza (bordo rosso, coerente col colore "pericolo" già usato altrove).
+function renderAoeTemplate(template: AoeTemplate, cellSize: number, preview: boolean) {
+  const cx = template.originX * cellSize;
+  const cy = template.originY * cellSize;
+  const r = template.size * cellSize;
+  const fill = preview ? "#e0a83e22" : "#dc262633";
+  const stroke = preview ? "#e0a83e" : "#dc2626";
+  const shared = { fill, stroke, strokeWidth: 1.5, className: "pointer-events-none" };
+
+  if (template.shape === "circle") {
+    return <circle cx={cx} cy={cy} r={r} {...shared} />;
+  }
+  if (template.shape === "line") {
+    const halfWidth = cellSize * 0.5;
+    return (
+      <rect
+        x={cx}
+        y={cy - halfWidth}
+        width={r}
+        height={halfWidth * 2}
+        transform={`rotate(${(template.angle * 180) / Math.PI} ${cx} ${cy})`}
+        {...shared}
+      />
+    );
+  }
+  const half = Math.PI / 6;
+  const x1 = cx + r * Math.cos(template.angle - half);
+  const y1 = cy + r * Math.sin(template.angle - half);
+  const x2 = cx + r * Math.cos(template.angle + half);
+  const y2 = cy + r * Math.sin(template.angle + half);
+  return <path d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`} {...shared} />;
+}
+
 function DungeonMap({
   dungeon,
   activeRoomId,
@@ -3633,6 +3849,9 @@ function DungeonMap({
   onPlaceMonster,
   onMoveMonster,
   onRemoveMonster,
+  templateShape = null,
+  onTemplateDrawn,
+  activeTemplates = [],
 }: {
   dungeon: { width: number; height: number; cells: CellType[][]; rooms: DungeonFull["rooms"] };
   activeRoomId: number | null;
@@ -3652,6 +3871,9 @@ function DungeonMap({
   onPlaceMonster?: (x: number, y: number) => void;
   onMoveMonster?: (id: string, x: number, y: number) => void;
   onRemoveMonster?: (id: string) => void;
+  templateShape?: TemplateShape | null;
+  onTemplateDrawn?: (template: AoeTemplate) => void;
+  activeTemplates?: AoeTemplate[];
 }) {
   const cellSize = 14;
   const isPaintingRef = useRef(false);
@@ -3663,14 +3885,42 @@ function DungeonMap({
   const draggingMonsterRef = useRef<string | null>(null);
   const [draggingMonsterId, setDraggingMonsterId] = useState<string | null>(null);
   const [monsterDragPos, setMonsterDragPos] = useState<{ x: number; y: number } | null>(null);
+  const draggingTemplateRef = useRef(false);
+  const [templateDrag, setTemplateDrag] = useState<
+    { originX: number; originY: number; x: number; y: number } | null
+  >(null);
 
   const fogActive = fogOfWar && !isDm;
   const revealedSet = new Set(revealedRooms);
-  const hiddenCells = new Set<string>();
+  // Luce dinamica vera: quello che i giocatori vedono ORA è l'unione di due fonti — la visuale
+  // automatica (linea di vista + raggio di scurovisione dai token giocatore, ricalcolata ad ogni
+  // spostamento) e le stanze rivelate a mano dal master (es. per un evento narrativo indipendente
+  // dalla posizione dei token). Non è "esplorato in memoria": una cella uscita dalla visuale
+  // torna scura, come una vera fonte di luce che si sposta — a differenza del fog of war "a
+  // memoria" di altri VTT, qui deliberatamente più semplice.
+  const autoVisibleCells = fogActive
+    ? computeVisibleCells(dungeon.cells, (tokens ?? []).map((t) => ({ x: t.x, y: t.y })))
+    : new Set<string>();
+  const manuallyRevealedCells = new Set<string>();
   if (fogActive) {
     for (const room of dungeon.rooms) {
-      if (revealedSet.has(room.id)) continue;
-      for (const [x, y] of room.cells) hiddenCells.add(`${x},${y}`);
+      if (revealedSet.has(room.id)) {
+        for (const [x, y] of room.cells) manuallyRevealedCells.add(`${x},${y}`);
+      }
+    }
+  }
+  const isRoomVisible = (room: DungeonFull["rooms"][number]) =>
+    !fogActive ||
+    revealedSet.has(room.id) ||
+    room.cells.some(([x, y]) => autoVisibleCells.has(`${x},${y}`));
+  const hiddenCells = new Set<string>();
+  if (fogActive) {
+    for (let y = 0; y < dungeon.height; y++) {
+      for (let x = 0; x < dungeon.width; x++) {
+        const key = `${x},${y}`;
+        if (autoVisibleCells.has(key) || manuallyRevealedCells.has(key)) continue;
+        hiddenCells.add(key);
+      }
     }
   }
 
@@ -3755,6 +4005,51 @@ function DungeonMap({
     };
   }, [isDm, dungeon.width, dungeon.height, onMoveMonster]);
 
+  // Trascinamento del template area d'effetto: origine al pointerdown, raggio/direzione seguono
+  // il puntatore mentre si trascina (stesso motore pointermove/pointerup a livello di window già
+  // usato per token/mostri), finalizzato al rilascio.
+  useEffect(() => {
+    if (!templateShape) return;
+    const clientToCell = (clientX: number, clientY: number) => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const x = Math.min(dungeon.width, Math.max(0, ((clientX - rect.left) / rect.width) * dungeon.width));
+      const y = Math.min(dungeon.height, Math.max(0, ((clientY - rect.top) / rect.height) * dungeon.height));
+      return { x, y };
+    };
+    const move = (event: PointerEvent) => {
+      if (!draggingTemplateRef.current) return;
+      const pos = clientToCell(event.clientX, event.clientY);
+      if (pos) setTemplateDrag((prev) => (prev ? { ...prev, x: pos.x, y: pos.y } : prev));
+    };
+    const up = () => {
+      if (!draggingTemplateRef.current) return;
+      draggingTemplateRef.current = false;
+      setTemplateDrag((drag) => {
+        if (drag) {
+          const dx = drag.x - drag.originX;
+          const dy = drag.y - drag.originY;
+          const size = Math.max(0.5, Math.hypot(dx, dy));
+          const angle = Math.atan2(dy, dx);
+          onTemplateDrawn?.({
+            shape: templateShape,
+            originX: Math.floor(drag.originX) + 0.5,
+            originY: Math.floor(drag.originY) + 0.5,
+            size,
+            angle,
+          });
+        }
+        return null;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [templateShape, dungeon.width, dungeon.height, onTemplateDrawn]);
+
   const handleCellDown = (x: number, y: number) => {
     if (markerMode) {
       onPlaceMarker?.(x, y);
@@ -3812,7 +4107,7 @@ function DungeonMap({
           }),
         )}
         {dungeon.rooms.map((room) => {
-          const hidden = fogActive && !revealedSet.has(room.id);
+          const hidden = !isRoomVisible(room);
           const fill = hidden ? "#0c0a09" : activeRoomId === room.id ? "#e0a83e33" : "#241f1a";
           const stroke = hidden ? "#0c0a09" : activeRoomId === room.id ? "#e0a83e" : "#3b322a";
           const label = hidden ? null : (
@@ -3992,6 +4287,46 @@ function DungeonMap({
             </g>
           );
         })}
+        {activeTemplates.map((template, index) => (
+          <g key={index}>{renderAoeTemplate(template, cellSize, false)}</g>
+        ))}
+        {templateDrag &&
+          templateShape &&
+          (() => {
+            const dx = templateDrag.x - templateDrag.originX;
+            const dy = templateDrag.y - templateDrag.originY;
+            const size = Math.max(0.3, Math.hypot(dx, dy));
+            const angle = Math.atan2(dy, dx);
+            return renderAoeTemplate(
+              {
+                shape: templateShape,
+                originX: Math.floor(templateDrag.originX) + 0.5,
+                originY: Math.floor(templateDrag.originY) + 0.5,
+                size,
+                angle,
+              },
+              cellSize,
+              true,
+            );
+          })()}
+        {templateShape && (
+          <rect
+            x={0}
+            y={0}
+            width={dungeon.width * cellSize}
+            height={dungeon.height * cellSize}
+            fill="transparent"
+            className="cursor-crosshair"
+            onPointerDown={(event) => {
+              const rect = svgRef.current?.getBoundingClientRect();
+              if (!rect) return;
+              const x = ((event.clientX - rect.left) / rect.width) * dungeon.width;
+              const y = ((event.clientY - rect.top) / rect.height) * dungeon.height;
+              draggingTemplateRef.current = true;
+              setTemplateDrag({ originX: x, originY: y, x, y });
+            }}
+          />
+        )}
       </svg>
     </div>
   );

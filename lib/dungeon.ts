@@ -50,6 +50,117 @@ export interface MonsterToken {
   colore: string;
 }
 
+// Template area d'effetto (cerchio/cono/linea), stile Roll20: disegnato trascinando sulla mappa
+// per vedere subito chi/cosa ci finisce dentro (es. una palla di fuoco), effimero — non
+// persistito su database, solo un messaggio realtime che ogni client mostra per qualche secondo
+// e poi lascia scadere (vedi VoiceChatPanel/template handling in app/campagne/page.tsx per lo
+// stesso principio di "contenuto a bassa fiducia, nessuna scrittura sul server").
+export type TemplateShape = "circle" | "cone" | "line";
+
+export interface AoeTemplate {
+  shape: TemplateShape;
+  // Cella di origine (in unità di cella, es. 4.5 = centro della cella 4) — cerchio/cono partono
+  // da qui, la linea la attraversa nella direzione di "angle".
+  originX: number;
+  originY: number;
+  // Raggio (cerchio) o lunghezza (cono/linea) in celle — 1 cella = 5 piedi, stessa convenzione
+  // già usata altrove nell'app per le distanze.
+  size: number;
+  // Direzione in radianti verso cui punta cono/linea (ignorato dal cerchio, simmetrico).
+  angle: number;
+}
+
+const CONE_HALF_ANGLE = Math.PI / 6; // 60° totali, apertura standard dei coni in 5e
+const LINE_HALF_WIDTH = 0.5; // una linea è larga 1 cella (5 piedi)
+
+/** true se il centro della cella (x,y) ricade dentro il template — usato per capire chi viene
+ * colpito da un'area d'effetto appena disegnata. */
+export function pointInTemplate(template: AoeTemplate, x: number, y: number): boolean {
+  const dx = x + 0.5 - template.originX;
+  const dy = y + 0.5 - template.originY;
+  const dist = Math.hypot(dx, dy);
+
+  if (template.shape === "circle") return dist <= template.size;
+  if (dist > template.size) return false;
+
+  if (template.shape === "cone") {
+    if (dist < 0.01) return true;
+    const pointAngle = Math.atan2(dy, dx);
+    let diff = Math.abs(pointAngle - template.angle);
+    if (diff > Math.PI) diff = 2 * Math.PI - diff;
+    return diff <= CONE_HALF_ANGLE;
+  }
+
+  // linea: proietta il punto sull'asse della linea (along) e sulla perpendicolare (across)
+  const along = dx * Math.cos(template.angle) + dy * Math.sin(template.angle);
+  const across = -dx * Math.sin(template.angle) + dy * Math.cos(template.angle);
+  return along >= 0 && along <= template.size && Math.abs(across) <= LINE_HALF_WIDTH;
+}
+
+// Luce dinamica: raggio di visione automatica dai token giocatore, in celle (1 cella = 5 piedi).
+// 12 celle = 60 piedi, il raggio di scurovisione standard 5e — un valore fisso ragionevole invece
+// di una fonte di luce configurabile per stanza/oggetto (fuori scope, l'app non traccia torce o
+// incantesimi di luce individuali).
+export const DEFAULT_VISION_RADIUS = 12;
+
+/** true se non c'è nessun muro lungo la linea retta fra le due celle (Bresenham) — stesso
+ * criterio "wall = opaco, tutto il resto passa" già usato per fog of war/generazione. */
+function hasLineOfSight(cells: CellType[][], fromX: number, fromY: number, toX: number, toY: number): boolean {
+  let x0 = fromX;
+  let y0 = fromY;
+  const dx = Math.abs(toX - x0);
+  const dy = Math.abs(toY - y0);
+  const sx = x0 < toX ? 1 : -1;
+  const sy = y0 < toY ? 1 : -1;
+  let err = dx - dy;
+  while (true) {
+    if (x0 === toX && y0 === toY) return true;
+    if (!(x0 === fromX && y0 === fromY) && cells[y0]?.[x0] === "wall") return false;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x0 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y0 += sy;
+    }
+  }
+}
+
+/** Unione delle celle visibili (linea di vista + raggio) da uno o più punti di origine — la
+ * "luce dinamica" vera e propria: usata sia lato server (per non mandare al client dati di
+ * celle/stanze/mostri fuori dalla visuale di nessun giocatore) sia lato client (per disegnare
+ * l'oscurità). Volutamente semplice (raycasting per cella, non vero shadowcasting ricorsivo): per
+ * le dimensioni di griglia di questo progetto (poche migliaia di celle) è già rapidissimo, ed
+ * evita le sottigliezze di implementazione di un vero algoritmo di shadowcasting simmetrico. */
+export function computeVisibleCells(
+  cells: CellType[][],
+  origins: { x: number; y: number }[],
+  radius: number = DEFAULT_VISION_RADIUS,
+): Set<string> {
+  const visible = new Set<string>();
+  const height = cells.length;
+  const width = cells[0]?.length ?? 0;
+  for (const origin of origins) {
+    const ox = Math.floor(origin.x);
+    const oy = Math.floor(origin.y);
+    const minX = Math.max(0, ox - radius);
+    const maxX = Math.min(width - 1, ox + radius);
+    const minY = Math.max(0, oy - radius);
+    const maxY = Math.min(height - 1, oy + radius);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const key = `${x},${y}`;
+        if (visible.has(key)) continue;
+        if (Math.hypot(x - ox, y - oy) > radius) continue;
+        if (hasLineOfSight(cells, ox, oy, x, y)) visible.add(key);
+      }
+    }
+  }
+  return visible;
+}
+
 export interface DungeonConfig {
   minRooms: number;
   maxRooms: number;
