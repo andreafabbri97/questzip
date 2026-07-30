@@ -45,7 +45,7 @@ export default function ProfiloPage() {
   if (!session?.user) return <p className="text-muted">Devi accedere per vedere il tuo profilo.</p>;
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
       <div className="flex items-center gap-4">
         {session.user.image ? (
           <Image

@@ -9,7 +9,7 @@ export default function NotifichePage() {
   const { notifications, unreadCount, markRead, markAllRead, deleteNotification } = useRealtime();
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
       <div className="flex items-center justify-between gap-3">
         <h1 className="heading-ornate text-3xl font-bold text-accent-strong">🔔 Notifiche</h1>
         {unreadCount > 0 && (

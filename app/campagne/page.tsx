@@ -242,7 +242,7 @@ function CampaignsPageInner() {
           <p>Nessuna campagna ancora. L&apos;avventura ti aspetta!</p>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 [@media(min-width:2200px)]:grid-cols-4">
           {campaigns.map((campaign) => (
             <li key={campaign.id}>
               <button

@@ -29,7 +29,10 @@ const sections = [
 
 export default function Home() {
   return (
-    <div className="space-y-10">
+    // Larghezza propria invece di ereditare quella (molto più generosa, pensata per elenchi
+    // lunghi) del contenitore <main> — con solo 3 card fisse, su un monitor 2K/4K si
+    // stiracchierebbero enormi con vuoto ai lati invece di restare compatte e leggibili.
+    <div className="space-y-10 max-w-3xl lg:max-w-4xl mx-auto">
       <section className="text-center pt-8 sm:pt-14 space-y-4">
         <h1 className="heading-ornate text-4xl sm:text-5xl font-bold text-accent-strong">
           QuestZip

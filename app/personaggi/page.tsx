@@ -286,7 +286,7 @@ export default function CharactersPage() {
           <p>Nessun personaggio ancora. Crea il tuo primo eroe!</p>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 [@media(min-width:2200px)]:grid-cols-4">
           {items.map((character) => (
             <li key={character.id}>
               <button

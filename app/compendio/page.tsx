@@ -71,6 +71,13 @@ const RARITY_ORDER = ["none", "common", "uncommon", "rare", "very rare", "legend
 
 const PAGE_SIZE = 30;
 
+// Riusate sia dalla vista principale sia da RegoleSection (stesso layout elenco+dettaglio, due
+// componenti distinti). Prima l'elenco era fisso a 70vh, sempre la stessa proporzione a
+// prescindere da quanto schermo ci fosse davvero sopra — su un monitor 2K/4K lasciava una fascia
+// vuota sotto l'elenco pur avendo altro spazio verticale disponibile. dvh invece di vh: su mobile
+// la barra degli indirizzi che appare/scompare non deve far "saltare" l'altezza.
+const COMPENDIO_LIST_MAX_HEIGHT = "lg:max-h-[calc(100dvh-19rem)] lg:min-h-[420px]";
+
 const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
   incantesimi: loadSpells,
   mostri: loadCreatures,
@@ -176,7 +183,7 @@ export default function CompendiumPage() {
   const results = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-6xl 2xl:max-w-[1500px] mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-6xl 2xl:max-w-[1500px] [@media(min-width:2200px)]:max-w-[1900px] mx-auto">
       <div>
         <h1 className="heading-ornate text-4xl font-bold text-accent-strong">Compendio</h1>
         <p className="text-sm text-muted mt-1">
@@ -328,7 +335,7 @@ export default function CompendiumPage() {
         />
       </div>
 
-      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] lg:gap-6 lg:items-start">
+      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] [@media(min-width:2200px)]:grid-cols-[600px_1fr] lg:gap-6 lg:items-start">
         <div className={selected ? "hidden lg:block space-y-2" : "space-y-2"}>
           {loadingCategory && (
             <p className="text-sm text-muted text-center py-6">Caricamento contenuti in corso…</p>
@@ -341,7 +348,9 @@ export default function CompendiumPage() {
           {!loadingCategory && categoryData && categoryData.length > 0 && results.length === 0 && (
             <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
           )}
-          <ul className="card-elevated divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
+          <ul
+            className={`card-elevated divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:overflow-y-auto ${COMPENDIO_LIST_MAX_HEIGHT}`}
+          >
             {results.map((entry) => (
               <li key={`${entry.source}-${entry.name}`}>
                 <button
@@ -601,7 +610,7 @@ function RegoleSection() {
         />
       </div>
 
-      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] lg:gap-6 lg:items-start">
+      <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] [@media(min-width:2200px)]:grid-cols-[600px_1fr] lg:gap-6 lg:items-start">
         <div className={selectedSection ? "hidden lg:block space-y-2" : "space-y-2"}>
           {sections === null && (
             <p className="text-sm text-muted text-center py-6">Caricamento in corso…</p>
@@ -609,7 +618,9 @@ function RegoleSection() {
           {sections && filtered.length === 0 && (
             <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
           )}
-          <ul className="card-elevated divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:max-h-[70vh] lg:overflow-y-auto">
+          <ul
+            className={`card-elevated divide-y divide-edge rounded-xl border border-edge bg-surface overflow-x-hidden lg:overflow-y-auto ${COMPENDIO_LIST_MAX_HEIGHT}`}
+          >
             {filtered.map((s) => (
               <li key={s.id}>
                 <button

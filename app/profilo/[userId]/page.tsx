@@ -80,7 +80,7 @@ export default function PublicProfilePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-3xl mx-auto">
       <Link href="/profilo" className="text-sm text-muted hover:text-foreground">
         ← Il tuo profilo
       </Link>
