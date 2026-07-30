@@ -2451,6 +2451,42 @@ function WeaponsSection({
   const updateWeapon = (id: string, patch: Partial<Weapon>) =>
     setArmi(character.armi.map((weapon) => (weapon.id === id ? { ...weapon, ...patch } : weapon)));
 
+  const [roll, setRoll] = useState<{
+    label: string;
+    detail: string;
+    total: number;
+    crit?: boolean;
+    fumble?: boolean;
+  } | null>(null);
+
+  const rollAttack = (weaponName: string, bonus: number) => {
+    const die = rollDie(20);
+    setRoll({
+      label: `${weaponName.trim() || "Arma"} — Attacco`,
+      detail: `${die} ${formatModifier(bonus)}`,
+      total: die + bonus,
+      crit: die === 20,
+      fumble: die === 1,
+    });
+  };
+
+  // "NdM" (es. "2d6") — stesso formato libero già in uso nel campo Dado danno. Un formato non
+  // riconosciuto (raro, es. testo lasciato vuoto) semplicemente non mostra il bottone Danno,
+  // invece di tirare un dado a caso su un input che non è quello che l'utente intendeva.
+  const rollDamage = (weaponName: string, dadoDanno: string, mod: number) => {
+    const match = dadoDanno.trim().match(/^(\d+)d(\d+)$/i);
+    if (!match) return;
+    const count = Math.min(20, Math.max(1, Number(match[1])));
+    const sides = Number(match[2]);
+    const rolls = Array.from({ length: count }, () => rollDie(sides));
+    const total = rolls.reduce((sum, value) => sum + value, 0) + mod;
+    setRoll({
+      label: `${weaponName.trim() || "Arma"} — Danno`,
+      detail: `[${rolls.join(", ")}]${mod !== 0 ? ` ${formatModifier(mod)}` : ""}`,
+      total,
+    });
+  };
+
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
@@ -2459,6 +2495,13 @@ function WeaponsSection({
           + Aggiungi arma
         </button>
       </div>
+      {roll && (
+        <p className="text-sm font-bold text-accent-strong">
+          🎲 {roll.label}: {roll.detail} = <span className="text-lg">{roll.total}</span>
+          {roll.crit && " — Colpo critico!"}
+          {roll.fumble && " — Fallimento critico…"}
+        </p>
+      )}
       {character.armi.length === 0 && <p className="text-sm text-muted">Nessuna arma aggiunta ancora.</p>}
       <div className="space-y-3">
         {character.armi.map((weapon) => {
@@ -2550,11 +2593,31 @@ function WeaponsSection({
                   A distanza
                 </label>
               </div>
-              <p className="text-sm text-accent-strong font-semibold">
-                Bonus attacco: {formatModifier(bonus)} · Danno: {weapon.dadoDanno}
-                {dmgMod !== 0 ? ` ${formatModifier(dmgMod)}` : ""}
-                {weapon.tipoDanno ? ` (${weapon.tipoDanno})` : ""}
-              </p>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-sm text-accent-strong font-semibold">
+                  Bonus attacco: {formatModifier(bonus)} · Danno: {weapon.dadoDanno}
+                  {dmgMod !== 0 ? ` ${formatModifier(dmgMod)}` : ""}
+                  {weapon.tipoDanno ? ` (${weapon.tipoDanno})` : ""}
+                </p>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => rollAttack(weapon.nome, bonus)}
+                    aria-label={`Tira per colpire con ${weapon.nome || "arma"}`}
+                    className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                  >
+                    🎲 Attacco
+                  </button>
+                  {/^\d+d\d+$/i.test(weapon.dadoDanno.trim()) && (
+                    <button
+                      onClick={() => rollDamage(weapon.nome, weapon.dadoDanno, dmgMod)}
+                      aria-label={`Tira danno con ${weapon.nome || "arma"}`}
+                      className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                    >
+                      🎲 Danno
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           );
         })}
