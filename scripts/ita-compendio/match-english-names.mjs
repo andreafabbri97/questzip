@@ -138,6 +138,72 @@ function normalizeName(name) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+// La traduzione IT->EN letterale spesso riordina le parole o sceglie un sinonimo diverso dal
+// nome ufficiale ("Armatura di Agathys" -> "Agathys armor" invece di "Armor of Agathys",
+// "Nystul's Magical Aura" invece di "Nystul's Magic Aura") — un confronto per stringa esatta
+// (normalizeName sopra) manca la maggioranza di questi casi. Fallback per token: spezza in
+// parole, scarta le più comuni preposizioni/articoli inglesi e appiattisce i plurali più
+// semplici (systematic mismatch di sinonimo come "Aiuto"->"Help" invece di "Aid" resta
+// volutamente NON abbinato: nessun token in comune, meglio mancare l'abbinamento che rischiare
+// di collegare due incantesimi diversi).
+const STOPWORDS = new Set(["of", "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "with", "from"]);
+// Soglia alta e margine minimo sul secondo classificato di proposito: un nome D&D corto
+// ("Fulmine" -> "Lightning") normalizza a un solo token generico condiviso da diversi
+// incantesimi veri ("Call Lightning", "Lightning Bolt"...) — abbinare quello sbagliato è
+// PEGGIO di non trovare nulla (mostrerebbe il contenuto di un incantesimo diverso). Meglio
+// mancare l'abbinamento in caso di ambiguità che rischiare un falso positivo silenzioso.
+const FUZZY_THRESHOLD = 0.6;
+const FUZZY_MIN_MARGIN = 0.15;
+const FUZZY_MIN_TOKENS = 2;
+
+function tokenize(name) {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !STOPWORDS.has(t))
+    .map((t) => (t.length > 3 && t.endsWith("s") && !t.endsWith("ss") ? t.slice(0, -1) : t));
+}
+
+function jaccard(tokensA, tokensB) {
+  const a = new Set(tokensA);
+  const b = new Set(tokensB);
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const t of a) if (b.has(t)) intersection++;
+  const union = a.size + b.size - intersection;
+  return intersection / union;
+}
+
+// Un solo indice per token costruito una volta per categoria (non per riga) — findFuzzyMatch
+// sotto lo riusa per ogni entry italiana ancora da abbinare.
+function buildFuzzyIndex(uniqueEnglishEntries) {
+  return uniqueEnglishEntries.map((entry) => ({ entry, tokens: tokenize(entry.name) }));
+}
+
+function findFuzzyMatch(translatedName, fuzzyIndex) {
+  const targetTokens = tokenize(translatedName);
+  if (targetTokens.length < FUZZY_MIN_TOKENS) return null;
+  let best = null;
+  let bestScore = 0;
+  let secondScore = 0;
+  for (const { entry, tokens } of fuzzyIndex) {
+    const score = jaccard(targetTokens, tokens);
+    if (score > bestScore) {
+      secondScore = bestScore;
+      bestScore = score;
+      best = entry;
+    } else if (score > secondScore) {
+      secondScore = score;
+    }
+  }
+  if (bestScore < FUZZY_THRESHOLD) return null;
+  if (bestScore - secondScore < FUZZY_MIN_MARGIN) return null;
+  return best;
+}
+
 async function fetchJson(url) {
   const res = await fetch(url);
   if (!res.ok) return null;
@@ -188,7 +254,7 @@ async function loadEnglishClasses() {
   return files.flatMap((f) => f?.class ?? []);
 }
 
-async function matchCategory({ label, table, loadEnglish, cache, overrides = {} }) {
+async function matchCategory({ label, table, loadEnglish, cache, overrides = {}, dryRun = false }) {
   const rows = await db.select().from(table).where(isNull(table.nomeInglese));
   if (rows.length === 0) {
     console.log(`${label}: nessuna riga da abbinare (già tutte fatte, o tabella vuota).`);
@@ -211,38 +277,50 @@ async function matchCategory({ label, table, loadEnglish, cache, overrides = {} 
       byName.set(key, entry);
     }
   }
+  const fuzzyIndex = buildFuzzyIndex([...byName.values()]);
 
   let matched = 0;
+  let fuzzyMatched = 0;
   for (const row of rows) {
     const englishName = await translateItToEn(row.nome, cache, overrides);
-    const match = englishName ? byName.get(normalizeName(englishName)) : null;
+    if (!englishName) continue;
+    const exact = byName.get(normalizeName(englishName));
+    const match = exact ?? findFuzzyMatch(englishName, fuzzyIndex);
     if (match) {
-      await db
-        .update(table)
-        .set({ nomeInglese: match.name, fonteInglese: match.source })
-        .where(eq(table.id, row.id));
+      if (!exact) {
+        fuzzyMatched++;
+        console.log(`  [fuzzy] "${row.nome}" ("${englishName}") -> "${match.name}" (${match.source})`);
+      }
+      if (!dryRun) {
+        await db
+          .update(table)
+          .set({ nomeInglese: match.name, fonteInglese: match.source })
+          .where(eq(table.id, row.id));
+      }
       matched++;
     }
   }
   saveCache(cache);
-  console.log(`${label}: ${matched}/${rows.length} abbinati.`);
+  console.log(`${label}: ${matched}/${rows.length} abbinati (di cui ${fuzzyMatched} solo per somiglianza di parole)${dryRun ? " [DRY RUN, nulla scritto]" : ""}.`);
 }
 
 async function main() {
   const cache = loadCache();
-  const only = process.argv[2];
+  const args = process.argv.slice(2);
+  const dryRun = args.includes("--dry-run");
+  const only = args.find((a) => !a.startsWith("--"));
 
   const categories = {
     incantesimi: () =>
-      matchCategory({ label: "Incantesimi", table: compendioItaIncantesimi, loadEnglish: loadEnglishSpells, cache }),
+      matchCategory({ label: "Incantesimi", table: compendioItaIncantesimi, loadEnglish: loadEnglishSpells, cache, dryRun }),
     mostri: () =>
-      matchCategory({ label: "Mostri", table: compendioItaMostri, loadEnglish: loadEnglishCreatures, cache }),
+      matchCategory({ label: "Mostri", table: compendioItaMostri, loadEnglish: loadEnglishCreatures, cache, dryRun }),
     razze: () =>
-      matchCategory({ label: "Razze", table: compendioItaRazze, loadEnglish: loadEnglishRaces, cache }),
+      matchCategory({ label: "Razze", table: compendioItaRazze, loadEnglish: loadEnglishRaces, cache, dryRun }),
     classi: () =>
-      matchCategory({ label: "Classi", table: compendioItaClassi, loadEnglish: loadEnglishClasses, cache }),
+      matchCategory({ label: "Classi", table: compendioItaClassi, loadEnglish: loadEnglishClasses, cache, dryRun }),
     oggetti: () =>
-      matchCategory({ label: "Oggetti", table: compendioItaOggetti, loadEnglish: loadEnglishItems, cache }),
+      matchCategory({ label: "Oggetti", table: compendioItaOggetti, loadEnglish: loadEnglishItems, cache, dryRun }),
     talenti: () =>
       matchCategory({
         label: "Talenti",
@@ -250,6 +328,7 @@ async function main() {
         loadEnglish: loadEnglishFeats,
         cache,
         overrides: KNOWN_TALENTI_PHB,
+        dryRun,
       }),
   };
 

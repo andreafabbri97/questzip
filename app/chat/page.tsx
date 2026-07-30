@@ -20,6 +20,14 @@ type UnifiedThread =
   | { kind: "campaign"; id: string; roomKey: string; nome: string }
   | { kind: "dm"; id: string; roomKey: string; nome: string; image: string | null };
 
+// Prima era un fisso 70vh, sempre la stessa proporzione a prescindere da quanto spazio ci fosse
+// davvero sopra (header, titolo, tab) — su un monitor alto (1080p/4K, la stessa proporzione
+// verticale) lasciava una fascia vuota fra il riquadro e il fondo dello schermo. dvh invece di vh
+// perché su mobile la barra degli indirizzi che appare/scompare non deve far "saltare" l'altezza.
+// Offset diverso da sm in su: sotto quella soglia c'è anche la barra di navigazione fissa in
+// fondo (vedi Nav) e main ha pb-24 invece di pb-10 per non finirci sotto.
+const CHAT_PANEL_HEIGHT = "h-[calc(100dvh-19rem)] sm:h-[calc(100dvh-15rem)] min-h-[420px]";
+
 // Anteprima stile WhatsApp: nei gruppi (campagna) col nome di chi ha scritto, nelle DM no (è
 // ovvio chi sia, essendo una conversazione 1-a-1) — "Tu:" in entrambi i casi se l'ultimo l'ho
 // scritto io.
@@ -242,7 +250,7 @@ function MessagesTab({
 
       <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>
         {selected ? (
-          <div className="rounded-xl border border-edge bg-surface overflow-hidden h-[70vh] flex flex-col">
+          <div className={`rounded-xl border border-edge bg-surface overflow-hidden flex flex-col ${CHAT_PANEL_HEIGHT}`}>
             <button
               onClick={() => setSelected(null)}
               className="lg:hidden text-sm text-muted hover:text-foreground px-3 pt-2 text-left shrink-0"
@@ -262,7 +270,9 @@ function MessagesTab({
             )}
           </div>
         ) : (
-          <div className="hidden lg:flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">
+          <div
+            className={`hidden lg:flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted ${CHAT_PANEL_HEIGHT}`}
+          >
             <p>Seleziona una conversazione.</p>
           </div>
         )}

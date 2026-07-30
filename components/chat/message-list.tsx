@@ -102,7 +102,11 @@ export function MessageList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto space-y-0.5 p-3">
+    // flex flex-col justify-end: quando i messaggi non riempiono il riquadro (poche righe di
+    // conversazione), li ancora in fondo vicino al composer invece di lasciarli appesi in alto
+    // con un vuoto enorme sotto — lo scroll continua a funzionare normalmente quando straboccano
+    // (bottomRef più sotto porta comunque all'ultimo messaggio).
+    <div className="flex-1 overflow-y-auto flex flex-col justify-end space-y-0.5 p-3">
       {messages.length === 0 && (
         <p className="text-sm text-muted text-center py-6">Nessun messaggio ancora — scrivi il primo!</p>
       )}

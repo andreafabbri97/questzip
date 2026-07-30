@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { getMyCharacters } from "@/app/actions/character-sync";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { FriendsTab } from "@/components/friends-tab";
+import { InstallPwaToggle } from "@/components/install-pwa-toggle";
 import { PushToggle } from "@/components/push-toggle";
 import { type Character, characterSchema } from "@/lib/dnd";
 import { useLocalCollection } from "@/lib/storage";
@@ -130,6 +131,11 @@ export default function ProfiloPage() {
       <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <h2 className="text-sm uppercase tracking-widest text-muted">🔔 Notifiche push</h2>
         <PushToggle />
+      </section>
+
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
+        <h2 className="text-sm uppercase tracking-widest text-muted">📲 Installa l&apos;app</h2>
+        <InstallPwaToggle />
       </section>
 
       <button
