@@ -470,6 +470,12 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "friend_request",
   "friend_accepted",
   "campaign_invite",
+  // Risposta dell'invitato — arriva a chi ha invitato, non a chi ha risposto (quella persona
+  // vede l'esito subito nella UI, non le serve una notifica su se stessa).
+  "campaign_invite_response",
+  // Il master ha assegnato XP (a fine combattimento o a mano) — prima l'unico modo di scoprirlo
+  // era aprire per caso la propria scheda personaggio e vedere il banner XP in sospeso.
+  "xp_granted",
 ]);
 
 // Solo eventi discreti e poco frequenti (richieste amicizia, inviti campagna) — i messaggi di

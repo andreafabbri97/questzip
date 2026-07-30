@@ -10,7 +10,7 @@ const CLOSE_ANIMATION_MS = 120;
 
 export function NotificationBell() {
   const { status } = useSession();
-  const { notifications, unreadCount, markRead, markAllRead } = useRealtime();
+  const { notifications, unreadCount, markRead, markAllRead, deleteNotification } = useRealtime();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -70,12 +70,19 @@ export function NotificationBell() {
             )}
           </div>
           {notifications.length === 0 ? (
-            <p className="p-3 text-sm text-muted">Nessuna notifica.</p>
+            <p className="p-4 text-center text-sm text-muted">
+              <span className="block text-2xl mb-1">🔔</span>
+              Nessuna notifica.
+            </p>
           ) : (
             <ul className="divide-y divide-edge">
               {notifications.map((n) => (
                 <li key={n.id}>
-                  <NotificationItem notification={n} onRead={() => markRead(n.id)} />
+                  <NotificationItem
+                    notification={n}
+                    onRead={() => markRead(n.id)}
+                    onDelete={() => deleteNotification(n.id)}
+                  />
                 </li>
               ))}
             </ul>

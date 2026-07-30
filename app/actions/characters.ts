@@ -3,7 +3,8 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
-import { campaignCharacters, users } from "@/lib/db/schema";
+import { campaignCharacters, campaigns, users } from "@/lib/db/schema";
+import { createNotification } from "@/lib/notifications";
 import type { Character } from "@/lib/dnd";
 
 export async function syncCharacterToCampaign(campaignId: string, character: Character) {
@@ -115,6 +116,13 @@ export async function grantXp(
   // UPDATE su 0 righe non genera errori di suo: senza questo controllo il master vedrebbe
   // "✓ Assegnato" anche se il giocatore non ha ancora sincronizzato un personaggio in campagna.
   if (!updated) throw new Error("Il giocatore non ha ancora sincronizzato un personaggio in questa campagna.");
+
+  const [campaign] = await db.select({ nome: campaigns.nome }).from(campaigns).where(eq(campaigns.id, campaignId));
+  await createNotification(targetUserId, "xp_granted", {
+    campaignId,
+    campaignNome: campaign?.nome ?? "",
+    xp: amount,
+  });
 }
 
 // userIds: chi ha davvero partecipato (di solito i characterUserId dei combattenti-PG
@@ -151,6 +159,17 @@ export async function grantXpToParty(
         : `XP assegnata solo a ${updated.length} su ${userIds.length} giocatori: qualcuno non ha (più) un personaggio sincronizzato.`,
     );
   }
+
+  const [campaign] = await db.select({ nome: campaigns.nome }).from(campaigns).where(eq(campaigns.id, campaignId));
+  await Promise.all(
+    updated.map((row) =>
+      createNotification(row.userId, "xp_granted", {
+        campaignId,
+        campaignNome: campaign?.nome ?? "",
+        xp: perPlayerAmount,
+      }),
+    ),
+  );
 }
 
 export async function claimXp(campaignId: string) {

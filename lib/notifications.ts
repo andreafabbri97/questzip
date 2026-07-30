@@ -27,6 +27,18 @@ const PUSH_CONTENT: Record<
     body: `${String(dati.inviterName ?? "Il master")} ti ha invitato in "${String(dati.campaignNome ?? "")}".`,
     url: "/campagne",
   }),
+  campaign_invite_response: (dati) => ({
+    title: dati.accepted ? "Invito accettato" : "Invito rifiutato",
+    body: dati.accepted
+      ? `${String(dati.responderName ?? "Qualcuno")} è entrato in "${String(dati.campaignNome ?? "")}".`
+      : `${String(dati.responderName ?? "Qualcuno")} ha rifiutato l'invito a "${String(dati.campaignNome ?? "")}".`,
+    url: "/campagne",
+  }),
+  xp_granted: (dati) => ({
+    title: "XP assegnata",
+    body: `Hai ricevuto ${String(dati.xp ?? "")} XP in "${String(dati.campaignNome ?? "")}" — vai sulla tua scheda per applicarla.`,
+    url: "/personaggi",
+  }),
 };
 
 /** Helper interno (non una server action): inserisce la notifica, la spinge in tempo reale verso

@@ -1,40 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getMyNotifications } from "@/app/actions/notifications";
 import { NotificationItem } from "@/components/notification-item";
 import { useRealtime } from "@/components/realtime-provider";
 
-// Più alto del limite di 30 usato dalla tendina della campanella (solo un'anteprima) — qui è il
-// centro notifiche vero e proprio.
-const PAGE_LIMIT = 100;
-
+// Legge la stessa lista condivisa della tendina della campanella (RealtimeProvider) invece di un
+// fetch proprio: le notifiche nuove compaiono qui subito, senza bisogno di ricaricare la pagina.
 export default function NotifichePage() {
-  const { markRead: markReadShared, markAllRead: markAllReadShared } = useRealtime();
-  const [notifications, setNotifications] = useState<Awaited<
-    ReturnType<typeof getMyNotifications>
-  > | null>(null);
-
-  useEffect(() => {
-    getMyNotifications(PAGE_LIMIT).then(setNotifications);
-  }, []);
-
-  // Aggiorna sia la lista locale di questa pagina (fino a 100) sia quella condivisa dal
-  // provider (le ultime 30, usata dal badge/tendina in header) — così il conteggio in header
-  // resta corretto anche segnando come lette notifiche da qui.
-  const markRead = (id: string) => {
-    setNotifications((prev) => prev?.map((n) => (n.id === id ? { ...n, letta: true } : n)) ?? prev);
-    markReadShared(id);
-  };
-
-  const markAllRead = () => {
-    setNotifications((prev) => prev?.map((n) => ({ ...n, letta: true })) ?? prev);
-    markAllReadShared();
-  };
-
-  if (!notifications) return <p className="text-muted">Caricamento…</p>;
-
-  const unreadCount = notifications.filter((n) => !n.letta).length;
+  const { notifications, unreadCount, markRead, markAllRead, deleteNotification } = useRealtime();
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -59,7 +31,11 @@ export default function NotifichePage() {
         <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface overflow-hidden">
           {notifications.map((n) => (
             <li key={n.id}>
-              <NotificationItem notification={n} onRead={() => markRead(n.id)} />
+              <NotificationItem
+                notification={n}
+                onRead={() => markRead(n.id)}
+                onDelete={() => deleteNotification(n.id)}
+              />
             </li>
           ))}
         </ul>

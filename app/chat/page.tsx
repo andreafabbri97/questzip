@@ -11,6 +11,7 @@ import { CampaignChat } from "@/components/chat/campaign-chat";
 import { DirectChat } from "@/components/chat/direct-chat";
 import { FriendsTab } from "@/components/friends-tab";
 import { useRealtime } from "@/components/realtime-provider";
+import { formatRelativeTime as formatThreadTime } from "@/lib/format-time";
 
 type Tab = "messaggi" | "amici";
 type SelectedThread = { kind: "campaign"; id: string } | { kind: "dm"; id: string } | null;
@@ -18,25 +19,6 @@ type SelectedThread = { kind: "campaign"; id: string } | { kind: "dm"; id: strin
 type UnifiedThread =
   | { kind: "campaign"; id: string; roomKey: string; nome: string }
   | { kind: "dm"; id: string; roomKey: string; nome: string; image: string | null };
-
-// Stessa convenzione WhatsApp: oggi -> ora, ieri -> "Ieri", ultimi 6 giorni -> giorno della
-// settimana, oltre -> data breve.
-function formatThreadTime(date: Date | string): string {
-  const d = new Date(date);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return "Ieri";
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-  if (diffDays < 7) {
-    const label = d.toLocaleDateString("it-IT", { weekday: "long" });
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  }
-  return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" });
-}
 
 // Anteprima stile WhatsApp: nei gruppi (campagna) col nome di chi ha scritto, nelle DM no (è
 // ovvio chi sia, essendo una conversazione 1-a-1) — "Tu:" in entrambi i casi se l'ultimo l'ho

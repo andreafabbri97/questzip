@@ -230,6 +230,19 @@ export async function respondToCampaignFriendInvite(inviteId: string, accept: bo
       await db.insert(campaignMembers).values({ campaignId: invite.campaignId, userId, role: "player" });
     }
   }
+
+  const [campaign] = await db
+    .select({ nome: campaigns.nome })
+    .from(campaigns)
+    .where(eq(campaigns.id, invite.campaignId));
+  const [responder] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  await createNotification(invite.invitedBy, "campaign_invite_response", {
+    campaignId: invite.campaignId,
+    campaignNome: campaign?.nome ?? "",
+    responderName: responder?.name ?? "Qualcuno",
+    accepted: accept,
+  });
+
   return invite.campaignId;
 }
 

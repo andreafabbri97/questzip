@@ -158,8 +158,12 @@ export async function sendFriendRequest(targetUserId: string) {
     );
   if (existingOutgoing) return;
 
+  let request: typeof friendRequests.$inferSelect;
   try {
-    await db.insert(friendRequests).values({ richiedenteId: userId, destinatarioId: targetUserId });
+    [request] = await db
+      .insert(friendRequests)
+      .values({ richiedenteId: userId, destinatarioId: targetUserId })
+      .returning();
   } catch {
     // Vinto dal vincolo unico parziale su (richiedente, destinatario) pending — due chiamate
     // quasi simultanee (doppio tap, due schede aperte) hanno superato entrambe il controllo
@@ -167,7 +171,11 @@ export async function sendFriendRequest(targetUserId: string) {
     // a quel ramo, la richiesta pendente esiste già, niente da fare.
     return;
   }
-  await createNotification(targetUserId, "friend_request", { fromUserId: userId, fromName: myName });
+  await createNotification(targetUserId, "friend_request", {
+    requestId: request.id,
+    fromUserId: userId,
+    fromName: myName,
+  });
 }
 
 export async function respondToFriendRequest(requestId: string, accept: boolean) {

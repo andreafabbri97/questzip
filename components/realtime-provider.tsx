@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useSession } from "next-auth/react";
 import { usePartyRoom } from "@/lib/use-party-room";
 import {
+  deleteNotification as deleteNotificationAction,
   getMyNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -17,6 +18,7 @@ interface RealtimeContextValue {
   unreadCount: number;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  deleteNotification: (id: string) => void;
   /** Iscrizione a un tipo di messaggio realtime (es. "chat-message", "dm-message") senza aprire
    * una seconda connessione — tutto passa dall'unica stanza personale "user-<id>" già aperta
    * qui. Usata dalle thread di chat aperte (fase 5/6). */
@@ -137,6 +139,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     markAllNotificationsRead();
   };
 
+  const deleteNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    deleteNotificationAction(id);
+  };
+
   const unreadCount = notifications.filter((n) => !n.letta).length;
 
   return (
@@ -146,6 +153,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         unreadCount,
         markRead,
         markAllRead,
+        deleteNotification,
         subscribe,
         threadActivity,
         refreshThreads,
