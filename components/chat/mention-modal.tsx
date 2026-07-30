@@ -83,7 +83,7 @@ export function MentionModal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 p-4 pt-16 sm:pt-4 ${
+      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-16 sm:pt-4 ${
         mention ? "animate-overlay-in" : "animate-overlay-out"
       }`}
       onClick={onClose}

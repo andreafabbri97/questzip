@@ -36,7 +36,7 @@ export function Nav() {
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-edge bg-background/85 backdrop-blur shadow-[0_4px_20px_-8px_rgba(0,0,0,0.6)]">
-        <div className="max-w-5xl 2xl:max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-6">
+        <div className="max-w-5xl 2xl:max-w-[1600px] [@media(min-width:2200px)]:max-w-[2200px] mx-auto px-4 h-14 flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/icon.svg" alt="" width={28} height={28} />
             <span className="heading-ornate font-display text-lg font-bold tracking-wide text-accent-strong">
@@ -169,7 +169,7 @@ function AccountButton() {
           className="rounded-full object-cover"
         />
       )}
-      <span className="hidden md:inline">{session.user.name}</span>
+      <span className="hidden lg:inline truncate max-w-[160px]">{session.user.name}</span>
     </Link>
   );
 }

@@ -191,7 +191,7 @@ function CampaignsPageInner() {
         </p>
         <button
           onClick={() => signIn("google")}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
         >
           Accedi con Google
         </button>
@@ -217,7 +217,7 @@ function CampaignsPageInner() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto">
       <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Campagne</h1>
 
       {error && <p className="text-sm text-danger">{error}</p>}
@@ -328,7 +328,7 @@ function CreateOrJoin({
         />
         <button
           onClick={create}
-          className="w-full glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          className="w-full glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
         >
           Crea (diventi il master)
         </button>
@@ -425,7 +425,7 @@ function CampaignDetailView({
   };
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
           ← Campagne
@@ -482,7 +482,7 @@ function CampaignDetailView({
 
       <RollTablesSection campaignId={campaignId} isDm={isDm} />
 
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+      <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
       <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm uppercase tracking-widest text-muted">Membri</h2>
@@ -567,7 +567,7 @@ function CampaignDetailView({
         </ul>
       </section>
 
-      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 md:mt-0">
         <h2 className="text-sm uppercase tracking-widest text-muted">Party</h2>
         {!party || party.length === 0 ? (
           <p className="text-sm text-muted">
@@ -667,7 +667,7 @@ function CampaignDetailView({
           />
           <button
             onClick={addNote}
-            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
           >
             Aggiungi al diario
           </button>
@@ -1138,7 +1138,7 @@ function JukeboxPlayer({
               setTitolo("");
               onChanged();
             }}
-            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
           >
             Imposta
           </button>
@@ -1155,7 +1155,7 @@ function JukeboxPlayer({
               {!playing && (
                 <button
                   onClick={() => setPlaying(true)}
-                  className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+                  className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97]"
                 >
                   ▶ Riproduci per me
                 </button>
@@ -1249,7 +1249,7 @@ function VoiceChatPanel({
                 setError("Non riesco ad accedere al microfono — controlla i permessi del browser.");
               });
             }}
-            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97]"
           >
             Entra
           </button>
@@ -1419,7 +1419,7 @@ function NewHandoutForm({
       <button
         onClick={create}
         disabled={creating || !titolo.trim()}
-        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
       >
         {creating ? "Creo…" : "Crea (nascosto ai giocatori)"}
       </button>
@@ -1479,7 +1479,7 @@ function HandoutDetail({
           <button
             onClick={save}
             disabled={saving}
-            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
           >
             {saving ? "…" : "Salva"}
           </button>
@@ -1622,7 +1622,7 @@ function RollTablesSection({ campaignId, isDm }: { campaignId: string; isDm: boo
                     <button
                       onClick={() => roll(table)}
                       disabled={table.voci.length === 0}
-                      className="rounded-md bg-accent text-background font-bold px-2.5 py-1 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+                      className="rounded-md bg-accent text-background font-bold px-2.5 py-1 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
                     >
                       🎲 Tira
                     </button>
@@ -1722,7 +1722,7 @@ function RollTableEditor({
         <button
           onClick={save}
           disabled={saving}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
         >
           {saving ? "…" : "Salva"}
         </button>
@@ -2040,7 +2040,7 @@ function EncounterDmControls({
         </label>
         <button
           onClick={add}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97]"
         >
           Aggiungi
         </button>
@@ -2136,7 +2136,7 @@ function XpDistributor({
         <button
           onClick={grant}
           disabled={granting || perPlayer <= 0 || participantUserIds.length === 0}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
         >
           {granting ? "Assegno…" : granted ? "✓ Assegnato" : "Assegna XP"}
         </button>
@@ -2211,7 +2211,7 @@ function GrantXpInline({
           }
         }}
         disabled={granting || amount <= 0}
-        className="rounded-md bg-accent text-background font-bold px-2 py-1 hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="rounded-md bg-accent text-background font-bold px-2 py-1 hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
       >
         {granting ? "…" : "Assegna"}
       </button>
@@ -2561,7 +2561,7 @@ function EncounterGenerator({
           <button
             onClick={addToEncounter}
             disabled={adding}
-            className="text-xs font-bold rounded-lg bg-accent text-background px-2 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+            className="text-xs font-bold rounded-lg bg-accent text-background px-2 py-1.5 hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
           >
             {adding ? "…" : "+ Aggiungi al combattimento"}
           </button>
@@ -3030,7 +3030,7 @@ function NewDungeonForm({
       <button
         onClick={generate}
         disabled={generating}
-        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
       >
         {generating ? "Genero…" : "🎲 Genera"}
       </button>
@@ -3123,7 +3123,7 @@ function NewOutdoorSceneForm({
       <button
         onClick={generate}
         disabled={generating}
-        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
       >
         {generating ? "Genero…" : "🎲 Genera"}
       </button>
@@ -3195,7 +3195,7 @@ function NewBlankDungeonForm({
         <button
           onClick={create}
           disabled={creating}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
         >
           {creating ? "Creo…" : "✏️ Crea tela vuota"}
         </button>
@@ -3637,7 +3637,7 @@ function DungeonViewer({
               <button
                 onClick={saveCells}
                 disabled={!dirty || saving}
-                className="rounded-md bg-accent text-background font-bold px-2 py-1 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+                className="rounded-md bg-accent text-background font-bold px-2 py-1 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
               >
                 {saving ? "…" : dirty ? "💾 Salva mappa" : "Salvato"}
               </button>
@@ -3829,7 +3829,7 @@ function RoomNotesEditor({
       <button
         onClick={save}
         disabled={saving}
-        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+        className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
       >
         {saving ? "…" : "Salva"}
       </button>
@@ -4570,7 +4570,7 @@ function NewRegionalMapForm({
         <button
           onClick={create}
           disabled={creating}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
         >
           {creating ? "Creo…" : "Crea mappa vuota"}
         </button>
@@ -4726,7 +4726,7 @@ function RegionalMapViewer({
             <button
               onClick={saveCells}
               disabled={saving}
-              className="rounded-lg bg-accent text-background font-bold px-2.5 py-1.5 hover:bg-accent-strong transition-colors disabled:opacity-50"
+              className="rounded-lg bg-accent text-background font-bold px-2.5 py-1.5 hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
             >
               {saving ? "Salvo…" : "💾 Salva terreno"}
             </button>

@@ -26,6 +26,7 @@
   --font-display: var(--font-display);
 }
 
+
 body {
   background: var(--background);
   background-image: radial-gradient(
@@ -57,12 +58,20 @@ h3 {
   transition:
     box-shadow 0.2s ease,
     border-color 0.2s ease,
-    transform 0.2s ease;
+    transform 0.1s ease;
   &:hover {
     box-shadow:
       0 1px 2px rgba(0, 0, 0, 0.3),
       0 12px 32px -8px rgba(0, 0, 0, 0.55);
     transform: translateY(-1px);
+  }
+  /* Feedback tattile alla pressione (dito/click) — prima solo poche card/bottoni lo avevano a
+     mano (active:scale-95 sparso), qui una volta per tutti i punti che già usano questa classe
+     (quasi ogni bottone/card cliccabile dell'app), coerente con le linee guida 2026 sulle
+     micro-interazioni ("far sentire" un tocco, non solo mostrarlo). */
+  &:active {
+    transform: translateY(0) scale(0.98);
+    transition-duration: 0.05s;
   }
 }
 
@@ -96,26 +105,41 @@ h3 {
   letter-spacing: 0.01em;
 }
 
-@keyframes dice-shake {
+/* Tumble del dado: rotazione su più assi con "prospettiva" (il genitore ha perspective, vedi
+   dice-roller.tsx) per dare l'illusione di un dado vero che rotola invece di un semplice numero
+   che trema — durata allineata alla sequenza di numeri finti in DiceRoller (~0,9s), rallenta
+   verso la fine (stessa easing "decelerate" di un oggetto reale che perde slancio) invece di
+   fermarsi di scatto. */
+@keyframes dice-tumble {
   0% {
-    transform: rotate(0deg) scale(1);
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1);
   }
-  25% {
-    transform: rotate(-12deg) scale(1.08);
+  12% {
+    transform: rotateX(160deg) rotateY(70deg) rotateZ(-18deg) scale(1.12);
   }
-  50% {
-    transform: rotate(10deg) scale(1.12);
+  28% {
+    transform: rotateX(340deg) rotateY(190deg) rotateZ(14deg) scale(0.92);
   }
-  75% {
-    transform: rotate(-6deg) scale(1.05);
+  46% {
+    transform: rotateX(480deg) rotateY(300deg) rotateZ(-10deg) scale(1.08);
+  }
+  64% {
+    transform: rotateX(590deg) rotateY(380deg) rotateZ(6deg) scale(0.96);
+  }
+  80% {
+    transform: rotateX(650deg) rotateY(420deg) rotateZ(-3deg) scale(1.04);
+  }
+  92% {
+    transform: rotateX(675deg) rotateY(438deg) rotateZ(1deg) scale(0.99);
   }
   100% {
-    transform: rotate(0deg) scale(1);
+    transform: rotateX(720deg) rotateY(450deg) rotateZ(0deg) scale(1);
   }
 }
 
 .animate-dice {
-  animation: dice-shake 0.45s ease-in-out;
+  display: inline-block;
+  animation: dice-tumble 0.9s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 @keyframes modal-in {

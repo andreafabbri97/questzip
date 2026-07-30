@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { IntField } from "@/components/int-field";
 import { formatModifier } from "@/lib/dnd";
 
@@ -31,6 +31,14 @@ export function DiceRoller() {
   const [mode, setMode] = useState<RollMode>("normale");
   const [history, setHistory] = useState<RollResult[]>([]);
   const [rolling, setRolling] = useState(false);
+  // Valore "finto" mostrato mentre il dado tumbla, cambiato rapidamente per dare l'illusione di
+  // un dado vero che gira prima di fermarsi — il risultato REALE è già calcolato ed entra subito
+  // in cronologia (l'RNG non aspetta l'animazione), solo la rivelazione a schermo è ritardata.
+  const [displayValue, setDisplayValue] = useState<number | null>(null);
+  // Se si preme "Tira" di nuovo prima che il tumble precedente finisca, questo id fa smettere
+  // la vecchia catena di setTimeout invece di lasciarla continuare in parallelo a quella nuova
+  // (altrimenti i due tumble si mischierebbero, con numeri che saltano in modo incoerente).
+  const rollIdRef = useRef(0);
 
   const latest = history[0];
   const modeEnabled = die === 20 && quantity === 1;
@@ -67,13 +75,30 @@ export function DiceRoller() {
       }),
     };
 
+    // Tumble: mostra numeri casuali che cambiano sempre più lentamente (come un dado vero che
+    // rallenta rotolando), poi si ferma esattamente sul risultato vero — mai l'inverso, per non
+    // rischiare che l'ultimo numero "finto" mostrato combaci per caso con quello vero e sembri un
+    // bug di doppia rivelazione.
+    const tumbleSteps = [70, 70, 90, 110, 140, 180, 230];
+    const rollId = ++rollIdRef.current;
     setRolling(true);
-    setTimeout(() => setRolling(false), 450);
+    const runStep = (index: number) => {
+      if (rollIdRef.current !== rollId) return;
+      if (index >= tumbleSteps.length) {
+        setDisplayValue(null);
+        setRolling(false);
+        return;
+      }
+      setDisplayValue(rollDie(die));
+      setTimeout(() => runStep(index + 1), tumbleSteps[index]);
+    };
+    runStep(0);
+
     setHistory((previous) => [result, ...previous].slice(0, 30));
   };
 
-  const isCrit = latest && latest.die === 20 && latest.rolls[0] === 20;
-  const isFumble = latest && latest.die === 20 && latest.rolls[0] === 1;
+  const isCrit = !rolling && latest && latest.die === 20 && latest.rolls[0] === 20;
+  const isFumble = !rolling && latest && latest.die === 20 && latest.rolls[0] === 1;
 
   return (
     <div className="space-y-6">
@@ -161,12 +186,14 @@ export function DiceRoller() {
                 : "border-edge bg-surface"
           }`}
         >
-          <div
-            className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
-              isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
-            }`}
-          >
-            {latest.total}
+          <div className="[perspective:400px]">
+            <div
+              className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
+                isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
+              }`}
+            >
+              {rolling ? (displayValue ?? latest.total) : latest.total}
+            </div>
           </div>
           <p className="text-sm text-muted mt-2">
             {latest.quantity > 1 ? `${latest.quantity}d${latest.die}` : `d${latest.die}`}

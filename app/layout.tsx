@@ -48,7 +48,7 @@ export default function RootLayout({
         <AuthSessionProvider>
           <RealtimeProvider>
             <Nav />
-            <main className="flex-1 w-full max-w-5xl 2xl:max-w-[1600px] mx-auto px-4 pb-24 pt-6 sm:pb-10">
+            <main className="flex-1 w-full max-w-5xl 2xl:max-w-[1600px] [@media(min-width:2200px)]:max-w-[2200px] mx-auto px-4 pb-24 pt-6 sm:pb-10">
               {children}
             </main>
           </RealtimeProvider>

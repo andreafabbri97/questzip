@@ -260,12 +260,12 @@ export default function CharactersPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Personaggi</h1>
         <button
           onClick={create}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
         >
           + Nuovo
         </button>
@@ -347,7 +347,7 @@ function UnsavedChangesModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 animate-overlay-in"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-overlay-in"
       onClick={onCancel}
     >
       <div
@@ -361,7 +361,7 @@ function UnsavedChangesModal({
         <div className="flex flex-col gap-2">
           <button
             onClick={onSaveAndExit}
-            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
           >
             💾 Salva ed esci
           </button>
@@ -400,7 +400,7 @@ function DeleteCharacterModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 animate-overlay-in"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-overlay-in"
       onClick={onCancel}
     >
       <div
@@ -558,7 +558,7 @@ function CharacterSheet({
   const labelClass = "text-xs uppercase tracking-widest text-muted";
 
   return (
-    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <button onClick={handleBack} className="text-sm text-muted hover:text-foreground shrink-0">
           ← Personaggi
@@ -695,7 +695,7 @@ function CharacterSheet({
             </p>
           )}
 
-          <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+          <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
             <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
               <h2 className="text-sm uppercase tracking-widest text-muted mb-4">
                 Punti ferita e difesa
@@ -826,7 +826,7 @@ function CharacterSheet({
               />
             </section>
 
-            <div className="mt-6 lg:mt-0">
+            <div className="mt-6 md:mt-0">
               <AbilityScoreSection character={character} onChange={onChange} setAbility={setAbility} />
             </div>
           </div>
@@ -835,9 +835,9 @@ function CharacterSheet({
 
           <WeaponsSection character={character} onChange={onChange} />
 
-          <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+          <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
             <ActiveConditionsSection character={character} onChange={onChange} />
-            <div className="mt-6 lg:mt-0">
+            <div className="mt-6 md:mt-0">
               <LimitedFeaturesSection character={character} onChange={onChange} />
             </div>
           </div>
@@ -869,7 +869,7 @@ function CharacterSheet({
 
       {tab === "info" && (
         <div className="space-y-6">
-          <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+          <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
             <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
               <label className="block">
                 <span className={labelClass}>Nome</span>
@@ -918,7 +918,7 @@ function CharacterSheet({
               <BackgroundTraits background={character.background} />
             </section>
 
-            <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 lg:mt-0">
+            <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 md:mt-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm uppercase tracking-widest text-muted">
                   Classi {character.classi.length > 1 && "(multiclasse)"}
@@ -1119,7 +1119,7 @@ function CampaignSync({
         <button
           onClick={sync}
           disabled={syncing}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
         >
           {syncing ? "…" : "Sincronizza"}
         </button>

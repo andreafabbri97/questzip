@@ -32,7 +32,7 @@ export default function ErrorBoundary({
       <div className="flex gap-3">
         <button
           onClick={reset}
-          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors"
+          className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
         >
           Riprova
         </button>

@@ -106,7 +106,7 @@ export default function PublicProfilePage() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => router.push(`/chat?thread=dm:${profile.id}`)}
-              className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors"
+              className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
             >
               💬 Chatta
             </button>
@@ -122,7 +122,7 @@ export default function PublicProfilePage() {
           <button
             disabled={busy}
             onClick={() => act(() => sendFriendRequest(profile.id))}
-            className="glow-accent shrink-0 rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors disabled:opacity-50"
+            className="glow-accent shrink-0 rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
           >
             + Aggiungi amico
           </button>
