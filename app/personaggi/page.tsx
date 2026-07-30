@@ -811,7 +811,7 @@ function CharacterSheet({
                   </p>
                 </div>
               </div>
-              <DarkvisionField character={character} onChange={onChange} />
+              <VisionField character={character} onChange={onChange} />
               <HitPointCalculator
                 character={character}
                 onApply={(hpMax) =>
@@ -1506,12 +1506,15 @@ function ClassFeaturesToggle({ className }: { className: string }) {
   );
 }
 
-// Raggio di visione al buio, per la luce dinamica "realistica" della mappa dungeon (vedi Fase D/E
-// in Campagne). Suggerito dalla scurovisione della razza nel Compendio (RawRace.darkvision, in
-// piedi — convertito in metri come "Velocità"), ma il campo resta sempre modificabile a mano:
-// talenti/incantesimi/invocazioni (es. Vista Infernale del Warlock) non si possono dedurre dalla
-// sola razza, stesso principio già usato per il peso massimo (suggerisci, non imporre).
-function DarkvisionField({
+// Visione al buio, per la luce dinamica "realistica" della mappa dungeon (vedi Fase D/E in
+// Campagne). Un solo numero (in metri, suggerito dalla scurovisione della razza nel Compendio,
+// RawRace.darkvision in piedi — convertito come "Velocità" — ma sempre modificabile a mano) più
+// due spunte indipendenti: "Scurovisione" decide se quel numero si applica davvero al buio
+// (spento di default: avere il dato compilato non basta, per poterlo tenere pronto anche su un
+// personaggio che per qualche motivo non ce l'ha), "Vede in oscurità magica" per chi la vede
+// anche dove la scurovisione normale non arriva (es. Vista Infernale del Warlock) — oggi solo un
+// dato di scheda, la mappa non modella ancora zone di oscurità magica a sé.
+function VisionField({
   character,
   onChange,
 }: {
@@ -1542,31 +1545,46 @@ function DarkvisionField({
   const suggested = race?.darkvision ? feetToMeters(race.darkvision) : null;
 
   return (
-    <div className="mt-4 flex items-center gap-2 flex-wrap">
-      <label className="flex items-center gap-2">
-        <span className="text-xs uppercase tracking-widest text-muted whitespace-nowrap">
-          Visione al buio (m)
-        </span>
-        <IntField
-          min={0}
-          value={character.visioneRadius}
-          onChange={(value) => onChange({ ...character, visioneRadius: value })}
-          className="w-16 rounded-md border border-edge bg-surface-raised px-2 py-1 text-sm text-foreground text-center"
-        />
-      </label>
-      {suggested !== null && suggested !== character.visioneRadius && (
-        <button
-          onClick={() => onChange({ ...character, visioneRadius: suggested })}
-          className="text-xs font-bold text-accent-strong hover:underline"
-        >
-          Suggerisci da razza ({suggested} m)
-        </button>
-      )}
-      {character.visioneRadius === 0 && (
-        <span className="text-[10px] text-muted">
-          0 = nessuna scurovisione, al buio non vede senza una fonte di luce
-        </span>
-      )}
+    <div className="mt-4 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-widest text-muted whitespace-nowrap">
+            Visione (m)
+          </span>
+          <IntField
+            min={0}
+            value={character.visioneRadius}
+            onChange={(value) => onChange({ ...character, visioneRadius: value })}
+            className="w-16 rounded-md border border-edge bg-surface-raised px-2 py-1 text-sm text-foreground text-center"
+          />
+        </label>
+        {suggested !== null && suggested !== character.visioneRadius && (
+          <button
+            onClick={() => onChange({ ...character, visioneRadius: suggested })}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            Suggerisci da razza ({suggested} m)
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-4 text-sm text-foreground">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={character.scurovisione}
+            onChange={(event) => onChange({ ...character, scurovisione: event.target.checked })}
+          />
+          Scurovisione
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={character.vedeOscuritaMagica}
+            onChange={(event) => onChange({ ...character, vedeOscuritaMagica: event.target.checked })}
+          />
+          Vede in oscurità magica
+        </label>
+      </div>
     </div>
   );
 }

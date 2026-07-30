@@ -24,7 +24,10 @@ export async function syncCharacterToCampaign(campaignId: string, character: Cha
     hpAttuali: character.hpAttuali,
     classeArmatura: character.classeArmatura,
     velocita: character.velocita,
-    visioneRadius: character.visioneRadius,
+    // Valore EFFETTIVO usato dalla luce dinamica, non il numero grezzo in scheda: senza
+    // "scurovisione" spuntata il personaggio non vede al buio anche se il campo Visione ha un
+    // valore compilato (es. tenuto lì per un personaggio che potrebbe riguadagnarla in futuro).
+    visioneRadius: character.scurovisione ? character.visioneRadius : 0,
     caratteristiche: character.caratteristiche,
     slotUsati: character.slotUsati,
     slotPattoUsati: character.slotPattoUsati,

@@ -193,11 +193,17 @@ export const characterSchema = z.object({
   hpTemporanei: z.number().int().min(0).default(0),
   classeArmatura: z.number().int().min(1),
   velocita: z.number().int().min(0),
-  // Raggio di visione al buio in metri (0 = nessuna scurovisione, vede solo con una fonte di
-  // luce che questa app non traccia) — suggerito dalla razza (vedi RACE_DARKVISION_METERS) ma
-  // sempre modificabile a mano per talenti/incantesimi/invocazioni che lo concedono (es. Vista
-  // Infernale del Warlock) e che non si possono dedurre in automatico dalla sola razza.
+  // Raggio di visione in metri — suggerito dalla scurovisione della razza (via Compendio) ma
+  // sempre modificabile a mano, per restare valido anche quando non deriva dalla razza (talenti,
+  // incantesimi, invocazioni). Si applica solo se "scurovisione" è spuntata: il numero da solo
+  // non basta, per poter tenere il valore compilato (es. il 60 piedi/18m tipico della propria
+  // razza) anche per un personaggio che per qualche motivo non ce l'ha davvero.
   visioneRadius: z.number().int().min(0).default(0),
+  scurovisione: z.boolean().default(false),
+  // Vista Infernale del Warlock e simili: scurovisione che funziona anche nell'oscurità
+  // magica (che normalmente la blocca, per regolamento) — oggi solo un dato di scheda, la mappa
+  // dungeon non modella ancora zone di oscurità magica separate da quella normale.
+  vedeOscuritaMagica: z.boolean().default(false),
   caratteristiche: abilityScoresSchema,
   trsCompetenti: z.array(z.enum(ABILITIES)).default([]),
   abilitaCompetenti: z.array(z.string()).default([]),
@@ -359,6 +365,8 @@ export function newCharacter(): Character {
     classeArmatura: 10,
     velocita: 9,
     visioneRadius: 0,
+    scurovisione: false,
+    vedeOscuritaMagica: false,
     caratteristiche: {
       forza: 10,
       destrezza: 10,
