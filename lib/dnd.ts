@@ -193,6 +193,11 @@ export const characterSchema = z.object({
   hpTemporanei: z.number().int().min(0).default(0),
   classeArmatura: z.number().int().min(1),
   velocita: z.number().int().min(0),
+  // Raggio di visione al buio in metri (0 = nessuna scurovisione, vede solo con una fonte di
+  // luce che questa app non traccia) — suggerito dalla razza (vedi RACE_DARKVISION_METERS) ma
+  // sempre modificabile a mano per talenti/incantesimi/invocazioni che lo concedono (es. Vista
+  // Infernale del Warlock) e che non si possono dedurre in automatico dalla sola razza.
+  visioneRadius: z.number().int().min(0).default(0),
   caratteristiche: abilityScoresSchema,
   trsCompetenti: z.array(z.enum(ABILITIES)).default([]),
   abilitaCompetenti: z.array(z.string()).default([]),
@@ -335,6 +340,13 @@ export function carryingCapacityKg(forza: number): number {
   return Math.round(forza * 7.5);
 }
 
+// Stessa conversione già usata altrove nel Compendio per le distanze (1,5m ogni 5 piedi) — il
+// dato di scurovisione del Compendio (RawRace.darkvision) arriva in piedi, qui serve in metri
+// per essere coerente con "Velocità (m)" già presente in scheda.
+export function feetToMeters(feet: number): number {
+  return Math.round(feet * 0.3);
+}
+
 export function newCharacter(): Character {
   return {
     id: crypto.randomUUID(),
@@ -346,6 +358,7 @@ export function newCharacter(): Character {
     hpTemporanei: 0,
     classeArmatura: 10,
     velocita: 9,
+    visioneRadius: 0,
     caratteristiche: {
       forza: 10,
       destrezza: 10,

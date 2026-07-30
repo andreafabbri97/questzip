@@ -31,6 +31,7 @@ import {
   canonicalClassName,
   carryingCapacityKg,
   characterSchema,
+  feetToMeters,
   formatModifier,
   levelForXp,
   multiclassCasterLevel,
@@ -810,6 +811,7 @@ function CharacterSheet({
                   </p>
                 </div>
               </div>
+              <DarkvisionField character={character} onChange={onChange} />
               <HitPointCalculator
                 character={character}
                 onApply={(hpMax) =>
@@ -1499,6 +1501,71 @@ function ClassFeaturesToggle({ className }: { className: string }) {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Raggio di visione al buio, per la luce dinamica "realistica" della mappa dungeon (vedi Fase D/E
+// in Campagne). Suggerito dalla scurovisione della razza nel Compendio (RawRace.darkvision, in
+// piedi — convertito in metri come "Velocità"), ma il campo resta sempre modificabile a mano:
+// talenti/incantesimi/invocazioni (es. Vista Infernale del Warlock) non si possono dedurre dalla
+// sola razza, stesso principio già usato per il peso massimo (suggerisci, non imporre).
+function DarkvisionField({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const [race, setRace] = useState<RawRace | null | undefined>(undefined);
+  // Reset durante il render (non nell'effetto sotto) quando cambia la razza — stesso pattern già
+  // consolidato in questo progetto per evitare un giro di setState sincrono dentro un effetto.
+  const [loadedFor, setLoadedFor] = useState(character.razza);
+  if (character.razza !== loadedFor) {
+    setLoadedFor(character.razza);
+    setRace(undefined);
+  }
+
+  useEffect(() => {
+    const name = character.razza.trim();
+    if (!name) return;
+    let cancelled = false;
+    loadRaces().then((races) => {
+      if (!cancelled) setRace(races.find((r) => r.name.toLowerCase() === name.toLowerCase()) ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [character.razza]);
+
+  const suggested = race?.darkvision ? feetToMeters(race.darkvision) : null;
+
+  return (
+    <div className="mt-4 flex items-center gap-2 flex-wrap">
+      <label className="flex items-center gap-2">
+        <span className="text-xs uppercase tracking-widest text-muted whitespace-nowrap">
+          Visione al buio (m)
+        </span>
+        <IntField
+          min={0}
+          value={character.visioneRadius}
+          onChange={(value) => onChange({ ...character, visioneRadius: value })}
+          className="w-16 rounded-md border border-edge bg-surface-raised px-2 py-1 text-sm text-foreground text-center"
+        />
+      </label>
+      {suggested !== null && suggested !== character.visioneRadius && (
+        <button
+          onClick={() => onChange({ ...character, visioneRadius: suggested })}
+          className="text-xs font-bold text-accent-strong hover:underline"
+        >
+          Suggerisci da razza ({suggested} m)
+        </button>
+      )}
+      {character.visioneRadius === 0 && (
+        <span className="text-[10px] text-muted">
+          0 = nessuna scurovisione, al buio non vede senza una fonte di luce
+        </span>
       )}
     </div>
   );

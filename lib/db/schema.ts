@@ -144,6 +144,14 @@ export const campaignDungeons = pgTable("campaign_dungeon", {
   fogOfWar: boolean("fog_of_war").notNull().default(false),
   revealedRooms: jsonb("revealed_rooms").$type<number[]>().notNull().default([]),
   monsterTokens: jsonb("monster_tokens").$type<MonsterToken[]>().notNull().default([]),
+  // "Movimento e visione realistici": quando attivo, la luce dinamica usa il raggio di visione
+  // REALE di ciascun personaggio (da campaignCharacters.visioneRadius) invece di un valore fisso
+  // uguale per tutti, e il trascinamento del token durante il proprio turno di combattimento
+  // segnala se supera la velocità del personaggio (avviso, non un blocco rigido — troppe
+  // eccezioni RAW, Scatto incluso, per un limite invalicabile). Indipendente da fogOfWar: si può
+  // volere il movimento realistico anche a mappa completamente visibile. Togglabile dal master in
+  // qualunque momento, anche a sessione in corso (stesso pattern di fogOfWar).
+  realisticMode: boolean("realistic_mode").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
@@ -260,6 +268,10 @@ export const campaignCharacters = pgTable(
     hpAttuali: integer("hp_attuali").notNull(),
     classeArmatura: integer("classe_armatura").notNull(),
     velocita: integer("velocita").notNull(),
+    // Raggio di visione al buio in metri (0 = nessuna scurovisione) — usato dalla luce dinamica
+    // "realistica" della mappa dungeon (vedi campaignDungeons.realisticMode) per dare a ciascun
+    // giocatore la SUA visuale reale invece di un raggio fisso uguale per tutti.
+    visioneRadius: integer("visione_radius").notNull().default(0),
     caratteristiche: jsonb("caratteristiche").$type<Record<Ability, number>>().notNull(),
     slotUsati: jsonb("slot_usati").$type<number[]>().notNull().default([0, 0, 0, 0, 0, 0, 0, 0, 0]),
     slotPattoUsati: integer("slot_patto_usati").notNull().default(0),

@@ -63,6 +63,7 @@ import {
   removeMonsterToken,
   removeMyToken,
   setFogOfWar,
+  setRealisticMode,
   toggleRoomRevealed,
   updateDungeonCells,
   updateRoomNotes,
@@ -70,6 +71,7 @@ import {
 } from "@/app/actions/dungeons";
 import {
   computeVisibleCells,
+  metersToCells,
   pointInTemplate,
   type AoeTemplate,
   type CellType,
@@ -3262,6 +3264,45 @@ function DungeonViewer({
     getDungeonTokens(dungeon.id).then(setRawTokens);
   }, [dungeon.id]);
 
+  // Visione/velocità REALI di ciascun giocatore (per la modalità realistica) — dallo snapshot
+  // sincronizzato in campagna, non dalla scheda completa (che potrebbe non essere accessibile,
+  // ed è comunque quello che il resto della campagna già usa come fonte per Party/XP/PF).
+  const [party, setParty] = useState<Awaited<ReturnType<typeof getPartyForCampaign>>>([]);
+  useEffect(() => {
+    getPartyForCampaign(dungeon.campaignId).then(setParty);
+  }, [dungeon.campaignId]);
+
+  // Combattimento attivo (per il limite di movimento in modalità realistica) — stessa stanza
+  // realtime "combat" già usata da chat/dadi/jukebox/voce di questa campagna, non quella
+  // dungeon-specifica usata sopra per token/celle: un dungeon può essere aperto senza che ci sia
+  // un combattimento in corso, e viceversa.
+  const [encounter, setEncounter] = useState<Awaited<ReturnType<typeof getActiveEncounter>>>(null);
+  const refreshEncounter = () => {
+    getActiveEncounter(dungeon.campaignId).then(setEncounter);
+  };
+  useEffect(refreshEncounter, [dungeon.campaignId]);
+  usePartyRoom({ kind: "combat", campaignId: dungeon.campaignId }, (message) => {
+    if ((message as { type?: string } | null)?.type === "encounter-changed") refreshEncounter();
+  });
+
+  const currentCombatant = encounter?.combatants[encounter.encounter.currentTurn] ?? null;
+  const isMyCombatTurn = Boolean(myUserId && currentCombatant?.characterUserId === myUserId);
+  const myVelocity = party.find((p) => p.userId === myUserId)?.velocita ?? 0;
+  const speedBudgetCells = metersToCells(myVelocity);
+
+  // Celle percorse nel turno corrente — azzerate quando cambia turno/round (reset a render,
+  // non in un effetto, stesso pattern già consolidato in questo progetto). Solo un avviso, non
+  // un blocco: troppe eccezioni RAW (Scatto, terreno difficile...) per un limite invalicabile.
+  const turnKey = encounter
+    ? `${encounter.encounter.id}-${encounter.encounter.round}-${encounter.encounter.currentTurn}`
+    : null;
+  const [loadedTurnKey, setLoadedTurnKey] = useState(turnKey);
+  const [movedThisTurn, setMovedThisTurn] = useState(0);
+  if (turnKey !== loadedTurnKey) {
+    setLoadedTurnKey(turnKey);
+    setMovedThisTurn(0);
+  }
+
   const [templateShape, setTemplateShape] = useState<TemplateShape | null>(null);
   const [activeTemplates, setActiveTemplates] = useState<
     { id: number; template: AoeTemplate; hits: string[] }[]
@@ -3337,14 +3378,19 @@ function DungeonViewer({
   });
 
   const myToken = rawTokens.find((t) => t.userId === myUserId) ?? null;
-  const tokens: DungeonToken[] = rawTokens.map((t) => ({
-    userId: t.userId,
-    x: t.x,
-    y: t.y,
-    label: tokenInitials(t.name),
-    color: tokenColor(t.userId),
-    isMe: t.userId === myUserId,
-  }));
+  const tokens: DungeonToken[] = rawTokens.map((t) => {
+    const character = party.find((p) => p.userId === t.userId);
+    return {
+      userId: t.userId,
+      x: t.x,
+      y: t.y,
+      label: tokenInitials(t.name),
+      color: tokenColor(t.userId),
+      isMe: t.userId === myUserId,
+      visioneRadius: character?.visioneRadius,
+      velocita: character?.velocita,
+    };
+  });
 
   const handleTemplateDrawn = (template: AoeTemplate) => {
     const hitTokens = tokens
@@ -3364,6 +3410,10 @@ function DungeonViewer({
   };
 
   const handleTokenDragEnd = async (x: number, y: number) => {
+    if (dungeon.realisticMode && isMyCombatTurn && myToken) {
+      const distance = Math.round(Math.hypot(x - myToken.x, y - myToken.y));
+      setMovedThisTurn((prev) => prev + distance);
+    }
     setRawTokens((prev) =>
       myUserId && prev.some((t) => t.userId === myUserId)
         ? prev.map((t) => (t.userId === myUserId ? { ...t, x, y } : t))
@@ -3442,6 +3492,11 @@ function DungeonViewer({
     onRoomUpdated();
   };
 
+  const toggleRealisticMode = async () => {
+    await setRealisticMode(dungeon.id, !dungeon.realisticMode);
+    onRoomUpdated();
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -3464,7 +3519,7 @@ function DungeonViewer({
       </div>
 
       {myUserId && (
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-wrap">
           {myToken ? (
             <button onClick={removeMyTokenFromMap} className="font-bold text-danger hover:underline">
               🧭 Rimuovi il mio token
@@ -3473,6 +3528,14 @@ function DungeonViewer({
             <button onClick={placeMyToken} className="font-bold text-accent-strong hover:underline">
               🧭 Metti il mio token in mappa
             </button>
+          )}
+          {dungeon.realisticMode && isMyCombatTurn && (
+            <span
+              className={`font-bold ${movedThisTurn > speedBudgetCells ? "text-danger" : "text-muted"}`}
+            >
+              🏃 È il tuo turno — movimento: {movedThisTurn}/{speedBudgetCells} celle
+              {movedThisTurn > speedBudgetCells && " (oltre la tua velocità!)"}
+            </span>
           )}
         </div>
       )}
@@ -3598,6 +3661,16 @@ function DungeonViewer({
               i giocatori vedono solo le stanze rivelate — apri una stanza per rivelarla
             </span>
           )}
+          <label className="flex items-center gap-1.5 text-xs font-bold text-foreground pl-2 border-l border-edge">
+            <input type="checkbox" checked={dungeon.realisticMode} onChange={toggleRealisticMode} />
+            🎯 Movimento e visione realistici
+          </label>
+          {dungeon.realisticMode && (
+            <span className="text-[10px] text-muted">
+              visione = quella reale del personaggio (se fog attivo) · avviso se ti muovi oltre la
+              tua velocità durante il tuo turno
+            </span>
+          )}
           <button
             onClick={() => {
               setMonsterMode((prev) => !prev);
@@ -3645,6 +3718,7 @@ function DungeonViewer({
         templateShape={templateShape}
         onTemplateDrawn={handleTemplateDrawn}
         activeTemplates={activeTemplates.map((t) => t.template)}
+        realisticMode={dungeon.realisticMode}
       />
       {activeTemplates.length > 0 && (
         <div className="space-y-1">
@@ -3781,6 +3855,10 @@ interface DungeonToken {
   label: string;
   color: string;
   isMe: boolean;
+  // Da campaignCharacters (personaggio sincronizzato), usati solo in modalità realistica —
+  // undefined se il giocatore non ha ancora sincronizzato un personaggio in questa campagna.
+  visioneRadius?: number;
+  velocita?: number;
 }
 
 function tokenColor(userId: string): string {
@@ -3852,6 +3930,7 @@ function DungeonMap({
   templateShape = null,
   onTemplateDrawn,
   activeTemplates = [],
+  realisticMode = false,
 }: {
   dungeon: { width: number; height: number; cells: CellType[][]; rooms: DungeonFull["rooms"] };
   activeRoomId: number | null;
@@ -3874,6 +3953,7 @@ function DungeonMap({
   templateShape?: TemplateShape | null;
   onTemplateDrawn?: (template: AoeTemplate) => void;
   activeTemplates?: AoeTemplate[];
+  realisticMode?: boolean;
 }) {
   const cellSize = 14;
   const isPaintingRef = useRef(false);
@@ -3899,7 +3979,14 @@ function DungeonMap({
   // torna scura, come una vera fonte di luce che si sposta — a differenza del fog of war "a
   // memoria" di altri VTT, qui deliberatamente più semplice.
   const autoVisibleCells = fogActive
-    ? computeVisibleCells(dungeon.cells, (tokens ?? []).map((t) => ({ x: t.x, y: t.y })))
+    ? computeVisibleCells(
+        dungeon.cells,
+        (tokens ?? []).map((t) => ({
+          x: t.x,
+          y: t.y,
+          radius: realisticMode ? metersToCells(t.visioneRadius ?? 0) : undefined,
+        })),
+      )
     : new Set<string>();
   const manuallyRevealedCells = new Set<string>();
   if (fogActive) {

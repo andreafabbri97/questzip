@@ -103,6 +103,12 @@ export function pointInTemplate(template: AoeTemplate, x: number, y: number): bo
 // incantesimi di luce individuali).
 export const DEFAULT_VISION_RADIUS = 12;
 
+// Character.visioneRadius è in metri (stessa unità di "Velocità"), la griglia è in celle
+// (1 cella = 5 piedi = 1,5m, stessa conversione già usata per Character.velocita altrove).
+export function metersToCells(meters: number): number {
+  return Math.round(meters / 1.5);
+}
+
 /** true se non c'è nessun muro lungo la linea retta fra le due celle (Bresenham) — stesso
  * criterio "wall = opaco, tutto il resto passa" già usato per fog of war/generazione. */
 function hasLineOfSight(cells: CellType[][], fromX: number, fromY: number, toX: number, toY: number): boolean {
@@ -133,16 +139,20 @@ function hasLineOfSight(cells: CellType[][], fromX: number, fromY: number, toX: 
  * celle/stanze/mostri fuori dalla visuale di nessun giocatore) sia lato client (per disegnare
  * l'oscurità). Volutamente semplice (raycasting per cella, non vero shadowcasting ricorsivo): per
  * le dimensioni di griglia di questo progetto (poche migliaia di celle) è già rapidissimo, ed
- * evita le sottigliezze di implementazione di un vero algoritmo di shadowcasting simmetrico. */
+ * evita le sottigliezze di implementazione di un vero algoritmo di shadowcasting simmetrico.
+ * Ogni origine può avere un raggio proprio (usato in "modalità realistica" per dare a ciascun
+ * giocatore la SUA visione reale, vedi Character.visioneRadius) — se assente usa il fallback
+ * fisso passato come secondo argomento. */
 export function computeVisibleCells(
   cells: CellType[][],
-  origins: { x: number; y: number }[],
-  radius: number = DEFAULT_VISION_RADIUS,
+  origins: { x: number; y: number; radius?: number }[],
+  fallbackRadius: number = DEFAULT_VISION_RADIUS,
 ): Set<string> {
   const visible = new Set<string>();
   const height = cells.length;
   const width = cells[0]?.length ?? 0;
   for (const origin of origins) {
+    const radius = origin.radius ?? fallbackRadius;
     const ox = Math.floor(origin.x);
     const oy = Math.floor(origin.y);
     const minX = Math.max(0, ox - radius);

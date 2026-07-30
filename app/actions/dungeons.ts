@@ -3,11 +3,12 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
-import { campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
+import { campaignCharacters, campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
 import {
   computeVisibleCells,
   generateDungeon,
   generateOutdoorScene,
+  metersToCells,
   type CellType,
   type DungeonConfig,
   type DungeonRoom,
@@ -118,11 +119,33 @@ export async function getDungeon(dungeonId: string) {
   // finché è nascosta. Forma/posizione (cells/centerX/centerY/vectorShape) restano invece
   // intenzionalmente — il client disegna comunque una sagoma scura piena per le stanze non
   // visibili (si vede "che c'è qualcosa qui", non cosa), design deliberato di questa fog of war.
+  // In modalità realistica, ogni giocatore vede secondo la SUA visione (da campaignCharacters,
+  // sincronizzata dalla scheda) invece di un raggio fisso uguale per tutti — leftJoin perché un
+  // token può esistere senza uno snapshot di personaggio sincronizzato (in quel caso ricade sul
+  // raggio fisso via "radius: undefined", vedi computeVisibleCells).
   const playerPositions = await db
-    .select({ x: dungeonTokens.x, y: dungeonTokens.y })
+    .select({
+      x: dungeonTokens.x,
+      y: dungeonTokens.y,
+      visioneRadiusMeters: campaignCharacters.visioneRadius,
+    })
     .from(dungeonTokens)
+    .leftJoin(
+      campaignCharacters,
+      and(
+        eq(campaignCharacters.userId, dungeonTokens.userId),
+        eq(campaignCharacters.campaignId, dungeon.campaignId),
+      ),
+    )
     .where(eq(dungeonTokens.dungeonId, dungeonId));
-  const autoVisible = computeVisibleCells(dungeon.cells, playerPositions);
+  const autoVisible = computeVisibleCells(
+    dungeon.cells,
+    playerPositions.map((p) => ({
+      x: p.x,
+      y: p.y,
+      radius: dungeon.realisticMode ? metersToCells(p.visioneRadiusMeters ?? 0) : undefined,
+    })),
+  );
 
   const revealedSet = new Set(dungeon.revealedRooms);
   const manuallyRevealedCellKeys = new Set<string>();
@@ -249,6 +272,22 @@ export async function setFogOfWar(dungeonId: string, enabled: boolean) {
   await requireDm(dungeon.campaignId, userId);
 
   await db.update(campaignDungeons).set({ fogOfWar: enabled }).where(eq(campaignDungeons.id, dungeonId));
+  await broadcastDungeonChanged(dungeonId);
+}
+
+export async function setRealisticMode(dungeonId: string, enabled: boolean) {
+  const userId = await requireUserId();
+  const [dungeon] = await db
+    .select({ campaignId: campaignDungeons.campaignId })
+    .from(campaignDungeons)
+    .where(eq(campaignDungeons.id, dungeonId));
+  if (!dungeon) throw new Error("Dungeon non trovato.");
+  await requireDm(dungeon.campaignId, userId);
+
+  await db
+    .update(campaignDungeons)
+    .set({ realisticMode: enabled })
+    .where(eq(campaignDungeons.id, dungeonId));
   await broadcastDungeonChanged(dungeonId);
 }
 
