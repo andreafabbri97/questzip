@@ -294,19 +294,27 @@ export function DiceRoller() {
             )}
           </div>
         )}
+        {/* Non più dentro "latest &&": deve esistere nel DOM fin dal primo render, anche prima
+            del primo tiro (vuoto). Se questo <div> viene creato SOLO al primo tiro, nasce già
+            con la classe "animate-dice" applicata dalla nascita — molti browser non fanno
+            partire un'animazione CSS su un elemento appena montato allo stesso modo affidabile
+            con cui la fanno ripartire su uno che GIÀ esiste e cambia classe (esattamente quello
+            che succede dal secondo tiro in poi: stesso nodo, solo "" -> "animate-dice"). Da qui
+            il bug "il primo tiro non si vede animare" segnalato solo quando la cronologia è
+            vuota. */}
+        {!hideBigNumber && (
+          <div className="[perspective:400px]">
+            <div
+              className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
+                isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
+              }`}
+            >
+              {latest ? (rolling ? (displayValue ?? latest.total) : latest.total) : ""}
+            </div>
+          </div>
+        )}
         {latest && (
           <>
-            {!hideBigNumber && (
-              <div className="[perspective:400px]">
-                <div
-                  className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
-                    isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
-                  }`}
-                >
-                  {rolling ? (displayValue ?? latest.total) : latest.total}
-                </div>
-              </div>
-            )}
             <p className="text-sm text-muted mt-2">
               {latest.quantity > 1 ? `${latest.quantity}d${latest.die}` : `d${latest.die}`}
               {latest.modifier !== 0 && ` ${formatModifier(latest.modifier)}`}
