@@ -235,16 +235,19 @@ export function DiceRoller() {
                 : "border-edge bg-surface"
           }`}
         >
-          {/* Dimensione fissa fin da subito (non solo quando pronta): BabylonJS inizializza la
-              scena contro le dimensioni reali del contenitore in quel momento, un canvas a
-              dimensione 0 durante il caricamento e poi "rivelato" via CSS non si ridimensiona
-              da solo — qui invece resta invisibile con opacity mentre carica, mai a 0px. Se
-              risulta definitivamente non disponibile (niente WebGL, o è fallito il caricamento)
-              collassa per sempre, non ha senso lasciare un riquadro vuoto. */}
+          {/* Dimensione fissa SEMPRE (mai collassata a 0, nemmeno per nasconderlo): BabylonJS
+              inizializza la scena contro le dimensioni reali del contenitore in quel momento, e
+              se più tardi il contenitore tornasse a 0px e poi di nuovo a dimensione reale non si
+              ridimensiona da solo — qui la visibilità la decide solo l'opacity.
+              Mostrato/nascosto in base a se QUESTO tiro specifico ha davvero usato i dadi 3D
+              (latest.usedDice3D), non se il motore è astrattamente "pronto": il motore diventa
+              pronto in genere DOPO che il primo tiro è già stato deciso col percorso di scorta
+              (Dice3D si monta solo qui sotto, un attimo prima), quindi durante il primo tiro
+              sarebbe comunque "ready" ma vuoto — un riquadro vuoto visibile sembrava un bug. */}
           {dice3dStatus !== "unavailable" && (
             <div
               className={`mb-3 h-56 sm:h-64 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
-                dice3dStatus === "ready" ? "opacity-100" : "opacity-0"
+                latest.usedDice3D ? "opacity-100" : "opacity-0"
               }`}
             >
               <Dice3D ref={dice3dRef} onStatusChange={setDice3dStatus} className="h-full w-full" />
