@@ -63,6 +63,16 @@ export function DiceRoller() {
   // caricamento, o WebGL/OffscreenCanvas non disponibile) si ricade sempre sul tumble numerico.
   const dice3dRef = useRef<Dice3DHandle>(null);
   const [dice3dStatus, setDice3dStatus] = useState<Dice3DStatus>("loading");
+  // true dal momento in cui QUESTO tiro decide di usare i dadi 3D fino a quando la promise di
+  // roll() si risolve (o fallisce) — a differenza di "latest?.usedDice3D" (che riflette solo
+  // l'ULTIMO TIRO GIÀ CONCLUSO) questo è vero anche mentre il tiro corrente è ancora in volo.
+  // Trovato il vero bug qui: il riquadro/il "nascondi il numero vecchio" erano entrambi legati a
+  // latest?.usedDice3D, quindi durante il primissimo tiro (latest ancora undefined) o comunque
+  // durante QUALSIASI tiro (latest si aggiorna solo DOPO che la promise si risolve) il riquadro
+  // restava invisibile per tutta la vera animazione e "scattava" visibile solo a fine tiro — dal
+  // secondo tiro in poi sembrava funzionare solo perché ereditava la visibilità lasciata dal
+  // primo (se anche quello aveva usato i dadi 3D), non perché il problema fosse risolto.
+  const [dice3dInFlight, setDice3dInFlight] = useState(false);
 
   const latest = history[0];
   const modeEnabled = die === 20 && quantity === 1;
@@ -80,6 +90,9 @@ export function DiceRoller() {
     let diceValues: number[];
     let usedDice3D = false;
     if (dice3dStatus === "ready" && dice3dRef.current) {
+      // Riquadro visibile PRIMA di aspettare il risultato, non dopo — altrimenti l'animazione
+      // vera resta nascosta dietro un riquadro ancora invisibile per tutta la sua durata.
+      setDice3dInFlight(true);
       try {
         diceValues = await dice3dRef.current.roll(`${diceToRoll}d${die}`);
         if (diceValues.length !== diceToRoll) throw new Error("Risultato 3D incompleto.");
@@ -88,6 +101,8 @@ export function DiceRoller() {
         // La scena era pronta ma qualcosa è andato storto durante QUESTO tiro (raro) — non
         // lasciare l'utente senza risultato, si ricade sul tiro "invisibile" con RNG normale.
         diceValues = Array.from({ length: diceToRoll }, () => rollDie(die));
+      } finally {
+        setDice3dInFlight(false);
       }
     } else {
       diceValues = Array.from({ length: diceToRoll }, () => rollDie(die));
@@ -166,8 +181,9 @@ export function DiceRoller() {
   const isFumble = !rolling && latest && latest.die === 20 && latest.rolls[0] === 1;
   // Il numero grande resta nascosto mentre i dadi 3D stanno ancora rotolando (la scena stessa È
   // l'animazione, mostrarlo sopra sarebbe ridondante/confuso) — col tumble numerico invece deve
-  // restare visibile, è lui l'animazione.
-  const hideBigNumber = rolling && latest?.usedDice3D;
+  // restare visibile, è lui l'animazione. dice3dInFlight, non latest?.usedDice3D: quest'ultimo
+  // riflette solo l'ultimo tiro GIÀ concluso, non quello in corso proprio ora.
+  const hideBigNumber = dice3dInFlight;
 
   return (
     <div className="space-y-6">
@@ -268,15 +284,16 @@ export function DiceRoller() {
             world.onscreen.js, l'aspect di default della libreria è 300/150 = 2:1). Un riquadro
             più alto che largo (come prima) lascia il tavolo comunque stretto in profondità, con
             vuoto sotto ai dadi qualunque altezza gli si dia — non "sembrava" ingrandito, il
-            tavolo davvero non cresce oltre la sua profondità fissa. Mostrato/nascosto in base a
-            se l'ULTIMO tiro (se esiste) ha davvero usato i dadi 3D, non se il motore è
-            astrattamente "pronto" — altrimenti resterebbe visibile ma vuoto ogni volta che un
-            tiro cade sul percorso di scorta. */}
+            tavolo davvero non cresce oltre la sua profondità fissa. Visibile durante il tiro
+            IN CORSO (dice3dInFlight) o se l'ultimo tiro concluso ha usato i dadi 3D — non solo
+            quest'ultimo da solo: quello riflette solo il tiro GIÀ FINITO, restava invisibile per
+            tutta la vera animazione (che si vede dal vivo sul canvas mentre la promise di
+            roll() è ancora in sospeso) e "scattava" visibile solo a risultato già pronto. */}
         {dice3dStatus !== "unavailable" && (
           <div className="relative mb-3 h-44 sm:h-60 w-full">
             <div
               className={`h-full w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
-                latest?.usedDice3D ? "opacity-100" : "opacity-0"
+                dice3dInFlight || latest?.usedDice3D ? "opacity-100" : "opacity-0"
               }`}
             >
               <Dice3D ref={dice3dRef} onStatusChange={setDice3dStatus} className="h-full w-full" />
