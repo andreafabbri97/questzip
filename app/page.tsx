@@ -29,62 +29,66 @@ const sections = [
 
 export default function Home() {
   return (
-    // Larghezza propria invece di ereditare quella (molto più generosa, pensata per elenchi
-    // lunghi) del contenitore <main> — con solo 3 card fisse, su un monitor 2K/4K si
-    // stiracchierebbero enormi con vuoto ai lati invece di restare compatte e leggibili.
-    <div className="space-y-10 max-w-3xl lg:max-w-4xl mx-auto">
-      <section className="text-center pt-8 sm:pt-14 space-y-4">
-        <h1 className="heading-ornate text-4xl sm:text-5xl font-bold text-accent-strong">
-          QuestZip
-        </h1>
-        <p className="text-muted max-w-xl mx-auto text-balance">
-          Il compagno di viaggio per le tue campagne di D&amp;D 5e. Per master
-          e giocatori, dal telefono o dal PC, anche al tavolo.
-        </p>
-      </section>
+    // Da lg in su il blocco si centra verticalmente nello spazio sotto l'header invece di
+    // restare ancorato in cima — su un monitor 2K/4K un contenuto così corto (titolo, 3 card,
+    // un paragrafo) lasciava un vuoto enorme sotto, sembrava dimenticato in un angolo invece che
+    // pensato per lo schermo. min-h invece di h fissa: su mobile/tablet (sotto lg) resta il
+    // flusso normale dall'alto, qui il contenuto è già abbastanza per riempire lo schermo.
+    <div className="lg:flex lg:min-h-[calc(100dvh-10rem)] lg:flex-col lg:justify-center">
+      <div className="space-y-10 max-w-2xl sm:max-w-3xl lg:max-w-4xl 2xl:max-w-5xl mx-auto w-full">
+        <section className="text-center pt-8 sm:pt-14 lg:pt-0 space-y-4">
+          <h1 className="heading-ornate text-4xl sm:text-5xl 2xl:text-6xl font-bold text-accent-strong">
+            QuestZip
+          </h1>
+          <p className="text-muted max-w-xl 2xl:max-w-2xl mx-auto text-balance 2xl:text-lg">
+            Il compagno di viaggio per le tue campagne di D&amp;D 5e. Per master
+            e giocatori, dal telefono o dal PC, anche al tavolo.
+          </p>
+        </section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sections.map((section) =>
-          section.ready ? (
-            <Link
-              key={section.title}
-              href={section.href}
-              className="group card-elevated card-elevated-hover rounded-xl border border-edge bg-surface p-5 transition-colors hover:border-accent/50 hover:bg-surface-raised"
-            >
-              <div className="text-3xl mb-3 transition-transform group-hover:scale-110">
-                {section.icon}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+          {sections.map((section) =>
+            section.ready ? (
+              <Link
+                key={section.title}
+                href={section.href}
+                className="group card-elevated card-elevated-hover rounded-xl border border-edge bg-surface p-5 lg:p-7 transition-colors hover:border-accent/50 hover:bg-surface-raised"
+              >
+                <div className="text-3xl lg:text-4xl mb-3 transition-transform group-hover:scale-110">
+                  {section.icon}
+                </div>
+                <h2 className="text-lg lg:text-xl font-bold text-foreground group-hover:text-accent-strong transition-colors">
+                  {section.title}
+                </h2>
+                <p className="text-sm lg:text-base text-muted mt-1">{section.description}</p>
+              </Link>
+            ) : (
+              <div
+                key={section.title}
+                className="rounded-xl border border-dashed border-edge bg-surface/50 p-5 lg:p-7 opacity-70"
+              >
+                <div className="text-3xl lg:text-4xl mb-3 grayscale">{section.icon}</div>
+                <h2 className="text-lg lg:text-xl font-bold text-muted">
+                  {section.title}
+                  <span className="ml-2 align-middle text-[10px] uppercase tracking-widest border border-edge rounded-full px-2 py-0.5">
+                    presto
+                  </span>
+                </h2>
+                <p className="text-sm lg:text-base text-muted mt-1">{section.description}</p>
               </div>
-              <h2 className="text-lg font-bold text-foreground group-hover:text-accent-strong transition-colors">
-                {section.title}
-              </h2>
-              <p className="text-sm text-muted mt-1">{section.description}</p>
-            </Link>
-          ) : (
-            <div
-              key={section.title}
-              className="rounded-xl border border-dashed border-edge bg-surface/50 p-5 opacity-70"
-            >
-              <div className="text-3xl mb-3 grayscale">{section.icon}</div>
-              <h2 className="text-lg font-bold text-muted">
-                {section.title}
-                <span className="ml-2 align-middle text-[10px] uppercase tracking-widest border border-edge rounded-full px-2 py-0.5">
-                  presto
-                </span>
-              </h2>
-              <p className="text-sm text-muted mt-1">{section.description}</p>
-            </div>
-          ),
-        )}
-      </section>
+            ),
+          )}
+        </section>
 
-      <p className="text-center text-xs text-muted">
-        Le Campagne sono condivise in tempo reale fra master e giocatori. I Personaggi hanno un
-        bottone &quot;Salva&quot; esplicito (avvisa se stai per uscire con modifiche non salvate,
-        come un documento) e sono sincronizzati anche sul tuo account: li ritrovi da qualsiasi
-        dispositivo, anche se cambi telefono o svuoti il browser — porti tu lo scatto in una
-        campagna condivisa quando vuoi. Il tiro dadi 🎲 è sempre nella barra di navigazione: si
-        apre senza uscire dalla pagina.
-      </p>
+        <p className="text-center text-xs lg:text-sm text-muted">
+          Le Campagne sono condivise in tempo reale fra master e giocatori. I Personaggi hanno un
+          bottone &quot;Salva&quot; esplicito (avvisa se stai per uscire con modifiche non salvate,
+          come un documento) e sono sincronizzati anche sul tuo account: li ritrovi da qualsiasi
+          dispositivo, anche se cambi telefono o svuoti il browser — porti tu lo scatto in una
+          campagna condivisa quando vuoi. Il tiro dadi 🎲 è sempre nella barra di navigazione: si
+          apre senza uscire dalla pagina.
+        </p>
+      </div>
     </div>
   );
 }
