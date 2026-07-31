@@ -258,18 +258,6 @@ export function DiceRoller() {
               : "border-edge bg-surface"
         }`}
       >
-        {/* Elimina solo l'ultimo tiro mostrato qui — mai durante l'animazione, cancellare un
-            risultato che non è ancora stato rivelato non avrebbe senso. */}
-        {latest && !rolling && (
-          <button
-            onClick={() => deleteEntry(latest.id)}
-            aria-label="Elimina questo tiro"
-            title="Elimina"
-            className="absolute right-3 top-3 text-muted/50 hover:text-danger transition-colors text-sm"
-          >
-            ✕
-          </button>
-        )}
         {/* Dimensione fissa SEMPRE (mai collassata a 0, nemmeno per nasconderlo): BabylonJS
             inizializza la scena contro le dimensioni reali del contenitore in quel momento, e
             se più tardi il contenitore tornasse a 0px e poi di nuovo a dimensione reale non si
@@ -285,12 +273,25 @@ export function DiceRoller() {
             astrattamente "pronto" — altrimenti resterebbe visibile ma vuoto ogni volta che un
             tiro cade sul percorso di scorta. */}
         {dice3dStatus !== "unavailable" && (
-          <div
-            className={`mb-3 h-44 sm:h-60 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
-              latest?.usedDice3D ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            <Dice3D ref={dice3dRef} onStatusChange={setDice3dStatus} className="h-full w-full" />
+          <div className="relative mb-3 h-44 sm:h-60 w-full">
+            <div
+              className={`h-full w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
+                latest?.usedDice3D ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              <Dice3D ref={dice3dRef} onStatusChange={setDice3dStatus} className="h-full w-full" />
+            </div>
+            {/* Il primissimo tiro cade quasi sempre sul tumble numerico di scorta, perché il
+                caricamento dei dadi 3D (~1MB fra motore, fisica e texture) richiede un attimo —
+                senza questo avviso sembra che non succeda niente mentre si aspetta, come se il
+                pulsante "Tira" si fosse bloccato. Sparisce non appena il motore risulta pronto
+                (anche se sta ancora caricando ma un tiro precedente l'ha già usato con successo),
+                non solo a rolling finito, altrimenti lampeggerebbe ad ogni tiro successivo. */}
+            {dice3dStatus === "loading" && !history.some((entry) => entry.usedDice3D) && (
+              <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-muted">
+                Caricamento dadi 3D…
+              </p>
+            )}
           </div>
         )}
         {latest && (

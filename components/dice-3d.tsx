@@ -112,8 +112,11 @@ export const Dice3D = forwardRef<
           // soglia (194.5): numeri neri, contrasto vero. Stessa tonalità oro dell'app, non un
           // colore a caso.
           themeColor: "#f2c14e",
-          // Al massimo consentito dalla libreria (range 2-9).
-          scale: 9,
+          // La documentazione consiglia un range 2-9, ma non ho trovato nessun clamp reale nel
+          // codice che lo faccia rispettare — sperimentale, va verificato dal vivo (rischio: a
+          // valori troppo alti i dadi potrebbero sovrapporsi/uscire dal tavolo, che ha una
+          // profondità fissa indipendente da questo valore).
+          scale: 12,
         });
         boxRef.current = box;
         return box.init();
