@@ -35,7 +35,11 @@ export default function Home() {
     // pensato per lo schermo. min-h invece di h fissa: su mobile/tablet (sotto lg) resta il
     // flusso normale dall'alto, qui il contenuto è già abbastanza per riempire lo schermo.
     <div className="lg:flex lg:min-h-[calc(100dvh-10rem)] lg:flex-col lg:justify-center">
-      <div className="space-y-10 max-w-2xl sm:max-w-3xl lg:max-w-4xl 2xl:max-w-5xl mx-auto w-full">
+      {/* Stessa scala di larghezza di Campagne/Chat/Personaggi (non quella più stretta usata la
+          prima volta): i margini laterali devono essere coerenti con le altre pagine, non un
+          compromesso a sé per "restare leggibile" — qui c'erano margini doppi rispetto al resto
+          dell'app. */}
+      <div className="space-y-10 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto w-full">
         <section className="text-center pt-8 sm:pt-14 lg:pt-0 space-y-4">
           <h1 className="heading-ornate text-4xl sm:text-5xl 2xl:text-6xl font-bold text-accent-strong">
             QuestZip
