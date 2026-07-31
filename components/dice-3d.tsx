@@ -74,10 +74,14 @@ export const Dice3D = forwardRef<
           // "npm install" (postinstall di @3d-dice/dice-box), non nel percorso di default
           // della libreria — vedi public/assets/.
           assetPath: "/assets/",
-          themeColor: "#e0a83e",
-          // Al massimo consentito dalla libreria (range 2-9): in un riquadro compatto come il
-          // nostro (dentro un modal, non a piena pagina) il dado doveva restare grande abbastanza
-          // da leggerci sopra il numero — di default sembrava un puntino perso al centro.
+          // NON #e0a83e (--accent): la libreria sceglie da sola numeri neri o bianchi in base
+          // alla luminosità di questo colore (soglia 175/255, formula 0.299r+0.587g+0.114b —
+          // vedi dice-box.es.js) — #e0a83e ha luminosità 172.6, APPENA sotto soglia: numeri
+          // bianchi su un dado giallo chiaro, illeggibili. --accent-strong sta comodamente sopra
+          // soglia (194.5): numeri neri, contrasto vero. Stessa tonalità oro dell'app, non un
+          // colore a caso.
+          themeColor: "#f2c14e",
+          // Al massimo consentito dalla libreria (range 2-9).
           scale: 9,
         });
         boxRef.current = box;

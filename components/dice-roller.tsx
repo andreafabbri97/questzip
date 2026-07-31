@@ -45,8 +45,11 @@ export function DiceRoller() {
   // (altrimenti i due tumble si mischierebbero, con numeri che saltano in modo incoerente).
   const rollIdRef = useRef(0);
 
-  // Dadi 3D fisici (BabylonJS+Ammo, vedi dice-3d.tsx): montato solo dopo il primo tiro (sotto,
-  // dentro "latest &&"), così chi apre il tiro dadi e non tira mai non paga il caricamento.
+  // Dadi 3D fisici (BabylonJS+Ammo, vedi dice-3d.tsx): montato subito insieme al resto del
+  // roller (non solo dopo il primo tiro) apposta — il caricamento richiede un attimo, montarlo
+  // solo al click su "Tira" significava che il primissimo tiro dopo l'apertura del modal cadeva
+  // quasi sempre sul tumble numerico di scorta, il motore non faceva ancora in tempo. Aprendo il
+  // modal si comincia a caricare subito, così di solito è già pronto al primo tiro vero.
   // "ready" solo quando la scena ha finito di inizializzarsi con successo — altrimenti (ancora in
   // caricamento, o WebGL/OffscreenCanvas non disponibile) si ricade sempre sul tumble numerico.
   const dice3dRef = useRef<Dice3DHandle>(null);
@@ -225,64 +228,70 @@ export function DiceRoller() {
         </button>
       </section>
 
-      {latest && (
-        <section
-          className={`rounded-xl border p-6 text-center ${
-            isCrit
-              ? "border-accent-strong bg-accent/10"
-              : isFumble
-                ? "border-danger bg-danger/10"
-                : "border-edge bg-surface"
-          }`}
-        >
-          {/* Dimensione fissa SEMPRE (mai collassata a 0, nemmeno per nasconderlo): BabylonJS
-              inizializza la scena contro le dimensioni reali del contenitore in quel momento, e
-              se più tardi il contenitore tornasse a 0px e poi di nuovo a dimensione reale non si
-              ridimensiona da solo — qui la visibilità la decide solo l'opacity.
-              Mostrato/nascosto in base a se QUESTO tiro specifico ha davvero usato i dadi 3D
-              (latest.usedDice3D), non se il motore è astrattamente "pronto": il motore diventa
-              pronto in genere DOPO che il primo tiro è già stato deciso col percorso di scorta
-              (Dice3D si monta solo qui sotto, un attimo prima), quindi durante il primo tiro
-              sarebbe comunque "ready" ma vuoto — un riquadro vuoto visibile sembrava un bug. */}
-          {dice3dStatus !== "unavailable" && (
-            <div
-              className={`mb-3 h-56 sm:h-64 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
-                latest.usedDice3D ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              <Dice3D ref={dice3dRef} onStatusChange={setDice3dStatus} className="h-full w-full" />
-            </div>
-          )}
-          {!hideBigNumber && (
-            <div className="[perspective:400px]">
-              <div
-                className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
-                  isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
-                }`}
-              >
-                {rolling ? (displayValue ?? latest.total) : latest.total}
+      {/* Non più condizionata a "latest": deve montarsi già all'apertura del modal (vedi
+          commento su dice3dRef sopra), non solo dopo il primo tiro. Prima del primo tiro mostra
+          solo il riquadro dadi (invisibile finché non pronto) senza numero/testo sotto. */}
+      <section
+        className={`rounded-xl border p-6 text-center ${
+          isCrit
+            ? "border-accent-strong bg-accent/10"
+            : isFumble
+              ? "border-danger bg-danger/10"
+              : "border-edge bg-surface"
+        }`}
+      >
+        {/* Dimensione fissa SEMPRE (mai collassata a 0, nemmeno per nasconderlo): BabylonJS
+            inizializza la scena contro le dimensioni reali del contenitore in quel momento, e
+            se più tardi il contenitore tornasse a 0px e poi di nuovo a dimensione reale non si
+            ridimensiona da solo — qui la visibilità la decide solo l'opacity. Grande apposta
+            (non solo per estetica): con un riquadro piccolo i dadi risultavano illeggibili,
+            "scale" della libreria è già al massimo consentito (9), la leva che resta è lo
+            spazio vero a disposizione. Mostrato/nascosto in base a se l'ULTIMO tiro (se esiste)
+            ha davvero usato i dadi 3D, non se il motore è astrattamente "pronto" — altrimenti
+            resterebbe visibile ma vuoto ogni volta che un tiro cade sul percorso di scorta. */}
+        {dice3dStatus !== "unavailable" && (
+          <div
+            className={`mb-3 h-72 sm:h-80 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
+              latest?.usedDice3D ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <Dice3D ref={dice3dRef} onStatusChange={setDice3dStatus} className="h-full w-full" />
+          </div>
+        )}
+        {latest && (
+          <>
+            {!hideBigNumber && (
+              <div className="[perspective:400px]">
+                <div
+                  className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
+                    isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
+                  }`}
+                >
+                  {rolling ? (displayValue ?? latest.total) : latest.total}
+                </div>
               </div>
-            </div>
-          )}
-          <p className="text-sm text-muted mt-2">
-            {latest.quantity > 1 ? `${latest.quantity}d${latest.die}` : `d${latest.die}`}
-            {latest.modifier !== 0 && ` ${formatModifier(latest.modifier)}`}
-            {latest.mode !== "normale" && ` · ${latest.mode}`}
-            {/* I tiri veri (e lo scartato in vantaggio/svantaggio) restano nascosti finché il
-                risultato sopra non è ancora rivelato — mostrarli subito spoilerebbe il risultato
-                prima che l'animazione (numerica o dei dadi 3D) finisca di "rivelarlo". */}
-            {!rolling && (
-              <>
-                {" · "}
-                [{latest.rolls.join(", ")}]
-                {latest.discarded !== undefined && ` (scartato: ${latest.discarded})`}
-              </>
             )}
-          </p>
-          {isCrit && <p className="text-accent-strong font-bold mt-1">Colpo critico! ⚔️</p>}
-          {isFumble && <p className="text-danger font-bold mt-1">Fallimento critico… 💀</p>}
-        </section>
-      )}
+            <p className="text-sm text-muted mt-2">
+              {latest.quantity > 1 ? `${latest.quantity}d${latest.die}` : `d${latest.die}`}
+              {latest.modifier !== 0 && ` ${formatModifier(latest.modifier)}`}
+              {latest.mode !== "normale" && ` · ${latest.mode}`}
+              {/* I tiri veri (e lo scartato in vantaggio/svantaggio) restano nascosti finché il
+                  risultato sopra non è ancora rivelato — mostrarli subito spoilerebbe il
+                  risultato prima che l'animazione (numerica o dei dadi 3D) finisca di
+                  "rivelarlo". */}
+              {!rolling && (
+                <>
+                  {" · "}
+                  [{latest.rolls.join(", ")}]
+                  {latest.discarded !== undefined && ` (scartato: ${latest.discarded})`}
+                </>
+              )}
+            </p>
+            {isCrit && <p className="text-accent-strong font-bold mt-1">Colpo critico! ⚔️</p>}
+            {isFumble && <p className="text-danger font-bold mt-1">Fallimento critico… 💀</p>}
+          </>
+        )}
+      </section>
 
       {history.length > 1 && (
         <section className="space-y-2">
