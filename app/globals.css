@@ -142,6 +142,19 @@ h3 {
   animation: dice-tumble 0.9s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
+/* Il foglio di stile di @3d-dice/dice-box (dist/style.css) mette SOLO l'opacità sulla classe
+   che assegna al proprio <canvas> — nessuna regola width/height:100%. Il canvas creato dalla
+   libreria resta quindi alla sua dimensione intrinseca di default del browser (300×150px) a
+   prescindere da quanto sia grande il div contenitore che gli passiamo: la libreria legge le
+   dimensioni del CANVAS STESSO (this.canvas.clientWidth/clientHeight), non del contenitore —
+   senza questa regola tutto quello che succede dentro (tavolo, telecamera, dadi) viene calcolato
+   su quel minuscolo 300×150 invece che sul riquadro vero (vedi dice-3d.tsx). */
+.dice-box-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 @keyframes modal-in {
   from {
     opacity: 0;
