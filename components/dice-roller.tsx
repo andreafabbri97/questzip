@@ -1,29 +1,34 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { z } from "zod";
 import { IntField } from "@/components/int-field";
 import { formatModifier } from "@/lib/dnd";
+import { useLocalCollection } from "@/lib/storage";
 import { Dice3D, type Dice3DHandle, type Dice3DStatus } from "@/components/dice-3d";
 
 const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
 
-type RollMode = "normale" | "vantaggio" | "svantaggio";
-
-interface RollResult {
-  id: string;
-  die: number;
-  quantity: number;
-  modifier: number;
-  mode: RollMode;
-  rolls: number[];
-  discarded?: number;
-  total: number;
-  timestamp: string;
+// Persistita in localStorage (vedi useLocalCollection sotto) — la cronologia dei tiri deve
+// sopravvivere a un refresh della pagina o alla chiusura del modal, non solo restare in memoria
+// per la durata della sessione.
+const rollResultSchema = z.object({
+  id: z.string(),
+  die: z.number(),
+  quantity: z.number(),
+  modifier: z.number(),
+  mode: z.enum(["normale", "vantaggio", "svantaggio"]),
+  rolls: z.array(z.number()),
+  discarded: z.number().optional(),
+  total: z.number(),
+  timestamp: z.string(),
   // Se questo tiro specifico ha usato i dadi 3D fisici o il tumble numerico di scorta — deciso
   // al momento del tiro (non solo dallo stato attuale di Dice3D), così un tiro riuscito via 3D
   // resta segnato tale anche se più tardi qualcosa smettesse di funzionare, e viceversa.
-  usedDice3D: boolean;
-}
+  usedDice3D: z.boolean(),
+});
+type RollResult = z.infer<typeof rollResultSchema>;
 
 function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
@@ -34,8 +39,12 @@ export function DiceRoller() {
   const [quantity, setQuantity] = useState(1);
   const [modifier, setModifier] = useState(0);
   const [mode, setMode] = useState<RollMode>("normale");
-  const [history, setHistory] = useState<RollResult[]>([]);
+  const { items: history, persist: persistHistory } = useLocalCollection(
+    "questzip:tiri-dadi",
+    rollResultSchema,
+  );
   const [rolling, setRolling] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   // Valore "finto" mostrato mentre il dado tumbla, cambiato rapidamente per dare l'illusione di
   // un dado vero che gira prima di fermarsi — usato solo quando i dadi 3D non sono disponibili
   // (vedi dice3dStatus sotto): con quelli veri l'animazione è la scena stessa, non serve.
@@ -117,7 +126,7 @@ export function DiceRoller() {
     if (usedDice3D) {
       // I dadi fisici hanno già finito di rotolare (abbiamo aspettato la loro promise) — nessun
       // tumble da far girare, si rivela subito.
-      setHistory((previous) => [result, ...previous].slice(0, 30));
+      persistHistory([result, ...history].slice(0, 30));
       setRolling(false);
       return;
     }
@@ -141,7 +150,16 @@ export function DiceRoller() {
     };
     runStep(0);
 
-    setHistory((previous) => [result, ...previous].slice(0, 30));
+    persistHistory([result, ...history].slice(0, 30));
+  };
+
+  const deleteEntry = (id: string) => {
+    persistHistory(history.filter((entry) => entry.id !== id));
+  };
+
+  const clearHistory = () => {
+    persistHistory([]);
+    setConfirmingClear(false);
   };
 
   const isCrit = !rolling && latest && latest.die === 20 && latest.rolls[0] === 20;
@@ -232,7 +250,7 @@ export function DiceRoller() {
           commento su dice3dRef sopra), non solo dopo il primo tiro. Prima del primo tiro mostra
           solo il riquadro dadi (invisibile finché non pronto) senza numero/testo sotto. */}
       <section
-        className={`rounded-xl border p-6 text-center ${
+        className={`relative rounded-xl border p-6 text-center ${
           isCrit
             ? "border-accent-strong bg-accent/10"
             : isFumble
@@ -240,6 +258,18 @@ export function DiceRoller() {
               : "border-edge bg-surface"
         }`}
       >
+        {/* Elimina solo l'ultimo tiro mostrato qui — mai durante l'animazione, cancellare un
+            risultato che non è ancora stato rivelato non avrebbe senso. */}
+        {latest && !rolling && (
+          <button
+            onClick={() => deleteEntry(latest.id)}
+            aria-label="Elimina questo tiro"
+            title="Elimina"
+            className="absolute right-3 top-3 text-muted/50 hover:text-danger transition-colors text-sm"
+          >
+            ✕
+          </button>
+        )}
         {/* Dimensione fissa SEMPRE (mai collassata a 0, nemmeno per nasconderlo): BabylonJS
             inizializza la scena contro le dimensioni reali del contenitore in quel momento, e
             se più tardi il contenitore tornasse a 0px e poi di nuovo a dimensione reale non si
@@ -293,24 +323,101 @@ export function DiceRoller() {
         )}
       </section>
 
-      {history.length > 1 && (
+      {history.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-sm uppercase tracking-widest text-muted">Cronologia</h2>
-          <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface">
-            {history.slice(1).map((entry) => (
-              <li key={entry.id} className="flex items-center justify-between px-4 py-2 text-sm">
-                <span className="text-muted">
-                  {entry.timestamp} ·{" "}
-                  {entry.quantity > 1 ? `${entry.quantity}d${entry.die}` : `d${entry.die}`}
-                  {entry.modifier !== 0 && ` ${formatModifier(entry.modifier)}`}
-                  {entry.mode !== "normale" && ` (${entry.mode})`}
-                </span>
-                <span className="font-bold text-foreground">{entry.total}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm uppercase tracking-widest text-muted">Cronologia</h2>
+            <button
+              onClick={() => setConfirmingClear(true)}
+              className="text-xs font-bold text-muted hover:text-danger transition-colors"
+            >
+              Elimina cronologia
+            </button>
+          </div>
+          {history.length > 1 && (
+            <ul className="divide-y divide-edge rounded-xl border border-edge bg-surface">
+              {history.slice(1).map((entry) => (
+                <li key={entry.id} className="flex items-center justify-between gap-2 px-4 py-2 text-sm">
+                  <span className="text-muted">
+                    {entry.timestamp} ·{" "}
+                    {entry.quantity > 1 ? `${entry.quantity}d${entry.die}` : `d${entry.die}`}
+                    {entry.modifier !== 0 && ` ${formatModifier(entry.modifier)}`}
+                    {entry.mode !== "normale" && ` (${entry.mode})`}
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-foreground">{entry.total}</span>
+                    <button
+                      onClick={() => deleteEntry(entry.id)}
+                      aria-label="Elimina questo tiro"
+                      title="Elimina"
+                      className="text-muted/50 hover:text-danger transition-colors text-xs px-1"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
+
+      {confirmingClear && (
+        <ClearHistoryConfirmModal onConfirm={clearHistory} onCancel={() => setConfirmingClear(false)} />
+      )}
     </div>
+  );
+}
+
+type RollMode = "normale" | "vantaggio" | "svantaggio";
+
+/** Stesso identico pattern di DeleteCharacterModal (app/personaggi/page.tsx) — un modal custom
+ * invece di window.confirm(), che l'utente ha esplicitamente chiesto di evitare qui. */
+function ClearHistoryConfirmModal({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-overlay-in"
+      onClick={onCancel}
+    >
+      <div
+        className="card-elevated w-full max-w-sm rounded-xl border border-edge bg-background p-5 space-y-4 animate-modal-in"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="text-lg font-display font-bold text-danger">Eliminare tutta la cronologia?</h2>
+        <p className="text-sm text-muted">
+          Tutti i tiri salvati verranno eliminati definitivamente da questo dispositivo. Non si può
+          annullare.
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onConfirm}
+            className="rounded-lg bg-danger text-background font-bold px-4 py-2 text-sm hover:opacity-90 transition-opacity"
+          >
+            Elimina tutto
+          </button>
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-edge px-4 py-2 text-sm text-foreground hover:border-accent/50 transition-colors"
+          >
+            Annulla
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
