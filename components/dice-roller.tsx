@@ -75,7 +75,20 @@ export function DiceRoller() {
       }),
     };
 
-    // Tumble: mostra numeri casuali che cambiano sempre più lentamente (come un dado vero che
+    // Il numero finto durante il tumble deve avere la stessa "forma" del totale vero — quanti
+    // dadi contano davvero (tutti quelli con quantity in modalità normale, ma solo UNO con
+    // vantaggio/svantaggio, dove il secondo è comunque scartato) più il modificatore. Prima
+    // tumblava sempre un singolo d(die) grezzo: con 3d20 o un modificatore alto il numero finto
+    // restava sempre 1-20 e poi "saltava" di colpo a un totale anche triplo — sembrava rotto,
+    // non un dado che rallenta.
+    const effectiveDieCount = effectiveMode === "normale" ? quantity : 1;
+    const fakeTotal = () =>
+      Array.from({ length: effectiveDieCount }, () => rollDie(die)).reduce(
+        (sum, value) => sum + value,
+        0,
+      ) + modifier;
+
+    // Tumble: mostra totali finti che cambiano sempre più lentamente (come un dado vero che
     // rallenta rotolando), poi si ferma esattamente sul risultato vero — mai l'inverso, per non
     // rischiare che l'ultimo numero "finto" mostrato combaci per caso con quello vero e sembri un
     // bug di doppia rivelazione.
@@ -89,7 +102,7 @@ export function DiceRoller() {
         setRolling(false);
         return;
       }
-      setDisplayValue(rollDie(die));
+      setDisplayValue(fakeTotal());
       setTimeout(() => runStep(index + 1), tumbleSteps[index]);
     };
     runStep(0);
