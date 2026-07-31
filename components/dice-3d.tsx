@@ -82,16 +82,26 @@ export const Dice3D = forwardRef<
     // delle dimensioni corrette sullo schermo — stesso principio di un canvas "retina" fatto a
     // mano. Il contenitore ESTERNO (con overflow:hidden) è quello che riceve className/occupa
     // davvero spazio nel layout, il transform sul contenitore interno non lo altera.
+    // BUG (mio, non della libreria): questo blocco prima girava solo "if (dpr > 1)" — il div
+    // interno riceveva una dimensione esplicita SOLO per correggere la nitidezza. Su uno schermo
+    // a densità 1x (comunissimo sui monitor desktop) il div restava senza altezza/larghezza
+    // proprie (un div vuoto senza contenuto collassa a ~0px di altezza), quindi dice-box
+    // misurava un contenitore minuscolo — a prescindere da quanto grande fosse il riquadro
+    // visibile intorno, e a prescindere da scale/throwForce/spinForce, che agivano tutti su
+    // quel canvas minuscolo. Il dimensionamento di base deve avvenire SEMPRE, non solo quando
+    // serve anche la correzione della densità.
     const outer = outerRef.current;
     const inner = document.getElementById(containerId);
-    const dpr = window.devicePixelRatio || 1;
-    if (outer && inner && dpr > 1) {
+    if (outer && inner) {
+      const dpr = window.devicePixelRatio || 1;
       const rect = outer.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
         inner.style.width = `${rect.width * dpr}px`;
         inner.style.height = `${rect.height * dpr}px`;
-        inner.style.transform = `scale(${1 / dpr})`;
-        inner.style.transformOrigin = "top left";
+        if (dpr !== 1) {
+          inner.style.transform = `scale(${1 / dpr})`;
+          inner.style.transformOrigin = "top left";
+        }
       }
     }
 
