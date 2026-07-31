@@ -124,14 +124,24 @@ export const Dice3D = forwardRef<
           themeColor: "#f2c14e",
           // Al massimo del range consigliato dalla documentazione ufficiale (2-9, default 6).
           scale: 9,
-          // Trovata la documentazione completa (prima ne avevo letta solo una versione tagliata):
-          // i dadi restavano ammucchiati vicino al punto di lancio invece di spargersi su tutto
-          // il tavolo — non è (solo) una questione di zoom della telecamera, è la FORZA del
-          // lancio che di default non basta a coprire un tavolo grande come il nostro riquadro.
-          // Aumentati rispetto ai default (throwForce 5, spinForce 4, startingHeight 8).
-          throwForce: 9,
-          spinForce: 7,
-          startingHeight: 12,
+          // Questi tre erano stati aumentati parecchio (9/7/12) quando il vero problema era
+          // ancora il canvas bloccato a 300x150 (vedi globals.css) — compensavano un tavolo
+          // minuscolo con più energia. Ora che il tavolo usa davvero tutto il riquadro non serve
+          // più spingerli così forte: valori più vicini ai default (throwForce 5, spinForce 4,
+          // startingHeight 8), un filo sopra per continuare a coprire bene lo spazio.
+          throwForce: 6,
+          spinForce: 5,
+          startingHeight: 9,
+          // Meno energia nel lancio + più attrito = i dadi si fermano prima invece di scivolare
+          // o rimbalzare gli uni sugli altri — non elimina la possibilità che con MOLTI dadi
+          // insieme qualcuno finisca sopra un altro (è una simulazione fisica vera, non un
+          // layout a griglia: nella realtà succede lo stesso lanciando 100 d20 in un vassoio),
+          // ma la riduce parecchio. restitution resta 0 (default, niente rimbalzo).
+          friction: 0.95,
+          // Un piccolo ritardo in più fra un dado e il successivo (default 10ms): ogni dado ha
+          // un attimo di tempo per depositarsi prima che arrivi quello dopo, invece di cadere
+          // tutti insieme nello stesso istante aumentando le probabilità di incastrarsi a vicenda.
+          delay: 60,
         });
         boxRef.current = box;
         return box.init();
