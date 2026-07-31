@@ -199,9 +199,16 @@ export function DiceRoller() {
             {latest.quantity > 1 ? `${latest.quantity}d${latest.die}` : `d${latest.die}`}
             {latest.modifier !== 0 && ` ${formatModifier(latest.modifier)}`}
             {latest.mode !== "normale" && ` · ${latest.mode}`}
-            {" · "}
-            [{latest.rolls.join(", ")}]
-            {latest.discarded !== undefined && ` (scartato: ${latest.discarded})`}
+            {/* I tiri veri (e lo scartato in vantaggio/svantaggio) restano nascosti finché il
+                numero grande sopra sta ancora tumblando — mostrarli subito spoilerebbe il
+                risultato prima che l'animazione finisca di "rivelarlo". */}
+            {!rolling && (
+              <>
+                {" · "}
+                [{latest.rolls.join(", ")}]
+                {latest.discarded !== undefined && ` (scartato: ${latest.discarded})`}
+              </>
+            )}
           </p>
           {isCrit && <p className="text-accent-strong font-bold mt-1">Colpo critico! ⚔️</p>}
           {isFumble && <p className="text-danger font-bold mt-1">Fallimento critico… 💀</p>}
