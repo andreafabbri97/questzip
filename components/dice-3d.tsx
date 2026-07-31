@@ -75,7 +75,10 @@ export const Dice3D = forwardRef<
           // della libreria — vedi public/assets/.
           assetPath: "/assets/",
           themeColor: "#e0a83e",
-          scale: 5.5,
+          // Al massimo consentito dalla libreria (range 2-9): in un riquadro compatto come il
+          // nostro (dentro un modal, non a piena pagina) il dado doveva restare grande abbastanza
+          // da leggerci sopra il numero — di default sembrava un puntino perso al centro.
+          scale: 9,
         });
         boxRef.current = box;
         return box.init();

@@ -243,7 +243,7 @@ export function DiceRoller() {
               collassa per sempre, non ha senso lasciare un riquadro vuoto. */}
           {dice3dStatus !== "unavailable" && (
             <div
-              className={`mb-3 h-40 sm:h-48 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
+              className={`mb-3 h-56 sm:h-64 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
                 dice3dStatus === "ready" ? "opacity-100" : "opacity-0"
               }`}
             >
