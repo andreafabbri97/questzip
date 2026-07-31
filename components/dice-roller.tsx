@@ -273,15 +273,20 @@ export function DiceRoller() {
         {/* Dimensione fissa SEMPRE (mai collassata a 0, nemmeno per nasconderlo): BabylonJS
             inizializza la scena contro le dimensioni reali del contenitore in quel momento, e
             se più tardi il contenitore tornasse a 0px e poi di nuovo a dimensione reale non si
-            ridimensiona da solo — qui la visibilità la decide solo l'opacity. Grande apposta
-            (non solo per estetica): con un riquadro piccolo i dadi risultavano illeggibili,
-            "scale" della libreria è già al massimo consentito (9), la leva che resta è lo
-            spazio vero a disposizione. Mostrato/nascosto in base a se l'ULTIMO tiro (se esiste)
-            ha davvero usato i dadi 3D, non se il motore è astrattamente "pronto" — altrimenti
-            resterebbe visibile ma vuoto ogni volta che un tiro cade sul percorso di scorta. */}
+            ridimensiona da solo — qui la visibilità la decide solo l'opacity.
+            Proporzione ~2:1 (larghezza:altezza) apposta, non un'altezza scelta a caso: il
+            "tavolo" fisico dove rotolano i dadi ha PROFONDITÀ FISSA in unità 3D — solo la
+            larghezza si adatta al rapporto larghezza/altezza del contenitore (vedi
+            world.onscreen.js, l'aspect di default della libreria è 300/150 = 2:1). Un riquadro
+            più alto che largo (come prima) lascia il tavolo comunque stretto in profondità, con
+            vuoto sotto ai dadi qualunque altezza gli si dia — non "sembrava" ingrandito, il
+            tavolo davvero non cresce oltre la sua profondità fissa. Mostrato/nascosto in base a
+            se l'ULTIMO tiro (se esiste) ha davvero usato i dadi 3D, non se il motore è
+            astrattamente "pronto" — altrimenti resterebbe visibile ma vuoto ogni volta che un
+            tiro cade sul percorso di scorta. */}
         {dice3dStatus !== "unavailable" && (
           <div
-            className={`mb-3 h-72 sm:h-80 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
+            className={`mb-3 h-44 sm:h-60 w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
               latest?.usedDice3D ? "opacity-100" : "opacity-0"
             }`}
           >
