@@ -112,11 +112,16 @@ export const Dice3D = forwardRef<
           // soglia (194.5): numeri neri, contrasto vero. Stessa tonalità oro dell'app, non un
           // colore a caso.
           themeColor: "#f2c14e",
-          // La documentazione consiglia un range 2-9, ma non ho trovato nessun clamp reale nel
-          // codice che lo faccia rispettare — sperimentale, va verificato dal vivo (rischio: a
-          // valori troppo alti i dadi potrebbero sovrapporsi/uscire dal tavolo, che ha una
-          // profondità fissa indipendente da questo valore).
-          scale: 12,
+          // Al massimo del range consigliato dalla documentazione ufficiale (2-9, default 6).
+          scale: 9,
+          // Trovata la documentazione completa (prima ne avevo letta solo una versione tagliata):
+          // i dadi restavano ammucchiati vicino al punto di lancio invece di spargersi su tutto
+          // il tavolo — non è (solo) una questione di zoom della telecamera, è la FORZA del
+          // lancio che di default non basta a coprire un tavolo grande come il nostro riquadro.
+          // Aumentati rispetto ai default (throwForce 5, spinForce 4, startingHeight 8).
+          throwForce: 9,
+          spinForce: 7,
+          startingHeight: 12,
         });
         boxRef.current = box;
         return box.init();
