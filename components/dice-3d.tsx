@@ -47,6 +47,7 @@ export const Dice3D = forwardRef<
   // solo DiceModal globale) non si scontrerebbero comunque.
   const rawId = useId();
   const containerId = `dice-3d-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const outerRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<DiceBoxInstance | null>(null);
 
   useEffect(() => {
@@ -62,6 +63,36 @@ export const Dice3D = forwardRef<
     if (!hasWebGL()) {
       update("unavailable");
       return;
+    }
+
+    // dice-box dimensiona il canvas leggendo clientWidth/clientHeight del container e
+    // mandandoli COSÌ COME SONO al Web Worker che fa il rendering, senza moltiplicarli per
+    // devicePixelRatio — verificato leggendo il sorgente della libreria (dice-box.es.js,
+    // postMessage({action:"init", width: canvas.clientWidth, ...})). Il pattern corretto per un
+    // canvas offscreen (documentato dagli stessi sviluppatori di BabylonJS: leggi la dimensione
+    // CSS, MOLTIPLICA per devicePixelRatio, poi manda quella al worker) qui manca — risultato,
+    // il canvas renderizza a densità 1x anche su schermi ad alta densità, sgranato rispetto al
+    // resto della pagina (che invece la rispetta automaticamente, essendo DOM/CSS normale).
+    //
+    // Aggirato dall'esterno senza toccare la libreria: il contenitore interno (quello passato a
+    // dice-box come "container") viene reso fisicamente più grande — moltiplicato per
+    // devicePixelRatio — PRIMA che dice-box lo misuri, poi scalato indietro via CSS transform
+    // per occupare visivamente lo stesso spazio di sempre. dice-box legge le dimensioni
+    // maggiorate (quindi crea un canvas a risoluzione più alta), il transform lo fa apparire
+    // delle dimensioni corrette sullo schermo — stesso principio di un canvas "retina" fatto a
+    // mano. Il contenitore ESTERNO (con overflow:hidden) è quello che riceve className/occupa
+    // davvero spazio nel layout, il transform sul contenitore interno non lo altera.
+    const outer = outerRef.current;
+    const inner = document.getElementById(containerId);
+    const dpr = window.devicePixelRatio || 1;
+    if (outer && inner && dpr > 1) {
+      const rect = outer.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        inner.style.width = `${rect.width * dpr}px`;
+        inner.style.height = `${rect.height * dpr}px`;
+        inner.style.transform = `scale(${1 / dpr})`;
+        inner.style.transformOrigin = "top left";
+      }
     }
 
     import("@3d-dice/dice-box")
@@ -112,5 +143,9 @@ export const Dice3D = forwardRef<
     },
   }));
 
-  return <div id={containerId} className={className} />;
+  return (
+    <div ref={outerRef} className={className} style={{ overflow: "hidden" }}>
+      <div id={containerId} />
+    </div>
+  );
 });
