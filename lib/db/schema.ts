@@ -582,6 +582,30 @@ export const pushSubscriptions = pgTable(
   (table) => [unique("push_subscription_endpoint_unique").on(table.endpoint)],
 );
 
+export const diceRollModeEnum = pgEnum("dice_roll_mode", ["normale", "vantaggio", "svantaggio"]);
+
+// Cronologia dei tiri dadi, sincronizzata sull'account — prima viveva solo in localStorage
+// (quindi per dispositivo, persa cambiando telefono/browser). Poche righe per utente lette per
+// intero (come notifications), non un feed ad alto volume come la chat: nessun indice composito.
+export const diceRolls = pgTable("dice_roll", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  die: integer("die").notNull(),
+  quantity: integer("quantity").notNull(),
+  modifier: integer("modifier").notNull(),
+  mode: diceRollModeEnum("mode").notNull(),
+  rolls: jsonb("rolls").$type<number[]>().notNull(),
+  // Solo con vantaggio/svantaggio (il valore del d20 scartato) — null per un tiro normale.
+  discarded: integer("discarded"),
+  total: integer("total").notNull(),
+  // Se questo tiro ha usato i dadi 3D fisici o il tumble numerico di scorta — vedi il commento
+  // gemello nello schema Zod lato client (components/dice-roller.tsx).
+  usedDice3D: boolean("used_dice_3d").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
 // --- Compendio in italiano, estratto dai manuali ufficiali (vedi scripts/ita-compendio/) ---
 // Contenuto proprietario: mai esposto senza login (l'intero sito lo richiede, vedi proxy.ts).
 

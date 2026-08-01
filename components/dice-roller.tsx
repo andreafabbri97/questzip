@@ -2,33 +2,38 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { z } from "zod";
 import { IntField } from "@/components/int-field";
 import { formatModifier } from "@/lib/dnd";
-import { useLocalCollection } from "@/lib/storage";
+import { clearMyDiceRolls, deleteDiceRoll, getMyDiceRolls, saveDiceRoll } from "@/app/actions/dice";
 import { Dice3D, type Dice3DHandle, type Dice3DStatus } from "@/components/dice-3d";
 
 const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
 
-// Persistita in localStorage (vedi useLocalCollection sotto) — la cronologia dei tiri deve
-// sopravvivere a un refresh della pagina o alla chiusura del modal, non solo restare in memoria
-// per la durata della sessione.
-const rollResultSchema = z.object({
-  id: z.string(),
-  die: z.number(),
-  quantity: z.number(),
-  modifier: z.number(),
-  mode: z.enum(["normale", "vantaggio", "svantaggio"]),
-  rolls: z.array(z.number()),
-  discarded: z.number().optional(),
-  total: z.number(),
-  timestamp: z.string(),
+type DiceRollRow = Awaited<ReturnType<typeof getMyDiceRolls>>[number];
+
+// Sincronizzata sull'account (app/actions/dice.ts), non più solo in localStorage — così è la
+// stessa su ogni dispositivo. `discarded` resta opzionale lato client per comodità di scrittura,
+// ma la colonna Postgres è nullable: converti sempre null -> undefined leggendo una riga dal DB
+// (vedi rowToResult), altrimenti i confronti "!== undefined" sparsi nel render si romperebbero.
+type RollResult = {
+  id: string;
+  die: number;
+  quantity: number;
+  modifier: number;
+  mode: RollMode;
+  rolls: number[];
+  discarded?: number;
+  total: number;
   // Se questo tiro specifico ha usato i dadi 3D fisici o il tumble numerico di scorta — deciso
   // al momento del tiro (non solo dallo stato attuale di Dice3D), così un tiro riuscito via 3D
   // resta segnato tale anche se più tardi qualcosa smettesse di funzionare, e viceversa.
-  usedDice3D: z.boolean(),
-});
-type RollResult = z.infer<typeof rollResultSchema>;
+  usedDice3D: boolean;
+  createdAt: Date;
+};
+
+function rowToResult(row: DiceRollRow): RollResult {
+  return { ...row, discarded: row.discarded ?? undefined };
+}
 
 function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
@@ -39,10 +44,12 @@ export function DiceRoller() {
   const [quantity, setQuantity] = useState(1);
   const [modifier, setModifier] = useState(0);
   const [mode, setMode] = useState<RollMode>("normale");
-  const { items: history, persist: persistHistory } = useLocalCollection(
-    "questzip:tiri-dadi",
-    rollResultSchema,
-  );
+  const [history, setHistory] = useState<RollResult[]>([]);
+  // Il salvataggio server di un tiro appena aggiunto in modo ottimistico (vedi addResult sotto) —
+  // serve a deleteEntry: se l'utente elimina un tiro prima che la insert sul DB sia tornata, va
+  // aspettata per eliminare la riga vera (col suo id reale), altrimenti resterebbe orfana sul
+  // server e ricomparirebbe al prossimo caricamento nonostante la "X".
+  const pendingSaves = useRef(new Map<string, Promise<DiceRollRow | null>>());
   const [rolling, setRolling] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
   // Valore "finto" mostrato mentre il dado tumbla, cambiato rapidamente per dare l'illusione di
@@ -74,8 +81,45 @@ export function DiceRoller() {
   // primo (se anche quello aveva usato i dadi 3D), non perché il problema fosse risolto.
   const [dice3dInFlight, setDice3dInFlight] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    getMyDiceRolls()
+      .then((rows) => {
+        if (!cancelled) setHistory(rows.map(rowToResult));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const latest = history[0];
   const modeEnabled = die === 20 && quantity === 1;
+
+  // Aggiunge il tiro alla cronologia SUBITO, in locale — l'animazione/rivelazione deve restare
+  // guidata solo da stato locale sincrono, esattamente come dice3dInFlight più sopra: un tiro non
+  // può restare in attesa di un giro di rete solo per poter comparire. Il salvataggio sul server
+  // avviene sullo sfondo e riconcilia poi l'id vero (stesso pattern già in uso per l'invio
+  // ottimistico dei messaggi in campaign-chat.tsx/direct-chat.tsx).
+  const addResult = (result: RollResult) => {
+    setHistory((prev) => [result, ...prev].slice(0, 30));
+    const savePromise = saveDiceRoll({
+      die: result.die,
+      quantity: result.quantity,
+      modifier: result.modifier,
+      mode: result.mode,
+      rolls: result.rolls,
+      discarded: result.discarded,
+      total: result.total,
+      usedDice3D: result.usedDice3D,
+    })
+      .then((row) => {
+        setHistory((prev) => prev.map((entry) => (entry.id === result.id ? rowToResult(row) : entry)));
+        return row;
+      })
+      .catch(() => null);
+    pendingSaves.current.set(result.id, savePromise);
+  };
 
   const roll = async () => {
     const effectiveMode = modeEnabled ? mode : "normale";
@@ -132,16 +176,13 @@ export function DiceRoller() {
       discarded,
       total,
       usedDice3D,
-      timestamp: new Date().toLocaleTimeString("it-IT", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      createdAt: new Date(),
     };
 
     if (usedDice3D) {
       // I dadi fisici hanno già finito di rotolare (abbiamo aspettato la loro promise) — nessun
       // tumble da far girare, si rivela subito.
-      persistHistory([result, ...history].slice(0, 30));
+      addResult(result);
       setRolling(false);
       return;
     }
@@ -165,15 +206,27 @@ export function DiceRoller() {
     };
     runStep(0);
 
-    persistHistory([result, ...history].slice(0, 30));
+    addResult(result);
   };
 
-  const deleteEntry = (id: string) => {
-    persistHistory(history.filter((entry) => entry.id !== id));
+  const deleteEntry = async (id: string) => {
+    setHistory((prev) => prev.filter((entry) => entry.id !== id));
+    const pending = pendingSaves.current.get(id);
+    if (pending) {
+      // Il tiro non è ancora arrivato sul server con il suo id vero — aspetta quello, poi elimina
+      // la riga giusta, invece di provare a eliminare un id temporaneo che non esiste sul DB.
+      pendingSaves.current.delete(id);
+      const row = await pending;
+      deleteDiceRoll(row ? row.id : id).catch(() => {});
+      return;
+    }
+    deleteDiceRoll(id).catch(() => {});
   };
 
   const clearHistory = () => {
-    persistHistory([]);
+    setHistory([]);
+    pendingSaves.current.clear();
+    clearMyDiceRolls().catch(() => {});
     setConfirmingClear(false);
   };
 
@@ -370,7 +423,11 @@ export function DiceRoller() {
               {history.slice(1).map((entry) => (
                 <li key={entry.id} className="flex items-center justify-between gap-2 px-4 py-2 text-sm">
                   <span className="text-muted">
-                    {entry.timestamp} ·{" "}
+                    {new Date(entry.createdAt).toLocaleTimeString("it-IT", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    ·{" "}
                     {entry.quantity > 1 ? `${entry.quantity}d${entry.die}` : `d${entry.die}`}
                     {entry.modifier !== 0 && ` ${formatModifier(entry.modifier)}`}
                     {entry.mode !== "normale" && ` (${entry.mode})`}
@@ -430,7 +487,7 @@ function ClearHistoryConfirmModal({
       >
         <h2 className="text-lg font-display font-bold text-danger">Eliminare tutta la cronologia?</h2>
         <p className="text-sm text-muted">
-          Tutti i tiri salvati verranno eliminati definitivamente da questo dispositivo. Non si può
+          Tutti i tiri salvati verranno eliminati definitivamente dal tuo account. Non si può
           annullare.
         </p>
         <div className="flex flex-col gap-2">
