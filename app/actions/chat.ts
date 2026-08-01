@@ -16,8 +16,10 @@ import {
 import {
   broadcastCampaignChatMessage,
   broadcastCampaignChatMessageDeleted,
+  broadcastCampaignChatRead,
   broadcastDirectMessage,
   broadcastDirectMessageDeleted,
+  broadcastDirectMessageRead,
 } from "@/lib/party";
 import { sendPushToUser } from "@/lib/push";
 
@@ -220,15 +222,65 @@ export async function deleteDirectMessage(messageId: string) {
 
 // roomKey rispecchia esattamente il nome della stanza realtime (vedi lib/party.ts): "campaign-<id>"
 // o "dm-<userIdLow>-<userIdHigh>" — così il "non letto" si calcola senza una tabella per tipo.
-export async function markThreadRead(roomKey: string) {
-  const userId = await requireUserId();
+async function upsertReadState(userId: string, roomKey: string, lastReadAt: Date) {
   await db
     .insert(chatReadState)
-    .values({ userId, roomKey, lastReadAt: new Date() })
+    .values({ userId, roomKey, lastReadAt })
     .onConflictDoUpdate({
       target: [chatReadState.userId, chatReadState.roomKey],
-      set: { lastReadAt: new Date() },
+      set: { lastReadAt },
     });
+}
+
+// Due varianti esplicite (invece di un markThreadRead(roomKey) generico) apposta: la conferma di
+// lettura deve anche essere trasmessa in tempo reale a chi ha scritto, e per farlo la chat di
+// campagna e le DM usano stanze realtime diverse (vedi lib/party.ts) — capirlo qui richiederebbe
+// riparsare roomKey, fragile per le DM dato che gli id utente (uuid) contengono già dei trattini.
+export async function markCampaignChatRead(campaignId: string) {
+  const userId = await requireUserId();
+  await requireMember(campaignId, userId);
+  const lastReadAt = new Date();
+  await upsertReadState(userId, `campaign-${campaignId}`, lastReadAt);
+  await broadcastCampaignChatRead(campaignId, userId, lastReadAt);
+}
+
+export async function markDirectChatRead(otherUserId: string) {
+  const userId = await requireUserId();
+  await requireFriendship(userId, otherUserId);
+  const lastReadAt = new Date();
+  const [userIdLow, userIdHigh] = canonicalPair(userId, otherUserId);
+  await upsertReadState(userId, `dm-${userIdLow}-${userIdHigh}`, lastReadAt);
+  await broadcastDirectMessageRead(userId, otherUserId, lastReadAt);
+}
+
+// Ultima lettura di CIASCUN membro della campagna per la sua chat — usata per decidere se un mio
+// messaggio è stato letto "da tutti" (spunta blu) o solo consegnato (spunta grigia), stesso
+// concetto delle doppie spunte WhatsApp nei gruppi.
+export async function getCampaignChatReadState(campaignId: string) {
+  const userId = await requireUserId();
+  await requireMember(campaignId, userId);
+  return db
+    .select({ userId: chatReadState.userId, lastReadAt: chatReadState.lastReadAt })
+    .from(chatReadState)
+    .where(eq(chatReadState.roomKey, `campaign-${campaignId}`));
+}
+
+// Solo l'ultima lettura DELL'ALTRO partecipante — la mia non serve per colorare le spunte sui
+// messaggi che HO inviato io.
+export async function getDirectChatReadState(otherUserId: string) {
+  const userId = await requireUserId();
+  await requireFriendship(userId, otherUserId);
+  const [userIdLow, userIdHigh] = canonicalPair(userId, otherUserId);
+  const [row] = await db
+    .select({ lastReadAt: chatReadState.lastReadAt })
+    .from(chatReadState)
+    .where(
+      and(
+        eq(chatReadState.roomKey, `dm-${userIdLow}-${userIdHigh}`),
+        eq(chatReadState.userId, otherUserId),
+      ),
+    );
+  return row?.lastReadAt ?? null;
 }
 
 export interface ThreadActivity {

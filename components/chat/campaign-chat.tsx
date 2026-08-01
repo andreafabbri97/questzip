@@ -6,7 +6,8 @@ import { getCampaign } from "@/app/actions/campaigns";
 import {
   deleteCampaignChatMessage,
   getCampaignChatMessages,
-  markThreadRead,
+  getCampaignChatReadState,
+  markCampaignChatRead,
   sendCampaignChatMessage,
 } from "@/app/actions/chat";
 import { usePartyRoom } from "@/lib/use-party-room";
@@ -28,10 +29,13 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
   const { refreshThreads } = useRealtime();
-  const roomKey = `campaign-${campaignId}`;
 
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getCampaign>> | null>(null);
   const [messages, setMessages] = useState<ChatMessageData[] | null>(null);
+  // userId -> ultima lettura di QUEL membro per questa chat — per decidere se un mio messaggio è
+  // "letto da tutti" (spunta blu) o solo consegnato. Aggiornata sia dal fetch iniziale sia dal
+  // realtime (evento "chat-read", vedi usePartyRoom sotto).
+  const [readState, setReadState] = useState<Map<string, Date>>(new Map());
   const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
   const [openMention, setOpenMention] = useState<ParsedMentionToken | null>(null);
   const [error, setError] = useState("");
@@ -49,6 +53,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
     setLoadedFor(campaignId);
     setDetail(null);
     setMessages(null);
+    setReadState(new Map());
     setReplyTo(null);
     setError("");
   }
@@ -95,7 +100,10 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
     getCampaignChatMessages(campaignId).then((rows) => {
       if (!cancelled) setMessages(rows);
     });
-    markThreadRead(roomKey)
+    getCampaignChatReadState(campaignId).then((rows) => {
+      if (!cancelled) setReadState(new Map(rows.map((r) => [r.userId, r.lastReadAt])));
+    });
+    markCampaignChatRead(campaignId)
       .then(() => {
         if (!cancelled) refreshThreads();
       })
@@ -128,16 +136,27 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
   // aperta — qui siamo su /chat, una pagina diversa, quindi apriamo la nostra connessione, ma il
   // nome stanza (e quindi i messaggi che riceviamo) è lo stesso.
   usePartyRoom({ kind: "combat", campaignId }, (data) => {
-    const payload = data as { type?: string; message?: ChatMessageData; messageId?: string };
+    const payload = data as {
+      type?: string;
+      message?: ChatMessageData;
+      messageId?: string;
+      userId?: string;
+      lastReadAt?: string;
+    };
     if (payload?.type === "chat-message" && payload.message) {
       upsertMessage(payload.message);
       // La thread è aperta proprio ora: segnala subito come letto invece di lasciare che il
       // pallino resti acceso finché non la si riapre.
-      markThreadRead(roomKey).then(refreshThreads).catch(() => {});
+      markCampaignChatRead(campaignId).then(refreshThreads).catch(() => {});
     }
     if (payload?.type === "chat-message-deleted" && payload.messageId) {
       const id = payload.messageId;
       setMessages((prev) => prev?.filter((m) => m.id !== id) ?? prev);
+    }
+    if (payload?.type === "chat-read" && payload.userId && payload.lastReadAt) {
+      const readUserId = payload.userId;
+      const lastReadAt = new Date(payload.lastReadAt);
+      setReadState((prev) => new Map(prev).set(readUserId, lastReadAt));
     }
   });
 
@@ -148,6 +167,17 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
   const memberMap = new Map(detail.members.map((m) => [m.userId, { name: m.name, image: m.image }]));
   const resolveAuthor = (id: string) => memberMap.get(id) ?? { name: null, image: null };
   const isDm = detail.myRole === "dm";
+
+  // "Letto" per un messaggio mio = tutti gli ALTRI membri l'hanno aperto dopo il suo invio (come
+  // la spunta blu di un gruppo WhatsApp) — se non ci sono altri membri (campagna con solo te) non
+  // c'è nessuno ad attendere, considerato letto per definizione.
+  const otherMemberIds = detail.members.map((m) => m.userId).filter((id) => id !== userId);
+  const isRead = (message: ChatMessageData) =>
+    otherMemberIds.length === 0 ||
+    otherMemberIds.every((id) => {
+      const lastReadAt = readState.get(id);
+      return !!lastReadAt && lastReadAt >= new Date(message.createdAt);
+    });
 
   // Invio ottimistico: la bolla compare SUBITO (come WhatsApp), non solo quando arriva l'eco
   // realtime — così il mittente vede il proprio messaggio a prescindere da eventuali intoppi
@@ -242,6 +272,7 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
         currentUserId={userId}
         canDelete={(message) => isDm || message.authorId === userId}
         resolveAuthor={resolveAuthor}
+        isRead={isRead}
         onReply={setReplyTo}
         onDelete={remove}
         onRetry={retry}

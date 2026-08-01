@@ -288,6 +288,11 @@ export default function GuidaPage() {
           rispondere a un messaggio specifico, eliminare i tuoi messaggi ed eliminare messaggi come
           master nella chat di campagna.
         </p>
+        <p>
+          Sui tuoi messaggi vedi le spunte ✓✓ in stile WhatsApp: grigie finché sono solo consegnate,
+          colorate quando sono state lette — nelle DM dall&apos;altra persona, nella chat di campagna
+          da <strong>tutti</strong> i membri (come le spunte blu di un gruppo).
+        </p>
         <Suggerimento>
           Scrivendo <code className="text-accent-strong">#</code> seguito da un nome (anche in
           italiano) puoi menzionare qualunque voce del Compendio — appare un chip cliccabile che apre
@@ -392,9 +397,9 @@ export default function GuidaPage() {
           </Faq>
           <Faq domanda="Non trovo un'opzione/pagina che mi aspetterei">
             Alcune funzioni sono deliberatamente fuori scope per restare un progetto gestibile per un
-            piccolo gruppo di amici (es. conferme di lettura in chat, allegati/immagini, marketplace
-            a pagamento). Se manca qualcosa che ti servirebbe davvero, chiedi a chi gestisce
-            l&apos;app.
+            piccolo gruppo di amici (es. modifica dei messaggi già inviati, &quot;sta scrivendo…&quot;,
+            allegati/immagini, marketplace a pagamento). Se manca qualcosa che ti servirebbe davvero,
+            chiedi a chi gestisce l&apos;app.
           </Faq>
         </div>
       </Sezione>

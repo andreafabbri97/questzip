@@ -68,6 +68,7 @@ export function MessageList({
   currentUserId,
   canDelete,
   resolveAuthor,
+  isRead,
   onReply,
   onDelete,
   onRetry,
@@ -78,6 +79,10 @@ export function MessageList({
   currentUserId: string;
   canDelete: (message: ChatMessageData) => boolean;
   resolveAuthor: (userId: string) => ChatAuthor;
+  /** Solo per i MIEI messaggi confermati (mai per quelli altrui, WhatsApp non mostra mai le
+   * spunte sui messaggi ricevuti) — vero se letto da tutti i destinatari, falso se solo
+   * consegnato (salvato sul server ma nessuno l'ha ancora aperto). */
+  isRead: (message: ChatMessageData) => boolean;
   onReply: (message: ChatMessageData) => void;
   onDelete: (messageId: string) => void;
   onRetry: (message: ChatMessageData) => void;
@@ -166,6 +171,19 @@ export function MessageList({
                       minute: "2-digit",
                     })}
                   </span>
+                  {/* Solo sui MIEI messaggi confermati — grigia "consegnato" (salvato sul
+                      server), color accento "letto" (tutti i destinatari l'hanno aperto). Niente
+                      distinzione fra "inviato" e "consegnato" come nella spunta singola di
+                      WhatsApp: qui il salvataggio sul server È la consegna, non c'è una fase
+                      intermedia osservabile. */}
+                  {mine && !message.status && (
+                    <span
+                      className={isRead(message) ? "text-accent-strong" : "text-muted/60"}
+                      title={isRead(message) ? "Letto" : "Consegnato"}
+                    >
+                      ✓✓
+                    </span>
+                  )}
                   {message.status === "sending" && <span title="Invio in corso…">🕒</span>}
                   {message.status === "failed" && (
                     <span className="text-danger" title="Messaggio non inviato">

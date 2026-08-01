@@ -76,3 +76,22 @@ export function broadcastDirectMessageDeleted(fromUserId: string, toUserId: stri
 export function broadcastNotification(userId: string, notification: unknown) {
   return publish(`user-${userId}`, { type: "notification", notification });
 }
+
+// Conferme di lettura in stile WhatsApp: la spunta sui MIEI messaggi deve colorarsi dal vivo
+// quando l'altra parte apre la conversazione, non solo al prossimo refresh — un evento in più
+// sulla stessa stanza già usata per i messaggi, nessuna nuova connessione.
+export function broadcastCampaignChatRead(campaignId: string, userId: string, lastReadAt: Date) {
+  return publish(`campaign-${campaignId}`, {
+    type: "chat-read",
+    userId,
+    lastReadAt: lastReadAt.toISOString(),
+  });
+}
+
+// Come broadcastDirectMessage: pubblicata su ENTRAMBE le stanze personali, non una stanza a sé
+// per la coppia — chi ha inviato i messaggi (per colorare le proprie spunte) e chi ha appena
+// letto (per riallineare un secondo dispositivo dello stesso lettore) sono entrambi in ascolto lì.
+export function broadcastDirectMessageRead(readerId: string, otherUserId: string, lastReadAt: Date) {
+  const payload = { type: "dm-read", readerId, lastReadAt: lastReadAt.toISOString() };
+  return Promise.all([publish(`user-${readerId}`, payload), publish(`user-${otherUserId}`, payload)]);
+}

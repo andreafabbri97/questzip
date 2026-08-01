@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
   deleteDirectMessage,
+  getDirectChatReadState,
   getDirectMessages,
-  markThreadRead,
+  markDirectChatRead,
   sendDirectMessage,
 } from "@/app/actions/chat";
 import { useRealtime } from "@/components/realtime-provider";
@@ -35,12 +36,11 @@ export function DirectChat({
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
   const { subscribe, refreshThreads } = useRealtime();
-  // Duplica volutamente la stessa logica di ordinamento di canonicalPair (lib/social-auth.ts)
-  // invece di importarla: quel file importa lib/db (solo server), non va bene in un componente
-  // client — qui basta una riga.
-  const roomKey = userId ? `dm-${[userId, otherUserId].sort().join("-")}` : null;
 
   const [messages, setMessages] = useState<ChatMessageData[] | null>(null);
+  // Ultima lettura dell'ALTRO partecipante (mai la mia: serve solo a colorare le spunte sui
+  // messaggi che HO inviato io) — aggiornata sia dal fetch iniziale sia dal realtime ("dm-read").
+  const [otherLastReadAt, setOtherLastReadAt] = useState<Date | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessageData | null>(null);
   const [openMention, setOpenMention] = useState<ParsedMentionToken | null>(null);
   const [error, setError] = useState("");
@@ -53,6 +53,7 @@ export function DirectChat({
   if (otherUserId !== loadedFor) {
     setLoadedFor(otherUserId);
     setMessages(null);
+    setOtherLastReadAt(null);
     setReplyTo(null);
     setError("");
   }
@@ -90,18 +91,19 @@ export function DirectChat({
     getDirectMessages(otherUserId).then((rows) => {
       if (!cancelled) setMessages(rows);
     });
-    if (roomKey) {
-      markThreadRead(roomKey)
-        .then(() => {
-          if (!cancelled) refreshThreads();
-        })
-        .catch(() => {});
-    }
+    getDirectChatReadState(otherUserId).then((lastReadAt) => {
+      if (!cancelled) setOtherLastReadAt(lastReadAt);
+    });
+    markDirectChatRead(otherUserId)
+      .then(() => {
+        if (!cancelled) refreshThreads();
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otherUserId, roomKey]);
+  }, [otherUserId]);
 
   // Rete di sicurezza indipendente dal realtime: se si torna su questa scheda dopo un po',
   // riallinea la cronologia — unita col locale per non far sparire un invio ancora in corso.
@@ -130,21 +132,29 @@ export function DirectChat({
       upsertMessage(message);
       // La thread è aperta proprio ora: segnala subito come letto invece di lasciare il pallino
       // acceso finché non la si riapre.
-      if (roomKey) markThreadRead(roomKey).then(refreshThreads).catch(() => {});
+      markDirectChatRead(otherUserId).then(refreshThreads).catch(() => {});
     });
     const unsubscribeDeleted = subscribe("dm-message-deleted", (payload) => {
       const messageId = (payload as { messageId?: string }).messageId;
       if (!messageId) return;
       setMessages((prev) => prev?.filter((m) => m.id !== messageId) ?? prev);
     });
+    // Solo l'evento generato dall'ALTRA parte: se il lettore sono io (su un secondo dispositivo,
+    // o l'eco del mio stesso markDirectChatRead) non deve toccare otherLastReadAt.
+    const unsubscribeRead = subscribe("dm-read", (payload) => {
+      const { readerId, lastReadAt } = payload as { readerId?: string; lastReadAt?: string };
+      if (readerId !== otherUserId || !lastReadAt) return;
+      setOtherLastReadAt(new Date(lastReadAt));
+    });
     return () => {
       unsubscribeNew();
       unsubscribeDeleted();
+      unsubscribeRead();
     };
     // refreshThreads cambia riferimento ad ogni render di RealtimeProvider: includerlo
     // ri-sottoscriverebbe ad ogni notifica in arrivo, inutilmente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subscribe, otherUserId, userId, roomKey]);
+  }, [subscribe, otherUserId, userId]);
 
   if (!messages || !userId) {
     return <p className="text-muted p-4">Caricamento…</p>;
@@ -154,6 +164,9 @@ export function DirectChat({
     id === userId
       ? { name: session?.user?.name ?? null, image: session?.user?.image ?? null }
       : { name: otherName, image: otherImage };
+
+  const isRead = (message: ChatMessageData) =>
+    !!otherLastReadAt && otherLastReadAt >= new Date(message.createdAt);
 
   // Invio ottimistico, stesso principio di CampaignChat: la bolla compare subito, non solo
   // quando (e se) torna l'eco realtime.
@@ -251,6 +264,7 @@ export function DirectChat({
         currentUserId={userId}
         canDelete={(message) => message.authorId === userId}
         resolveAuthor={resolveAuthor}
+        isRead={isRead}
         onReply={setReplyTo}
         onDelete={remove}
         onRetry={retry}
