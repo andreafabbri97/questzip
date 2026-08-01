@@ -250,7 +250,13 @@ export default function GuidaPage() {
         <ListaPuntata
           voci={[
             "Da d4 a d100, fino a 100 dadi insieme, con modificatore e vantaggio/svantaggio (solo su 1d20).",
-            "I dadi 3D fisici veri (se il tuo dispositivo supporta WebGL) rotolano davvero con fisica reale; se non disponibili, un tumble animato mostra comunque il risultato con lo stesso effetto \"suspense\".",
+            <>
+              <strong>Più tipi di dado nello stesso tiro</strong> — es. 1d12 (arma) + 2d8 (Punizione
+              Divina) in un unico tiro, invece di doverli tirare separatamente e sommarli a mano.
+              Bottone &quot;+ Aggiungi un altro dado&quot; sotto la quantità (fino a 4 gruppi); si
+              disattiva automaticamente vantaggio/svantaggio, che ha senso solo per un 1d20 puro.
+            </>,
+            "I dadi 3D fisici veri (se il tuo dispositivo supporta WebGL) rotolano davvero con fisica reale — anche più tipi di dado insieme, nello stesso lancio fisico; se non disponibili, un tumble animato mostra comunque il risultato con lo stesso effetto \"suspense\".",
             "La cronologia dei tiri è sincronizzata sul tuo account: la ritrovi identica su ogni dispositivo dove fai login, non solo su quello con cui hai tirato. Tiene gli ultimi 30 tiri.",
             "Puoi eliminare un singolo tiro dalla cronologia (✕) o tutta la cronologia in un colpo (chiede conferma, non è reversibile).",
           ]}

@@ -4,17 +4,29 @@ import { forwardRef, useEffect, useId, useImperativeHandle, useRef } from "react
 
 export type Dice3DStatus = "loading" | "ready" | "unavailable";
 
+export interface DiceRollResult {
+  /** Indice del gruppo nell'array di notazioni passato a roll() (stesso ordine, 0-based) — così
+   * chi chiama può ricostruire quale dado appartiene a quale gruppo (es. il d12 dell'arma vs i
+   * 2d8 della Punizione Divina), anche quando dice-box mescola l'ordine di risoluzione. */
+  groupId: number;
+  sides: number;
+  value: number;
+}
+
 export interface Dice3DHandle {
-  /** notation tipo "3d20" — restituisce il valore di ciascun dado nell'ordine in cui dice-box
-   * li riporta (per vantaggio/svantaggio non importa l'ordine, si scelgono max/min comunque). */
-  roll: (notation: string) => Promise<number[]>;
+  /** Una notazione per gruppo di dadi (es. ["1d12","2d8"]) — TUTTI i gruppi vengono tirati
+   * insieme in un solo lancio fisico, non uno dopo l'altro. dice-box supporta nativamente un
+   * array di notazioni semplici passato a .roll() (vedi createNotationArray nel sorgente della
+   * libreria); le notazioni composte in una singola stringa tipo "1d12+2d8" invece NON sono
+   * supportate senza il modulo dice-parser-interface aggiuntivo, da cui la scelta di un array. */
+  roll: (notations: string[]) => Promise<DiceRollResult[]>;
 }
 
 // La libreria non pubblica tipi TypeScript (pacchetto JS puro) — qui basta la forma che usiamo
 // davvero, non l'intera API di @3d-dice/dice-box.
 interface DiceBoxInstance {
   init: () => Promise<unknown>;
-  roll: (notation: string) => Promise<{ value: number }[]>;
+  roll: (notation: string[]) => Promise<DiceRollResult[]>;
 }
 interface DiceBoxConstructor {
   new (config: Record<string, unknown>): DiceBoxInstance;
@@ -163,11 +175,11 @@ export const Dice3D = forwardRef<
   }, []);
 
   useImperativeHandle(ref, () => ({
-    roll: async (notation: string) => {
+    roll: async (notations: string[]) => {
       const box = boxRef.current;
       if (!box) return [];
-      const results = await box.roll(notation);
-      return results.map((entry) => entry.value);
+      const results = await box.roll(notations);
+      return results.map((entry) => ({ groupId: entry.groupId, sides: entry.sides, value: entry.value }));
     },
   }));
 

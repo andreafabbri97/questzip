@@ -8,8 +8,13 @@ import { clearMyDiceRolls, deleteDiceRoll, getMyDiceRolls, saveDiceRoll } from "
 import { Dice3D, type Dice3DHandle, type Dice3DStatus } from "@/components/dice-3d";
 
 const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
+// Oltre non ha più senso pratico al tavolo (un tiro di danno reale raramente combina più di 2-3
+// dadi diversi) e il riquadro dei dadi 3D comincerebbe a diventare illeggibile.
+const MAX_GROUPS = 4;
 
 type DiceRollRow = Awaited<ReturnType<typeof getMyDiceRolls>>[number];
+
+type RollGroup = { die: number; quantity: number; rolls: number[] };
 
 // Sincronizzata sull'account (app/actions/dice.ts), non più solo in localStorage — così è la
 // stessa su ogni dispositivo. `discarded` resta opzionale lato client per comodità di scrittura,
@@ -17,11 +22,11 @@ type DiceRollRow = Awaited<ReturnType<typeof getMyDiceRolls>>[number];
 // (vedi rowToResult), altrimenti i confronti "!== undefined" sparsi nel render si romperebbero.
 type RollResult = {
   id: string;
-  die: number;
-  quantity: number;
+  // Uno o più gruppi di dadi combinati in UN SOLO tiro (es. 1d12 + 2d8 per un'arma con la
+  // Punizione Divina) — vedi il commento gemello sulla tabella dice_roll in lib/db/schema.ts.
+  groups: RollGroup[];
   modifier: number;
   mode: RollMode;
-  rolls: number[];
   discarded?: number;
   total: number;
   // Se questo tiro specifico ha usato i dadi 3D fisici o il tumble numerico di scorta — deciso
@@ -39,9 +44,21 @@ function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1;
 }
 
+// "1d12 + 2d8" — usata sia per l'etichetta del bottone "Tira" sia per la cronologia.
+function formatGroupsLabel(groups: { die: number; quantity: number }[]): string {
+  return groups.map((g) => (g.quantity > 1 ? `${g.quantity}d${g.die}` : `d${g.die}`)).join(" + ");
+}
+
+// "[7] + [5, 3]" — un blocco di tiri veri per gruppo invece di appiattirli tutti in un'unica
+// lista, dove non si capirebbe più quale dado ha dato cosa.
+function formatRollsDetail(groups: RollGroup[]): string {
+  return groups.map((g) => `[${g.rolls.join(", ")}]`).join(" + ");
+}
+
 export function DiceRoller() {
-  const [die, setDie] = useState<number>(20);
-  const [quantity, setQuantity] = useState(1);
+  const [groups, setGroups] = useState<{ id: string; die: number; quantity: number }[]>(() => [
+    { id: crypto.randomUUID(), die: 20, quantity: 1 },
+  ]);
   const [modifier, setModifier] = useState(0);
   const [mode, setMode] = useState<RollMode>("normale");
   const [history, setHistory] = useState<RollResult[]>([]);
@@ -94,7 +111,21 @@ export function DiceRoller() {
   }, []);
 
   const latest = history[0];
-  const modeEnabled = die === 20 && quantity === 1;
+  // Vantaggio/svantaggio ha senso solo per un tiro puro 1d20 (un attacco/tiro salvezza), non per
+  // una combinazione di più gruppi (es. una somma di danni) — si disattiva appena si aggiunge un
+  // secondo gruppo o si cambia il primo.
+  const modeEnabled = groups.length === 1 && groups[0].die === 20 && groups[0].quantity === 1;
+
+  const setGroupDie = (id: string, die: number) =>
+    setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, die } : g)));
+  const setGroupQuantity = (id: string, quantity: number) =>
+    setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, quantity } : g)));
+  // Nuovo gruppo di default 1d6 (il dado da danno più comune) — l'utente lo cambia se serve.
+  const addGroup = () =>
+    setGroups((prev) =>
+      prev.length >= MAX_GROUPS ? prev : [...prev, { id: crypto.randomUUID(), die: 6, quantity: 1 }],
+    );
+  const removeGroup = (id: string) => setGroups((prev) => (prev.length > 1 ? prev.filter((g) => g.id !== id) : prev));
 
   // Aggiunge il tiro alla cronologia SUBITO, in locale — l'animazione/rivelazione deve restare
   // guidata solo da stato locale sincrono, esattamente come dice3dInFlight più sopra: un tiro non
@@ -104,11 +135,9 @@ export function DiceRoller() {
   const addResult = (result: RollResult) => {
     setHistory((prev) => [result, ...prev].slice(0, 30));
     const savePromise = saveDiceRoll({
-      die: result.die,
-      quantity: result.quantity,
+      groups: result.groups,
       modifier: result.modifier,
       mode: result.mode,
-      rolls: result.rolls,
       discarded: result.discarded,
       total: result.total,
       usedDice3D: result.usedDice3D,
@@ -123,56 +152,68 @@ export function DiceRoller() {
 
   const roll = async () => {
     const effectiveMode = modeEnabled ? mode : "normale";
-    // Quanti dadi fisici/finti servono per determinare il risultato — tutti quelli di quantity
-    // in modalità normale, ma solo 2 con vantaggio/svantaggio (uno dei due viene comunque
-    // scartato, non ha senso animarne di più).
-    const diceToRoll = effectiveMode === "normale" ? quantity : 2;
+    // In vantaggio/svantaggio (possibile solo con un singolo gruppo 1d20, vedi modeEnabled) si
+    // animano comunque 2 dadi fisici/finti — uno dei due viene scartato, non ha senso animarne di
+    // più — sostituendo il gruppo unico con un gruppo temporaneo "2d20" solo per la fase di tiro.
+    const rollPlan: { die: number; quantity: number }[] =
+      effectiveMode === "normale"
+        ? groups.map((g) => ({ die: g.die, quantity: g.quantity }))
+        : [{ die: 20, quantity: 2 }];
 
     const rollId = ++rollIdRef.current;
     setRolling(true);
 
-    let diceValues: number[];
+    // groupValues[i] = valori del gruppo i-esimo di rollPlan, nello stesso ordine.
+    let groupValues: number[][];
     let usedDice3D = false;
     if (dice3dStatus === "ready" && dice3dRef.current) {
       // Riquadro visibile PRIMA di aspettare il risultato, non dopo — altrimenti l'animazione
       // vera resta nascosta dietro un riquadro ancora invisibile per tutta la sua durata.
       setDice3dInFlight(true);
       try {
-        diceValues = await dice3dRef.current.roll(`${diceToRoll}d${die}`);
-        if (diceValues.length !== diceToRoll) throw new Error("Risultato 3D incompleto.");
+        // Un array di notazioni semplici, una per gruppo — TUTTI i dadi (anche di tipo diverso)
+        // vengono tirati insieme in un solo lancio fisico, non uno dopo l'altro (vedi il
+        // commento su Dice3DHandle.roll in dice-3d.tsx: dice-box non supporta una singola
+        // stringa combinata tipo "1d12+2d8" senza un modulo aggiuntivo, ma supporta nativamente
+        // un array di notazioni).
+        const notations = rollPlan.map((g) => `${g.quantity}d${g.die}`);
+        const results = await dice3dRef.current.roll(notations);
+        groupValues = rollPlan.map((g, index) => {
+          const values = results.filter((r) => r.groupId === index).map((r) => r.value);
+          if (values.length !== g.quantity) throw new Error("Risultato 3D incompleto.");
+          return values;
+        });
         usedDice3D = true;
       } catch {
         // La scena era pronta ma qualcosa è andato storto durante QUESTO tiro (raro) — non
         // lasciare l'utente senza risultato, si ricade sul tiro "invisibile" con RNG normale.
-        diceValues = Array.from({ length: diceToRoll }, () => rollDie(die));
+        groupValues = rollPlan.map((g) => Array.from({ length: g.quantity }, () => rollDie(g.die)));
       } finally {
         setDice3dInFlight(false);
       }
     } else {
-      diceValues = Array.from({ length: diceToRoll }, () => rollDie(die));
+      groupValues = rollPlan.map((g) => Array.from({ length: g.quantity }, () => rollDie(g.die)));
     }
     if (rollIdRef.current !== rollId) return; // superato da un tiro più recente nel frattempo
 
-    let rolls: number[];
+    let resultGroups: RollGroup[];
     let discarded: number | undefined;
     if (effectiveMode === "normale") {
-      rolls = diceValues;
+      resultGroups = groups.map((g, index) => ({ die: g.die, quantity: g.quantity, rolls: groupValues[index] }));
     } else {
-      const [first, second] = diceValues;
+      const [first, second] = groupValues[0];
       const keepHigh = effectiveMode === "vantaggio";
       const kept = keepHigh ? Math.max(first, second) : Math.min(first, second);
       discarded = keepHigh ? Math.min(first, second) : Math.max(first, second);
-      rolls = [kept];
+      resultGroups = [{ die: 20, quantity: 1, rolls: [kept] }];
     }
 
-    const total = rolls.reduce((sum, value) => sum + value, 0) + modifier;
+    const total = resultGroups.reduce((sum, g) => sum + g.rolls.reduce((s, v) => s + v, 0), 0) + modifier;
     const result: RollResult = {
       id: crypto.randomUUID(),
-      die,
-      quantity,
+      groups: resultGroups,
       modifier,
       mode: effectiveMode,
-      rolls,
       discarded,
       total,
       usedDice3D,
@@ -187,12 +228,15 @@ export function DiceRoller() {
       return;
     }
 
-    // Percorso di scorta: stesso tumble numerico di sempre. Il numero finto ha la stessa "forma"
-    // del totale vero (somma di diceToRoll dadi + modificatore) — con più dadi o un modificatore
-    // alto restare sempre in un range piccolo per poi "saltare" di colpo sembrerebbe un bug.
+    // Percorso di scorta: stesso tumble numerico di sempre, ora sommato su TUTTI i gruppi. Il
+    // numero finto ha la stessa "forma" del totale vero — con più dadi o un modificatore alto
+    // restare sempre in un range piccolo per poi "saltare" di colpo sembrerebbe un bug.
     const fakeTotal = () =>
-      Array.from({ length: diceToRoll }, () => rollDie(die)).reduce((sum, value) => sum + value, 0) +
-      modifier;
+      rollPlan.reduce(
+        (sum, g) =>
+          sum + Array.from({ length: g.quantity }, () => rollDie(g.die)).reduce((s, v) => s + v, 0),
+        0,
+      ) + modifier;
     const tumbleSteps = [70, 70, 90, 110, 140, 180, 230];
     const runStep = (index: number) => {
       if (rollIdRef.current !== rollId) return;
@@ -230,8 +274,11 @@ export function DiceRoller() {
     setConfirmingClear(false);
   };
 
-  const isCrit = !rolling && latest && latest.die === 20 && latest.rolls[0] === 20;
-  const isFumble = !rolling && latest && latest.die === 20 && latest.rolls[0] === 1;
+  // Crit/fallimento critico hanno senso solo per un tiro puro 1d20 (attacco/salvezza), mai per
+  // una combinazione di più gruppi (es. una somma di danni).
+  const singleGroup = latest && latest.groups.length === 1 ? latest.groups[0] : null;
+  const isCrit = !rolling && !!singleGroup && singleGroup.die === 20 && singleGroup.rolls[0] === 20;
+  const isFumble = !rolling && !!singleGroup && singleGroup.die === 20 && singleGroup.rolls[0] === 1;
   // Il numero grande resta nascosto mentre i dadi 3D stanno ancora rotolando (la scena stessa È
   // l'animazione, mostrarlo sopra sarebbe ridondante/confuso) — col tumble numerico invece deve
   // restare visibile, è lui l'animazione. dice3dInFlight, non latest?.usedDice3D: quest'ultimo
@@ -247,9 +294,9 @@ export function DiceRoller() {
             {DICE.map((sides) => (
               <button
                 key={sides}
-                onClick={() => setDie(sides)}
+                onClick={() => setGroupDie(groups[0].id, sides)}
                 className={`card-elevated-hover rounded-lg border py-2 text-sm font-bold transition-colors ${
-                  die === sides
+                  groups[0].die === sides
                     ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted hover:text-foreground"
                 }`}
@@ -266,8 +313,8 @@ export function DiceRoller() {
             <IntField
               min={1}
               max={100}
-              value={quantity}
-              onChange={setQuantity}
+              value={groups[0].quantity}
+              onChange={(quantity) => setGroupQuantity(groups[0].id, quantity)}
               className="mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
             />
           </label>
@@ -282,6 +329,51 @@ export function DiceRoller() {
             />
           </label>
         </div>
+
+        {/* Gruppi di dadi aggiuntivi combinati nello STESSO tiro (es. 1d12 + 2d8 per un'arma con
+            la Punizione Divina) — prima serviva un tiro separato per ogni tipo di dado. Riga
+            compatta (select + quantità + rimuovi) invece di ripetere la griglia di pulsanti del
+            dado principale: con 2-3 gruppi diventerebbe ingombrante, specialmente su mobile. */}
+        {groups.length > 1 && (
+          <div className="space-y-2">
+            {groups.slice(1).map((group) => (
+              <div key={group.id} className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-widest text-muted">+</span>
+                <select
+                  value={group.die}
+                  onChange={(event) => setGroupDie(group.id, Number(event.target.value))}
+                  className="input-focus rounded-lg border border-edge bg-surface-raised px-2 py-2 text-sm text-foreground"
+                >
+                  {DICE.map((sides) => (
+                    <option key={sides} value={sides}>
+                      d{sides}
+                    </option>
+                  ))}
+                </select>
+                <IntField
+                  min={1}
+                  max={100}
+                  value={group.quantity}
+                  onChange={(quantity) => setGroupQuantity(group.id, quantity)}
+                  className="w-16 rounded-lg border border-edge bg-surface-raised px-2 py-2 text-sm text-foreground"
+                />
+                <button
+                  onClick={() => removeGroup(group.id)}
+                  aria-label="Rimuovi questo gruppo di dadi"
+                  title="Rimuovi"
+                  className="ml-auto text-muted/60 hover:text-danger transition-colors text-sm px-1"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {groups.length < MAX_GROUPS && (
+          <button onClick={addGroup} className="text-xs font-bold text-accent-strong hover:underline">
+            + Aggiungi un altro dado
+          </button>
+        )}
 
         <div>
           <p className="text-xs uppercase tracking-widest text-muted mb-2">
@@ -310,7 +402,7 @@ export function DiceRoller() {
           disabled={rolling}
           className="w-full rounded-xl bg-accent text-background font-display font-bold text-lg py-3 transition-transform hover:bg-accent-strong active:scale-95 disabled:opacity-60 disabled:active:scale-100"
         >
-          Tira {quantity > 1 ? `${quantity}d${die}` : `d${die}`}
+          Tira {formatGroupsLabel(groups)}
           {modifier !== 0 && ` ${formatModifier(modifier)}`}
         </button>
       </section>
@@ -386,7 +478,7 @@ export function DiceRoller() {
         {latest && (
           <>
             <p className="text-sm text-muted mt-2">
-              {latest.quantity > 1 ? `${latest.quantity}d${latest.die}` : `d${latest.die}`}
+              {formatGroupsLabel(latest.groups)}
               {latest.modifier !== 0 && ` ${formatModifier(latest.modifier)}`}
               {latest.mode !== "normale" && ` · ${latest.mode}`}
               {/* I tiri veri (e lo scartato in vantaggio/svantaggio) restano nascosti finché il
@@ -396,7 +488,7 @@ export function DiceRoller() {
               {!rolling && (
                 <>
                   {" · "}
-                  [{latest.rolls.join(", ")}]
+                  {formatRollsDetail(latest.groups)}
                   {latest.discarded !== undefined && ` (scartato: ${latest.discarded})`}
                 </>
               )}
@@ -427,8 +519,7 @@ export function DiceRoller() {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}{" "}
-                    ·{" "}
-                    {entry.quantity > 1 ? `${entry.quantity}d${entry.die}` : `d${entry.die}`}
+                    · {formatGroupsLabel(entry.groups)}
                     {entry.modifier !== 0 && ` ${formatModifier(entry.modifier)}`}
                     {entry.mode !== "normale" && ` (${entry.mode})`}
                   </span>

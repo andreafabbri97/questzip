@@ -20,11 +20,9 @@ export async function getMyDiceRolls() {
 }
 
 export async function saveDiceRoll(data: {
-  die: number;
-  quantity: number;
+  groups: { die: number; quantity: number; rolls: number[] }[];
   modifier: number;
   mode: "normale" | "vantaggio" | "svantaggio";
-  rolls: number[];
   discarded?: number;
   total: number;
   usedDice3D: boolean;

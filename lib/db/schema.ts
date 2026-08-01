@@ -592,12 +592,14 @@ export const diceRolls = pgTable("dice_roll", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  die: integer("die").notNull(),
-  quantity: integer("quantity").notNull(),
+  // Uno o più gruppi di dadi combinati in UN SOLO tiro (es. 1d12 + 2d8 per un'arma con la
+  // Punizione Divina) — prima poteva esisterne solo uno, con die/quantity/rolls come colonne
+  // piatte in cima alla riga invece che in un array.
+  groups: jsonb("groups").$type<{ die: number; quantity: number; rolls: number[] }[]>().notNull(),
   modifier: integer("modifier").notNull(),
   mode: diceRollModeEnum("mode").notNull(),
-  rolls: jsonb("rolls").$type<number[]>().notNull(),
-  // Solo con vantaggio/svantaggio (il valore del d20 scartato) — null per un tiro normale.
+  // Solo con vantaggio/svantaggio (il valore del d20 scartato) — null per un tiro normale. Ha
+  // senso solo quando groups è un singolo gruppo 1d20 (vedi modeEnabled lato client).
   discarded: integer("discarded"),
   total: integer("total").notNull(),
   // Se questo tiro ha usato i dadi 3D fisici o il tumble numerico di scorta — vedi il commento
