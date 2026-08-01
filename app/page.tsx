@@ -27,7 +27,7 @@ const sections = [
   },
   {
     href: "/guida",
-    icon: "📘",
+    icon: "❓",
     title: "Guida e FAQ",
     description:
       "Come usare QuestZip: primi passi, gestire una sessione dal vivo passo passo, domande frequenti.",
