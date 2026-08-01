@@ -55,6 +55,15 @@ function formatRollsDetail(groups: RollGroup[]): string {
   return groups.map((g) => `[${g.rolls.join(", ")}]`).join(" + ");
 }
 
+// "01/08/26 14:32" — formattata a mano (invece di toLocaleDateString) per garantire l'ordine
+// GG/MM/AA a prescindere dalla locale del browser, richiesto esplicitamente dall'utente: la
+// cronologia può accumulare tiri di giorni diversi, la sola ora non basta più a distinguerli.
+function formatEntryTimestamp(date: Date | string): string {
+  const d = new Date(date);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${pad(d.getFullYear() % 100)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function DiceRoller() {
   const [groups, setGroups] = useState<{ id: string; die: number; quantity: number }[]>(() => [
     { id: crypto.randomUUID(), die: 20, quantity: 1 },
@@ -515,11 +524,7 @@ export function DiceRoller() {
               {history.slice(1).map((entry) => (
                 <li key={entry.id} className="flex items-center justify-between gap-2 px-4 py-2 text-sm">
                   <span className="text-muted">
-                    {new Date(entry.createdAt).toLocaleTimeString("it-IT", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    · {formatGroupsLabel(entry.groups)}
+                    {formatEntryTimestamp(entry.createdAt)} · {formatGroupsLabel(entry.groups)}
                     {entry.modifier !== 0 && ` ${formatModifier(entry.modifier)}`}
                     {entry.mode !== "normale" && ` (${entry.mode})`}
                   </span>
