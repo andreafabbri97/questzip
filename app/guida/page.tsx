@@ -326,9 +326,6 @@ export default function GuidaPage() {
       {/* ---------------------------------------------------------------- FAQ */}
       <Sezione id="faq" titolo="❓ Domande frequenti">
         <div className="space-y-2">
-          <Faq domanda="Devo pagare qualcosa?">
-            No, QuestZip non ha abbonamenti né acquisti in-app.
-          </Faq>
           <Faq domanda="Posso avere più personaggi?">
             Sì, non c&apos;è un limite al numero di personaggi che puoi creare e salvare sul tuo
             account.
