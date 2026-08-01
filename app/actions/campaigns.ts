@@ -79,15 +79,12 @@ export async function getCampaign(campaignId: string) {
 export async function createInvite(campaignId: string) {
   const userId = await requireUserId();
   await requireDm(campaignId, userId);
-  // Senza una scadenza il link resta valido per sempre — chiunque lo trovi (screenshot vecchio,
-  // link condiviso per sbaglio in un posto pubblico) può ancora unirsi a distanza di anni. Una
-  // settimana è ampia per il caso d'uso reale (invitare qualcuno alla prossima sessione) senza
-  // lasciare un accesso a tempo indeterminato aperto.
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const [invite] = await db
-    .insert(campaignInvites)
-    .values({ campaignId, createdBy: userId, expiresAt })
-    .returning();
+  // Nessuna scadenza (expiresAt resta null, colonna nullable apposta): il link vale finché il
+  // master non lo revoca esplicitamente — deciso dopo un giro precedente che li scadeva a 7
+  // giorni, scomodo per un gruppo che invita "quando capita" invece che subito dopo averlo
+  // generato. La revoca resta comunque disponibile per lo stesso motivo di sicurezza di prima
+  // (screenshot vecchio, link condiviso per sbaglio).
+  const [invite] = await db.insert(campaignInvites).values({ campaignId, createdBy: userId }).returning();
   return invite.code;
 }
 

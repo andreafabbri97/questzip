@@ -78,8 +78,8 @@ export default function GuidaPage() {
             </>,
             <>
               Dalla pagina della campagna genera un link/codice invito e mandalo ai tuoi giocatori
-              (chat, WhatsApp, quello che preferite fuori dall&apos;app — l&apos;invito dura 7 giorni
-              ed è sempre revocabile).
+              (chat, WhatsApp, quello che preferite fuori dall&apos;app — l&apos;invito non scade,
+              resta valido finché non lo revochi tu).
             </>,
             <>
               Aggiungi i tuoi amici su QuestZip (sezione &quot;Amici&quot; nel{" "}
