@@ -69,6 +69,7 @@ export function Nav() {
             )}
           </nav>
           <div className="ml-auto flex items-center gap-4">
+            <GuidaButton />
             <ChatButton />
             <NotificationBell />
             <AccountButton />
@@ -106,6 +107,27 @@ export function Nav() {
 
       <DiceModal open={diceOpen} onClose={() => setDiceOpen(false)} />
     </>
+  );
+}
+
+// Stessa filosofia di ChatButton/NotificationBell sotto: un'icona sempre visibile in header
+// (desktop e mobile, non solo nella barra di navigazione desktop) invece di una voce in più nella
+// barra mobile a 5 colonne, che è già piena.
+function GuidaButton() {
+  const pathname = usePathname();
+  const active = pathname.startsWith("/guida");
+
+  return (
+    <Link
+      href="/guida"
+      aria-label="Guida e FAQ"
+      title="Guida e FAQ"
+      className={`text-lg transition-colors ${
+        active ? "text-accent-strong" : "text-muted hover:text-foreground"
+      }`}
+    >
+      ❓
+    </Link>
   );
 }
 
