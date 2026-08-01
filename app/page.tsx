@@ -25,6 +25,14 @@ const sections = [
       "Incantesimi, mostri, oggetti magici, razze, talenti, classi e regole — anche in italiano ufficiale.",
     ready: true,
   },
+  {
+    href: "/guida",
+    icon: "📘",
+    title: "Guida e FAQ",
+    description:
+      "Come usare QuestZip: primi passi, gestire una sessione dal vivo passo passo, domande frequenti.",
+    ready: true,
+  },
 ];
 
 export default function Home() {
@@ -50,7 +58,7 @@ export default function Home() {
           </p>
         </section>
 
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {sections.map((section) =>
             section.ready ? (
               <Link
