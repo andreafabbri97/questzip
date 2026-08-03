@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import { NotificationBell } from "@/components/notification-bell";
 import { DiceModal } from "@/components/dice-modal";
+import { AiAssistantModal } from "@/components/ai-assistant-modal";
 import { useRealtime } from "@/components/realtime-provider";
+import { isAiAvailable } from "@/app/actions/ai";
 
 type NavLink =
   | { kind: "link"; href: string; label: string; icon: string }
@@ -69,6 +71,7 @@ export function Nav() {
             )}
           </nav>
           <div className="ml-auto flex items-center gap-4">
+            <AiAssistantButton />
             <GuidaButton />
             <ChatButton />
             <NotificationBell />
@@ -106,6 +109,33 @@ export function Nav() {
       </nav>
 
       <DiceModal open={diceOpen} onClose={() => setDiceOpen(false)} />
+    </>
+  );
+}
+
+// Compare solo se GEMINI_API_KEY è configurata sul server — controllato una volta all'apertura
+// (nessun bottone che poi fallisce ogni volta che lo premi se l'IA non è disponibile).
+function AiAssistantButton() {
+  const [available, setAvailable] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    isAiAvailable().then(setAvailable).catch(() => setAvailable(false));
+  }, []);
+
+  if (!available) return null;
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Assistente regole IA"
+        title="Assistente regole IA"
+        className="text-lg text-muted transition-colors hover:text-foreground"
+      >
+        🤖
+      </button>
+      <AiAssistantModal open={open} onClose={() => setOpen(false)} />
     </>
   );
 }
