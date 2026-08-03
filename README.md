@@ -28,6 +28,8 @@ Necessarie in `.env.local` (sviluppo) e nelle Environment Variables del progetto
 - `NEXT_PUBLIC_PARTYKIT_HOST` — host del Worker Cloudflare deployato (es. `questzip-party.<tuo-account>.workers.dev`, senza `https://`). Pubblico per forza (serve al browser per aprire il WebSocket).
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — chiavi per le notifiche push del browser (libreria `web-push`), generabili con `node -e "console.log(require('web-push').generateVAPIDKeys())"`; `VAPID_SUBJECT` è un `mailto:` di contatto richiesto dallo standard. Se assenti, l'app funziona comunque ma senza push (restano solo le notifiche in-app).
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — stessa chiave pubblica di `VAPID_PUBLIC_KEY`, duplicata col prefisso `NEXT_PUBLIC_` perché serve anche al browser per sottoscriversi.
+- `GEMINI_API_KEY` — chiave gratuita da [Google AI Studio](https://aistudio.google.com/apikey), abilita le funzioni assistite dall'IA (import di schede PDF/foto non riconosciute, assistente regole in chat, riassunto sessioni, bozze handout). Server-only, mai esposta al browser. Se assente, l'app funziona comunque per intero: le funzioni IA sono un extra opzionale, non un requisito — semplicemente non compaiono in UI.
+- `GEMINI_MODEL` — id del modello da usare (default `gemini-2.5-flash` se assente). I nomi dei modelli Gemini cambiano spesso: utile poterlo aggiornare da qui senza toccare codice.
 
 Dopo aver modificato lo schema in `lib/db/schema.ts`, sincronizzalo col database con `npm run db:push`.
 

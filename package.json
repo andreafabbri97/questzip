@@ -15,6 +15,7 @@
   "dependencies": {
     "@3d-dice/dice-box": "^1.1.4",
     "@auth/drizzle-adapter": "^1.11.3",
+    "@google/genai": "^2.15.0",
     "@neondatabase/serverless": "^1.1.0",
     "country-flag-icons": "^1.6.20",
     "drizzle-orm": "^0.45.2",
