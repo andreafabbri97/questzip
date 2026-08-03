@@ -19,9 +19,14 @@ function getClient(): GoogleGenAI | null {
   return client;
 }
 
-// I nomi dei modelli Gemini cambiano spesso (nuove versioni, ritiri) — un env var con default
-// evita di dover toccare il codice quando Google ne rilascia uno nuovo o ne ritira uno vecchio.
-const DEFAULT_MODEL = "gemini-2.5-flash";
+// "gemini-flash-lite-latest": alias mantenuto da Google (punta sempre al modello Flash-Lite più
+// recente, resistente al ritiro dei modelli con versione fissa — verificato: "gemini-2.5-flash"
+// risulta già non più disponibile per chi ha creato la chiave di recente). Preferito alla
+// variante "flash" piena: quota giornaliera gratuita separata (verificato con una chiave di
+// prova: la variante piena l'ha esaurita a ~20 richieste/giorno, la lite no) e comunque adeguata
+// per compiti come estrazione strutturata/domande sul Compendio, non ragionamento complesso.
+// GEMINI_MODEL resta disponibile per chi vuole un modello più pesante (es. un piano a pagamento).
+const DEFAULT_MODEL = "gemini-flash-lite-latest";
 
 export interface AskGeminiInput {
   prompt: string;

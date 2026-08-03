@@ -46,7 +46,7 @@ const PROMPT = `Sei un assistente che estrae dati da una scheda di personaggio d
   "note": string
 }
 
-Traduci in italiano se la scheda originale è in un'altra lingua. Per ogni campo che non riesci a leggere con sicurezza, usa una stringa vuota, un array vuoto o 0 — non inventare un valore plausibile al posto di un dato mancante o illeggibile.`;
+Traduci in italiano se la scheda originale è in un'altra lingua. Per ogni campo che non riesci a leggere con sicurezza, usa una stringa vuota, un array vuoto o 0 — non inventare un valore plausibile al posto di un dato mancante o illeggibile. Eccezione: se "hpAttuali" non è scritto esplicitamente sulla scheda, usa lo stesso valore di "hpMax" invece di 0 (un personaggio appena creato ha i punti ferita pieni, non a zero).`;
 
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
