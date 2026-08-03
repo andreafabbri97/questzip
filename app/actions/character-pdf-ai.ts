@@ -11,15 +11,8 @@ import {
   type KnownSpell,
   type Weapon,
 } from "@/lib/dnd";
-import { askGemini, geminiEnabled } from "@/lib/gemini";
+import { askGemini } from "@/lib/gemini";
 import { clamp } from "@/lib/pdf-character-import";
-
-/** Solo per decidere se mostrare l'opzione "prova con l'IA" in UI quando il parser locale non
- * riconosce un PDF — evita di dover tentare una chiamata vera solo per scoprire che manca la
- * chiave (stesso scopo di geminiEnabled(), ma richiamabile da un componente client). */
-export async function isAiImportAvailable() {
-  return geminiEnabled();
-}
 
 const PROMPT = `Sei un assistente che estrae dati da una scheda di personaggio di Dungeons & Dragons 5ª edizione, allegata come PDF o foto. Rispondi SOLO con un oggetto JSON valido, senza testo introduttivo, senza spiegazioni, senza blocchi markdown — solo il JSON, con esattamente questa forma:
 

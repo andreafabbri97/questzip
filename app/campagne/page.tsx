@@ -23,6 +23,8 @@ import {
   stopJukebox,
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign, grantXp, grantXpToParty } from "@/app/actions/characters";
+import { isAiAvailable } from "@/app/actions/ai";
+import { summarizeSession } from "@/app/actions/ai-session-summary";
 import { IntField } from "@/components/int-field";
 import {
   createHandout,
@@ -373,6 +375,11 @@ function CampaignDetailView({
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteText, setNoteText] = useState("");
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  // Stato a parte da "error" sopra: quello sostituisce l'intera pagina (fallita l'apertura della
+  // campagna), questo è solo un avviso testuale accanto al bottone del riassunto.
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const refresh = () => {
     getCampaign(campaignId)
@@ -382,6 +389,9 @@ function CampaignDetailView({
   };
 
   useEffect(refresh, [campaignId]);
+  useEffect(() => {
+    isAiAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
+  }, []);
 
   if (error) {
     return (
@@ -422,6 +432,30 @@ function CampaignDetailView({
     setNoteTitle("");
     setNoteText("");
     refresh();
+  };
+
+  // Precompila SOLO il form, non salva mai da sola — il master la rilegge/corregge come farebbe
+  // con una bozza scritta da un giocatore, prima di confermare col bottone "Aggiungi al diario"
+  // di sempre. Riassume la chat dall'ultima nota salvata in poi (l'intera cronologia se non ce
+  // n'è ancora una), stesso concetto di "da dove eravamo rimasti" del diario stesso.
+  const generateSummary = async () => {
+    setSummarizing(true);
+    setSummaryError(null);
+    try {
+      const lastNote = detail.sessionNotes[detail.sessionNotes.length - 1];
+      const summary = await summarizeSession(
+        campaignId,
+        lastNote ? new Date(lastNote.createdAt).toISOString() : null,
+      );
+      if (summary) {
+        setNoteTitle((prev) => prev || `Sessione ${detail.sessionNotes.length + 1}`);
+        setNoteText(summary);
+      } else {
+        setSummaryError("Non ho trovato messaggi recenti da riassumere (o l'assistente IA non è disponibile).");
+      }
+    } finally {
+      setSummarizing(false);
+    }
   };
 
   return (
@@ -665,12 +699,25 @@ function CampaignDetailView({
             rows={3}
             className="input-focus w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
           />
-          <button
-            onClick={addNote}
-            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
-          >
-            Aggiungi al diario
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={addNote}
+              className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
+            >
+              Aggiungi al diario
+            </button>
+            {aiAvailable && (
+              <button
+                onClick={generateSummary}
+                disabled={summarizing}
+                title="Legge la chat di campagna dall'ultima sessione e propone un riassunto — lo rivedi e modifichi prima di salvare, non salva da solo"
+                className="rounded-lg border border-edge px-4 py-2 text-sm text-muted hover:text-foreground hover:border-accent/50 transition-colors disabled:opacity-60"
+              >
+                {summarizing ? "Genero il riassunto…" : "✨ Genera riassunto IA"}
+              </button>
+            )}
+          </div>
+          {summaryError && <p className="text-xs text-danger">{summaryError}</p>}
         </div>
 
         {detail.sessionNotes.length > 0 && (

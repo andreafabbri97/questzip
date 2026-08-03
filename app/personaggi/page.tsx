@@ -81,7 +81,8 @@ import {
 import { RenderEntries } from "@/lib/fivetools/entries";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 import { importCharacterFromPdf } from "@/lib/pdf-character-import";
-import { importCharacterFromPdfWithAi, isAiImportAvailable } from "@/app/actions/character-pdf-ai";
+import { importCharacterFromPdfWithAi } from "@/app/actions/character-pdf-ai";
+import { isAiAvailable } from "@/app/actions/ai";
 
 const loadClassNames = () => loadClassData().then((data) => data.classes);
 
@@ -120,7 +121,7 @@ function ExportImport({
   const [aiImporting, setAiImporting] = useState(false);
 
   useEffect(() => {
-    isAiImportAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
+    isAiAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
   }, []);
 
   const exportAll = () => {
