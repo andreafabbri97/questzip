@@ -22,15 +22,16 @@ import {
  * amici, solo i VALORI cambiano da un personaggio all'altro) — per questo ha senso avere una
  * mappa hard-coded invece di un parser che intuisce la struttura al volo.
  *
- * Scoperta analizzando il PDF con PyMuPDF (non a intuito): alcuni campi hanno un nome interno
- * che NON corrisponde alla didascalia stampata nella loro posizione — un difetto noto di questo
- * template specifico, non un errore di chi l'ha compilato. Verificato incrociando le coordinate
- * dei campi con quelle del testo statico stampato: il campo chiamato "Alignment" è nella colonna
- * "BACKGROUND", il campo "XP" è nella colonna "ALLINEAMENTO", il campo "Background" è nella
- * colonna "LIVELLO" (confermato: il suo valore "5 + 3" sommato dà il livello totale 8, che
- * combacia esattamente col bonus di competenza +3 scritto altrove sulla stessa scheda). La mappa
- * sotto usa i nomi INTERNI dei campi ma con il commento della loro vera posizione, per chi la
- * legge in futuro.
+ * Scoperta analizzando il PDF con PyMuPDF (non a intuito): il campo chiamato "Background" NON
+ * contiene il background — contiene il livello (confermato: il suo valore "5 + 3" sommato dà il
+ * livello totale 8, che combacia esattamente col bonus di competenza +3 scritto altrove sulla
+ * stessa scheda) — un difetto del template, non un errore di chi l'ha compilato. Il campo
+ * "Alignment" invece corrisponde davvero all'Allineamento (confermato dall'utente) e il campo
+ * "XP" finisce per esclusione nel Background — anche se il suo contenuto reale è spesso testo
+ * simile a un allineamento (es. "legale n[eutrale]"): a quanto pare chi compila la scheda in
+ * pratica segue il nome interno del campo mostrato dal proprio lettore PDF, non la didascalia
+ * stampata nella pagina, quindi "XP" finisce per essere usato come terzo campo descrittivo libero
+ * più che come punti esperienza veri e propri.
  */
 
 type FieldValues = { text: Map<string, string>; check: Map<string, boolean> };
@@ -449,12 +450,11 @@ export async function importCharacterFromPdf(bytes: ArrayBuffer): Promise<Charac
 
   const base = newCharacter();
 
-  // Vedi il commento in cima al file: su QUESTO template i campi "Alignment"/"XP"/"Background"
-  // sono nella posizione grafica di, rispettivamente, Background/Allineamento/Livello — non è un
-  // refuso di chi ha compilato la scheda, è il campo del modulo ad essere mal nominato.
+  // Vedi il commento in cima al file: "Background" contiene in realtà il livello, "Alignment" è
+  // davvero l'Allineamento, "XP" finisce nel Background per esclusione.
   const classi = parseClasses(text.get("ClassLevel") ?? "", text.get("Background") ?? "");
-  const background = text.get("Alignment")?.trim() ?? "";
-  const allineamento = matchAlignment(text.get("XP") ?? "");
+  const allineamento = matchAlignment(text.get("Alignment") ?? "");
+  const background = text.get("XP")?.trim() ?? "";
 
   const trsCompetenti: Ability[] = [];
   for (const [field, ability] of Object.entries(ABILITY_SAVE_FIELD)) {
