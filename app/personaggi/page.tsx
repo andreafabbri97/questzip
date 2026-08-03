@@ -81,6 +81,7 @@ import {
 import { RenderEntries } from "@/lib/fivetools/entries";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 import { importCharacterFromPdf } from "@/lib/pdf-character-import";
+import { importCharacterFromPdfWithAi, isAiImportAvailable } from "@/app/actions/character-pdf-ai";
 
 const loadClassNames = () => loadClassData().then((data) => data.classes);
 
@@ -107,6 +108,20 @@ function ExportImport({
   // qualche MB richiede un attimo — un pulsante che non dà nessun segnale in quell'intervallo
   // sembrerebbe rotto, specie perché il file picker si chiude subito.
   const [importingPdf, setImportingPdf] = useState(false);
+  // Se l'assistente IA non è configurato (nessuna GEMINI_API_KEY sul server) l'opzione "prova
+  // con l'IA" non deve nemmeno comparire — controllato una volta all'apertura della pagina.
+  const [aiAvailable, setAiAvailable] = useState(false);
+  // File non riconosciuto dal parser locale, in attesa di conferma esplicita dell'utente prima
+  // di provare a leggerlo con l'IA (il file viene inviato a Google per l'analisi — non un
+  // passaggio automatico/silenzioso, sono i dati personali del personaggio di qualcuno).
+  const [pendingAiImport, setPendingAiImport] = useState<{ bytes: ArrayBuffer; mimeType: string } | null>(
+    null,
+  );
+  const [aiImporting, setAiImporting] = useState(false);
+
+  useEffect(() => {
+    isAiImportAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
+  }, []);
 
   const exportAll = () => {
     const blob = new Blob([JSON.stringify(characters, null, 2)], { type: "application/json" });
@@ -136,23 +151,58 @@ function ExportImport({
       .catch(() => setError("Impossibile leggere il file."));
   };
 
-  // Non un importatore generico per "un PDF qualsiasi": legge il template di scheda cartacea
-  // compilabile che il gruppo usa davvero (lo stesso file .pdf vuoto condiviso fra tutti gli
-  // amici) — vedi lib/pdf-character-import.ts per i dettagli su quali campi vengono letti.
-  const importPdfFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Prima via: il template di scheda cartacea compilabile che il gruppo usa davvero (lo stesso
+  // file .pdf vuoto condiviso fra tutti gli amici) — vedi lib/pdf-character-import.ts. Istantaneo,
+  // gratuito, e più preciso dell'IA per QUESTO template specifico, quindi resta il tentativo
+  // predefinito anche ora che esiste un fallback IA per tutto il resto.
+  const importPdfFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     setError(null);
+    setPendingAiImport(null);
     setImportingPdf(true);
-    file
-      .arrayBuffer()
-      .then((bytes) => importCharacterFromPdf(bytes))
-      .then((character) => onImport([character]))
+    try {
+      const bytes = await file.arrayBuffer();
+      if (file.type === "application/pdf") {
+        try {
+          const character = await importCharacterFromPdf(bytes);
+          onImport([character]);
+          return;
+        } catch (err) {
+          // Non è il nostro template — se l'IA è disponibile si passa alla conferma esplicita
+          // sotto, altrimenti resta il solo errore di sempre.
+          if (!aiAvailable) {
+            setError(err instanceof Error ? err.message : "Impossibile leggere questo PDF.");
+            return;
+          }
+        }
+      }
+      if (aiAvailable) {
+        setPendingAiImport({ bytes, mimeType: file.type || "application/pdf" });
+      } else {
+        setError("QuestZip non riconosce questo file come una scheda compatibile.");
+      }
+    } finally {
+      setImportingPdf(false);
+    }
+  };
+
+  // Chiamato solo dopo la conferma esplicita dell'utente (vedi il riquadro sotto) — il file
+  // finisce sui server di Google per l'analisi, non deve mai partire in automatico.
+  const confirmAiImport = () => {
+    if (!pendingAiImport) return;
+    setError(null);
+    setAiImporting(true);
+    importCharacterFromPdfWithAi(pendingAiImport.bytes, pendingAiImport.mimeType)
+      .then((character) => {
+        onImport([character]);
+        setPendingAiImport(null);
+      })
       .catch((err) =>
-        setError(err instanceof Error ? err.message : "Impossibile leggere questo PDF."),
+        setError(err instanceof Error ? err.message : "Impossibile leggere questo file con l'IA."),
       )
-      .finally(() => setImportingPdf(false));
+      .finally(() => setAiImporting(false));
   };
 
   return (
@@ -177,13 +227,39 @@ function ExportImport({
         {importingPdf ? "Importazione…" : "📄 Importa da PDF"}
         <input
           type="file"
-          accept="application/pdf"
+          // Il tipo immagine ha senso solo se l'IA è disponibile: il parser locale legge solo
+          // PDF compilabili, una foto passa per forza dal fallback IA.
+          accept={aiAvailable ? "application/pdf,image/*" : "application/pdf"}
           onChange={importPdfFile}
           disabled={importingPdf}
           className="hidden"
         />
       </label>
       {error && <span className="text-xs text-danger">{error}</span>}
+      {pendingAiImport && (
+        <div className="w-full rounded-lg border border-edge bg-surface-raised p-3 text-xs text-muted space-y-2">
+          <p>
+            Questo file non sembra il nostro template PDF conosciuto. Vuoi provare a leggerlo con
+            l&apos;assistente IA? Il contenuto verrà inviato a Google per l&apos;analisi.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={confirmAiImport}
+              disabled={aiImporting}
+              className="rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors disabled:opacity-60"
+            >
+              {aiImporting ? "Lettura in corso…" : "Sì, prova con l'IA"}
+            </button>
+            <button
+              onClick={() => setPendingAiImport(null)}
+              disabled={aiImporting}
+              className="rounded-lg border border-edge px-3 py-1.5 text-xs text-foreground hover:border-accent/50 transition-colors disabled:opacity-60"
+            >
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

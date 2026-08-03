@@ -63,7 +63,10 @@ function toInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function clamp(n: number, min: number, max: number): number {
+// Esportata: riusata anche da app/actions/character-pdf-ai.ts (fallback IA per PDF/foto non
+// riconosciuti da questo parser) per lo stesso identico motivo — clampare un numero letto da
+// una fonte non fidata (modulo PDF o risposta di un modello) dentro i limiti dello schema.
+export function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
