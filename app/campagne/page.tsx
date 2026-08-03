@@ -24,6 +24,7 @@ import {
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign, grantXp, grantXpToParty } from "@/app/actions/characters";
 import { isAiAvailable } from "@/app/actions/ai";
+import { generateHandoutDraft } from "@/app/actions/ai-content-draft";
 import { summarizeSession } from "@/app/actions/ai-session-summary";
 import { IntField } from "@/components/int-field";
 import {
@@ -1427,6 +1428,12 @@ function NewHandoutForm({
   const [testo, setTesto] = useState("");
   const [immagineUrl, setImmagineUrl] = useState("");
   const [creating, setCreating] = useState(false);
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    isAiAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
+  }, []);
 
   const create = async () => {
     if (!titolo.trim()) return;
@@ -1439,6 +1446,20 @@ function NewHandoutForm({
       onCreated();
     } finally {
       setCreating(false);
+    }
+  };
+
+  // Precompila SOLO il campo testo, non salva mai da sola — usa il titolo (e il testo già
+  // scritto, se c'è, come indicazione in più) per proporre una bozza che il master rivede prima
+  // di salvare, stesso principio del riassunto sessioni sopra.
+  const generateDraft = async () => {
+    if (!titolo.trim() || generating) return;
+    setGenerating(true);
+    try {
+      const draft = await generateHandoutDraft(titolo, testo);
+      if (draft) setTesto(draft);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -1457,6 +1478,16 @@ function NewHandoutForm({
         rows={3}
         className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
       />
+      {aiAvailable && (
+        <button
+          onClick={generateDraft}
+          disabled={!titolo.trim() || generating}
+          title="Scrive una bozza di testo in base al titolo — la rivedi e modifichi prima di salvare"
+          className="text-xs font-bold text-accent-strong hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
+        >
+          {generating ? "Scrivo…" : "✨ Genera bozza"}
+        </button>
+      )}
       <input
         value={immagineUrl}
         onChange={(event) => setImmagineUrl(event.target.value)}
