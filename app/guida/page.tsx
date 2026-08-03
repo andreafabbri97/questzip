@@ -14,6 +14,7 @@ const indice = [
   { href: "#compendio", label: "📖 Compendio" },
   { href: "#amici-chat", label: "💬 Amici, chat e notifiche" },
   { href: "#profilo-pwa", label: "📱 Profilo e app sul telefono" },
+  { href: "#assistenza-ia", label: "🤖 Assistenza IA" },
   { href: "#faq", label: "❓ Domande frequenti" },
   { href: "#problemi", label: "🔧 Problemi comuni" },
 ];
@@ -144,6 +145,8 @@ export default function GuidaPage() {
           il bonus d&apos;attacco delle armi dopo l&apos;import: sono gli unici due punti che
           restano volutamente non importati (il PDF non ha un modo affidabile di indicarli),
           QuestZip li ricalcola comunque da solo una volta inseriti caratteristica e competenza.
+          Se il PDF non è questo template (o è una foto), puoi provare a farlo leggere
+          dall&apos;assistente IA — vedi <a href="#assistenza-ia" className="text-accent-strong hover:underline">Assistenza IA</a> più sotto.
         </p>
       </Sezione>
 
@@ -161,7 +164,7 @@ export default function GuidaPage() {
             <><strong>Mappa regionale</strong> — un editor di mappe di ambientazione (terreno dipinto a mano + marcatori con etichetta/icona/note), pensata come riferimento statico che il master prepara con calma: nessun token, nessuna fog of war, non cambia mentre i giocatori guardano.</>,
             <><strong>Dungeon</strong> — mappe di gioco vere e proprie, vedi la sezione sotto.</>,
             <><strong>Jukebox</strong> — condividi un URL YouTube o audio diretto: ognuno preme &quot;play&quot; sul proprio dispositivo (i browser bloccano l&apos;autoplay, quindi non parte da solo per tutti).</>,
-            <><strong>Handout</strong> — lore/immagini che il master tiene nascosti finché non li rivela ai giocatori.</>,
+            <><strong>Handout</strong> — lore/immagini che il master tiene nascosti finché non li rivela ai giocatori (con una bozza di testo generabile dall&apos;IA, vedi <a href="#assistenza-ia" className="text-accent-strong hover:underline">Assistenza IA</a>).</>,
             <><strong>Tabelle casuali</strong> — tabelle personalizzate con voci pesate (utili per incontri casuali, bottino, eventi).</>,
           ]}
         />
@@ -223,7 +226,8 @@ export default function GuidaPage() {
           direttamente fra loro, senza passare da un server audio — attivala solo se vi serve,
           pensata per gruppi piccoli (5-8 persone). A fine sessione, aggiungi una nota nel diario
           della campagna: è il modo più semplice per ritrovare &quot;dove eravamo rimasti&quot; alla
-          sessione successiva.
+          sessione successiva — se l&apos;IA è configurata, un bottone può proporne una bozza
+          leggendo la chat della sessione (vedi <a href="#assistenza-ia" className="text-accent-strong hover:underline">Assistenza IA</a>).
         </p>
 
         <SottoTitolo>Esempio pratico: un&apos;imboscata in una stanza nascosta</SottoTitolo>
@@ -345,6 +349,48 @@ export default function GuidaPage() {
           per richieste di amicizia, inviti campagna e nuovi messaggi in chat — sono per dispositivo,
           quindi vanno attivate su ciascun telefono/browser dove vuoi riceverle.
         </p>
+      </Sezione>
+
+      {/* ---------------------------------------------------------------- Assistenza IA */}
+      <Sezione id="assistenza-ia" titolo="🤖 Assistenza IA">
+        <p>
+          Alcune funzioni sono assistite da un&apos;intelligenza artificiale (Gemini di Google) —
+          sempre <strong>opzionali</strong>: se non sono configurate, o se l&apos;IA non risponde
+          per qualunque motivo, il resto dell&apos;app funziona esattamente come sempre. Nessuna
+          di queste salva mai nulla in automatico: il risultato finisce sempre in un campo che
+          rivedi e modifichi tu prima di confermare, come farebbe un giocatore che ti propone una
+          bozza.
+        </p>
+        <ListaPuntata
+          voci={[
+            <>
+              <strong>Import di qualsiasi scheda PDF/foto</strong> — in Personaggi, se il PDF non
+              è il nostro template conosciuto, puoi provare a farlo leggere dall&apos;IA (icona 📄
+              Importa da PDF, poi &quot;Sì, prova con l&apos;IA&quot;).
+            </>,
+            <>
+              <strong>Assistente regole</strong> — icona 🤖 in header, apre una domanda/risposta
+              veloce sulle regole di D&amp;D 5e ancorata (dove possibile) alle voci vere del
+              Compendio.
+            </>,
+            <>
+              <strong>Riassunto sessioni</strong> — bottone &quot;✨ Genera riassunto IA&quot; nel
+              Diario delle sessioni di una campagna: legge la chat dall&apos;ultima sessione e
+              propone un riassunto da rivedere prima di salvare.
+            </>,
+            <>
+              <strong>Bozze per gli Handout</strong> — bottone &quot;✨ Genera bozza&quot; quando
+              crei un handout: propone il testo del documento in base al titolo.
+            </>,
+          ]}
+        />
+        <Suggerimento>
+          Quando usi una di queste funzioni, il contenuto (il PDF/foto, il testo della chat, il
+          titolo dell&apos;handout, la domanda) viene inviato ai server di Google per
+          l&apos;elaborazione — non succede mai in automatico, solo quando premi tu il bottone
+          apposito. Le risposte dell&apos;assistente regole sono generate, non tratte da un testo
+          ufficiale: in caso di dubbio importante, verifica sempre sul Compendio o sul manuale.
+        </Suggerimento>
       </Sezione>
 
       {/* ---------------------------------------------------------------- FAQ */}
