@@ -80,6 +80,7 @@ import {
 } from "@/lib/fivetools/data";
 import { RenderEntries } from "@/lib/fivetools/entries";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
+import { importCharacterFromPdf } from "@/lib/pdf-character-import";
 
 const loadClassNames = () => loadClassData().then((data) => data.classes);
 
@@ -102,6 +103,10 @@ function ExportImport({
   onImport: (imported: Character[]) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  // Solo per il PDF: a differenza del JSON (istantaneo, poche righe di testo) leggere un PDF di
+  // qualche MB richiede un attimo — un pulsante che non dà nessun segnale in quell'intervallo
+  // sembrerebbe rotto, specie perché il file picker si chiude subito.
+  const [importingPdf, setImportingPdf] = useState(false);
 
   const exportAll = () => {
     const blob = new Blob([JSON.stringify(characters, null, 2)], { type: "application/json" });
@@ -131,6 +136,25 @@ function ExportImport({
       .catch(() => setError("Impossibile leggere il file."));
   };
 
+  // Non un importatore generico per "un PDF qualsiasi": legge il template di scheda cartacea
+  // compilabile che il gruppo usa davvero (lo stesso file .pdf vuoto condiviso fra tutti gli
+  // amici) — vedi lib/pdf-character-import.ts per i dettagli su quali campi vengono letti.
+  const importPdfFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError(null);
+    setImportingPdf(true);
+    file
+      .arrayBuffer()
+      .then((bytes) => importCharacterFromPdf(bytes))
+      .then((character) => onImport([character]))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Impossibile leggere questo PDF."),
+      )
+      .finally(() => setImportingPdf(false));
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       {characters.length > 0 && (
@@ -144,6 +168,20 @@ function ExportImport({
       <label className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-muted hover:text-foreground hover:border-accent/50 transition-colors cursor-pointer">
         ⬆ Importa
         <input type="file" accept="application/json" onChange={importFile} className="hidden" />
+      </label>
+      <label
+        className={`rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-muted transition-colors ${
+          importingPdf ? "opacity-60" : "hover:text-foreground hover:border-accent/50 cursor-pointer"
+        }`}
+      >
+        {importingPdf ? "Importazione…" : "📄 Importa da PDF"}
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={importPdfFile}
+          disabled={importingPdf}
+          className="hidden"
+        />
       </label>
       {error && <span className="text-xs text-danger">{error}</span>}
     </div>

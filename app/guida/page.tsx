@@ -132,6 +132,19 @@ export default function GuidaPage() {
           opzionale (regola homebrew disattivabile). Slot incantesimo, multiclasse, bonus di
           competenza e tiri salvezza/abilità sono calcolati automaticamente dal livello.
         </p>
+        <SottoTitolo>Importare un personaggio</SottoTitolo>
+        <p>
+          Nella pagina Personaggi, accanto a &quot;Esporta&quot;/&quot;Importa&quot; (per i file
+          JSON esportati da QuestZip stesso), c&apos;è anche <strong>&quot;📄 Importa da
+          PDF&quot;</strong>: se hai un PDF della scheda cartacea che usiamo come gruppo già
+          compilato, lo carichi e QuestZip legge da solo caratteristiche, classi/livelli, PF/CA,
+          abilità, tiri salvezza, incantesimi (con il livello corretto), armi, inventario, tratti
+          di personalità e le note di razza/classe direttamente dai campi del modulo — non serve
+          ricopiare tutto a mano. Ricontrolla comunque il peso dei singoli oggetti in Inventario e
+          il bonus d&apos;attacco delle armi dopo l&apos;import: sono gli unici due punti che
+          restano volutamente non importati (il PDF non ha un modo affidabile di indicarli),
+          QuestZip li ricalcola comunque da solo una volta inseriti caratteristica e competenza.
+        </p>
       </Sezione>
 
       {/* ---------------------------------------------------------------- Campagne */}
