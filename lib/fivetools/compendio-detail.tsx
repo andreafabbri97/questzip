@@ -445,6 +445,41 @@ const ITA_MONSTER_SECTIONS: { key: "tratti" | "azioni" | "azioniLeggendarie" | "
   { key: "reazioni", label: "Reazioni" },
 ];
 
+// Il testo IA dei mostri (compendio_traduzione_ia.descrizioneIta) è un unico blob piatto, non la
+// struttura FiveEntry[] originale — una riga per tratto/azione (vedi englishText() nello script
+// scripts/ita-compendio/ai-translate-compendio.mjs, che genera esattamente questo formato: "Nome:
+// testo" per i tratti, "Azione — Nome: testo" per le azioni, ecc.). Qui lo riportiamo alla stessa
+// struttura a gruppi usata per il testo ufficiale/inglese, invece di mostrarlo come blocco unico.
+const IA_CREATURE_PREFIXES: { prefix: string; label: string }[] = [
+  { prefix: "Azione Leggendaria — ", label: "Azioni leggendarie" },
+  { prefix: "Azione Bonus — ", label: "Azioni bonus" },
+  { prefix: "Reazione — ", label: "Reazioni" },
+  { prefix: "Azione — ", label: "Azioni" },
+];
+const IA_CREATURE_GROUP_ORDER = ["Tratti", "Azioni", "Azioni bonus", "Reazioni", "Azioni leggendarie"];
+
+function parseIaCreatureText(text: string): Map<string, { name: string; text: string }[]> {
+  const groups = new Map<string, { name: string; text: string }[]>();
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    let label = "Tratti";
+    let rest = line;
+    for (const { prefix, label: prefixLabel } of IA_CREATURE_PREFIXES) {
+      if (line.startsWith(prefix)) {
+        label = prefixLabel;
+        rest = line.slice(prefix.length);
+        break;
+      }
+    }
+    const colonIndex = rest.indexOf(": ");
+    const name = colonIndex === -1 ? rest : rest.slice(0, colonIndex);
+    const body = colonIndex === -1 ? "" : rest.slice(colonIndex + 2);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label)!.push({ name, text: body });
+  }
+  return groups;
+}
+
 function CreatureDetail({ creature, language }: { creature: RawCreature; language: Language }) {
   const abilities: [string, number][] = [
     ["FOR", creature.str],
@@ -458,6 +493,10 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
   const ia = useTraduzioneIa("mostri", creature.name, creature.source, language === "it");
   const liveTranslatedName = useTranslatedText(creature.name, "en", "it");
   const translatedName = ia?.nomeIta ?? liveTranslatedName;
+  const iaGroups = useMemo(
+    () => (ia?.descrizioneIta ? parseIaCreatureText(ia.descrizioneIta) : null),
+    [ia],
+  );
   const [itaMostri, setItaMostri] = useState<Awaited<ReturnType<typeof getMostriIta>> | null>(null);
 
   useEffect(() => {
@@ -571,7 +610,26 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
       <Stat label="Sensi" value={creature.senses?.join(", ")} />
       <Stat label="Linguaggi" value={creature.languages?.join(", ")} />
 
-      {ACTION_GROUPS.map((group) => {
+      {language === "it" && iaGroups
+        ? IA_CREATURE_GROUP_ORDER.map((label) => {
+            const items = iaGroups.get(label);
+            if (!items || items.length === 0) return null;
+            return (
+              <div key={label} className="space-y-2">
+                <p className="text-xs uppercase tracking-widest text-muted">{label}</p>
+                {items.map((item, index) => (
+                  <div
+                    key={`${item.name}-${index}`}
+                    className="rounded-lg border border-edge bg-surface-raised p-3"
+                  >
+                    <p className="text-sm font-bold text-foreground mb-1.5">{item.name}</p>
+                    <p className="text-sm text-foreground leading-relaxed">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })
+        : ACTION_GROUPS.map((group) => {
         const list = creature[group.key] as
           | { name: string; entries: FiveEntry[] }[]
           | undefined;
