@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { DiceRoller } from "@/components/dice-roller";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 /** Renderizzato via portal direttamente sotto <body>, non annidato nell'header — un overlay
  * "fixed" dentro un antenato con backdrop-blur (l'header ce l'ha) resterebbe confinato al suo
@@ -20,6 +21,8 @@ import { DiceRoller } from "@/components/dice-roller";
 export function DiceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [everOpened, setEverOpened] = useState(open);
   if (open && !everOpened) setEverOpened(true);
+
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open) return;

@@ -6,6 +6,7 @@ import { IntField } from "@/components/int-field";
 import { formatModifier } from "@/lib/dnd";
 import { clearMyDiceRolls, deleteDiceRoll, getMyDiceRolls, saveDiceRoll } from "@/app/actions/dice";
 import { Dice3D, type Dice3DHandle, type Dice3DStatus } from "@/components/dice-3d";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
 // Oltre non ha più senso pratico al tavolo (un tiro di danno reale raramente combina più di 2-3
@@ -564,6 +565,8 @@ function ClearHistoryConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  useBodyScrollLock(true);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onCancel();

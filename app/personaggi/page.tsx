@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/character-sync";
 import { getOggettiIta, getTalentiIta } from "@/app/actions/compendio-ita";
 import { useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
@@ -454,6 +455,8 @@ function UnsavedChangesModal({
   onDiscard: () => void;
   onCancel: () => void;
 }) {
+  useBodyScrollLock(true);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onCancel();
@@ -507,6 +510,8 @@ function DeleteCharacterModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  useBodyScrollLock(true);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onCancel();

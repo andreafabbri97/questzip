@@ -7,6 +7,7 @@ import { MENTION_KIND_LOADERS } from "@/lib/fivetools/mention-search";
 import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 import { EntryDetail, type Entry, type Language } from "@/lib/fivetools/compendio-detail";
 import type { CompendiumKind } from "@/lib/fivetools/data";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 const CLOSE_ANIMATION_MS = 150;
 
@@ -35,6 +36,9 @@ export function MentionModal({
   // l'animazione di chiusura invece di sparire di scatto (stesso pattern degli altri modal).
   const [rendered, setRendered] = useState(false);
   if (mention && !rendered) setRendered(true);
+
+  useBodyScrollLock(!!mention);
+
   useEffect(() => {
     if (mention) return;
     const timeout = setTimeout(() => setRendered(false), CLOSE_ANIMATION_MS);

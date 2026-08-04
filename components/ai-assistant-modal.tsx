@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { askRulesAssistant } from "@/app/actions/ai-assistant";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 interface Exchange {
   id: string;
@@ -23,6 +24,8 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
   const [history, setHistory] = useState<Exchange[]>([]);
   const [asking, setAsking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
