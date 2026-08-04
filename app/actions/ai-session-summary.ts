@@ -36,7 +36,7 @@ export async function summarizeSession(
     transcript = transcript.slice(-MAX_TRANSCRIPT_CHARS);
   }
 
-  const prompt = `Sei l'assistente di un master di Dungeons & Dragons 5ª edizione. Leggi questo estratto della chat della campagna "${detail.campaign.nome}" e scrivi un riassunto in italiano della sessione di gioco (3-6 frasi, in terza persona, focalizzato sugli eventi narrativi/di gioco — ignora i messaggi puramente organizzativi tipo "ci vediamo alle 21" o le menzioni del Compendio). Rispondi SOLO col testo del riassunto, senza titoli né introduzioni.\n\n${transcript}`;
+  const prompt = `Sei l'assistente di un master di Dungeons & Dragons 5ª edizione. Leggi questo estratto della chat della campagna "${detail.campaign.nome}" e scrivi un riassunto in italiano della sessione di gioco (3-6 frasi, in terza persona, focalizzato sugli eventi narrativi/di gioco — ignora i messaggi puramente organizzativi tipo "ci vediamo alle 21" o le menzioni del Compendio). Non usare markdown (niente **asterischi**, niente # per i titoli): il testo finisce in un campo semplice, non renderizzato. Rispondi SOLO col testo del riassunto, senza titoli né introduzioni.\n\n${transcript}`;
 
   return askGemini({ prompt });
 }

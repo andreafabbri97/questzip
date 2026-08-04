@@ -13,7 +13,7 @@ export async function generateHandoutDraft(titolo: string, hint: string): Promis
 
   const prompt = `Sei l'assistente di un master di Dungeons & Dragons 5ª edizione. Scrivi il testo di un handout — un documento che il master mostra ai giocatori (una lettera, un'iscrizione, un cartello, un frammento di diario...) — con questo titolo: "${trimmedTitle}".${
     hint.trim() ? ` Indicazioni aggiuntive del master: ${hint.trim()}.` : ""
-  } Scrivi in italiano, nello stile e nella persona appropriati al tipo di documento — il TESTO del documento stesso, non una descrizione esterna di cosa contiene. Massimo 150 parole. Rispondi SOLO col testo dell'handout, senza titoli, virgolette o spiegazioni aggiuntive.`;
+  } Scrivi in italiano, nello stile e nella persona appropriati al tipo di documento — il TESTO del documento stesso, non una descrizione esterna di cosa contiene. Massimo 150 parole. Non usare markdown (niente **asterischi**, niente # per i titoli): il testo finisce in un campo semplice, non renderizzato. Rispondi SOLO col testo dell'handout, senza titoli, virgolette o spiegazioni aggiuntive.`;
 
   return askGemini({ prompt });
 }
