@@ -11,6 +11,7 @@ import {
   syncCharacterRemote,
 } from "@/app/actions/character-sync";
 import { getOggettiIta, getTalentiIta } from "@/app/actions/compendio-ita";
+import { useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
 import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
@@ -77,6 +78,7 @@ import {
   type RawItem,
   type RawRace,
   type RawSubclass,
+  type CompendiumKind,
 } from "@/lib/fivetools/data";
 import { RenderEntries } from "@/lib/fivetools/entries";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
@@ -1003,6 +1005,7 @@ function CharacterSheet({
                   loader={loadRaces}
                   placeholder="Elf, Dwarf, Halfling…"
                   inputClassName={inputClass}
+                  kind="razze"
                 />
               </label>
               <label className="block">
@@ -1028,6 +1031,7 @@ function CharacterSheet({
                   loader={loadBackgrounds}
                   placeholder="Acolyte, Soldier, Sage…"
                   inputClassName={inputClass}
+                  kind="background"
                 />
               </label>
               <BackgroundTraits background={character.background} />
@@ -1259,12 +1263,14 @@ function Autocomplete<T extends { name: string; source: string }>({
   loader,
   placeholder,
   inputClassName,
+  kind,
 }: {
   value: string;
   onChange: (value: string) => void;
   loader: () => Promise<T[]>;
   placeholder: string;
   inputClassName: string;
+  kind: CompendiumKind;
 }) {
   const [options, setOptions] = useState<T[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -1331,7 +1337,7 @@ function Autocomplete<T extends { name: string; source: string }>({
                 className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface transition-colors"
               >
                 {option.name}
-                <ItalianHint text={option.name} />
+                <ItalianHint text={option.name} kind={kind} source={option.source} />
               </button>
             </li>
           ))}
@@ -1341,8 +1347,10 @@ function Autocomplete<T extends { name: string; source: string }>({
   );
 }
 
-function ItalianHint({ text }: { text: string }) {
-  const translated = useTranslatedText(text, "en", "it");
+function ItalianHint({ text, kind, source }: { text: string; kind: CompendiumKind; source: string }) {
+  const ia = useTraduzioneIa(kind, text, source, true);
+  const liveTranslated = useTranslatedText(text, "en", "it");
+  const translated = ia?.nomeIta ?? liveTranslated;
   if (!translated || translated.toLowerCase() === text.toLowerCase()) return null;
   return <span className="ml-2 text-xs text-muted">({translated})</span>;
 }
@@ -1376,6 +1384,7 @@ function ClassRow({
             loader={loadClassNames}
             placeholder="Fighter, Wizard…"
             inputClassName={rowInputClass}
+            kind="classi"
           />
           <ClassNameWarning name={entry.nome} />
         </div>
@@ -2027,6 +2036,7 @@ function LevelUpWizard({
                   loader={loadFeats}
                   placeholder="Alert, Lucky, Tough…"
                   inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+                  kind="talenti"
                 />
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -2257,6 +2267,7 @@ function InventorySection({
                     loader={loadInventoryItems}
                     placeholder="Pozione di Guarigione, Spada +1, torcia…"
                     inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                    kind="oggetti"
                   />
                 </div>
                 <IntField
@@ -2337,7 +2348,9 @@ function InventoryItemInfo({ nome }: { nome: string }) {
   }, []);
 
   const match = items?.find((i) => i.name.toLowerCase() === nome.trim().toLowerCase()) ?? null;
-  const translatedName = useTranslatedText(match?.name, "en", "it");
+  const ia = useTraduzioneIa("oggetti", match?.name ?? "", match?.source ?? "", !!match);
+  const liveTranslatedName = useTranslatedText(match?.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
 
   useEffect(() => {
     if (!showInfo || !match) return;
@@ -2379,6 +2392,10 @@ function InventoryItemInfo({ nome }: { nome: string }) {
                 {ufficiale.descrizione}
               </p>
             </>
+          ) : ia?.descrizioneIta ? (
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+              {ia.descrizioneIta}
+            </p>
           ) : match.entries ? (
             <RenderEntries entries={match.entries} />
           ) : (
@@ -2542,6 +2559,7 @@ function TalentiSection({
                   loader={loadFeats}
                   placeholder="Alert, Lucky, Tough…"
                   inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                  kind="talenti"
                 />
               </div>
               <button
@@ -2572,7 +2590,9 @@ function FeatInfo({ nome }: { nome: string }) {
   }, []);
 
   const match = feats?.find((f) => f.name.toLowerCase() === nome.trim().toLowerCase()) ?? null;
-  const translatedName = useTranslatedText(match?.name, "en", "it");
+  const ia = useTraduzioneIa("talenti", match?.name ?? "", match?.source ?? "", !!match);
+  const liveTranslatedName = useTranslatedText(match?.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
 
   useEffect(() => {
     if (!showInfo || !match) return;
@@ -2612,6 +2632,10 @@ function FeatInfo({ nome }: { nome: string }) {
                 {ufficiale.descrizione}
               </p>
             </>
+          ) : ia?.descrizioneIta ? (
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+              {ia.descrizioneIta}
+            </p>
           ) : (
             <RenderEntries entries={match.entries} />
           )}
@@ -2870,6 +2894,7 @@ function SpellListSection({
                 loader={loadSpells}
                 placeholder="Fireball, Cure Wounds…"
                 inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+                kind="incantesimi"
               />
             </div>
             <IntField

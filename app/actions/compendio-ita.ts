@@ -1,6 +1,6 @@
 "use server";
 
-import { ne } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import {
@@ -11,7 +11,9 @@ import {
   compendioItaRazze,
   compendioItaRegole,
   compendioItaTalenti,
+  compendioTraduzioniIa,
 } from "@/lib/db/schema";
+import type { CompendiumKind } from "@/lib/fivetools/data";
 
 async function requireAuth() {
   const session = await auth();
@@ -54,4 +56,11 @@ export async function getOggettiIta() {
 export async function getTalentiIta() {
   await requireAuth();
   return db.select().from(compendioItaTalenti);
+}
+
+// Cache IA (compendio_traduzione_ia): nomi/descrizioni tradotti dall'IA per le voci che non hanno
+// testo ufficiale — priorità di lettura sempre ufficiale -> IA -> traduzione live, mai il contrario.
+export async function getTraduzioniIa(kind: CompendiumKind) {
+  await requireAuth();
+  return db.select().from(compendioTraduzioniIa).where(eq(compendioTraduzioniIa.kind, kind));
 }

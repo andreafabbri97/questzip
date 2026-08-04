@@ -55,6 +55,7 @@ import {
   getOggettiIta,
   getRazzeIta,
   getTalentiIta,
+  getTraduzioniIa,
 } from "@/app/actions/compendio-ita";
 import type { CompendiumKind } from "@/lib/fivetools/data";
 
@@ -103,6 +104,48 @@ function loadTalentiIta() {
   return itaTalentiPromise;
 }
 
+// Cache IA (compendio_traduzione_ia): stessa idea delle cache ufficiali qui sopra, una promise per
+// kind. Priorità di lettura ovunque nel file: testo ufficiale (tabelle sopra) -> questa cache IA ->
+// traduzione live di useTranslatedText/EntriesBlock, mai il contrario.
+const iaPromises = new Map<CompendiumKind, ReturnType<typeof getTraduzioniIa>>();
+function loadTraduzioniIa(kind: CompendiumKind) {
+  let promise = iaPromises.get(kind);
+  if (!promise) {
+    promise = getTraduzioniIa(kind);
+    iaPromises.set(kind, promise);
+  }
+  return promise;
+}
+
+export type TraduzioneIaRow = Awaited<ReturnType<typeof getTraduzioniIa>>[number];
+
+// Nome/descrizione dalla cache IA per una voce di primo livello del Compendio: kind+name+source
+// combaciano esattamente (sono le stesse chiavi inglesi di 5etools), a differenza del match col
+// testo ufficiale che deve confrontare nomi in lingue diverse via normalizeItaName. Esportata:
+// riusata anche fuori da questo file (es. app/personaggi/page.tsx per l'autocompletamento),
+// stesso principio già in uso per EntryDetail nel modal delle menzioni in chat.
+export function useTraduzioneIa(
+  kind: CompendiumKind,
+  name: string,
+  source: string,
+  enabled: boolean,
+): TraduzioneIaRow | null {
+  const [rows, setRows] = useState<TraduzioneIaRow[] | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    loadTraduzioniIa(kind).then((data) => {
+      if (!cancelled) setRows(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [kind, enabled]);
+
+  return useMemo(() => rows?.find((r) => r.name === name && r.source === source) ?? null, [rows, name, source]);
+}
+
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
 // italiano ufficiale con la traduzione automatica del nome inglese di 5etools
 function normalizeItaName(name: string): string {
@@ -118,8 +161,24 @@ function normalizeItaName(name: string): string {
  * non confonde, anzi aiuta a riconoscere il termine — a differenza dei paragrafi lunghi,
  * dove inglese e italiano mischiati diventano illeggibili (da cui lo switch su EntriesBlock).
  */
-export function DualName({ text, inline = false }: { text: string; inline?: boolean }) {
-  const translated = useTranslatedText(text, "en", "it");
+export function DualName({
+  text,
+  inline = false,
+  kind,
+  source,
+}: {
+  text: string;
+  inline?: boolean;
+  /** Se presenti insieme, il nome tradotto viene cercato prima nella cache IA (voci di primo
+   * livello del Compendio) prima di ricadere sulla traduzione live — solo dove ha senso: le
+   * caratteristiche di classe, le azioni dei mostri ecc. non hanno una voce propria nella cache
+   * IA e continuano a usare solo la traduzione live passando questi due prop. */
+  kind?: CompendiumKind;
+  source?: string;
+}) {
+  const ia = useTraduzioneIa(kind ?? "incantesimi", text, source ?? "", !!(kind && source));
+  const liveTranslated = useTranslatedText(text, "en", "it");
+  const translated = ia?.nomeIta ?? liveTranslated;
   if (!translated || translated.toLowerCase() === text.toLowerCase()) return <>{text}</>;
   if (inline) {
     return (
@@ -180,6 +239,32 @@ export function EntriesBlock({
   );
 }
 
+/** Come EntriesBlock, ma usa il testo tradotto dall'IA (cache compendio_traduzione_ia) quando
+ * disponibile invece della traduzione live — qualità migliore, ancorata alla terminologia
+ * ufficiale. Ricade su EntriesBlock (live) se l'IA non ha ancora tradotto questa voce. */
+function EntriesBlockOrIa({
+  entries,
+  language,
+  iaText,
+}: {
+  entries: FiveEntry[] | undefined;
+  language: Language;
+  iaText?: string | null;
+}) {
+  if (language === "it" && iaText) {
+    return (
+      <div className="space-y-2">
+        {iaText.split("\n\n").map((paragrafo, index) => (
+          <p key={index} className="text-sm text-foreground leading-relaxed">
+            {paragrafo}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return <EntriesBlock entries={entries} language={language} />;
+}
+
 export function SourceBadge({ source, books }: { source: string; books: Map<string, BookMeta> | null }) {
   const meta = books?.get(source);
   const edition: Edition = meta?.edition ?? "2014";
@@ -211,6 +296,12 @@ export function EntryDetail({
   onBack: () => void;
 }) {
   const meta = books?.get(entry.source);
+  const iaGenerica = useTraduzioneIa(
+    kind,
+    entry.name,
+    entry.source,
+    language === "it" && (kind === "background" || kind === "condizioni"),
+  );
   return (
     // "@container": le griglie a più colonne qui sotto si adattano alla larghezza REALE di
     // questo box (container query, Tailwind v4) invece che a quella dello schermo — senza
@@ -223,7 +314,7 @@ export function EntryDetail({
       </button>
       <div className="flex items-start justify-between gap-3">
         <h2 className="heading-ornate text-2xl font-display font-bold text-accent-strong">
-          <DualName text={entry.name} />
+          <DualName text={entry.name} kind={kind} source={entry.source} />
         </h2>
         <SourceBadge source={entry.source} books={books} />
       </div>
@@ -235,9 +326,10 @@ export function EntryDetail({
       {kind === "razze" && <RaceDetail race={entry as RawRace} language={language} />}
       {kind === "talenti" && <FeatDetail feat={entry as RawFeat} language={language} />}
       {(kind === "background" || kind === "condizioni") && (
-        <EntriesBlock
+        <EntriesBlockOrIa
           entries={(entry as RawBackground | RawCondition).entries}
           language={language}
+          iaText={iaGenerica?.descrizioneIta}
         />
       )}
       {kind === "classi" && <ClassDetail cls={entry as RawClass} language={language} />}
@@ -263,7 +355,9 @@ const ITA_SOURCE_NAMES: Record<string, string> = {
 
 function SpellDetail({ spell, language }: { spell: RawSpell; language: Language }) {
   const material = formatMaterial(spell.components);
-  const translatedName = useTranslatedText(spell.name, "en", "it");
+  const ia = useTraduzioneIa("incantesimi", spell.name, spell.source, language === "it");
+  const liveTranslatedName = useTranslatedText(spell.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
   const [itaSpells, setItaSpells] = useState<Awaited<ReturnType<typeof getIncantesimiIta>> | null>(
     null,
   );
@@ -324,7 +418,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
       {material && <p className="text-sm text-muted italic">Materiali: {material}</p>}
       <div className="border-t border-edge pt-3 space-y-2">
         <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
-        <EntriesBlock entries={spell.entries} language={language} />
+        <EntriesBlockOrIa entries={spell.entries} language={language} iaText={ia?.descrizioneIta} />
       </div>
       {spell.entriesHigherLevel && (
         <div>
@@ -361,7 +455,9 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
     ["CAR", creature.cha],
   ];
 
-  const translatedName = useTranslatedText(creature.name, "en", "it");
+  const ia = useTraduzioneIa("mostri", creature.name, creature.source, language === "it");
+  const liveTranslatedName = useTranslatedText(creature.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
   const [itaMostri, setItaMostri] = useState<Awaited<ReturnType<typeof getMostriIta>> | null>(null);
 
   useEffect(() => {
@@ -527,7 +623,9 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
         ? `richiede sintonia (${item.reqAttune})`
         : null;
 
-  const translatedName = useTranslatedText(item.name, "en", "it");
+  const ia = useTraduzioneIa("oggetti", item.name, item.source, language === "it");
+  const liveTranslatedName = useTranslatedText(item.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
   const [itaOggetti, setItaOggetti] = useState<Awaited<ReturnType<typeof getOggettiIta>> | null>(
     null,
   );
@@ -576,13 +674,15 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
       <p className="text-sm text-muted italic capitalize">
         {[typeName, item.rarity, attunement].filter(Boolean).join(" · ")}
       </p>
-      <EntriesBlock entries={item.entries} language={language} />
+      <EntriesBlockOrIa entries={item.entries} language={language} iaText={ia?.descrizioneIta} />
     </>
   );
 }
 
 function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
-  const translatedName = useTranslatedText(race.name, "en", "it");
+  const ia = useTraduzioneIa("razze", race.name, race.source, language === "it");
+  const liveTranslatedName = useTranslatedText(race.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
   const [itaRazze, setItaRazze] = useState<Awaited<ReturnType<typeof getRazzeIta>> | null>(null);
 
   useEffect(() => {
@@ -651,7 +751,7 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
         />
       </div>
       <div className="border-t border-edge pt-3">
-        <EntriesBlock entries={race.entries} language={language} />
+        <EntriesBlockOrIa entries={race.entries} language={language} iaText={ia?.descrizioneIta} />
       </div>
     </>
   );
@@ -660,7 +760,9 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
 function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
   const prerequisite = formatPrerequisite(feat.prerequisite);
 
-  const translatedName = useTranslatedText(feat.name, "en", "it");
+  const ia = useTraduzioneIa("talenti", feat.name, feat.source, language === "it");
+  const liveTranslatedName = useTranslatedText(feat.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
   const [itaTalenti, setItaTalenti] = useState<Awaited<ReturnType<typeof getTalentiIta>> | null>(
     null,
   );
@@ -703,7 +805,7 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
         {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
       </div>
       <div className="border-t border-edge pt-3">
-        <EntriesBlock entries={feat.entries} language={language} />
+        <EntriesBlockOrIa entries={feat.entries} language={language} iaText={ia?.descrizioneIta} />
       </div>
     </>
   );
@@ -728,7 +830,9 @@ function buildTableColumns(cls: RawClass) {
 
 function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   const [classData, setClassData] = useState<ClassData | null>(null);
-  const translatedName = useTranslatedText(cls.name, "en", "it");
+  const ia = useTraduzioneIa("classi", cls.name, cls.source, language === "it");
+  const liveTranslatedName = useTranslatedText(cls.name, "en", "it");
+  const translatedName = ia?.nomeIta ?? liveTranslatedName;
   const [itaClassi, setItaClassi] = useState<Awaited<ReturnType<typeof getClassiIta>> | null>(
     null,
   );

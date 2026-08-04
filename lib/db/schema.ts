@@ -752,3 +752,28 @@ export const compendioItaTalenti = pgTable("compendio_ita_talento", {
   nomeInglese: text("nome_inglese"),
   fonteInglese: text("fonte_inglese"),
 });
+
+// Cache permanente di traduzioni assistite dall'IA (Gemini) per le voci del Compendio SENZA
+// testo ufficiale (le tabelle compendio_ita_* sopra restano sempre la fonte migliore quando
+// esistono — questa tabella copre tutto il resto, prima lasciato alla sola traduzione automatica
+// dal vivo di lib/fivetools/translate.ts). Riempita da scripts/ita-compendio/ai-translate-
+// compendio.mjs, un lavoro lungo (migliaia di voci) pensato per girare su più giorni: nomeIta e
+// descrizioneIta nullable APPOSTA, "cosa manca ancora" è semplicemente una WHERE su uno dei due
+// essere null — stessa tecnica di ripresa già usata da nomeInglese/fonteInglese sopra. Chiave
+// (kind, name, source) sul nome INGLESE originale 5etools: non ha senso duplicarla per lingua,
+// una riga per voce del Compendio, non per lingua.
+export const compendioTraduzioniIa = pgTable(
+  "compendio_traduzione_ia",
+  {
+    kind: text("kind").notNull(),
+    name: text("name").notNull(),
+    source: text("source").notNull(),
+    nomeIta: text("nome_ita"),
+    // Testo semplice (mai la struttura FiveEntry[] originale) — stessa convenzione già in uso
+    // per il testo ufficiale sopra (es. compendioItaIncantesimi.descrizione), estratto con
+    // flattenEntries (lib/fivetools/entries.tsx) prima di essere tradotto.
+    descrizioneIta: text("descrizione_ita"),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.kind, table.name, table.source] })],
+);
