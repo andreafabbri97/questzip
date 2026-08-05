@@ -5,6 +5,7 @@ import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
   ABILITY_LABELS,
+  canonicalClassName,
   formatModifier,
   multiclassCasterLevel,
   totalLevel,
@@ -12,12 +13,16 @@ import {
   weaponAbilityModifier,
   weaponAttackBonus,
   type Character,
+  type KnownFeat,
   type KnownSpell,
   type Weapon,
 } from "@/lib/dnd";
-import { loadSpells } from "@/lib/fivetools/data";
+import { loadInfusions, loadSpells, type RawOptionalFeature } from "@/lib/fivetools/data";
 import { Autocomplete } from "./autocomplete";
+import { CompendioInfoButton } from "./compendio-info-button";
 import { rollDie } from "./helpers";
+import { LocalInfoButton } from "./local-info-button";
+import type { SimpleEntryData } from "./simple-entry-modal";
 
 export function WeaponsSection({
   character,
@@ -256,60 +261,157 @@ export function SpellListSection({
       )}
       <div className="space-y-2">
         {character.incantesimi.map((spell) => (
-          <div key={spell.id} className="flex items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <Autocomplete
-                value={spell.nome}
-                onChange={(nome) =>
-                  setIncantesimi(
-                    character.incantesimi.map((s) => (s.id === spell.id ? { ...s, nome } : s)),
-                  )
-                }
-                loader={loadSpells}
-                placeholder="Fireball, Cure Wounds…"
-                inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
-                kind="incantesimi"
-              />
-            </div>
-            <IntField
-              min={0}
-              max={9}
-              value={spell.livello}
-              onChange={(value) =>
-                setIncantesimi(
-                  character.incantesimi.map((s) =>
-                    s.id === spell.id ? { ...s, livello: value } : s,
-                  ),
-                )
-              }
-              aria-label="Livello incantesimo"
-              className="w-14 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground text-center"
-            />
-            <label className="flex items-center gap-1 text-xs text-muted shrink-0">
-              <input
-                type="checkbox"
-                checked={spell.preparato}
-                onChange={(event) =>
+          <div key={spell.id} className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Autocomplete
+                  value={spell.nome}
+                  onChange={(nome) =>
+                    setIncantesimi(
+                      character.incantesimi.map((s) => (s.id === spell.id ? { ...s, nome } : s)),
+                    )
+                  }
+                  loader={loadSpells}
+                  placeholder="Fireball, Cure Wounds…"
+                  inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
+                  kind="incantesimi"
+                />
+              </div>
+              <IntField
+                min={0}
+                max={9}
+                value={spell.livello}
+                onChange={(value) =>
                   setIncantesimi(
                     character.incantesimi.map((s) =>
-                      s.id === spell.id ? { ...s, preparato: event.target.checked } : s,
+                      s.id === spell.id ? { ...s, livello: value } : s,
                     ),
                   )
                 }
+                aria-label="Livello incantesimo"
+                className="w-14 rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground text-center"
               />
-              Preparato
-            </label>
-            <button
-              onClick={() => setIncantesimi(character.incantesimi.filter((s) => s.id !== spell.id))}
-              className="text-muted hover:text-danger text-sm shrink-0"
-              aria-label={`Rimuovi ${spell.nome || "incantesimo"}`}
-            >
-              ×
-            </button>
+              <label className="flex items-center gap-1 text-xs text-muted shrink-0">
+                <input
+                  type="checkbox"
+                  checked={spell.preparato}
+                  onChange={(event) =>
+                    setIncantesimi(
+                      character.incantesimi.map((s) =>
+                        s.id === spell.id ? { ...s, preparato: event.target.checked } : s,
+                      ),
+                    )
+                  }
+                />
+                Preparato
+              </label>
+              <button
+                onClick={() => setIncantesimi(character.incantesimi.filter((s) => s.id !== spell.id))}
+                className="text-muted hover:text-danger text-sm shrink-0"
+                aria-label={`Rimuovi ${spell.nome || "incantesimo"}`}
+              >
+                ×
+              </button>
+            </div>
+            <CompendioInfoButton kind="incantesimi" nome={spell.nome} />
           </div>
         ))}
       </div>
     </section>
   );
+}
+
+/**
+ * Infusioni dell'Artefice — assenti finora dalla scheda: mostrate solo se il personaggio ha
+ * almeno una classe Artefice, stesso identico pattern nome-libero+autocomplete di TalentiSection
+ * (components/personaggi/inventory-equipment.tsx), ma con la propria fonte dati (le infusioni non
+ * sono una categoria del Compendio a sé, vedi loadInfusions in lib/fivetools/data.ts) e quindi il
+ * proprio bottone di verifica (LocalInfoButton anziché CompendioInfoButton).
+ */
+export function InfusionsSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const isArtificer = character.classi.some(
+    (c) => canonicalClassName(c.nome).toLowerCase() === "artificer",
+  );
+  if (!isArtificer) return null;
+
+  const setInfusioni = (infusioniConosciute: KnownFeat[]) =>
+    onChange({ ...character, infusioniConosciute });
+
+  const addInfusione = () =>
+    setInfusioni([...character.infusioniConosciute, { id: crypto.randomUUID(), nome: "" }]);
+
+  const loadInfusionCandidates = async (): Promise<SimpleEntryData[]> => {
+    const infusions = await loadInfusions();
+    return infusions.map((infusion: RawOptionalFeature) => ({
+      title: infusion.name,
+      meta: formatInfusionPrerequisite(infusion),
+      entries: infusion.entries,
+    }));
+  };
+
+  return (
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Infusioni conosciute</h2>
+        <button onClick={addInfusione} className="text-xs font-bold text-accent-strong hover:underline">
+          + Aggiungi infusione
+        </button>
+      </div>
+      {character.infusioniConosciute.length === 0 && (
+        <p className="text-sm text-muted">Nessuna infusione aggiunta ancora.</p>
+      )}
+      <div className="space-y-2">
+        {character.infusioniConosciute.map((infusione) => (
+          <div key={infusione.id} className="rounded-lg border border-edge bg-surface-raised p-2.5 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Autocomplete
+                  value={infusione.nome}
+                  onChange={(nome) =>
+                    setInfusioni(
+                      character.infusioniConosciute.map((i) =>
+                        i.id === infusione.id ? { ...i, nome } : i,
+                      ),
+                    )
+                  }
+                  loader={loadInfusions}
+                  placeholder="Armor of Magical Strength, Enhanced…"
+                  inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                />
+              </div>
+              <button
+                onClick={() =>
+                  setInfusioni(character.infusioniConosciute.filter((i) => i.id !== infusione.id))
+                }
+                className="text-muted hover:text-danger text-sm shrink-0"
+                aria-label={`Rimuovi ${infusione.nome || "infusione"}`}
+              >
+                ×
+              </button>
+            </div>
+            <LocalInfoButton nome={infusione.nome} loadCandidates={loadInfusionCandidates} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function formatInfusionPrerequisite(infusion: RawOptionalFeature): string | undefined {
+  const parts: string[] = [];
+  for (const prereq of infusion.prerequisite ?? []) {
+    if (prereq.level) {
+      const className = prereq.level.class?.name ?? "Artefice";
+      parts.push(`Richiede livello ${prereq.level.level} da ${className}`);
+    }
+    if (prereq.item) parts.push(...prereq.item);
+  }
+  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 

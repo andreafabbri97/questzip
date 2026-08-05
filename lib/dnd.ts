@@ -136,7 +136,19 @@ export const knownFeatSchema = z.object({
 });
 export type KnownFeat = z.infer<typeof knownFeatSchema>;
 
-export const characterSchema = z.object({
+// Oggetto magico posseduto — "armonizzato" è una spunta per riga (non più un tetto fisso a 3 sulla
+// lunghezza dell'elenco): il limite RAW di 3 oggetti sintonizzati contemporaneamente è mostrato
+// come promemoria nella UI ma non blocca più l'aggiunta, perché alcune classi/privilegi (es.
+// l'invocazione occulta Patto della Catena non c'entra, ma il Fabbro da Battaglia o certi oggetti
+// come l'Anello di Sintonia Spirituale aumentano il tetto) lo alzano legittimamente.
+export const magicItemSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  armonizzato: z.boolean().default(true),
+});
+export type MagicItem = z.infer<typeof magicItemSchema>;
+
+const rawCharacterSchema = z.object({
   id: z.string(),
   nome: z.string().min(1),
   classi: z.array(classEntrySchema).min(1),
@@ -202,9 +214,7 @@ export const characterSchema = z.object({
   // effetti presi dalla tabella "Livelli di Follia" fornita direttamente dall'utente, vedi
   // LIVELLO_FOLLIA_EFFETTI più sotto.
   livelloFollia: z.number().int().min(0).max(6).default(0),
-  // Nomi degli oggetti magici richiedenti sintonia attualmente armonizzati — il limite di 3 è
-  // una regola RAW fissa, non configurabile.
-  oggettiArmonizzati: z.array(z.string()).default([]),
+  oggettiMagici: z.array(magicItemSchema).default([]),
   privilegiLimitati: z.array(limitedFeatureSchema).default([]),
   // Peso massimo trasportabile in kg — suggerito da Forza×7,5 (vedi carryingCapacityKg) ma
   // sempre un campo modificabile a mano, mai ricalcolato in automatico ad ogni variazione di
@@ -227,12 +237,37 @@ export const characterSchema = z.object({
   incantesimi: z.array(knownSpellSchema).default([]),
   armi: z.array(weaponSchema).default([]),
   talenti: z.array(knownFeatSchema).default([]),
+  // Infusioni conosciute (privilegio "Infondere Oggetto" dell'Artefice) — stesso identico formato
+  // di "talenti" (solo nome), mostrate in UI solo se il personaggio ha almeno un livello da
+  // Artefice fra le proprie classi.
+  infusioniConosciute: z.array(knownFeatSchema).default([]),
   note: z.string().default(""),
   // Timestamp (epoch ms) dell'ultima modifica — non mostrato in UI, serve solo al backup su
   // account (vedi app/actions/character-sync.ts) per capire, fra la copia locale e quella sul
   // server, quale delle due è la più recente in caso di modifiche fatte da due dispositivi.
   aggiornatoAl: z.number().default(() => Date.now()),
 });
+
+/**
+ * Migrazione in lettura per personaggi salvati PRIMA che "oggettiArmonizzati" (string[], tetto
+ * fisso a 3) diventasse "oggettiMagici" (MagicItem[], spunta di armonizzazione per riga, nessun
+ * tetto) — senza questo passaggio i vecchi oggetti armonizzati sparirebbero silenziosamente alla
+ * prima apertura di una scheda esistente, semplicemente perché il campo col vecchio nome non è
+ * più definito nello schema e "oggettiMagici" partirebbe vuoto per default.
+ */
+export const characterSchema = z.preprocess((raw) => {
+  if (raw && typeof raw === "object" && !("oggettiMagici" in raw) && "oggettiArmonizzati" in raw) {
+    const obj = raw as Record<string, unknown>;
+    const legacy = Array.isArray(obj.oggettiArmonizzati) ? (obj.oggettiArmonizzati as unknown[]) : [];
+    return {
+      ...obj,
+      oggettiMagici: legacy
+        .filter((nome): nome is string => typeof nome === "string")
+        .map((nome) => ({ id: crypto.randomUUID(), nome, armonizzato: true })),
+    };
+  }
+  return raw;
+}, rawCharacterSchema);
 
 export type Character = z.infer<typeof characterSchema>;
 
@@ -339,7 +374,7 @@ export function newCharacter(): Character {
     ispirazione: false,
     dadiVitaUsati: 0,
     affaticamento: 0,
-    oggettiArmonizzati: [],
+    oggettiMagici: [],
     privilegiLimitati: [],
     livelloFollia: 0,
     pesoMassimo: 0,
@@ -353,6 +388,7 @@ export function newCharacter(): Character {
     incantesimi: [],
     armi: [],
     talenti: [],
+    infusioniConosciute: [],
     note: "",
     aggiornatoAl: Date.now(),
   };

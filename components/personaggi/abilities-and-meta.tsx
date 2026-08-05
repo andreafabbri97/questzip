@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
@@ -30,9 +30,14 @@ import {
   type Ability,
   type Character,
   type LimitedFeature,
+  type MagicItem,
 } from "@/lib/dnd";
-import { loadClassData } from "@/lib/fivetools/data";
+import { loadClassData, loadItems, resolveClassFeatures, resolveSubclassFeatures } from "@/lib/fivetools/data";
+import { Autocomplete } from "./autocomplete";
+import { CompendioInfoButton } from "./compendio-info-button";
 import { rollDie } from "./helpers";
+import { LocalInfoButton } from "./local-info-button";
+import type { SimpleEntryData } from "./simple-entry-modal";
 
 export function DeathSaves({
   character,
@@ -250,46 +255,62 @@ export function AttunedItemsSection({
   character: Character;
   onChange: (character: Character) => void;
 }) {
-  const items = character.oggettiArmonizzati;
-  const setItems = (next: string[]) => onChange({ ...character, oggettiArmonizzati: next });
+  const items = character.oggettiMagici;
+  const setItems = (next: MagicItem[]) => onChange({ ...character, oggettiMagici: next });
+  const updateItem = (id: string, patch: Partial<MagicItem>) =>
+    setItems(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+
+  // 3 è il tetto RAW di base per l'armonizzazione, ma solo un promemoria: alcune classi/oggetti
+  // (es. Fabbro da Battaglia, Anello di Sintonia Spirituale) lo alzano legittimamente, quindi non
+  // blocca più l'aggiunta di nuove spunte oltre quel numero.
+  const armonizzatiCount = items.filter((item) => item.armonizzato).length;
 
   return (
     <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
       <div className="flex items-center justify-between">
-        {/* Il tetto di 3 è una regola RAW fissa, non una preferenza — per questo il bottone
-            "+ Aggiungi" sparisce del tutto oltre 3 invece di limitarsi a disabilitarlo. */}
-        <span className="text-[10px] uppercase tracking-widest text-muted">
-          Oggetti magici armonizzati
+        <span className="text-[10px] uppercase tracking-widest text-muted">Oggetti magici</span>
+        <span className={`text-xs ${armonizzatiCount > 3 ? "text-accent-strong font-bold" : "text-muted"}`}>
+          {armonizzatiCount}/3 armonizzati
         </span>
-        <span className="text-xs text-muted">{items.length}/3</span>
       </div>
-      {items.map((nome, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <input
-            value={nome}
-            onChange={(event) =>
-              setItems(items.map((v, i) => (i === index ? event.target.value : v)))
-            }
-            placeholder="Nome oggetto"
-            className="input-focus flex-1 rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground"
-          />
-          <button
-            onClick={() => setItems(items.filter((_, i) => i !== index))}
-            className="text-muted hover:text-danger text-sm shrink-0"
-            aria-label="Rimuovi oggetto armonizzato"
-          >
-            ×
-          </button>
+      {items.map((item) => (
+        <div key={item.id} className="space-y-1">
+          <div className="flex items-center gap-2">
+            <label className="flex items-center shrink-0" title="Armonizzato">
+              <input
+                type="checkbox"
+                checked={item.armonizzato}
+                onChange={(event) => updateItem(item.id, { armonizzato: event.target.checked })}
+                aria-label={`${item.nome || "Oggetto"} armonizzato`}
+              />
+            </label>
+            <div className="flex-1 min-w-0">
+              <Autocomplete
+                value={item.nome}
+                onChange={(nome) => updateItem(item.id, { nome })}
+                loader={loadItems}
+                placeholder="Nome oggetto magico"
+                inputClassName="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground"
+                kind="oggetti"
+              />
+            </div>
+            <button
+              onClick={() => setItems(items.filter((i) => i.id !== item.id))}
+              className="text-muted hover:text-danger text-sm shrink-0"
+              aria-label={`Rimuovi ${item.nome || "oggetto magico"}`}
+            >
+              ×
+            </button>
+          </div>
+          <CompendioInfoButton kind="oggetti" nome={item.nome} />
         </div>
       ))}
-      {items.length < 3 && (
-        <button
-          onClick={() => setItems([...items, ""])}
-          className="text-xs font-bold text-accent-strong hover:underline"
-        >
-          + Aggiungi
-        </button>
-      )}
+      <button
+        onClick={() => setItems([...items, { id: crypto.randomUUID(), nome: "", armonizzato: true }])}
+        className="text-xs font-bold text-accent-strong hover:underline"
+      >
+        + Aggiungi
+      </button>
     </div>
   );
 }
@@ -306,6 +327,43 @@ export function LimitedFeaturesSection({
     onChange({ ...character, privilegiLimitati: next });
   const updateFeature = (id: string, patch: Partial<LimitedFeature>) =>
     setFeatures(features.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+
+  // I privilegi a usi limitati non sono una categoria del Compendio a sé (vivono dentro i dati
+  // delle classi/sottoclassi) — la ricerca si limita a QUELLE del personaggio invece che a tutte
+  // le classi esistenti, dato che un privilegio come "Rabbia" ha senso solo lì.
+  const loadFeatureCandidates = useCallback(async (): Promise<SimpleEntryData[]> => {
+    const data = await loadClassData();
+    const results: SimpleEntryData[] = [];
+    for (const entry of character.classi) {
+      const canonical = canonicalClassName(entry.nome).toLowerCase();
+      if (!canonical) continue;
+      const cls = data.classes.find((c) => c.name.toLowerCase() === canonical);
+      if (cls) {
+        for (const feature of resolveClassFeatures(data, cls)) {
+          results.push({
+            title: feature.name,
+            meta: `${cls.name} — liv. ${feature.level}`,
+            entries: feature.entries,
+          });
+        }
+      }
+      if (entry.sottoclasse) {
+        const subclass = data.subclasses.find(
+          (s) => s.name === entry.sottoclasse && s.className.toLowerCase() === canonical,
+        );
+        if (subclass) {
+          for (const feature of resolveSubclassFeatures(data, subclass)) {
+            results.push({
+              title: feature.name,
+              meta: `${subclass.name} — liv. ${feature.level}`,
+              entries: feature.entries,
+            });
+          }
+        }
+      }
+    }
+    return results;
+  }, [character.classi]);
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -332,56 +390,56 @@ export function LimitedFeaturesSection({
       ) : (
         <ul className="space-y-2">
           {features.map((f) => (
-            <li
-              key={f.id}
-              className="rounded-lg border border-edge bg-surface-raised p-3 flex flex-wrap items-center gap-3"
-            >
-              <input
-                value={f.nome}
-                onChange={(event) => updateFeature(f.id, { nome: event.target.value })}
-                placeholder="Nome (es. Rabbia)"
-                className="input-focus flex-1 min-w-[140px] rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
-              />
-              <label className="flex items-center gap-1.5 text-xs text-muted shrink-0">
-                Max
-                <IntField
-                  min={1}
-                  max={99}
-                  value={f.usiMax}
-                  onChange={(value) =>
-                    updateFeature(f.id, { usiMax: value, usiUsati: Math.min(f.usiUsati, value) })
-                  }
-                  className="w-12 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+            <li key={f.id} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  value={f.nome}
+                  onChange={(event) => updateFeature(f.id, { nome: event.target.value })}
+                  placeholder="Nome (es. Rabbia)"
+                  className="input-focus flex-1 min-w-[140px] rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
                 />
-              </label>
-              <select
-                value={f.recupero}
-                onChange={(event) =>
-                  updateFeature(f.id, {
-                    recupero: event.target.value as LimitedFeature["recupero"],
-                  })
-                }
-                className="shrink-0 rounded-md border border-edge bg-surface px-1.5 py-1 text-xs text-foreground"
-              >
-                {RECUPERO_OPTIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {RECUPERO_LABELS[r]}
-                  </option>
-                ))}
-              </select>
-              <SlotCounter
-                label="Usi"
-                max={f.usiMax}
-                used={f.usiUsati}
-                onChange={(used) => updateFeature(f.id, { usiUsati: used })}
-              />
-              <button
-                onClick={() => setFeatures(features.filter((x) => x.id !== f.id))}
-                className="text-muted hover:text-danger text-sm shrink-0"
-                aria-label={`Rimuovi ${f.nome || "privilegio"}`}
-              >
-                ×
-              </button>
+                <label className="flex items-center gap-1.5 text-xs text-muted shrink-0">
+                  Max
+                  <IntField
+                    min={1}
+                    max={99}
+                    value={f.usiMax}
+                    onChange={(value) =>
+                      updateFeature(f.id, { usiMax: value, usiUsati: Math.min(f.usiUsati, value) })
+                    }
+                    className="w-12 rounded-md border border-edge bg-surface px-1.5 py-1 text-sm text-foreground text-center"
+                  />
+                </label>
+                <select
+                  value={f.recupero}
+                  onChange={(event) =>
+                    updateFeature(f.id, {
+                      recupero: event.target.value as LimitedFeature["recupero"],
+                    })
+                  }
+                  className="shrink-0 rounded-md border border-edge bg-surface px-1.5 py-1 text-xs text-foreground"
+                >
+                  {RECUPERO_OPTIONS.map((r) => (
+                    <option key={r} value={r}>
+                      {RECUPERO_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
+                <SlotCounter
+                  label="Usi"
+                  max={f.usiMax}
+                  used={f.usiUsati}
+                  onChange={(used) => updateFeature(f.id, { usiUsati: used })}
+                />
+                <button
+                  onClick={() => setFeatures(features.filter((x) => x.id !== f.id))}
+                  className="text-muted hover:text-danger text-sm shrink-0"
+                  aria-label={`Rimuovi ${f.nome || "privilegio"}`}
+                >
+                  ×
+                </button>
+              </div>
+              <LocalInfoButton nome={f.nome} loadCandidates={loadFeatureCandidates} />
             </li>
           ))}
         </ul>

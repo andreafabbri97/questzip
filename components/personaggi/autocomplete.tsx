@@ -18,7 +18,10 @@ export function Autocomplete<T extends { name: string; source: string }>({
   loader: () => Promise<T[]>;
   placeholder: string;
   inputClassName: string;
-  kind: CompendiumKind;
+  // Assente per elenchi che non sono una categoria del Compendio a sé (es. le infusioni
+  // dell'Artefice, vedi InfusionsSection) — in quel caso niente suggerimento in italiano, dato
+  // che non esiste una mappa di traduzione ufficiale/IA da interrogare per quella categoria.
+  kind?: CompendiumKind;
 }) {
   const [options, setOptions] = useState<T[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -85,7 +88,7 @@ export function Autocomplete<T extends { name: string; source: string }>({
                 className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface transition-colors"
               >
                 {option.name}
-                <ItalianHint text={option.name} kind={kind} source={option.source} />
+                {kind && <ItalianHint text={option.name} kind={kind} source={option.source} />}
               </button>
             </li>
           ))}

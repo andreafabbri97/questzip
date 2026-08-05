@@ -11,6 +11,7 @@ import {
   type KnownFeat,
   type KnownSpell,
   type LimitedFeature,
+  type MagicItem,
   type Weapon,
 } from "@/lib/dnd";
 
@@ -503,13 +504,16 @@ export async function importCharacterFromPdf(bytes: ArrayBuffer): Promise<Charac
     .filter(Boolean)
     .map((nome) => ({ id: crypto.randomUUID(), nome }));
 
-  const oggettiArmonizzati = [
+  // Il template PDF ha solo 3 campi dedicati (limite RAW dell'epoca) — importati come già
+  // armonizzati, dato che sulla scheda cartacea "oggetti magici" era di fatto solo questa sezione.
+  const oggettiMagici: MagicItem[] = [
     text.get("AttunedMagic 1"),
     text.get("AttunedMagic 2"),
     text.get("AttunedMagic 3"),
   ]
     .map((v) => v?.trim())
-    .filter((v): v is string => !!v);
+    .filter((v): v is string => !!v)
+    .map((nome) => ({ id: crypto.randomUUID(), nome, armonizzato: true }));
 
   const linguaggi = [text.get("Languages 1"), text.get("Languages 2")]
     .filter((v): v is string => !!v)
@@ -570,7 +574,7 @@ export async function importCharacterFromPdf(bytes: ArrayBuffer): Promise<Charac
     ispirazione: [1, 2, 3, 4].some((n) => check.get(`insp${n}`)),
     affaticamento: clamp(toInt(text.get("Exhaustion"), 0), 0, 6),
     livelloFollia: clamp(toInt(text.get("MadnessLvl"), 0), 0, 6),
-    oggettiArmonizzati,
+    oggettiMagici,
     privilegiLimitati: parseLimitedFeatures(text, check),
     linguaggi,
     inventario: parseInventory(text),

@@ -136,3 +136,36 @@ export async function searchMentionCandidates(query: string, limit = 8): Promise
     .filter((c) => c.name.toLowerCase().includes(q) || c.nameIta?.toLowerCase().includes(q))
     .slice(0, limit);
 }
+
+// Ignora maiuscole/accenti/punteggiatura — stessa euristica già in uso altrove nel progetto
+// (es. normalizeItaName in inventory-equipment.tsx) per far combaciare un nome italiano digitato
+// a mano con quello ufficiale/IA anche se differiscono per un accento o un apostrofo.
+function normalizeCompendioName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Trova la voce di Compendio (nome inglese + fonte, per alimentare MentionModal) il cui nome
+ * combacia ESATTAMENTE (non una sottostringa) con quanto scritto a mano in un campo libero della
+ * scheda personaggio — talento, incantesimo, oggetto — provando sia il nome inglese sia quello
+ * italiano (ufficiale o auto-tradotto dall'IA). Se il giocatore ha scritto un nome che non esiste
+ * nel Compendio, ritorna null: il campo resta testo libero, niente errore.
+ */
+export async function findCompendioMatch(
+  kind: CompendiumKind,
+  nome: string,
+): Promise<{ name: string; source: string } | null> {
+  const q = normalizeCompendioName(nome);
+  if (!q) return null;
+  const all = await loadAllMentionCandidates();
+  const found = all.find(
+    (c) =>
+      c.kind === kind &&
+      (normalizeCompendioName(c.name) === q || (c.nameIta && normalizeCompendioName(c.nameIta) === q)),
+  );
+  return found ? { name: found.name, source: found.source } : null;
+}

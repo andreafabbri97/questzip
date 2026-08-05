@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { IntField } from "@/components/int-field";
-import { getOggettiIta, getTalentiIta } from "@/app/actions/compendio-ita";
-import { useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
 import {
   CONDIZIONI_5E,
   DAMAGE_TYPES,
@@ -13,15 +11,9 @@ import {
   type InventoryItem,
   type KnownFeat,
 } from "@/lib/dnd";
-import {
-  loadFeats,
-  loadInventoryItems,
-  type RawFeat,
-  type RawItem,
-} from "@/lib/fivetools/data";
-import { RenderEntries } from "@/lib/fivetools/entries";
-import { useTranslatedText } from "@/lib/fivetools/translate";
+import { loadFeats, loadInventoryItems } from "@/lib/fivetools/data";
 import { Autocomplete } from "./autocomplete";
+import { CompendioInfoButton } from "./compendio-info-button";
 
 export function PersonalitySection({
   character,
@@ -230,103 +222,12 @@ export function InventorySection({
                 />
                 <span className="text-[10px] text-muted">kg</span>
               </label>
-              <InventoryItemInfo nome={item.nome} />
+              <CompendioInfoButton kind="oggetti" nome={item.nome} />
             </div>
           ))}
         </div>
       )}
     </section>
-  );
-}
-
-// confronta i nomi ignorando maiuscole/accenti/punteggiatura, stessa euristica usata nel
-// Compendio (app/compendio/page.tsx) per far combaciare il nome italiano ufficiale con la
-// traduzione automatica del nome inglese
-function normalizeItaName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]/g, "");
-}
-
-const ITEM_RARITY_LABELS: Record<string, string> = {
-  common: "comune",
-  uncommon: "non comune",
-  rare: "raro",
-  "very rare": "molto raro",
-  legendary: "leggendario",
-  artifact: "artefatto",
-};
-
-function InventoryItemInfo({ nome }: { nome: string }) {
-  const [showInfo, setShowInfo] = useState(false);
-  const [items, setItems] = useState<RawItem[] | null>(null);
-  const [oggettiIta, setOggettiIta] = useState<Awaited<ReturnType<typeof getOggettiIta>> | null>(
-    null,
-  );
-
-  useEffect(() => {
-    loadInventoryItems().then(setItems);
-  }, []);
-
-  const match = items?.find((i) => i.name.toLowerCase() === nome.trim().toLowerCase()) ?? null;
-  const ia = useTraduzioneIa("oggetti", match?.name ?? "", match?.source ?? "", !!match);
-  const liveTranslatedName = useTranslatedText(match?.name, "en", "it");
-  const translatedName = ia?.nomeIta ?? liveTranslatedName;
-
-  useEffect(() => {
-    if (!showInfo || !match) return;
-    let cancelled = false;
-    getOggettiIta().then((data) => {
-      if (!cancelled) setOggettiIta(data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [showInfo, match]);
-
-  if (!match) return null;
-
-  const rarity = match.rarity ? (ITEM_RARITY_LABELS[match.rarity] ?? match.rarity) : null;
-  const attunement = match.reqAttune ? "richiede sintonia" : null;
-
-  const ufficiale =
-    oggettiIta && translatedName
-      ? (oggettiIta.find((o) => normalizeItaName(o.nome) === normalizeItaName(translatedName)) ?? null)
-      : null;
-
-  return (
-    <div className="pt-1 border-t border-edge/60">
-      <button
-        onClick={() => setShowInfo((prev) => !prev)}
-        className="text-xs font-bold text-accent-strong hover:underline"
-      >
-        {[rarity, attunement].filter(Boolean).join(" · ") || "Dettagli"}
-        {" — "}
-        {showInfo ? "Nascondi" : "Come funziona"}
-      </button>
-      {showInfo && (
-        <div className="mt-2">
-          {ufficiale ? (
-            <>
-              <p className="text-[10px] font-bold text-accent-strong mb-1">📖 Testo ufficiale</p>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                {ufficiale.descrizione}
-              </p>
-            </>
-          ) : ia?.descrizioneIta ? (
-            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-              {ia.descrizioneIta}
-            </p>
-          ) : match.entries ? (
-            <RenderEntries entries={match.entries} />
-          ) : (
-            <p className="text-sm text-muted">Nessuna descrizione disponibile.</p>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -493,78 +394,11 @@ export function TalentiSection({
                 ×
               </button>
             </div>
-            <FeatInfo nome={talento.nome} />
+            <CompendioInfoButton kind="talenti" nome={talento.nome} />
           </div>
         ))}
       </div>
     </section>
-  );
-}
-
-function FeatInfo({ nome }: { nome: string }) {
-  const [showInfo, setShowInfo] = useState(false);
-  const [feats, setFeats] = useState<RawFeat[] | null>(null);
-  const [talentiIta, setTalentiIta] = useState<Awaited<ReturnType<typeof getTalentiIta>> | null>(
-    null,
-  );
-
-  useEffect(() => {
-    loadFeats().then(setFeats);
-  }, []);
-
-  const match = feats?.find((f) => f.name.toLowerCase() === nome.trim().toLowerCase()) ?? null;
-  const ia = useTraduzioneIa("talenti", match?.name ?? "", match?.source ?? "", !!match);
-  const liveTranslatedName = useTranslatedText(match?.name, "en", "it");
-  const translatedName = ia?.nomeIta ?? liveTranslatedName;
-
-  useEffect(() => {
-    if (!showInfo || !match) return;
-    let cancelled = false;
-    getTalentiIta().then((data) => {
-      if (!cancelled) setTalentiIta(data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [showInfo, match]);
-
-  if (!match) return null;
-
-  const ufficiale =
-    talentiIta && translatedName
-      ? (talentiIta.find((t) => normalizeItaName(t.nome) === normalizeItaName(translatedName)) ?? null)
-      : null;
-
-  return (
-    <div className="pt-1 border-t border-edge/60">
-      <button
-        onClick={() => setShowInfo((prev) => !prev)}
-        className="text-xs font-bold text-accent-strong hover:underline"
-      >
-        {showInfo ? "Nascondi" : "Come funziona"}
-      </button>
-      {showInfo && (
-        <div className="mt-2">
-          {ufficiale ? (
-            <>
-              <p className="text-[10px] font-bold text-accent-strong mb-1">📖 Testo ufficiale</p>
-              {ufficiale.prerequisito && (
-                <p className="text-xs text-muted mb-1">Prerequisiti: {ufficiale.prerequisito}</p>
-              )}
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                {ufficiale.descrizione}
-              </p>
-            </>
-          ) : ia?.descrizioneIta ? (
-            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-              {ia.descrizioneIta}
-            </p>
-          ) : (
-            <RenderEntries entries={match.entries} />
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 

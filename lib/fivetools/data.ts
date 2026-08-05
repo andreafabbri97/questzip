@@ -116,6 +116,17 @@ export interface RawCondition {
   entries: FiveEntry[];
 }
 
+export interface RawOptionalFeature {
+  name: string;
+  source: string;
+  featureType?: string[];
+  prerequisite?: {
+    level?: { level: number; class?: { name: string } };
+    item?: string[];
+  }[];
+  entries: FiveEntry[];
+}
+
 export type TableCell = string | number | { type: string; value?: number };
 
 export interface ClassTableGroup {
@@ -188,6 +199,9 @@ interface BackgroundsFile {
 interface ConditionsFile {
   condition: RawCondition[];
   disease: RawCondition[];
+}
+interface OptionalFeaturesFile {
+  optionalfeature: RawOptionalFeature[];
 }
 interface ClassFile {
   class: RawClass[];
@@ -305,6 +319,21 @@ export interface ClassData {
   subclasses: RawSubclass[];
   subclassFeatures: RawSubclassFeature[];
   classFeatures: RawClassFeature[];
+}
+
+let infusionsPromise: Promise<RawOptionalFeature[]> | null = null;
+/**
+ * Infusioni dell'Artefice — 5etools non le modella come una categoria a sé ma come "optional
+ * feature" di tipo AI ("Artificer Infusion"), nello stesso file condiviso con stili di
+ * combattimento, invocazioni occulte, manovre del Guerriero ecc., qui filtrati via.
+ */
+export function loadInfusions(): Promise<RawOptionalFeature[]> {
+  if (!infusionsPromise) {
+    infusionsPromise = fetchJson<OptionalFeaturesFile>(`${RAW_BASE}/optionalfeatures.json`).then(
+      (file) => (file?.optionalfeature ?? []).filter((f) => f.featureType?.includes("AI")),
+    );
+  }
+  return infusionsPromise;
 }
 
 let classDataPromise: Promise<ClassData> | null = null;

@@ -40,7 +40,7 @@ import {
   PersonalitySection,
   TalentiSection,
 } from "./inventory-equipment";
-import { SpellListSection, WeaponsSection } from "./weapons-spells";
+import { InfusionsSection, SpellListSection, WeaponsSection } from "./weapons-spells";
 import {
   AbilityScoreSection,
   AttunedItemsSection,
@@ -488,6 +488,7 @@ export function CharacterSheet({
         <div className="space-y-6">
           <SpellSlotsSection character={character} onChange={onChange} />
           <SpellListSection character={character} onChange={onChange} />
+          <InfusionsSection character={character} onChange={onChange} />
         </div>
       )}
 
