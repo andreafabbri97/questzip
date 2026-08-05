@@ -36,24 +36,34 @@ export function usePartyRoom(args: PartyRoomArgs | null, onMessage: (data: unkno
     let socket: PartySocket | null = null;
 
     (async () => {
-      const res = await fetch("/api/party-token", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(args),
-      });
-      if (!res.ok || cancelled) return;
-      const { token, room } = (await res.json()) as { token: string; room: string };
-      if (cancelled) return;
+      // try/catch attorno all'intera richiesta: se la sessione scade mentre la scheda resta
+      // aperta, il middleware di autenticazione (proxy.ts) reindirizza questa richiesta alla
+      // pagina di login HTML invece di rispondere con JSON — res.ok resta true (redirect seguito
+      // fino a una 200 finale), ma res.json() lancerebbe un'eccezione qui dentro una promise
+      // "fire and forget", senza nessuno pronto a intercettarla. Stesso principio di
+      // "degrada invece di rompersi" già usato per lib/gemini.ts, lib/push.ts, lib/party.ts.
+      try {
+        const res = await fetch("/api/party-token", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(args),
+        });
+        if (!res.ok || cancelled) return;
+        const { token, room } = (await res.json()) as { token: string; room: string };
+        if (cancelled) return;
 
-      socket = new PartySocket({ host, party: "main", room, query: { token } });
-      socket.addEventListener("message", (event) => {
-        try {
-          onMessageRef.current(JSON.parse(event.data as string));
-        } catch {
-          // messaggio non JSON: ignorato
-        }
-      });
-      socketRef.current = socket;
+        socket = new PartySocket({ host, party: "main", room, query: { token } });
+        socket.addEventListener("message", (event) => {
+          try {
+            onMessageRef.current(JSON.parse(event.data as string));
+          } catch {
+            // messaggio non JSON: ignorato
+          }
+        });
+        socketRef.current = socket;
+      } catch {
+        // realtime non disponibile per questa sessione: il resto dell'app funziona comunque
+      }
     })();
 
     return () => {

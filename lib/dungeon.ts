@@ -10,6 +10,21 @@
 // solo nel pennello della tela vuota (il generatore procedurale resta solo dungeon) — stesso
 // identico motore a griglia (token, fog of war, note stanza), solo altri colori/nomi.
 export type CellType = "wall" | "floor" | "door" | "corridor" | "grass" | "tree" | "water" | "rock";
+// Elenco canonico dei valori validi — usato per validare le celle inviate dal client prima di
+// scriverle sul dungeon (vedi updateDungeonCells in app/actions/dungeons.ts): senza questo
+// controllo, un valore non valido finirebbe silenziosamente trattato come "non muro" (quindi
+// sempre visibile/attraversabile) dalla logica di fog of war in getDungeon, che confronta solo
+// `cell === "wall"`.
+export const CELL_TYPES: CellType[] = [
+  "wall",
+  "floor",
+  "door",
+  "corridor",
+  "grass",
+  "tree",
+  "water",
+  "rock",
+];
 export type RoomShape = "rectangular" | "organic" | "circular" | "polygonal";
 export type RoomDensity = "sparse" | "scattered" | "dense" | "symmetric";
 export type CorridorStyle = "straight" | "errant" | "labyrinth";
@@ -53,8 +68,9 @@ export interface MonsterToken {
 // Template area d'effetto (cerchio/cono/linea), stile Roll20: disegnato trascinando sulla mappa
 // per vedere subito chi/cosa ci finisce dentro (es. una palla di fuoco), effimero — non
 // persistito su database, solo un messaggio realtime che ogni client mostra per qualche secondo
-// e poi lascia scadere (vedi VoiceChatPanel/template handling in app/campagne/page.tsx per lo
-// stesso principio di "contenuto a bassa fiducia, nessuna scrittura sul server").
+// e poi lascia scadere (vedi VoiceChatPanel in components/campagne/session-tools.tsx e il
+// template handling in components/campagne/dungeon-editor.tsx per lo stesso principio di
+// "contenuto a bassa fiducia, nessuna scrittura sul server").
 export type TemplateShape = "circle" | "cone" | "line";
 
 export interface AoeTemplate {

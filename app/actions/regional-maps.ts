@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { campaignRegionalMaps } from "@/lib/db/schema";
-import type { RegionalMarker, TerrainType } from "@/lib/regional-map";
+import { TERRAIN_TYPES, type RegionalMarker, type TerrainType } from "@/lib/regional-map";
 
 // Nessun realtime qui (a differenza del dungeon): la mappa regionale è una risorsa di
 // riferimento che il master prepara fra una sessione e l'altra, non qualcosa che cambia
@@ -75,6 +75,10 @@ export async function updateRegionalMapCells(mapId: string, cells: TerrainType[]
 
   if (cells.length !== map.height || cells.some((row) => row.length !== map.width)) {
     throw new Error("Dimensioni della mappa non valide.");
+  }
+  const validCells = new Set<string>(TERRAIN_TYPES);
+  if (cells.some((row) => row.some((cell) => !validCells.has(cell)))) {
+    throw new Error("Contenuto della mappa non valido.");
   }
   await db.update(campaignRegionalMaps).set({ cells }).where(eq(campaignRegionalMaps.id, mapId));
 }

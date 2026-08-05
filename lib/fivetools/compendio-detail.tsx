@@ -122,7 +122,7 @@ export type TraduzioneIaRow = Awaited<ReturnType<typeof getTraduzioniIa>>[number
 // Nome/descrizione dalla cache IA per una voce di primo livello del Compendio: kind+name+source
 // combaciano esattamente (sono le stesse chiavi inglesi di 5etools), a differenza del match col
 // testo ufficiale che deve confrontare nomi in lingue diverse via normalizeItaName. Esportata:
-// riusata anche fuori da questo file (es. app/personaggi/page.tsx per l'autocompletamento),
+// riusata anche fuori da questo file (es. components/personaggi/autocomplete.tsx),
 // stesso principio già in uso per EntryDetail nel modal delle menzioni in chat.
 export function useTraduzioneIa(
   kind: CompendiumKind,

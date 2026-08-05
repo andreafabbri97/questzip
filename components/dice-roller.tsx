@@ -556,8 +556,9 @@ export function DiceRoller() {
 
 type RollMode = "normale" | "vantaggio" | "svantaggio";
 
-/** Stesso identico pattern di DeleteCharacterModal (app/personaggi/page.tsx) — un modal custom
- * invece di window.confirm(), che l'utente ha esplicitamente chiesto di evitare qui. */
+/** Stesso identico pattern di DeleteCharacterModal (components/personaggi/character-sheet-core.tsx)
+ * — un modal custom invece di window.confirm(), che l'utente ha esplicitamente chiesto di
+ * evitare qui. */
 function ClearHistoryConfirmModal({
   onConfirm,
   onCancel,

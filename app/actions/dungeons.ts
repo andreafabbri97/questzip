@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireDm, requireMember, requireUserId } from "@/lib/campaign-auth";
 import { campaignCharacters, campaignDungeons, dungeonTokens, users } from "@/lib/db/schema";
 import {
+  CELL_TYPES,
   computeVisibleCells,
   generateDungeon,
   generateOutdoorScene,
@@ -201,6 +202,10 @@ export async function updateDungeonCells(dungeonId: string, cells: CellType[][])
 
   if (cells.length !== dungeon.height || cells.some((row) => row.length !== dungeon.width)) {
     throw new Error("Dimensioni della mappa non valide.");
+  }
+  const validCells = new Set<string>(CELL_TYPES);
+  if (cells.some((row) => row.some((cell) => !validCells.has(cell)))) {
+    throw new Error("Contenuto della mappa non valido.");
   }
   await db.update(campaignDungeons).set({ cells }).where(eq(campaignDungeons.id, dungeonId));
   await broadcastDungeonChanged(dungeonId);

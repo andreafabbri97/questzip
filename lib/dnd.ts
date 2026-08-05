@@ -1,4 +1,30 @@
 import { z } from "zod";
+import {
+  ALIGNMENTS,
+  CONDIZIONI_5E,
+  DAMAGE_TYPES,
+  FULL_CASTER_SLOTS,
+  LANGUAGES,
+  LIVELLO_FOLLIA_EFFETTI,
+  PACT_MAGIC,
+  POINT_BUY_COST,
+  SKILLS,
+  XP_BY_CR,
+  XP_THRESHOLDS,
+} from "./dnd-tables";
+
+// Tabelle pure spostate in dnd-tables.ts per dimensione del file — ri-esportate qui così tutti i
+// call site esistenti (`import { SKILLS } from "@/lib/dnd"`) restano validi senza modifiche.
+export {
+  ALIGNMENTS,
+  CONDIZIONI_5E,
+  DAMAGE_TYPES,
+  LANGUAGES,
+  LIVELLO_FOLLIA_EFFETTI,
+  POINT_BUY_COST,
+  SKILLS,
+  XP_BY_CR,
+};
 
 export const ABILITIES = [
   "forza",
@@ -30,27 +56,6 @@ export const ABILITY_CODE_TO_KEY: Record<string, Ability> = {
   cha: "carisma",
 };
 
-export const SKILLS: { nome: string; abilita: Ability }[] = [
-  { nome: "Acrobazia", abilita: "destrezza" },
-  { nome: "Addestrare Animali", abilita: "saggezza" },
-  { nome: "Arcano", abilita: "intelligenza" },
-  { nome: "Atletica", abilita: "forza" },
-  { nome: "Furtività", abilita: "destrezza" },
-  { nome: "Indagare", abilita: "intelligenza" },
-  { nome: "Inganno", abilita: "carisma" },
-  { nome: "Intimidire", abilita: "carisma" },
-  { nome: "Intrattenere", abilita: "carisma" },
-  { nome: "Intuizione", abilita: "saggezza" },
-  { nome: "Medicina", abilita: "saggezza" },
-  { nome: "Natura", abilita: "intelligenza" },
-  { nome: "Percezione", abilita: "saggezza" },
-  { nome: "Persuasione", abilita: "carisma" },
-  { nome: "Rapidità di Mano", abilita: "destrezza" },
-  { nome: "Religione", abilita: "intelligenza" },
-  { nome: "Sopravvivenza", abilita: "saggezza" },
-  { nome: "Storia", abilita: "intelligenza" },
-];
-
 export const abilityScoresSchema = z.object({
   forza: z.number().int().min(1).max(30),
   destrezza: z.number().int().min(1).max(30),
@@ -59,6 +64,8 @@ export const abilityScoresSchema = z.object({
   saggezza: z.number().int().min(1).max(30),
   carisma: z.number().int().min(1).max(30),
 });
+
+export type AbilityScores = z.infer<typeof abilityScoresSchema>;
 
 export const classEntrySchema = z.object({
   nome: z.string(),
@@ -91,7 +98,11 @@ export type KnownSpell = z.infer<typeof knownSpellSchema>;
 export const weaponSchema = z.object({
   id: z.string(),
   nome: z.string(),
-  caratteristica: z.enum(["forza", "destrezza", "finezza"]).default("forza"),
+  // Non solo Forza/Destrezza: alcune sottoclassi attaccano in mischia con un'altra
+  // caratteristica (es. Cavaliere Eldritch/Artefice-Fabbro da Battaglia con Intelligenza,
+  // Maledizione dello Spadaccino Warlock con Carisma) — coperte tutte e sei, più "finezza" per
+  // l'arma con proprietà Finezza (il migliore tra Forza e Destrezza, il caso più comune).
+  caratteristica: z.enum([...ABILITIES, "finezza"]).default("forza"),
   competente: z.boolean().default(true),
   bonusExtra: z.number().int().default(0),
   dadoDanno: z.string().default("1d6"),
@@ -124,64 +135,6 @@ export const knownFeatSchema = z.object({
   nome: z.string(),
 });
 export type KnownFeat = z.infer<typeof knownFeatSchema>;
-
-/** Le 16 lingue standard del PHB (8 comuni + 8 esoteriche): elenco piccolo e fisso, usato solo
- * per suggerire scelte comuni — restano comunque testo libero per lingue homebrew/regionali. */
-export const LANGUAGES = [
-  "Comune",
-  "Nanico",
-  "Elfico",
-  "Gigante",
-  "Gnomesco",
-  "Goblin",
-  "Halfling",
-  "Orchesco",
-  "Abissale",
-  "Celestiale",
-  "Draconico",
-  "Linguaggio Profondo",
-  "Infernale",
-  "Primordiale",
-  "Silvano",
-  "Sottocomune",
-] as const;
-
-/** I 13 tipi di danno standard 5e, per resistenze/immunità/vulnerabilità. */
-export const DAMAGE_TYPES = [
-  "Acido",
-  "Contundente",
-  "Freddo",
-  "Fuoco",
-  "Forza",
-  "Fulmine",
-  "Necrotico",
-  "Perforante",
-  "Veleno",
-  "Psichico",
-  "Radiante",
-  "Tagliente",
-  "Tuono",
-] as const;
-
-/** Le 14 condizioni standard 5e (stesso elenco usato per il tracker di combattimento in
- * Campagne, vedi app/campagne/page.tsx): qui serve per le condizioni attive sulla scheda
- * Personaggio anche fuori da un combattimento (es. una maledizione fra una sessione e l'altra). */
-export const CONDIZIONI_5E = [
-  "Affascinato",
-  "Afferrato",
-  "Accecato",
-  "Assordato",
-  "Avvelenato",
-  "Incapacitato",
-  "Indebolito",
-  "Invisibile",
-  "Paralizzato",
-  "Pietrificato",
-  "Prono",
-  "Spaventato",
-  "Stordito",
-  "Trattenuto",
-] as const;
 
 export const characterSchema = z.object({
   id: z.string(),
@@ -307,18 +260,6 @@ export function xpForNextLevel(level: number): number | null {
   return level >= 20 ? null : XP_PER_LEVEL[level];
 }
 
-export const ALIGNMENTS = [
-  "Legale Buono",
-  "Neutrale Buono",
-  "Caotico Buono",
-  "Legale Neutrale",
-  "Neutrale",
-  "Caotico Neutrale",
-  "Legale Malvagio",
-  "Neutrale Malvagio",
-  "Caotico Malvagio",
-] as const;
-
 export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
@@ -329,22 +270,11 @@ export function formatModifier(mod: number): string {
 
 export function proficiencyBonus(level: number): number {
   // Le regole RAW non vanno oltre livello 20 — l'editor di classi limita ogni singola classe a
-  // max 20 (vedi ClassRow in app/personaggi/page.tsx) ma non la SOMMA in multiclasse, quindi un
+  // max 20 (vedi ClassRow in components/personaggi/classes-leveling.tsx) ma non la SOMMA in multiclasse, quindi un
   // totale più alto è raggiungibile. Stesso approccio già usato per gli slot incantesimo
   // (FULL_CASTER_SLOTS): oltre il tetto si resta fermi al valore di livello 20, non si estrapola.
   return 2 + Math.floor((Math.min(20, level) - 1) / 4);
 }
-
-// Testo dell'effetto per ciascun livello di follia — tabella fornita direttamente dall'utente
-// (regola homebrew della sua campagna, non presente nei manuali ufficiali).
-export const LIVELLO_FOLLIA_EFFETTI: Record<number, string> = {
-  1: "Svantaggio sulle prove di abilità mentale e sugli incantesimi.",
-  2: "Paura di creature, luoghi e oggetti casuali decisi dal DM.",
-  3: "Svantaggio su tiri per colpire, prove di abilità e tiri salvezza.",
-  4: "Ogni ora: TS Saggezza CD 12 o pazzia a breve termine per 1d10 minuti.",
-  5: "Paralizzato mentalmente. Se resti al livello 5 dopo 1d4 giorni, sali al 6.",
-  6: "Pazzia permanente — il personaggio passa sotto il controllo del DM.",
-};
 
 // Capacità di carico in kg = Forza × 7,5 (valore indicato dall'utente per la sua campagna,
 // leggermente diverso dall'arrotondamento RAW più comune) — solo un SUGGERIMENTO mostrato in UI,
@@ -519,31 +449,33 @@ export function spellAttackBonus(level: number, abilityScore: number): number {
   return proficiencyBonus(level) + abilityModifier(abilityScore);
 }
 
+export type WeaponAbility = Ability | "finezza";
+
 /** Bonus al tiro per colpire di un'arma: modificatore di caratteristica (Finezza usa il
  * migliore tra Forza e Destrezza) + bonus di competenza se competente + eventuale bonus fisso
  * (arma magica, ecc.). Lo stesso modificatore di caratteristica si aggiunge anche ai danni. */
 export function weaponAbilityModifier(
-  caratteristica: "forza" | "destrezza" | "finezza",
-  forzaScore: number,
-  destrezzaScore: number,
+  caratteristica: WeaponAbility,
+  caratteristiche: AbilityScores,
 ): number {
-  const str = abilityModifier(forzaScore);
-  const dex = abilityModifier(destrezzaScore);
-  if (caratteristica === "forza") return str;
-  if (caratteristica === "destrezza") return dex;
-  return Math.max(str, dex);
+  if (caratteristica === "finezza") {
+    return Math.max(
+      abilityModifier(caratteristiche.forza),
+      abilityModifier(caratteristiche.destrezza),
+    );
+  }
+  return abilityModifier(caratteristiche[caratteristica]);
 }
 
 export function weaponAttackBonus(
-  caratteristica: "forza" | "destrezza" | "finezza",
-  forzaScore: number,
-  destrezzaScore: number,
+  caratteristica: WeaponAbility,
+  caratteristiche: AbilityScores,
   competente: boolean,
   level: number,
   bonusExtra: number,
 ): number {
   return (
-    weaponAbilityModifier(caratteristica, forzaScore, destrezzaScore) +
+    weaponAbilityModifier(caratteristica, caratteristiche) +
     (competente ? proficiencyBonus(level) : 0) +
     bonusExtra
   );
@@ -552,16 +484,6 @@ export function weaponAttackBonus(
 export const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const;
 
 export const POINT_BUY_BUDGET = 27;
-export const POINT_BUY_COST: Record<number, number> = {
-  8: 0,
-  9: 1,
-  10: 2,
-  11: 3,
-  12: 4,
-  13: 5,
-  14: 7,
-  15: 9,
-};
 
 export function pointBuyCost(scores: Record<Ability, number>): number {
   return ABILITIES.reduce((total, ability) => total + (POINT_BUY_COST[scores[ability]] ?? 0), 0);
@@ -618,25 +540,6 @@ export const DIFFICULTY_LABELS: Record<EncounterDifficulty, string> = {
   mortale: "Mortale",
 };
 
-/** Soglie XP per personaggio, per livello (1-20) e difficoltà. */
-const XP_THRESHOLDS: Record<EncounterDifficulty, number[]> = {
-  facile: [25, 50, 75, 125, 250, 300, 350, 450, 550, 600, 800, 1000, 1100, 1250, 1400, 1600, 2000, 2100, 2400, 2800],
-  medio: [50, 100, 150, 250, 500, 600, 750, 900, 1100, 1200, 1600, 2000, 2200, 2500, 2800, 3200, 3900, 4200, 4900, 5700],
-  difficile: [75, 150, 225, 375, 750, 900, 1100, 1400, 1600, 1900, 2400, 3000, 3400, 3800, 4300, 4800, 5900, 6300, 7300, 8500],
-  mortale: [100, 200, 400, 500, 1100, 1400, 1700, 2100, 2400, 2800, 3600, 4500, 5100, 5700, 6400, 7200, 8800, 9500, 10900, 12700],
-};
-
-/** XP per grado sfida (CR), regole standard. */
-export const XP_BY_CR: Record<string, number> = {
-  "0": 10, "1/8": 25, "1/4": 50, "1/2": 100,
-  "1": 200, "2": 450, "3": 700, "4": 1100, "5": 1800,
-  "6": 2300, "7": 2900, "8": 3900, "9": 5000, "10": 5900,
-  "11": 7200, "12": 8400, "13": 10000, "14": 11500, "15": 13000,
-  "16": 15000, "17": 18000, "18": 20000, "19": 22000, "20": 25000,
-  "21": 33000, "22": 41000, "23": 50000, "24": 62000, "25": 75000,
-  "26": 90000, "27": 105000, "28": 120000, "29": 135000, "30": 155000,
-};
-
 /** Moltiplicatore incontro in base al numero di mostri (regole standard). */
 export function encounterMultiplier(monsterCount: number): number {
   if (monsterCount <= 1) return 1;
@@ -662,32 +565,6 @@ export function adjustedEncounterXp(crXp: number, monsterCount: number): number 
 
 // --- Slot incantesimi (regole standard PHB) ---
 
-/** Slot per livello incantesimo (1°-9°), indicizzata per livello personaggio 1-20. Tabella standard
- * dei "full caster" (Bardo/Chierico/Druido/Stregone/Mago), usata anche per il livello incantatore
- * effettivo in multiclasse. */
-const FULL_CASTER_SLOTS: number[][] = [
-  [2, 0, 0, 0, 0, 0, 0, 0, 0],
-  [3, 0, 0, 0, 0, 0, 0, 0, 0],
-  [4, 2, 0, 0, 0, 0, 0, 0, 0],
-  [4, 3, 0, 0, 0, 0, 0, 0, 0],
-  [4, 3, 2, 0, 0, 0, 0, 0, 0],
-  [4, 3, 3, 0, 0, 0, 0, 0, 0],
-  [4, 3, 3, 1, 0, 0, 0, 0, 0],
-  [4, 3, 3, 2, 0, 0, 0, 0, 0],
-  [4, 3, 3, 3, 1, 0, 0, 0, 0],
-  [4, 3, 3, 3, 2, 0, 0, 0, 0],
-  [4, 3, 3, 3, 2, 1, 0, 0, 0],
-  [4, 3, 3, 3, 2, 1, 0, 0, 0],
-  [4, 3, 3, 3, 2, 1, 1, 0, 0],
-  [4, 3, 3, 3, 2, 1, 1, 0, 0],
-  [4, 3, 3, 3, 2, 1, 1, 1, 0],
-  [4, 3, 3, 3, 2, 1, 1, 1, 0],
-  [4, 3, 3, 3, 2, 1, 1, 1, 1],
-  [4, 3, 3, 3, 3, 1, 1, 1, 1],
-  [4, 3, 3, 3, 3, 2, 1, 1, 1],
-  [4, 3, 3, 3, 3, 2, 2, 1, 1],
-];
-
 const FULL_CASTERS = new Set(["bard", "cleric", "druid", "sorcerer", "wizard"]);
 const HALF_CASTERS = new Set(["paladin", "ranger"]);
 
@@ -709,20 +586,6 @@ export function spellSlotsForCasterLevel(casterLevel: number): number[] {
   if (casterLevel <= 0) return [0, 0, 0, 0, 0, 0, 0, 0, 0];
   return FULL_CASTER_SLOTS[Math.min(20, casterLevel) - 1];
 }
-
-/** Patto Magico del Warlock (livello slot, numero slot), per livello di classe Warlock 1-20. */
-const PACT_MAGIC: { slotLevel: number; slots: number }[] = [
-  { slotLevel: 1, slots: 1 }, { slotLevel: 1, slots: 2 },
-  { slotLevel: 2, slots: 2 }, { slotLevel: 2, slots: 2 },
-  { slotLevel: 3, slots: 2 }, { slotLevel: 3, slots: 2 },
-  { slotLevel: 4, slots: 2 }, { slotLevel: 4, slots: 2 },
-  { slotLevel: 5, slots: 2 }, { slotLevel: 5, slots: 2 },
-  { slotLevel: 5, slots: 3 }, { slotLevel: 5, slots: 3 },
-  { slotLevel: 5, slots: 3 }, { slotLevel: 5, slots: 3 },
-  { slotLevel: 5, slots: 3 }, { slotLevel: 5, slots: 3 },
-  { slotLevel: 5, slots: 4 }, { slotLevel: 5, slots: 4 },
-  { slotLevel: 5, slots: 4 }, { slotLevel: 5, slots: 4 },
-];
 
 export function warlockLevel(classi: { nome: string; livello: number }[]): number {
   return classi
