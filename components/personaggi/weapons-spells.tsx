@@ -17,10 +17,10 @@ import {
   type KnownSpell,
   type Weapon,
 } from "@/lib/dnd";
+import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
 import { loadInfusions, loadSpells, type RawOptionalFeature } from "@/lib/fivetools/data";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
-import { rollDie } from "./helpers";
 import { LocalInfoButton } from "./local-info-button";
 import type { SimpleEntryData } from "./simple-entry-modal";
 
@@ -52,39 +52,31 @@ export function WeaponsSection({
   const updateWeapon = (id: string, patch: Partial<Weapon>) =>
     setArmi(character.armi.map((weapon) => (weapon.id === id ? { ...weapon, ...patch } : weapon)));
 
-  const [roll, setRoll] = useState<{
-    label: string;
-    detail: string;
-    total: number;
-    crit?: boolean;
-    fumble?: boolean;
-  } | null>(null);
+  // Apre lo stesso modal dadi (3D fisico incluso) della pagina /dadi, già preimpostato per questo
+  // tiro specifico — richiesto dall'utente al posto del tiro istantaneo "invisibile" che c'era
+  // prima (nessuna animazione, solo un numero che appariva in un paragrafo di testo).
+  const [dicePreset, setDicePreset] = useState<DiceRollerPreset | null>(null);
 
-  const rollAttack = (weaponName: string, bonus: number) => {
-    const die = rollDie(20);
-    setRoll({
+  const openAttackRoll = (weaponName: string, bonus: number) => {
+    setDicePreset({
       label: `${weaponName.trim() || "Arma"} — Attacco`,
-      detail: `${die} ${formatModifier(bonus)}`,
-      total: die + bonus,
-      crit: die === 20,
-      fumble: die === 1,
+      groups: [{ die: 20, quantity: 1 }],
+      modifier: bonus,
     });
   };
 
   // "NdM" (es. "2d6") — stesso formato libero già in uso nel campo Dado danno. Un formato non
   // riconosciuto (raro, es. testo lasciato vuoto) semplicemente non mostra il bottone Danno,
-  // invece di tirare un dado a caso su un input che non è quello che l'utente intendeva.
-  const rollDamage = (weaponName: string, dadoDanno: string, mod: number) => {
+  // invece di aprire il modal su un input che non è quello che l'utente intendeva.
+  const openDamageRoll = (weaponName: string, dadoDanno: string, mod: number) => {
     const match = dadoDanno.trim().match(/^(\d+)d(\d+)$/i);
     if (!match) return;
-    const count = Math.min(20, Math.max(1, Number(match[1])));
-    const sides = Number(match[2]);
-    const rolls = Array.from({ length: count }, () => rollDie(sides));
-    const total = rolls.reduce((sum, value) => sum + value, 0) + mod;
-    setRoll({
+    const quantity = Math.min(20, Math.max(1, Number(match[1])));
+    const die = Number(match[2]);
+    setDicePreset({
       label: `${weaponName.trim() || "Arma"} — Danno`,
-      detail: `[${rolls.join(", ")}]${mod !== 0 ? ` ${formatModifier(mod)}` : ""}`,
-      total,
+      groups: [{ die, quantity }],
+      modifier: mod,
     });
   };
 
@@ -96,13 +88,7 @@ export function WeaponsSection({
           + Aggiungi arma
         </button>
       </div>
-      {roll && (
-        <p className="text-sm font-bold text-accent-strong">
-          🎲 {roll.label}: {roll.detail} = <span className="text-lg">{roll.total}</span>
-          {roll.crit && " — Colpo critico!"}
-          {roll.fumble && " — Fallimento critico…"}
-        </p>
-      )}
+      <DiceRollerModal preset={dicePreset} onClose={() => setDicePreset(null)} />
       {character.armi.length === 0 && <p className="text-sm text-muted">Nessuna arma aggiunta ancora.</p>}
       <div className="space-y-3">
         {character.armi.map((weapon) => {
@@ -204,7 +190,7 @@ export function WeaponsSection({
                 </p>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
-                    onClick={() => rollAttack(weapon.nome, bonus)}
+                    onClick={() => openAttackRoll(weapon.nome, bonus)}
                     aria-label={`Tira per colpire con ${weapon.nome || "arma"}`}
                     className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
                   >
@@ -212,7 +198,7 @@ export function WeaponsSection({
                   </button>
                   {/^\d+d\d+$/i.test(weapon.dadoDanno.trim()) && (
                     <button
-                      onClick={() => rollDamage(weapon.nome, weapon.dadoDanno, dmgMod)}
+                      onClick={() => openDamageRoll(weapon.nome, weapon.dadoDanno, dmgMod)}
                       aria-label={`Tira danno con ${weapon.nome || "arma"}`}
                       className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
                     >

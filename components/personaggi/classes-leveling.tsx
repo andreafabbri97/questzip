@@ -27,6 +27,7 @@ import {
   type RawRace,
   type RawSubclass,
 } from "@/lib/fivetools/data";
+import { DualName, EntriesBlock } from "@/lib/fivetools/compendio-detail";
 import { RenderEntries } from "@/lib/fivetools/entries";
 import { Autocomplete } from "./autocomplete";
 import { loadClassNames, rollDie } from "./helpers";
@@ -220,7 +221,10 @@ function SubclassFeaturesToggle({
         onClick={() => setShowFeatures((prev) => !prev)}
         className="text-xs font-bold text-accent-strong hover:underline"
       >
-        {showFeatures ? "Nascondi" : "Come funziona"} {subclassName}
+        {/* Le sottoclassi non hanno una voce propria nella cache ufficiale/IA (solo le 12 classi
+            base del Manuale del Giocatore ce l'hanno) — DualName senza kind/source ricade sulla
+            sola traduzione live, stesso trattamento dei nomi dei privilegi qui sotto. */}
+        {showFeatures ? "Nascondi" : "Come funziona"} <DualName text={subclassName} inline />
       </button>
       {showFeatures && (
         <div className="mt-2 space-y-3 border-t border-edge pt-3">
@@ -231,10 +235,10 @@ function SubclassFeaturesToggle({
               className="rounded-lg border border-edge bg-surface p-3"
             >
               <p className="text-sm font-bold text-foreground mb-1.5">
-                {feature.name}{" "}
+                <DualName text={feature.name} inline />{" "}
                 <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
               </p>
-              <RenderEntries entries={feature.entries} />
+              <EntriesBlock entries={feature.entries} language="it" />
             </div>
           ))}
         </div>
@@ -260,6 +264,7 @@ export function ClassFeaturesSection({ character }: { character: Character }) {
 
 function ClassFeaturesToggle({ className }: { className: string }) {
   const [showFeatures, setShowFeatures] = useState(false);
+  const [classSource, setClassSource] = useState<string | null>(null);
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
   >(null);
@@ -271,6 +276,7 @@ function ClassFeaturesToggle({ className }: { className: string }) {
       const cls = data.classes.find((c) => c.name.toLowerCase() === canonicalClassName(className).toLowerCase());
       if (!cls) return;
       setFeatures(resolveClassFeatures(data, cls));
+      setClassSource(cls.source);
     });
     return () => {
       cancelled = true;
@@ -283,7 +289,11 @@ function ClassFeaturesToggle({ className }: { className: string }) {
         onClick={() => setShowFeatures((prev) => !prev)}
         className="text-xs font-bold text-accent-strong hover:underline"
       >
-        {showFeatures ? "Nascondi" : "Come funziona"} {className}
+        {/* Le 12 classi base del Manuale del Giocatore hanno un nome ufficiale in
+            compendio_traduzione_ia/compendio_ita_classe — kind+source qui abilita quella
+            priorità (vedi DualName); le altre classi ricadono comunque sulla traduzione live. */}
+        {showFeatures ? "Nascondi" : "Come funziona"}{" "}
+        {classSource ? <DualName text={className} kind="classi" source={classSource} inline /> : className}
       </button>
       {showFeatures && (
         <div className="mt-2 space-y-3 border-t border-edge pt-3">
@@ -294,10 +304,10 @@ function ClassFeaturesToggle({ className }: { className: string }) {
               className="rounded-lg border border-edge bg-surface-raised p-3"
             >
               <p className="text-sm font-bold text-foreground mb-1.5">
-                {feature.name}{" "}
+                <DualName text={feature.name} inline />{" "}
                 <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
               </p>
-              <RenderEntries entries={feature.entries} />
+              <EntriesBlock entries={feature.entries} language="it" />
             </div>
           ))}
         </div>
@@ -744,8 +754,10 @@ export function LevelUpWizard({
                 key={feature.name}
                 className="rounded-lg border border-edge bg-surface p-3 mt-1.5"
               >
-                <p className="text-sm font-bold text-foreground mb-1.5">{feature.name}</p>
-                <RenderEntries entries={feature.entries} />
+                <p className="text-sm font-bold text-foreground mb-1.5">
+                  <DualName text={feature.name} inline />
+                </p>
+                <EntriesBlock entries={feature.entries} language="it" />
               </div>
             ))}
           </div>

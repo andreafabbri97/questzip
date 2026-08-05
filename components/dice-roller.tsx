@@ -65,11 +65,25 @@ function formatEntryTimestamp(date: Date | string): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${pad(d.getFullYear() % 100)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function DiceRoller() {
-  const [groups, setGroups] = useState<{ id: string; die: number; quantity: number }[]>(() => [
-    { id: crypto.randomUUID(), die: 20, quantity: 1 },
-  ]);
-  const [modifier, setModifier] = useState(0);
+export function DiceRoller({
+  initialGroups,
+  initialModifier = 0,
+}: {
+  // Preimpostazione per un tiro specifico (es. attacco/danno di un'arma dalla scheda Personaggio,
+  // vedi DiceRollerModal) — invece del d20 singolo di default. Letta solo al mount: questo
+  // componente non risincronizza se le prop cambiano dopo, DiceRollerModal lo rimonta con una
+  // "key" diversa per ogni preset invece di tenerlo vivo e aggiornarlo.
+  initialGroups?: { die: number; quantity: number }[];
+  initialModifier?: number;
+} = {}) {
+  const [groups, setGroups] = useState<{ id: string; die: number; quantity: number }[]>(() =>
+    (initialGroups && initialGroups.length > 0 ? initialGroups : [{ die: 20, quantity: 1 }]).map((g) => ({
+      id: crypto.randomUUID(),
+      die: g.die,
+      quantity: g.quantity,
+    })),
+  );
+  const [modifier, setModifier] = useState(initialModifier);
   const [mode, setMode] = useState<RollMode>("normale");
   const [history, setHistory] = useState<RollResult[]>([]);
   // Il salvataggio server di un tiro appena aggiunto in modo ottimistico (vedi addResult sotto) —
