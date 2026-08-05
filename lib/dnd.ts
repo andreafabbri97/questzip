@@ -193,6 +193,13 @@ export const characterSchema = z.object({
   hpTemporanei: z.number().int().min(0).default(0),
   classeArmatura: z.number().int().min(1),
   velocita: z.number().int().min(0),
+  // Iniziativa e percezione passiva sono normalmente calcolate dal vivo dalle caratteristiche
+  // (Destrezza / Saggezza+competenza), quindi restano sempre corrette dopo un level-up o un
+  // aumento di caratteristica — questi due campi sono solo un BONUS aggiuntivo sommato al
+  // calcolo, per talenti/oggetti che lo modificano direttamente (es. Allerta: +5 all'iniziativa,
+  // Attento: +5 alla percezione passiva), stesso principio di "bonusExtra" sulle armi.
+  iniziativaBonus: z.number().int().default(0),
+  percezionePassivaBonus: z.number().int().default(0),
   // Raggio di visione in metri — suggerito dalla scurovisione della razza (via Compendio) ma
   // sempre modificabile a mano, per restare valido anche quando non deriva dalla razza (talenti,
   // incantesimi, invocazioni). Si applica solo se "scurovisione" è spuntata: il numero da solo
@@ -364,6 +371,8 @@ export function newCharacter(): Character {
     hpTemporanei: 0,
     classeArmatura: 10,
     velocita: 9,
+    iniziativaBonus: 0,
+    percezionePassivaBonus: 0,
     visioneRadius: 0,
     scurovisione: false,
     vedeOscuritaMagica: false,

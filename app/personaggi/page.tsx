@@ -918,8 +918,17 @@ function CharacterSheet({
                 <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
                   <span className={labelClass}>Iniziativa</span>
                   <p className="text-lg font-bold text-foreground">
-                    {formatModifier(abilityModifier(character.caratteristiche.destrezza))}
+                    {formatModifier(
+                      abilityModifier(character.caratteristiche.destrezza) + character.iniziativaBonus,
+                    )}
                   </p>
+                  <IntField
+                    value={character.iniziativaBonus}
+                    onChange={(value) => set("iniziativaBonus", value)}
+                    className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-center text-xs text-foreground"
+                    placeholder="bonus"
+                    aria-label="Bonus extra all'iniziativa"
+                  />
                 </div>
                 <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
                   <span className={labelClass}>Percezione passiva</span>
@@ -929,8 +938,15 @@ function CharacterSheet({
                       character.abilitaCompetenti.includes("Percezione"),
                       character.abilitaEsperte.includes("Percezione"),
                       totalLevel(character.classi),
-                    )}
+                    ) + character.percezionePassivaBonus}
                   </p>
+                  <IntField
+                    value={character.percezionePassivaBonus}
+                    onChange={(value) => set("percezionePassivaBonus", value)}
+                    className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-center text-xs text-foreground"
+                    placeholder="bonus"
+                    aria-label="Bonus extra alla percezione passiva"
+                  />
                 </div>
               </div>
               <VisionField character={character} onChange={onChange} />
