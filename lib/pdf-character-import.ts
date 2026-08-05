@@ -47,7 +47,18 @@ async function readFields(bytes: ArrayBuffer): Promise<FieldValues> {
     // singolo campo nelle tabelle di mappatura sotto.
     const name = field.getName().trim();
     if (field instanceof PDFTextField) {
-      text.set(name, (field.getText() ?? "").trim());
+      // pdf-lib lancia un'eccezione su un campo "rich text" senza un valore semplice utilizzabile
+      // (es. formattazione RTF residua ma di fatto vuoto) — capitato su schede reali del gruppo
+      // (campo "AppearanceText", mai usato da QuestZip) e bastava a far fallire la lettura
+      // dell'INTERO PDF, con tutti gli altri campi validi scartati insieme a quello. Il valore
+      // vero in questi casi è comunque vuoto, quindi trattarlo come stringa vuota è corretto.
+      let value = "";
+      try {
+        value = (field.getText() ?? "").trim();
+      } catch {
+        value = "";
+      }
+      text.set(name, value);
     } else if (field instanceof PDFCheckBox) {
       check.set(name, field.isChecked());
     }
@@ -86,6 +97,16 @@ function matchAlignment(raw: string): string {
 // nomi delle classi e i livelli vivono in due campi separati sul PDF, associati per posizione
 // (stesso ordine in entrambe le liste).
 function parseClasses(classNames: string, classLevels: string): ClassEntry[] {
+  // Alcune schede reali (multiclasse) non seguono la convenzione dei due campi separati e scrivono
+  // nome+livello di ogni classe assieme in un unico campo, es. "Artefice 4 Mago 1" — se il campo
+  // nomi contiene già dei numeri, prova prima questo formato prima del percorso standard sotto.
+  if (/\d/.test(classNames)) {
+    const pairs = [...classNames.matchAll(/(\p{L}[\p{L}'\s]*?)\s+(\d{1,2})(?=\s|$)/gu)]
+      .map((m) => ({ nome: m[1].trim(), livello: clamp(toInt(m[2], 1), 1, 20) }))
+      .filter((c) => c.nome);
+    if (pairs.length > 0) return pairs;
+  }
+
   const names = classNames
     .split(/[-/]/)
     .map((s) => s.trim())
