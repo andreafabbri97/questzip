@@ -3683,6 +3683,20 @@ function DungeonViewer({
                     {BRUSH_LABELS[option]}
                   </button>
                 ))}
+                <button
+                  onClick={() => {
+                    setBrush("wall");
+                    setMarkerMode(false);
+                  }}
+                  title="Riporta la cella a muro"
+                  className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                    !markerMode && brush === "wall"
+                      ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+                      : "border-edge bg-surface text-muted hover:text-foreground"
+                  }`}
+                >
+                  🧹 Gomma
+                </button>
               </div>
               <div className="flex gap-1 pl-1 border-l border-edge">
                 {OUTDOOR_BRUSHES.map((option) => (
@@ -3701,6 +3715,20 @@ function DungeonViewer({
                     {BRUSH_LABELS[option]}
                   </button>
                 ))}
+                <button
+                  onClick={() => {
+                    setBrush("grass");
+                    setMarkerMode(false);
+                  }}
+                  title="Riporta la cella a erba"
+                  className={`rounded-md border px-2 py-1 text-xs font-bold transition-colors ${
+                    !markerMode && brush === "grass"
+                      ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+                      : "border-edge bg-surface text-muted hover:text-foreground"
+                  }`}
+                >
+                  🧹 Gomma
+                </button>
               </div>
               <button
                 onClick={() => setMarkerMode((prev) => !prev)}

@@ -178,5 +178,19 @@ export async function importCharacterFromPdfWithAi(
     throw new Error("L'IA non è riuscita a leggere questo file in un formato utilizzabile.");
   }
 
-  return characterSchema.parse(mapAiResultToCharacter(parsed));
+  // characterSchema.parse() può rifiutare l'oggetto costruito da mapAiResultToCharacter se
+  // l'IA ha restituito dati fuori dai vincoli che mapAiResultToCharacter non copre (es. una
+  // combinazione di campi imprevista) — un ZodError qui, se lasciato risalire com'è, arriva al
+  // client come il generico "An error occurred in the Server Components render" di Next.js in
+  // produzione (il messaggio tecnico viene redatto), invece del messaggio italiano già pronto
+  // per gli altri casi di fallimento di questa stessa funzione. Stessa sorte per qualunque altra
+  // eccezione imprevista qui sotto: mai lasciarne uscire una "grezza".
+  try {
+    return characterSchema.parse(mapAiResultToCharacter(parsed));
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Non sono riuscito a leggere")) throw err;
+    throw new Error(
+      "L'IA ha letto il file ma non è riuscita a estrarre una scheda personaggio valida. Prova con un altro file o inseriscila a mano.",
+    );
+  }
 }

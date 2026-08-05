@@ -16,6 +16,7 @@ import {
   getOggettiIta,
   getRazzeIta,
   getTalentiIta,
+  getTraduzioniIa,
 } from "@/app/actions/compendio-ita";
 
 export interface MentionCandidate {
@@ -90,9 +91,31 @@ function loadAllMentionCandidates(): Promise<MentionCandidate[]> {
       ),
     ).then((lists) => lists.flat());
 
-    allCandidatesPromise = Promise.all([english, italian]).then(([englishCandidates, italianMatches]) => {
+    // Voci autotradotte dall'IA (compendio_traduzione_ia): copre tutto ciò che non ha (ancora)
+    // testo ufficiale — senza questo, la ricerca delle menzioni in italiano trovava solo il
+    // piccolo sottoinsieme ufficiale (es. incantesimi PHB/Tasha/Xanathar) e falliva su tutto il
+    // resto, obbligando a cercare sempre in inglese.
+    const ia = Promise.all(
+      (Object.keys(MENTION_KIND_LOADERS) as CompendiumKind[]).map((kind) =>
+        getTraduzioniIa(kind).then((rows) =>
+          rows
+            .filter((r) => r.nomeIta)
+            .map((r) => ({ kind, name: r.name, source: r.source, nameIta: r.nomeIta as string })),
+        ),
+      ),
+    ).then((lists) => lists.flat());
+
+    allCandidatesPromise = Promise.all([english, italian, ia]).then(([englishCandidates, italianMatches, iaMatches]) => {
       const byKey = new Map<string, MentionCandidate>();
       for (const c of englishCandidates) byKey.set(`${c.kind}:${c.name}:${c.source}`, c);
+      // L'IA riempie nameIta per le voci senza testo ufficiale...
+      for (const m of iaMatches) {
+        const key = `${m.kind}:${m.name}:${m.source}`;
+        const existing = byKey.get(key);
+        if (existing) existing.nameIta = m.nameIta;
+        else byKey.set(key, m);
+      }
+      // ...ma il nome ufficiale, quando esiste, ha sempre l'ultima parola (sovrascrive quello IA).
       for (const m of italianMatches) {
         const key = `${m.kind}:${m.name}:${m.source}`;
         const existing = byKey.get(key);

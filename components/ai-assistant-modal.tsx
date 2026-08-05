@@ -81,7 +81,7 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
       onClick={onClose}
     >
       <div
-        className="card-elevated flex h-[min(34rem,82vh)] w-full max-w-lg flex-col rounded-xl border border-edge bg-surface overflow-hidden animate-modal-in"
+        className="card-elevated flex h-[min(34rem,82dvh)] w-full max-w-lg flex-col rounded-xl border border-edge bg-surface overflow-hidden animate-modal-in"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-edge px-4 py-2.5 shrink-0">
