@@ -149,11 +149,11 @@ async function loadEnglishConditions() {
 function englishText(kind, raw) {
   if (kind === "mostri") {
     const parts = [];
-    for (const t of raw.trait ?? []) parts.push(`${t.name}: ${flattenEntries(t.entries).join(" ")}`);
-    for (const a of raw.action ?? []) parts.push(`Azione — ${a.name}: ${flattenEntries(a.entries).join(" ")}`);
-    for (const b of raw.bonus ?? []) parts.push(`Azione Bonus — ${b.name}: ${flattenEntries(b.entries).join(" ")}`);
-    for (const r of raw.reaction ?? []) parts.push(`Reazione — ${r.name}: ${flattenEntries(r.entries).join(" ")}`);
-    for (const l of raw.legendary ?? []) parts.push(`Azione Leggendaria — ${l.name}: ${flattenEntries(l.entries).join(" ")}`);
+    for (const t of raw.trait ?? []) parts.push(`${stripTags(t.name)}: ${flattenEntries(t.entries).join(" ")}`);
+    for (const a of raw.action ?? []) parts.push(`Azione — ${stripTags(a.name)}: ${flattenEntries(a.entries).join(" ")}`);
+    for (const b of raw.bonus ?? []) parts.push(`Azione Bonus — ${stripTags(b.name)}: ${flattenEntries(b.entries).join(" ")}`);
+    for (const r of raw.reaction ?? []) parts.push(`Reazione — ${stripTags(r.name)}: ${flattenEntries(r.entries).join(" ")}`);
+    for (const l of raw.legendary ?? []) parts.push(`Azione Leggendaria — ${stripTags(l.name)}: ${flattenEntries(l.entries).join(" ")}`);
     return parts.join("\n");
   }
   if (kind === "classi") return ""; // nessun testo descrittivo nel loader attuale (solo crunch meccanico)
