@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSession, signIn } from "next-auth/react";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { useGuardedNavigation, useUnsavedChangesGuard } from "@/components/unsaved-changes-provider";
 import { getMyCampaigns } from "@/app/actions/campaigns";
 import { claimXp, getMyCharacterInCampaign, syncCharacterToCampaign } from "@/app/actions/characters";
 import { IntField } from "@/components/int-field";
@@ -79,8 +80,8 @@ export function CharacterSheet({
   // stessi due nomi — solo ora puntano allo stato locale invece che al salvataggio immediato.
   const [character, setCharacterState] = useState(persistedCharacter);
   const [dirty, setDirty] = useState(false);
-  const [showExitModal, setShowExitModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const guardNavigate = useGuardedNavigation();
   // Tab ispirati a Roll20 (la piattaforma più diffusa) e alla scheda cartacea di riferimento
   // dell'utente: "Combattimento" di default, tutto il resto un click di distanza invece che più
   // in basso nello stesso scroll — durante il gioco vero serve solo la prima, il resto si legge
@@ -111,6 +112,12 @@ export function CharacterSheet({
     setDirty(false);
   };
 
+  // Registra questa scheda presso il provider condiviso (components/unsaved-changes-provider.tsx)
+  // finché ci sono modifiche non salvate — stesso identico modal a prescindere che l'utente provi
+  // a uscire dal bottone "← Personaggi" qui sotto o da un link della barra di navigazione in alto
+  // (prima erano due percorsi scollegati, il secondo non avvisava affatto).
+  useUnsavedChangesGuard(dirty, { onSaveAndExit: handleSave, onDiscard: () => {} });
+
   // Solo per il reclamo XP (vedi CampaignSync più sotto): a differenza di ogni altra modifica
   // qui, che resta bozza scartabile finché non si preme "Salva", claimXp azzera SUBITO lo XP in
   // sospeso lato server, un effetto reale e irreversibile — lasciarlo come bozza locale vorrebbe
@@ -123,13 +130,7 @@ export function CharacterSheet({
     setDirty(false);
   };
 
-  const handleBack = () => {
-    if (dirty) {
-      setShowExitModal(true);
-    } else {
-      onBack();
-    }
-  };
+  const handleBack = () => guardNavigate(onBack);
 
   const set = <K extends keyof Character>(key: K, value: Character[K]) =>
     onChange({ ...character, [key]: value });
@@ -219,21 +220,6 @@ export function CharacterSheet({
             onDelete();
           }}
           onCancel={() => setShowDeleteModal(false)}
-        />
-      )}
-
-      {showExitModal && (
-        <UnsavedChangesModal
-          onSaveAndExit={() => {
-            handleSave();
-            setShowExitModal(false);
-            onBack();
-          }}
-          onDiscard={() => {
-            setShowExitModal(false);
-            onBack();
-          }}
-          onCancel={() => setShowExitModal(false)}
         />
       )}
 
@@ -792,61 +778,6 @@ function CloudStatusBadge({ status }: { status?: CloudStatus }) {
     status === "syncing" ? "☁ Backup…" : status === "synced" ? "☁ Backup ok" : "⚠ Backup non riuscito";
   const color = status === "error" ? "text-danger" : "text-muted";
   return <span className={`text-[11px] ${color} shrink-0`}>{label}</span>;
-}
-
-function UnsavedChangesModal({
-  onSaveAndExit,
-  onDiscard,
-  onCancel,
-}: {
-  onSaveAndExit: () => void;
-  onDiscard: () => void;
-  onCancel: () => void;
-}) {
-  useBodyScrollLock(true);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onCancel]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-overlay-in"
-      onClick={onCancel}
-    >
-      <div
-        className="card-elevated w-full max-w-sm rounded-xl border border-edge bg-background p-5 space-y-4 animate-modal-in"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-lg font-display font-bold text-accent-strong">Modifiche non salvate</h2>
-        <p className="text-sm text-muted">
-          Stai per uscire senza salvare le modifiche a questo personaggio. Cosa vuoi fare?
-        </p>
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={onSaveAndExit}
-            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
-          >
-            💾 Salva ed esci
-          </button>
-          <button
-            onClick={onCancel}
-            className="rounded-lg border border-edge px-4 py-2 text-sm text-foreground hover:border-accent/50 transition-colors"
-          >
-            Annulla
-          </button>
-          <button onClick={onDiscard} className="rounded-lg px-4 py-2 text-sm text-danger hover:underline">
-            Esci senza salvare
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
 }
 
 function DeleteCharacterModal({

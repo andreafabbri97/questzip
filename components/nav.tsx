@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import { NotificationBell } from "@/components/notification-bell";
 import { DiceModal } from "@/components/dice-modal";
 import { AiAssistantModal } from "@/components/ai-assistant-modal";
 import { useRealtime } from "@/components/realtime-provider";
+import { useGuardedNavigation } from "@/components/unsaved-changes-provider";
 import { isAiAvailable } from "@/app/actions/ai";
 
 type NavLink =
@@ -30,16 +31,32 @@ const links: NavLink[] = [
 
 export function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const guardNavigate = useGuardedNavigation();
   const [diceOpen, setDiceOpen] = useState(false);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
+  // Tutti i link di navigazione (qui e nei bottoncini header sotto) passano da qui invece di
+  // lasciare fare a <Link> il suo click di default — se la scheda Personaggio ha modifiche non
+  // salvate, mostra lo stesso modal "Modifiche non salvate" del bottone "← Personaggi" dentro la
+  // pagina invece di scartarle in silenzio (bug segnalato dall'utente: prima i due percorsi non
+  // erano collegati, i link della barra di navigazione non avvisavano affatto).
+  const navigate = (href: string) => guardNavigate(() => router.push(href));
+
   return (
     <>
       <header className="sticky top-0 z-20 border-b border-edge bg-background/85 backdrop-blur shadow-[0_4px_20px_-8px_rgba(0,0,0,0.6)]">
         <div className="max-w-5xl 2xl:max-w-[1600px] [@media(min-width:2200px)]:max-w-[2200px] mx-auto px-4 h-14 flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
+          <Link
+            href="/"
+            onClick={(event) => {
+              event.preventDefault();
+              navigate("/");
+            }}
+            className="flex items-center gap-2"
+          >
             <Image src="/icon.svg" alt="" width={28} height={28} />
             <span className="heading-ornate font-display text-lg font-bold tracking-wide text-accent-strong">
               QuestZip
@@ -59,6 +76,10 @@ export function Nav() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigate(link.href);
+                  }}
                   className={`relative px-3 py-1.5 rounded-md transition-all ${
                     isActive(link.href)
                       ? "glow-accent bg-accent/10 text-accent-strong"
@@ -96,6 +117,10 @@ export function Nav() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate(link.href);
+                }}
                 className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] ${
                   isActive(link.href) ? "text-accent-strong" : "text-muted"
                 }`}
@@ -145,11 +170,17 @@ function AiAssistantButton() {
 // barra mobile a 5 colonne, che è già piena.
 function GuidaButton() {
   const pathname = usePathname();
+  const router = useRouter();
+  const guardNavigate = useGuardedNavigation();
   const active = pathname.startsWith("/guida");
 
   return (
     <Link
       href="/guida"
+      onClick={(event) => {
+        event.preventDefault();
+        guardNavigate(() => router.push("/guida"));
+      }}
       aria-label="Guida e FAQ"
       title="Guida e FAQ"
       className={`text-lg transition-colors ${
@@ -165,6 +196,8 @@ function GuidaButton() {
 // testo in nav — un solo punto d'accesso alla Chat, non più duplicato fra header e barra mobile.
 function ChatButton() {
   const pathname = usePathname();
+  const router = useRouter();
+  const guardNavigate = useGuardedNavigation();
   const { status } = useSession();
   const { threadActivity } = useRealtime();
 
@@ -175,6 +208,10 @@ function ChatButton() {
   return (
     <Link
       href="/chat"
+      onClick={(event) => {
+        event.preventDefault();
+        guardNavigate(() => router.push("/chat"));
+      }}
       aria-label="Chat"
       className={`relative text-lg transition-colors ${
         active ? "text-accent-strong" : "text-muted hover:text-foreground"
@@ -191,6 +228,8 @@ function ChatButton() {
 }
 
 function AccountButton() {
+  const router = useRouter();
+  const guardNavigate = useGuardedNavigation();
   const { data: session, status } = useSession();
 
   if (status === "loading") return null;
@@ -209,6 +248,10 @@ function AccountButton() {
   return (
     <Link
       href="/profilo"
+      onClick={(event) => {
+        event.preventDefault();
+        guardNavigate(() => router.push("/profilo"));
+      }}
       className="flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
       title="Il tuo profilo"
     >

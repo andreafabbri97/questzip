@@ -19,7 +19,11 @@ test("il sottotitolo italiano di un incantesimo con testo ufficiale usa il nome 
   const row = page.getByText("Eldritch Blast", { exact: true }).first();
   await expect(row).toBeVisible();
   await expect(page.getByText("Blast Occulto")).not.toBeVisible();
-  await expect(page.getByText("Deflagrazione Occulta").first()).toBeVisible();
+  // Timeout più largo del default: il sottotitolo dipende da un giro al DB (server action) per
+  // l'indice italiano, che a server appena avviato (cache dei loader ancora vuota) può richiedere
+  // più dei 5s di default — non un problema di logica, verificato ripetendo la stessa asserzione a
+  // cache calda (passa in <4s).
+  await expect(page.getByText("Deflagrazione Occulta").first()).toBeVisible({ timeout: 15000 });
 
   await row.click();
   await expect(page.locator("h2", { hasText: "Eldritch Blast" })).toContainText(

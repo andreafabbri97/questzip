@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -18,17 +19,39 @@ vi.mock("@/components/dice-roller-modal", () => ({
 
 // Autocomplete/CompendioInfoButton fanno fetch veri (catalogo 5etools, DB per la cache IA) via
 // useEffect al mount — inutili e pesanti da simulare qui, dove interessa solo il comportamento dei
-// bottoni dado dell'elenco incantesimi. Sostituiti con stub minimi controllati.
+// bottoni dado dell'elenco incantesimi. Sostituiti con stub minimi controllati — il bottone
+// "Scegli dal Compendio" simula il click su un suggerimento reale (a differenza di scrivere a
+// mano), per testare onSelect (usato per precompilare il dado danno).
 vi.mock("@/components/personaggi/autocomplete", () => ({
   Autocomplete: ({
     value,
     onChange,
+    onSelect,
     placeholder,
   }: {
     value: string;
     onChange: (value: string) => void;
+    onSelect?: (option: { name: string; source: string; entries: unknown[] }) => void;
     placeholder: string;
-  }) => <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />,
+  }) => (
+    <>
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+      {onSelect && (
+        <button
+          type="button"
+          onClick={() =>
+            onSelect({
+              name: value,
+              source: "PHB",
+              entries: ["Un raggio di energia sfreccia, infligge {@damage 8d6} danni da fuoco."],
+            })
+          }
+        >
+          Scegli dal Compendio
+        </button>
+      )}
+    </>
+  ),
 }));
 
 vi.mock("@/components/personaggi/compendio-info-button", () => ({
@@ -136,6 +159,46 @@ describe("SpellListSection", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("scegliendo un incantesimo dal Compendio precompila da sola il dado danno se vuoto", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [character, setCharacter] = useState(
+        baseCharacter({
+          classi: [{ nome: "Mago", livello: 5 }],
+          incantesimi: [
+            { id: "s1", nome: "Palla di Fuoco", livello: 3, preparato: true, dadoDanno: "" },
+          ],
+        }),
+      );
+      return <SpellListSection character={character} onChange={setCharacter} />;
+    }
+    render(<Harness />);
+
+    await user.click(screen.getByRole("button", { name: "Scegli dal Compendio" }));
+
+    expect(screen.getByLabelText("Dado danno di Palla di Fuoco")).toHaveValue("8d6");
+  });
+
+  it("scegliere di nuovo un incantesimo dal Compendio non sovrascrive un dado danno già compilato", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [character, setCharacter] = useState(
+        baseCharacter({
+          classi: [{ nome: "Mago", livello: 5 }],
+          incantesimi: [
+            { id: "s1", nome: "Palla di Fuoco", livello: 3, preparato: true, dadoDanno: "2d10" },
+          ],
+        }),
+      );
+      return <SpellListSection character={character} onChange={setCharacter} />;
+    }
+    render(<Harness />);
+
+    await user.click(screen.getByRole("button", { name: "Scegli dal Compendio" }));
+
+    expect(screen.getByLabelText("Dado danno di Palla di Fuoco")).toHaveValue("2d10");
+  });
+
   it("🎲 Attacco usa il bonus d'attacco da incantatore della classe primaria", async () => {
     const user = userEvent.setup();
     const character = baseCharacter({
@@ -146,10 +209,10 @@ describe("SpellListSection", () => {
     });
     render(<SpellListSection character={character} onChange={() => {}} />);
 
-    await user.click(screen.getByRole("button", { name: "Tira per colpire con Dardo Incantato" }));
+    await user.click(screen.getByRole("button", { name: "Lancia Dardo Incantato come incantesimo" }));
 
     const expectedBonus = spellAttackBonus(5, character.caratteristiche.intelligenza);
-    expect(screen.getByTestId("dice-label")).toHaveTextContent("Dardo Incantato — Attacco");
+    expect(screen.getByTestId("dice-label")).toHaveTextContent("Dardo Incantato — Lancia Incantesimo");
     expect(screen.getByTestId("dice-modifier")).toHaveTextContent(String(expectedBonus));
   });
 
@@ -178,7 +241,7 @@ describe("SpellListSection", () => {
       incantesimi: [{ id: "s1", nome: "Luce", livello: 0, preparato: true, dadoDanno: "" }],
     });
     render(<SpellListSection character={character} onChange={() => {}} />);
-    expect(screen.getByRole("button", { name: "Tira per colpire con Luce" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lancia Luce come incantesimo" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tira danno con Luce" })).not.toBeInTheDocument();
   });
 });

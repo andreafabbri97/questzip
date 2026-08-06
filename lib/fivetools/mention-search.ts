@@ -137,6 +137,53 @@ export async function searchMentionCandidates(query: string, limit = 8): Promise
     .slice(0, limit);
 }
 
+const candidatesByKindPromise = new Map<CompendiumKind, Promise<MentionCandidate[]>>();
+
+// Stessa fusione inglese+ufficiale+IA di loadAllMentionCandidates sopra, ma per UNA sola
+// categoria — usata da findCompendioMatch, che a differenza delle menzioni `#Nome` in chat
+// conosce già il kind in anticipo (passato come prop dal chiamante, es. "talenti" per il bottone
+// "📖 Verifica" di un talento in scheda) e non ha alcun bisogno di caricare anche le altre 7
+// categorie (mostri da solo ha ~4500 voci) solo per scartarle subito dopo col filtro su kind.
+// Bug segnalato dall'utente: il primo bottone "Verifica" aperto su qualsiasi pagina restava
+// "in caricamento" per un momento percepibile proprio perché tirava dentro l'intero Compendio.
+function loadMentionCandidatesForKind(kind: CompendiumKind): Promise<MentionCandidate[]> {
+  let promise = candidatesByKindPromise.get(kind);
+  if (!promise) {
+    const english = MENTION_KIND_LOADERS[kind]().then((entries) =>
+      entries.map((e): MentionCandidate => ({ kind, name: e.name, source: e.source })),
+    );
+    const italian = (ITA_LOADERS[kind]?.() ?? Promise.resolve([])).then((rows) =>
+      rows
+        .filter((r) => r.nomeInglese && r.fonteInglese)
+        .map((r) => ({ kind, name: r.nomeInglese as string, source: r.fonteInglese as string, nameIta: r.nome })),
+    );
+    const ia = getTraduzioniIa(kind).then((rows) =>
+      rows
+        .filter((r) => r.nomeIta)
+        .map((r) => ({ kind, name: r.name, source: r.source, nameIta: r.nomeIta as string })),
+    );
+    promise = Promise.all([english, italian, ia]).then(([englishCandidates, italianMatches, iaMatches]) => {
+      const byKey = new Map<string, MentionCandidate>();
+      for (const c of englishCandidates) byKey.set(`${c.name}:${c.source}`, c);
+      for (const m of iaMatches) {
+        const key = `${m.name}:${m.source}`;
+        const existing = byKey.get(key);
+        if (existing) existing.nameIta = m.nameIta;
+        else byKey.set(key, m);
+      }
+      for (const m of italianMatches) {
+        const key = `${m.name}:${m.source}`;
+        const existing = byKey.get(key);
+        if (existing) existing.nameIta = m.nameIta;
+        else byKey.set(key, m);
+      }
+      return [...byKey.values()];
+    });
+    candidatesByKindPromise.set(kind, promise);
+  }
+  return promise;
+}
+
 // Ignora maiuscole/accenti/punteggiatura — stessa euristica già in uso altrove nel progetto
 // (es. normalizeItaName in inventory-equipment.tsx) per far combaciare un nome italiano digitato
 // a mano con quello ufficiale/IA anche se differiscono per un accento o un apostrofo.
@@ -161,11 +208,9 @@ export async function findCompendioMatch(
 ): Promise<{ name: string; source: string } | null> {
   const q = normalizeCompendioName(nome);
   if (!q) return null;
-  const all = await loadAllMentionCandidates();
-  const found = all.find(
-    (c) =>
-      c.kind === kind &&
-      (normalizeCompendioName(c.name) === q || (c.nameIta && normalizeCompendioName(c.nameIta) === q)),
+  const candidates = await loadMentionCandidatesForKind(kind);
+  const found = candidates.find(
+    (c) => normalizeCompendioName(c.name) === q || (c.nameIta && normalizeCompendioName(c.nameIta) === q),
   );
   return found ? { name: found.name, source: found.source } : null;
 }

@@ -20,7 +20,8 @@ import {
   type Weapon,
 } from "@/lib/dnd";
 import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
-import { loadInfusions, loadSpells, type RawOptionalFeature } from "@/lib/fivetools/data";
+import { loadInfusions, loadSpells, type RawOptionalFeature, type RawSpell } from "@/lib/fivetools/data";
+import { guessDamageDice } from "@/lib/fivetools/entries";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
 import { LocalInfoButton } from "./local-info-button";
@@ -190,11 +191,11 @@ export function WeaponsSection({
                   {dmgMod !== 0 ? ` ${formatModifier(dmgMod)}` : ""}
                   {weapon.tipoDanno ? ` (${weapon.tipoDanno})` : ""}
                 </p>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   <button
                     onClick={() => openAttackRoll(weapon.nome, bonus)}
                     aria-label={`Tira per colpire con ${weapon.nome || "arma"}`}
-                    className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                    className="shrink-0 rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
                   >
                     🎲 Attacco
                   </button>
@@ -202,7 +203,7 @@ export function WeaponsSection({
                     <button
                       onClick={() => openDamageRoll(weapon.nome, weapon.dadoDanno, dmgMod)}
                       aria-label={`Tira danno con ${weapon.nome || "arma"}`}
-                      className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                      className="shrink-0 rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
                     >
                       🎲 Danno
                     </button>
@@ -252,7 +253,7 @@ export function SpellListSection({
 
   const openSpellAttackRoll = (spellName: string) => {
     setDicePreset({
-      label: `${spellName.trim() || "Incantesimo"} — Attacco`,
+      label: `${spellName.trim() || "Incantesimo"} — Lancia Incantesimo`,
       groups: [{ die: 20, quantity: 1 }],
       modifier: attackBonus,
     });
@@ -292,6 +293,18 @@ export function SpellListSection({
                   onChange={(nome) =>
                     setIncantesimi(
                       character.incantesimi.map((s) => (s.id === spell.id ? { ...s, nome } : s)),
+                    )
+                  }
+                  onSelect={(option: RawSpell) =>
+                    setIncantesimi(
+                      character.incantesimi.map((s) =>
+                        // Precompila il dado danno SOLO se ancora vuoto: scegliere di nuovo lo
+                        // stesso incantesimo (o un altro) non deve mai sovrascrivere un valore che
+                        // il giocatore ha già eventualmente corretto a mano.
+                        s.id === spell.id && !s.dadoDanno.trim()
+                          ? { ...s, dadoDanno: guessDamageDice(option.entries, option.entriesHigherLevel) }
+                          : s,
+                      ),
                     )
                   }
                   loader={loadSpells}
@@ -338,7 +351,7 @@ export function SpellListSection({
             </div>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <CompendioInfoButton kind="incantesimi" nome={spell.nome} />
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
                 <input
                   value={spell.dadoDanno}
                   onChange={(event) =>
@@ -350,22 +363,22 @@ export function SpellListSection({
                   }
                   placeholder="dado danno"
                   aria-label={`Dado danno di ${spell.nome || "incantesimo"}`}
-                  className="w-20 rounded-md border border-edge bg-surface px-1.5 py-1 text-xs text-foreground"
+                  className="w-16 shrink-0 rounded-md border border-edge bg-surface px-1.5 py-1 text-xs text-foreground"
                 />
                 {castingAbility && (
                   <button
                     onClick={() => openSpellAttackRoll(spell.nome)}
-                    aria-label={`Tira per colpire con ${spell.nome || "incantesimo"}`}
-                    className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                    aria-label={`Lancia ${spell.nome || "incantesimo"} come incantesimo`}
+                    className="shrink-0 rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
                   >
-                    🎲 Attacco
+                    🎲 Lancia Incantesimo
                   </button>
                 )}
                 {/^\d+d\d+$/i.test(spell.dadoDanno.trim()) && (
                   <button
                     onClick={() => openSpellDamageRoll(spell.nome, spell.dadoDanno)}
                     aria-label={`Tira danno con ${spell.nome || "incantesimo"}`}
-                    className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                    className="shrink-0 rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
                   >
                     🎲 Danno
                   </button>

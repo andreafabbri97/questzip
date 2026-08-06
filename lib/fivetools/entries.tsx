@@ -76,6 +76,35 @@ function EntryBlock({ entry }: { entry: FiveEntry }) {
   }
 }
 
+function collectRawText(entries: FiveEntry[] | undefined): string {
+  if (!entries) return "";
+  return entries
+    .map((entry) => {
+      if (typeof entry === "string") return entry;
+      const parts: string[] = [];
+      if (entry.entry) parts.push(entry.entry);
+      if (entry.entries) parts.push(collectRawText(entry.entries));
+      if (entry.items) parts.push(collectRawText(entry.items));
+      return parts.join(" ");
+    })
+    .join(" ");
+}
+
+/**
+ * Primo dado di DANNO trovato nel testo grezzo di un incantesimo (es. "8d6" per Palla di Fuoco),
+ * per precompilare da sola il campo "dado danno" in scheda invece di lasciarlo sempre a mano —
+ * cerca specificamente il tag 5etools "{@damage NdM}" (non ancora ripulito da stripTags), MAI un
+ * generico pattern "NdM" nel testo: 5etools distingue già i dadi che sono danno ({@damage}) da
+ * quelli che non lo sono ({@dice}, es. il d4 di Guidance non è danno) — usare il tag giusto evita
+ * di scambiare un tiro qualsiasi per un tiro danno. Stringa vuota se l'incantesimo non infligge
+ * danni diretti (la maggior parte non li infligge).
+ */
+export function guessDamageDice(entries: FiveEntry[] | undefined, entriesHigherLevel?: FiveEntry[]): string {
+  const raw = `${collectRawText(entries)} ${collectRawText(entriesHigherLevel)}`;
+  const match = raw.match(/\{@damage (\d{1,2}d\d{1,3})/);
+  return match ? match[1] : "";
+}
+
 /** Appiattisce le entries in blocchi di testo semplice, usato per la traduzione automatica. */
 export function flattenEntries(entries: FiveEntry[] | undefined): string[] {
   if (!entries) return [];

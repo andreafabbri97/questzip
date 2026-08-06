@@ -7,7 +7,14 @@ const AUTH_FILE = "playwright/.auth/user.json";
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // Tutti gli spec condividono lo STESSO account di test (login di scorta, vedi
+  // app/api/auth/test-login) e quindi la stessa riga "personaggi" sincronizzata sul server (vedi
+  // la riconciliazione cloud in app/personaggi/page.tsx, legata all'account, non al singolo
+  // browser context) — in parallelo, due spec che aprono una scheda Personaggio nello stesso
+  // momento possono farsi sovrascrivere a vicenda i dati appena iniettati in localStorage.
+  // Workers=1 sacrifica un po' di velocità (suite ancora piccola) per determinismo.
+  fullyParallel: false,
+  workers: 1,
   reporter: "html",
   use: {
     baseURL: "http://localhost:3000",

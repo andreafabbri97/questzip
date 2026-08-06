@@ -940,7 +940,7 @@ export function SavingThrowsAndSkills({
           Suggerisci dalla classe di origine
         </button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {ABILITIES.map((ability) => {
           const proficient = character.trsCompetenti.includes(ability);
           const bonus = character.trsBonus[ability] ?? 0;
@@ -950,17 +950,17 @@ export function SavingThrowsAndSkills({
             <div key={ability} className="flex items-stretch gap-1">
               <button
                 onClick={() => toggleSave(ability)}
-                className={`flex flex-1 items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+                className={`flex flex-1 min-w-0 items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
                   proficient
                     ? "border-accent bg-accent/10 text-accent-strong"
                     : "border-edge bg-surface-raised text-muted hover:text-foreground"
                 }`}
               >
-                <span className="flex items-center gap-1.5">
-                  <span className={`size-2 rounded-full ${proficient ? "bg-accent" : "bg-edge"}`} />
-                  {ABILITY_LABELS[ability]}
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span className={`size-2 rounded-full shrink-0 ${proficient ? "bg-accent" : "bg-edge"}`} />
+                  <span className="truncate">{ABILITY_LABELS[ability]}</span>
                 </span>
-                <span className="font-bold">{formatModifier(mod)}</span>
+                <span className="font-bold shrink-0">{formatModifier(mod)}</span>
               </button>
               <IntField
                 value={bonus}

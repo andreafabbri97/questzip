@@ -8,6 +8,7 @@ import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 export function Autocomplete<T extends { name: string; source: string }>({
   value,
   onChange,
+  onSelect,
   loader,
   placeholder,
   inputClassName,
@@ -15,6 +16,10 @@ export function Autocomplete<T extends { name: string; source: string }>({
 }: {
   value: string;
   onChange: (value: string) => void;
+  // Chiamata SOLO quando l'utente sceglie un suggerimento dalla lista (non ad ogni tasto premuto
+  // digitando a mano) — dà accesso alla voce intera del Compendio, non solo al nome, per chi
+  // vuole derivarne altri campi in automatico (es. il dado danno di un incantesimo).
+  onSelect?: (option: T) => void;
   loader: () => Promise<T[]>;
   placeholder: string;
   inputClassName: string;
@@ -90,6 +95,7 @@ export function Autocomplete<T extends { name: string; source: string }>({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   onChange(option.name);
+                  onSelect?.(option);
                   setOpen(false);
                 }}
                 className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface transition-colors"
