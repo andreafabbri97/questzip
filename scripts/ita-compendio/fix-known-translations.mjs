@@ -48,6 +48,20 @@ const CORRECTIONS = [
   { kind: "classi", name: "Mastermind", source: "XGE", nomeIta: "Pianificatore", note: "XGE pag. 28 — era 'Mente Geniale'" },
   { kind: "classi", name: "Shadow Magic", source: "XGE", nomeIta: "Magia delle Ombre", note: "XGE pag. 28 — era 'Magia dell'Ombra'" },
   { kind: "classi", name: "War Magic", source: "XGE", nomeIta: "Magia della Guerra", note: "XGE pag. 28 — era 'Magia Bellica'" },
+
+  // Trovate allo stesso modo nel Calderone Omnicomprensivo di Tasha (extracted/tasha.json).
+  { kind: "classi", name: "Draconic Bloodline", source: "PHB", nomeIta: "Discendenza Draconica", note: "PHB pag. 110 — l'utente aveva corretto in precedenza in 'Stirpe Draconica' ma non era giusto, verificato di nuovo sul testo reale" },
+  { kind: "classi", name: "Circle of Wildfire", source: "TCE", nomeIta: "Circolo della Fiamma", note: "TCE — era 'Circolo del Fuoco Selvaggio'" },
+  { kind: "classi", name: "Rune Knight", source: "TCE", nomeIta: "Cavaliere Runico", note: "TCE — era 'Cavaliere delle Rune'" },
+  { kind: "classi", name: "Fey Wanderer", source: "TCE", nomeIta: "Viandante Fatato", note: "TCE — era 'Vagabondo Fatato'" },
+  { kind: "classi", name: "Swarmkeeper", source: "TCE", nomeIta: "Custode degli Sciami", note: "TCE — era 'Guardiano dello Sciame'" },
+  { kind: "classi", name: "Soulknife", source: "TCE", nomeIta: "Lama Spirituale", note: "TCE — era 'Lama dell'Anima'" },
+  { kind: "classi", name: "Order of Scribes", source: "TCE", nomeIta: "Ordine degli Scribi", note: "TCE — era 'Ordine degli Scrivani'" },
+
+  // Trovate allo stesso modo in Fizban's Treasury of Dragons e Bigby Presenta La Gloria dei
+  // Giganti (indice all'inizio del libro, stesso trucco usato per Xanathar's pag. 28).
+  { kind: "classi", name: "Drakewarden", source: "FTD", nomeIta: "Guardiano dei Draghi", note: "FTD, indice — era 'Guardiano del Draghetto'" },
+  { kind: "classi", name: "Path of the Giant", source: "BGG", nomeIta: "Via del Gigante", note: "BGG, indice — era 'Cammino del Gigante' (questo libro traduce 'Path of' come 'Via', non 'Cammino')" },
 ];
 
 const sql = neon(process.env.DATABASE_URL);

@@ -166,13 +166,27 @@ for (const sub of bookSubclasses) {
   // Ripulisce interruzioni di riga OCR (spazi doppi, a-capo nel mezzo di una frase) in un unico
   // paragrafo leggibile — stessa idea di flattenEntries per il resto della pipeline, qui a mano
   // perché il testo è grezzo (nessuna struttura FiveEntry).
-  const paragraph = rawBody
+  let paragraph = rawBody
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean)
     .join(" ")
     .replace(/\s{2,}/g, " ")
     .trim();
+
+  // Tasha's Cauldron (e solo quello, tra i libri qui gestiti) intercala battute satiriche a
+  // margine firmate "TASHA" (a volte "TASHA.", col punto attaccato) prima del vero paragrafo
+  // introduttivo — es. "Lasciare che sia la magia a tenere le redini è una pessima idea, ma non
+  // sono mica tua madre. Vivi senza rimpianti. TASHA. Molti luoghi del multiverso...". La battuta
+  // non è testo di regolamento, la si scarta tenendo solo ciò che segue l'ultima occorrenza della
+  // firma (qualunque punteggiatura la segua).
+  const tashaSignature = /\bTASHA\.?\s*/;
+  if (tashaSignature.test(paragraph)) {
+    const parts = paragraph.split(tashaSignature);
+    paragraph = parts[parts.length - 1].trim();
+  }
+  // Simboli OCR isolati rimasti in testa (es. "©" al posto di virgolette di apertura).
+  paragraph = paragraph.replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ0-9]+/, "").trim();
 
   if (paragraph.length < 40) {
     needsReview.push({ name: sub.name, source: sub.source, nomeIaAttuale: existing.nomeIta, reason: "paragrafo estratto troppo corto, probabile confine sbagliato" });
