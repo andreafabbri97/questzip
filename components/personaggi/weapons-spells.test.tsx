@@ -58,6 +58,13 @@ vi.mock("@/components/personaggi/compendio-info-button", () => ({
   CompendioInfoButton: () => null,
 }));
 
+// SimpleEntryModal (usato da LocalInfoButton, a sua volta usato da chi renderizza privilegi a
+// usi limitati) importa EntriesBlock da lib/fivetools/compendio-detail, che risale fino a
+// next-auth -> next/server — non risolvibile sotto Vitest/jsdom, stesso motivo dei due mock sopra.
+vi.mock("@/components/personaggi/simple-entry-modal", () => ({
+  SimpleEntryModal: () => null,
+}));
+
 function baseCharacter(overrides: Partial<Character> = {}): Character {
   return {
     ...newCharacter(),

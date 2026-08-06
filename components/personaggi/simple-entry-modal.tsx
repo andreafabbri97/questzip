@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { RenderEntries, type FiveEntry } from "@/lib/fivetools/entries";
+import { EntriesBlock } from "@/lib/fivetools/compendio-detail";
+import type { FiveEntry } from "@/lib/fivetools/entries";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 const CLOSE_ANIMATION_MS = 150;
@@ -11,6 +12,13 @@ export interface SimpleEntryData {
   title: string;
   meta?: string;
   entries: FiveEntry[];
+  // Testo italiano già risolto (ufficiale o cache IA, qualità migliore della traduzione al volo)
+  // quando disponibile per questa voce specifica — un paragrafo per elemento dell'array. Se
+  // assente, si ricade sulla traduzione dal vivo di "entries" (EntriesBlock), mai testo inglese
+  // grezzo: questo modal prima mostrava sempre e solo inglese (bug — "le traduzioni non ci
+  // sono ancora", segnalato dall'utente), a differenza di ogni altro punto di dettaglio del
+  // Compendio nell'app.
+  textIt?: string[];
 }
 
 /**
@@ -75,7 +83,18 @@ export function SimpleEntryModal({
         </div>
         <div className="overflow-y-auto p-4">
           {data?.meta && <p className="text-xs text-muted mb-2">{data.meta}</p>}
-          {data && <RenderEntries entries={data.entries} />}
+          {data &&
+            (data.textIt ? (
+              <div className="space-y-2">
+                {data.textIt.map((paragrafo, index) => (
+                  <p key={index} className="text-sm text-foreground leading-relaxed">
+                    {paragrafo}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <EntriesBlock entries={data.entries} language="it" />
+            ))}
         </div>
       </div>
     </div>,

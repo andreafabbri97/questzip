@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 :root {
+  /* Il sito ha un solo tema (sempre scuro, nessun toggle) — senza questa dichiarazione il
+     browser applica lo scrollbar/controlli nativi CHIARI a qualunque contenitore con overflow
+     proprio (modal, elenco del Compendio...), mentre solo lo scrollbar della FINESTRA segue il
+     tema scuro del sistema operativo: la stessa pagina finiva con scrollbar scure e chiare
+     mescolate. Segnalato dall'utente con screenshot il 2026-08-06. */
+  color-scheme: dark;
   --background: #0c0a09;
   --surface: #1a1613;
   --surface-raised: #241f1a;
@@ -10,6 +16,29 @@
   --accent: #e0a83e;
   --accent-strong: #f2c14e;
   --danger: #c0453e;
+}
+
+/* Firefox */
+* {
+  scrollbar-color: var(--border) var(--surface);
+  scrollbar-width: thin;
+}
+
+/* Chrome/Edge/Safari — stile coerente col resto del sito invece del thumb grigio di default che
+   "color-scheme: dark" da solo produce per gli scrollbar interni. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 
 @theme inline {

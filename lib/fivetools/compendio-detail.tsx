@@ -84,7 +84,9 @@ function loadMostriIta() {
   return itaMostriPromise;
 }
 let itaRazzePromise: ReturnType<typeof getRazzeIta> | null = null;
-function loadRazzeIta() {
+// Esportata: riusata da components/personaggi/classes-leveling.tsx per i "Privilegi di razza"
+// della scheda del personaggio, stessa fonte ufficiale mostrata nel Compendio.
+export function loadRazzeIta() {
   if (!itaRazzePromise) itaRazzePromise = getRazzeIta();
   return itaRazzePromise;
 }
@@ -157,17 +159,41 @@ const OFFICIAL_LOADERS: Partial<
   classi: loadClassiIta,
 };
 
+export interface ItalianNameIndex {
+  /** "name|source" -> nome ufficiale, solo per righe collegate via nomeInglese/fonteInglese. */
+  official: Map<string, string>;
+  /** "name" (senza fonte) -> nome ufficiale, dalla PRIMA fonte trovata per quel nome — usato come
+   * ripiego quando la fonte esatta non ha testo ufficiale proprio. Vedi doc sotto. */
+  officialAny: Map<string, string>;
+  /** "name|source" -> nome dalla cache IA (traduzione automatica salvata, mai il testo ufficiale). */
+  ia: Map<string, string>;
+}
+
 /**
- * Indice nome-italiano per la ricerca nel Compendio (app/compendio/page.tsx): per ogni entry
- * inglese di 5etools (chiave "name|source"), il miglior nome italiano disponibile — quello
- * ufficiale se la riga è collegata via nomeInglese/fonteInglese, altrimenti il nome della cache
- * IA. Prima la ricerca traduceva dal vivo solo la query digitata (IT->EN) confrontandola col
- * nome inglese grezzo: cercare il nome esatto del manuale italiano falliva spesso perché quella
- * traduzione al volo non sempre combacia col termine ufficiale (stesso problema del match
- * ufficiale sopra). Qui invece si confronta la query direttamente contro i nomi italiani reali.
+ * Indice nome-italiano per la ricerca nel Compendio (app/compendio/page.tsx) e per DualName: per
+ * ogni entry inglese di 5etools, il miglior nome italiano disponibile, con priorità ufficiale
+ * (fonte esatta) > ufficiale (qualsiasi fonte) > cache IA (fonte esatta) > traduzione dal vivo
+ * (quest'ultima gestita dal chiamante). Prima la ricerca traduceva dal vivo solo la query digitata
+ * (IT->EN) confrontandola col nome inglese grezzo: cercare il nome esatto del manuale italiano
+ * falliva spesso perché quella traduzione al volo non sempre combacia col termine ufficiale
+ * (stesso problema del match ufficiale). Qui invece si confronta la query direttamente contro i
+ * nomi italiani reali.
+ *
+ * Il livello "ufficiale (qualsiasi fonte)" esiste perché molte voci del Player's Handbook 2024
+ * (XPHB) sono ristampe di una voce PHB 2014 con lo STESSO nome inglese ma nessun testo ufficiale
+ * proprio ancora estratto — senza questo livello la voce XPHB ricadeva sulla cache IA, che spesso
+ * indovina un nome diverso da quello del manuale (es. "Wrathful Smite": ufficiale PHB "Punizione
+ * Collerica" contro IA XPHB "Punizione Irata" per lo stesso incantesimo, nome invariato tra le due
+ * edizioni) — segnalato dall'utente con screenshot il 2026-08-06. Il nome ufficiale di QUALSIASI
+ * fonte resta più affidabile di una traduzione automatica, anche quando non è quello della fonte
+ * esatta — per questo viene prima della cache IA, non dopo.
  */
-export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): Map<string, string> {
-  const [index, setIndex] = useState<Map<string, string>>(new Map());
+export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): ItalianNameIndex {
+  const empty = useMemo<ItalianNameIndex>(
+    () => ({ official: new Map(), officialAny: new Map(), ia: new Map() }),
+    [],
+  );
+  const [result, setResult] = useState<ItalianNameIndex>(empty);
 
   useEffect(() => {
     if (!enabled) return;
@@ -176,16 +202,19 @@ export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): M
     Promise.all([officialLoader ? officialLoader() : Promise.resolve([]), loadTraduzioniIa(kind)]).then(
       ([official, ia]) => {
         if (cancelled) return;
-        const map = new Map<string, string>();
-        for (const row of ia) {
-          if (row.nomeIta) map.set(`${row.name}|${row.source}`, row.nomeIta);
-        }
+        const officialMap = new Map<string, string>();
+        const officialAnyMap = new Map<string, string>();
         for (const row of official) {
           if (row.nomeInglese && row.fonteInglese) {
-            map.set(`${row.nomeInglese}|${row.fonteInglese}`, row.nome);
+            officialMap.set(`${row.nomeInglese}|${row.fonteInglese}`, row.nome);
+            if (!officialAnyMap.has(row.nomeInglese)) officialAnyMap.set(row.nomeInglese, row.nome);
           }
         }
-        setIndex(map);
+        const iaMap = new Map<string, string>();
+        for (const row of ia) {
+          if (row.nomeIta) iaMap.set(`${row.name}|${row.source}`, row.nomeIta);
+        }
+        setResult({ official: officialMap, officialAny: officialAnyMap, ia: iaMap });
       },
     );
     return () => {
@@ -193,7 +222,12 @@ export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): M
     };
   }, [kind, enabled]);
 
-  return index;
+  return result;
+}
+
+/** Miglior nome italiano per una entry di 5etools, con la priorità documentata su useItalianSearchIndex. */
+export function bestItalianName(index: ItalianNameIndex, name: string, source: string): string | undefined {
+  return index.official.get(`${name}|${source}`) ?? index.officialAny.get(name) ?? index.ia.get(`${name}|${source}`);
 }
 
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
@@ -213,7 +247,7 @@ function normalizeItaName(name: string): string {
 // abbinato), ricade sul confronto per nome tradotto — meno affidabile, perché il nome ufficiale
 // del manuale a volte differisce dalla resa automatica del nome inglese (es. "Fiotto Acido"
 // ufficiale vs "Spruzzo Acido" prodotto dalla traduzione automatica di "Acid Splash").
-function findUfficiale<T extends { nome: string; nomeInglese: string | null; fonteInglese: string | null }>(
+export function findUfficiale<T extends { nome: string; nomeInglese: string | null; fonteInglese: string | null }>(
   list: T[],
   translatedName: string | null,
   entryName: string,
@@ -254,7 +288,7 @@ export function DualName({
   const italianIndex = useItalianSearchIndex(kind ?? "incantesimi", !!(kind && source));
   const liveTranslated = useTranslatedText(text, "en", "it");
   const translated =
-    (kind && source ? italianIndex.get(`${text}|${source}`) : undefined) ?? liveTranslated;
+    (kind && source ? bestItalianName(italianIndex, text, source) : undefined) ?? liveTranslated;
   if (!translated || translated.toLowerCase() === text.toLowerCase()) return <>{text}</>;
   if (inline) {
     return (
@@ -565,6 +599,23 @@ export function parseIaClassText(text: string): { name: string; level: number; t
     if (!line.trim()) continue;
     const match = line.match(CLASS_FEATURE_LINE_RE);
     if (match) items.push({ name: match[1], level: Number(match[2]), text: match[3] });
+  }
+  return items;
+}
+
+// Formato scritto da self-translate-fetch.mjs per kind "razze": paragrafi separati da riga vuota,
+// "Nome: testo" (niente livello, le razze non ne hanno) — stessa idea di parseIaClassText. Il
+// paragrafo introduttivo e le intestazioni di sottorazza ("— Elfo Alto —") non hanno ":" e vengono
+// scartati di proposito: qui servono solo i tratti veri e propri, mostrati come righe cliccabili
+// nella scheda del personaggio.
+const RACE_TRAIT_PARAGRAPH_RE = /^([^:\n]{1,60}): ([\s\S]*)$/;
+export function parseIaRaceText(text: string): { name: string; text: string }[] {
+  const items: { name: string; text: string }[] = [];
+  for (const paragraph of text.split("\n\n")) {
+    const trimmed = paragraph.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(RACE_TRAIT_PARAGRAPH_RE);
+    if (match) items.push({ name: match[1], text: match[2] });
   }
   return items;
 }

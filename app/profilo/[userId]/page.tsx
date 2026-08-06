@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { getPublicProfile, removeFriend, sendFriendRequest } from "@/app/actions/friends";
+import {
+  cancelFriendRequest,
+  getPublicProfile,
+  removeFriend,
+  respondToFriendRequest,
+  sendFriendRequest,
+} from "@/app/actions/friends";
 
 export default function PublicProfilePage() {
   const params = useParams<{ userId: string }>();
@@ -116,6 +122,41 @@ export default function PublicProfilePage() {
               className="text-xs text-muted hover:text-danger disabled:opacity-50"
             >
               Rimuovi amico
+            </button>
+          </div>
+        ) : profile.incomingRequestId ? (
+          // Questa persona ha già scritto a TE: non ha senso proporre "+ Aggiungi amico" (creerebbe
+          // una seconda richiesta) — stessa azione già disponibile nella tab Amici, qui accessibile
+          // direttamente dal profilo.
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              disabled={busy}
+              onClick={() => act(() => respondToFriendRequest(profile.incomingRequestId!, true))}
+              className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
+            >
+              Accetta richiesta
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => act(() => respondToFriendRequest(profile.incomingRequestId!, false))}
+              className="text-xs text-muted hover:text-danger disabled:opacity-50"
+            >
+              Rifiuta
+            </button>
+          </div>
+        ) : profile.outgoingRequestId ? (
+          // Bug segnalato dall'utente il 2026-08-06: senza questo stato il bottone mostrava
+          // sempre "+ Aggiungi amico" anche con una richiesta già in sospeso, permettendo di
+          // "inviarne" un'altra a vuoto (sendFriendRequest la ignora silenziosamente, ma l'utente
+          // non aveva modo di saperlo guardando solo questo bottone).
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="text-xs text-muted">Richiesta inviata</span>
+            <button
+              disabled={busy}
+              onClick={() => act(() => cancelFriendRequest(profile.outgoingRequestId!))}
+              className="text-xs text-muted hover:text-danger disabled:opacity-50"
+            >
+              Annulla
             </button>
           </div>
         ) : (

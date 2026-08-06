@@ -27,10 +27,19 @@ import {
   type RawRace,
   type RawSubclass,
 } from "@/lib/fivetools/data";
-import { DualName, EntriesBlock, parseIaClassText, useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
-import { RenderEntries } from "@/lib/fivetools/entries";
+import {
+  DualName,
+  EntriesBlock,
+  findUfficiale,
+  loadRazzeIta,
+  parseIaClassText,
+  parseIaRaceText,
+  useTraduzioneIa,
+} from "@/lib/fivetools/compendio-detail";
+import type { FiveEntry } from "@/lib/fivetools/entries";
 import { Autocomplete } from "./autocomplete";
 import { loadClassNames, rollDie } from "./helpers";
+import { SimpleEntryModal, type SimpleEntryData } from "./simple-entry-modal";
 
 export function ClassRow({
   entry,
@@ -269,42 +278,104 @@ function SubclassFeaturesToggle({
 }
 
 export function ClassFeaturesSection({ character }: { character: Character }) {
-  const classNames = Array.from(
-    new Set(character.classi.map((c) => c.nome.trim()).filter(Boolean)),
-  );
-  if (classNames.length === 0) return null;
+  if (character.classi.length === 0) return null;
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
       <h2 className="text-sm uppercase tracking-widest text-muted">Privilegi di classe</h2>
-      {classNames.map((name) => (
-        <ClassFeaturesToggle key={name} className={name} />
+      {character.classi.map((entry, index) => (
+        <ClassFeaturesToggle key={`${entry.nome}-${index}`} classEntry={entry} />
       ))}
     </section>
   );
 }
 
-function ClassFeaturesToggle({ className }: { className: string }) {
+type LeveledFeature = {
+  name: string;
+  level: number;
+  entries: import("@/lib/fivetools/entries").FiveEntry[];
+  // Fonte della classe o della sottoclasse a cui appartiene: serve a cercare il nome ufficiale/IA
+  // corretto (DualName) per QUESTA specifica feature, non solo per la classe nel suo insieme.
+  source: string;
+  // Se la feature viene dalla classe base o dalla sottoclasse — serve ad abbinare il testo IA
+  // giusto (vedi sotto): mischiare le due code in un solo elenco per livello faceva sì che una
+  // feature di sottoclasse "rubasse" la traduzione destinata a una feature della classe base
+  // (o viceversa) quando i conteggi per livello delle due fonti non coincidevano — osservato con
+  // "Draconic Bloodline" dello Stregone, che compare (per un motivo dei dati 5etools) sia come
+  // feature di sottoclasse al 1° livello sia di nuovo al 3°, senza una riga IA corrispondente.
+  origin: "class" | "subclass";
+};
+
+function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
   const [showFeatures, setShowFeatures] = useState(false);
+  const [selected, setSelected] = useState<SimpleEntryData | null>(null);
   const [classSource, setClassSource] = useState<string | null>(null);
-  const [features, setFeatures] = useState<
-    { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
-  >(null);
-  const ia = useTraduzioneIa("classi", className, classSource ?? "", !!classSource);
-  const iaFeatures = ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null;
+  const [subclassSource, setSubclassSource] = useState<string | null>(null);
+  const [features, setFeatures] = useState<LeveledFeature[] | null>(null);
+
+  // Testo ufficiale/IA per classe e sottoclasse (priorità sulla traduzione dal vivo, stesso
+  // principio di ClassDetail in compendio-detail.tsx). Il nome nel testo IA è già in ITALIANO
+  // (es. "Ispirazione Bardica"), quindi non si può far combaciare con quello inglese di
+  // resolveClassFeatures per nome — si abbina per livello, prendendo le righe IA di quel livello
+  // nello stesso ordine in cui compaiono le feature inglesi a quel livello. Due code SEPARATE
+  // (classe/sottoclasse, mai mescolate): la classe base e la sottoclasse hanno ciascuna il proprio
+  // testo IA generato indipendentemente, quindi solo l'ordine ALL'INTERNO della stessa fonte è
+  // garantito coerente — mischiarle in un solo elenco per livello ha causato un abbinamento
+  // sbagliato reale (vedi nota su LeveledFeature.origin).
+  const classIa = useTraduzioneIa("classi", classEntry.nome, classSource ?? "", !!classSource);
+  const subclassIa = useTraduzioneIa(
+    "classi",
+    classEntry.sottoclasse ?? "",
+    subclassSource ?? "",
+    !!(classEntry.sottoclasse && subclassSource),
+  );
+  const buildQueueByLevel = (text: string | null | undefined) => {
+    const map = new Map<number, { name: string; text: string }[]>();
+    for (const f of text ? parseIaClassText(text) : []) {
+      const items = map.get(f.level) ?? [];
+      items.push({ name: f.name, text: f.text });
+      map.set(f.level, items);
+    }
+    return map;
+  };
+  const classIaByLevel = buildQueueByLevel(classIa?.descrizioneIta);
+  const subclassIaByLevel = buildQueueByLevel(subclassIa?.descrizioneIta);
 
   useEffect(() => {
     let cancelled = false;
     loadClassData().then((data) => {
       if (cancelled) return;
-      const cls = data.classes.find((c) => c.name.toLowerCase() === canonicalClassName(className).toLowerCase());
+      const cls = data.classes.find(
+        (c) => c.name.toLowerCase() === canonicalClassName(classEntry.nome).toLowerCase(),
+      );
       if (!cls) return;
-      setFeatures(resolveClassFeatures(data, cls));
       setClassSource(cls.source);
+      // Solo i privilegi FINO al livello attuale del personaggio in questa classe — prima
+      // mostrava sempre l'intera classe (1-20), un semplice copia-incolla del Compendio senza
+      // rapporto col personaggio reale (segnalato dall'utente).
+      const classFeatures: LeveledFeature[] = resolveClassFeatures(data, cls)
+        .filter((f) => f.level <= classEntry.livello)
+        .map((f) => ({ name: f.name, level: f.level, entries: f.entries, source: f.classSource, origin: "class" }));
+
+      let subclassFeatures: LeveledFeature[] = [];
+      const subclassName = classEntry.sottoclasse?.trim();
+      if (subclassName) {
+        const subclass = data.subclasses.find(
+          (s) => s.name === subclassName && s.className.toLowerCase() === canonicalClassName(classEntry.nome).toLowerCase(),
+        );
+        if (subclass) {
+          setSubclassSource(subclass.source);
+          subclassFeatures = resolveSubclassFeatures(data, subclass)
+            .filter((f) => f.level <= classEntry.livello)
+            .map((f) => ({ name: f.name, level: f.level, entries: f.entries, source: f.subclassSource, origin: "subclass" }));
+        }
+      }
+
+      setFeatures([...classFeatures, ...subclassFeatures].sort((a, b) => a.level - b.level));
     });
     return () => {
       cancelled = true;
     };
-  }, [className]);
+  }, [classEntry.nome, classEntry.sottoclasse, classEntry.livello]);
 
   return (
     <div>
@@ -316,40 +387,43 @@ function ClassFeaturesToggle({ className }: { className: string }) {
             compendio_traduzione_ia/compendio_ita_classe — kind+source qui abilita quella
             priorità (vedi DualName); le altre classi ricadono comunque sulla traduzione live. */}
         {showFeatures ? "Nascondi" : "Come funziona"}{" "}
-        {classSource ? <DualName text={className} kind="classi" source={classSource} inline /> : className}
+        {classSource ? <DualName text={classEntry.nome} kind="classi" source={classSource} inline /> : classEntry.nome}
+        {classEntry.sottoclasse && ` (${classEntry.sottoclasse})`}
       </button>
       {showFeatures && (
-        <div className="mt-2 space-y-3 border-t border-edge pt-3">
+        <div className="mt-2 space-y-1 border-t border-edge pt-2">
           {!features && <p className="text-sm text-muted">Caricamento…</p>}
-          {/* La cache IA (compendio_traduzione_ia) ha priorità sulla traduzione live: stesso
-              principio di ClassDetail in compendio-detail.tsx, altrimenti qui si vedrebbe sempre
-              e solo la traduzione automatica al volo anche per le classi già tradotte a mano. */}
-          {iaFeatures
-            ? iaFeatures.map((feature, index) => (
-                <div
-                  key={`${feature.name}-${feature.level}-${index}`}
-                  className="rounded-lg border border-edge bg-surface-raised p-3"
-                >
-                  <p className="text-sm font-bold text-foreground mb-1.5">
-                    {feature.name} <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
-                  </p>
-                  <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
-                </div>
-              ))
-            : features?.map((feature) => (
-                <div
-                  key={`${feature.name}-${feature.level}`}
-                  className="rounded-lg border border-edge bg-surface-raised p-3"
-                >
-                  <p className="text-sm font-bold text-foreground mb-1.5">
-                    <DualName text={feature.name} inline />{" "}
-                    <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
-                  </p>
-                  <EntriesBlock entries={feature.entries} language="it" />
-                </div>
-              ))}
+          {features?.length === 0 && (
+            <p className="text-sm text-muted">Nessun privilegio ancora a questo livello.</p>
+          )}
+          {/* Elenco compatto, come gli incantesimi conosciuti: una riga per privilegio invece del
+              testo intero sempre visibile — il dettaglio si apre in un modal al click. */}
+          {features?.map((feature, index) => {
+            const queueByLevel = feature.origin === "class" ? classIaByLevel : subclassIaByLevel;
+            const ia = queueByLevel.get(feature.level)?.shift();
+            return (
+              <button
+                key={`${feature.name}-${feature.level}-${index}`}
+                onClick={() =>
+                  setSelected({
+                    title: feature.name,
+                    meta: `Liv. ${feature.level}`,
+                    entries: feature.entries,
+                    textIt: ia ? [ia.text] : undefined,
+                  })
+                }
+                className="flex w-full items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-left text-sm hover:border-accent/50 transition-colors"
+              >
+                <span className="text-foreground truncate">
+                  <DualName text={feature.name} kind="classi" source={feature.source} inline />
+                </span>
+                <span className="text-xs text-muted shrink-0">Liv. {feature.level}</span>
+              </button>
+            );
+          })}
         </div>
       )}
+      <SimpleEntryModal data={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
@@ -437,9 +511,13 @@ export function VisionField({
   );
 }
 
+type NamedTrait = { name: string; textIt?: string[]; entries: FiveEntry[] };
+
 export function RaceTraits({ razza }: { razza: string }) {
   const [showTraits, setShowTraits] = useState(false);
+  const [selected, setSelected] = useState<SimpleEntryData | null>(null);
   const [race, setRace] = useState<RawRace | null | undefined>(undefined);
+  const [itaRazze, setItaRazze] = useState<Awaited<ReturnType<typeof loadRazzeIta>> | null>(null);
 
   useEffect(() => {
     const name = razza.trim();
@@ -447,14 +525,75 @@ export function RaceTraits({ razza }: { razza: string }) {
     let cancelled = false;
     loadRaces().then((races) => {
       if (cancelled) return;
-      setRace(races.find((r) => r.name.toLowerCase() === name.toLowerCase()) ?? null);
+      // Alcune fonti (es. "LFL") ridefiniscono una razza già esistente altrove via "_copy" senza
+      // portare con sé i tratti veri (entries mancante) — .find() da solo può pescare quella
+      // invece della fonte "piena" (es. PHB), mostrando zero privilegi per una razza che invece
+      // ne ha. Tra i nomi che combaciano, preferisce quello con contenuto reale.
+      const matches = races.filter((r) => r.name.toLowerCase() === name.toLowerCase());
+      const withEntries = matches.find((r) => Array.isArray(r.entries) && r.entries.length > 0);
+      setRace(withEntries ?? matches[0] ?? null);
     });
     return () => {
       cancelled = true;
     };
   }, [razza]);
 
-  if (!razza.trim() || race === null) return null;
+  useEffect(() => {
+    let cancelled = false;
+    loadRazzeIta().then((data) => {
+      if (!cancelled) setItaRazze(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ia = useTraduzioneIa("razze", race?.name ?? "", race?.source ?? "", !!race);
+
+  if (!razza.trim()) return null;
+
+  if (race === null) {
+    return (
+      <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
+        <h2 className="text-sm uppercase tracking-widest text-muted mb-1">Privilegi di razza</h2>
+        <p className="text-sm text-muted">
+          &ldquo;{razza}&rdquo; non è stata trovata nel Compendio (razza personalizzata o non
+          ancora tradotta): nessun privilegio automatico da mostrare qui, aggiungili a mano tra i
+          Talenti se vuoi tenerne traccia.
+        </p>
+      </section>
+    );
+  }
+
+  const ufficiale =
+    itaRazze && race ? findUfficiale(itaRazze, ia?.nomeIta ?? null, race.name, race.source) : null;
+
+  const traits: NamedTrait[] = [];
+  if (ufficiale) {
+    for (const tratto of ufficiale.tratti) {
+      traits.push({ name: tratto.nome, textIt: [tratto.testo], entries: [] });
+    }
+    for (const sottorazza of ufficiale.sottorazze) {
+      for (const tratto of sottorazza.tratti) {
+        traits.push({ name: `${tratto.nome} (${sottorazza.nome})`, textIt: [tratto.testo], entries: [] });
+      }
+    }
+  } else if (ia?.descrizioneIta) {
+    for (const tratto of parseIaRaceText(ia.descrizioneIta)) {
+      traits.push({ name: tratto.name, textIt: [tratto.text], entries: [] });
+    }
+  } else if (race) {
+    // "entries" è dichiarato non-opzionale nel tipo RawRace ma i dati grezzi di 5etools non sono
+    // validati a runtime: alcune razze (specie sottorazze/varianti) arrivano davvero senza questo
+    // campo — scoperto proprio su "Elf"/PHB durante un render transitorio (prima che testo
+    // ufficiale/IA finissero di caricare), mandava in crash l'intero componente.
+    for (const entry of race.entries ?? []) {
+      if (typeof entry !== "string" && entry.name) {
+        const inner = entry.entries ?? (entry.entry ? [entry.entry] : []);
+        traits.push({ name: entry.name, entries: inner });
+      }
+    }
+  }
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
@@ -462,14 +601,27 @@ export function RaceTraits({ razza }: { razza: string }) {
         onClick={() => setShowTraits((prev) => !prev)}
         className="text-xs font-bold text-accent-strong hover:underline"
       >
-        {showTraits ? "Nascondi" : "Come funziona"} {razza}
+        {showTraits ? "Nascondi" : "Come funziona"}{" "}
+        {race ? <DualName text={race.name} kind="razze" source={race.source} inline /> : razza}
       </button>
       {showTraits && (
-        <div className="mt-3 border-t border-edge pt-3">
+        <div className="mt-3 space-y-1 border-t border-edge pt-3">
           {!race && <p className="text-sm text-muted">Caricamento…</p>}
-          {race && <RenderEntries entries={race.entries} />}
+          {race && traits.length === 0 && (
+            <p className="text-sm text-muted">Nessun privilegio disponibile.</p>
+          )}
+          {traits.map((trait, index) => (
+            <button
+              key={`${trait.name}-${index}`}
+              onClick={() => setSelected({ title: trait.name, entries: trait.entries, textIt: trait.textIt })}
+              className="flex w-full items-center gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-left text-sm hover:border-accent/50 transition-colors"
+            >
+              <span className="text-foreground truncate">{trait.name}</span>
+            </button>
+          ))}
         </div>
       )}
+      <SimpleEntryModal data={selected} onClose={() => setSelected(null)} />
     </section>
   );
 }
@@ -491,6 +643,10 @@ export function BackgroundTraits({ background }: { background: string }) {
     };
   }, [background]);
 
+  // I background non hanno testo ufficiale estratto dai manuali (nessuna tabella compendio_ita_*
+  // per questa categoria) — solo cache IA o traduzione dal vivo, stessa priorità del resto del file.
+  const ia = useTraduzioneIa("background", data?.name ?? "", data?.source ?? "", !!data);
+
   if (!background.trim() || data === null) return null;
 
   return (
@@ -499,12 +655,25 @@ export function BackgroundTraits({ background }: { background: string }) {
         onClick={() => setShowTraits((prev) => !prev)}
         className="text-xs font-bold text-accent-strong hover:underline"
       >
-        {showTraits ? "Nascondi" : "Come funziona"} {background}
+        {showTraits ? "Nascondi" : "Come funziona"}{" "}
+        {data ? <DualName text={data.name} kind="background" source={data.source} inline /> : background}
       </button>
       {showTraits && (
-        <div className="mt-2 border-t border-edge pt-3">
+        <div className="mt-2 space-y-2 border-t border-edge pt-3">
           {!data && <p className="text-sm text-muted">Caricamento…</p>}
-          {data && <RenderEntries entries={data.entries} />}
+          {data &&
+            (ia?.descrizioneIta ? (
+              ia.descrizioneIta
+                .split("\n")
+                .filter((line) => line.trim())
+                .map((line, index) => (
+                  <p key={index} className="text-sm text-foreground leading-relaxed">
+                    {line}
+                  </p>
+                ))
+            ) : (
+              <EntriesBlock entries={data.entries} language="it" />
+            ))}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useItalianSearchIndex, useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
+import { bestItalianName, useItalianSearchIndex } from "@/lib/fivetools/compendio-detail";
 import { type CompendiumKind } from "@/lib/fivetools/data";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 
@@ -68,7 +68,7 @@ export function Autocomplete<T extends { name: string; source: string }>({
               .filter((o) => {
                 if (o.name.toLowerCase().includes(query)) return true;
                 if (translatedQuery && o.name.toLowerCase().includes(translatedQuery)) return true;
-                const italianName = italianIndex.get(`${o.name}|${o.source}`);
+                const italianName = bestItalianName(italianIndex, o.name, o.source);
                 return !!italianName && italianName.toLowerCase().includes(query);
               })
               .map((o) => [o.name, o]),
@@ -112,9 +112,12 @@ export function Autocomplete<T extends { name: string; source: string }>({
 }
 
 function ItalianHint({ text, kind, source }: { text: string; kind: CompendiumKind; source: string }) {
-  const ia = useTraduzioneIa(kind, text, source, true);
+  // Stessa priorità ufficiale (fonte esatta) > ufficiale (altra fonte) > cache IA > traduzione dal
+  // vivo di DualName — prima qui mancava perfino il controllo del testo ufficiale, mostrando
+  // sempre e solo IA/live anche per voci con un nome ufficiale collegato.
+  const italianIndex = useItalianSearchIndex(kind, true);
   const liveTranslated = useTranslatedText(text, "en", "it");
-  const translated = ia?.nomeIta ?? liveTranslated;
+  const translated = bestItalianName(italianIndex, text, source) ?? liveTranslated;
   if (!translated || translated.toLowerCase() === text.toLowerCase()) return null;
   return <span className="ml-2 text-xs text-muted">({translated})</span>;
 }

@@ -78,6 +78,8 @@ export async function getPublicProfile(userId: string) {
   if (!user) return null;
 
   let isFriend = false;
+  let outgoingRequestId: string | null = null;
+  let incomingRequestId: string | null = null;
   if (viewerId !== userId) {
     const [userIdLow, userIdHigh] = canonicalPair(viewerId, userId);
     const [friendshipRow] = await db
@@ -85,6 +87,36 @@ export async function getPublicProfile(userId: string) {
       .from(friendships)
       .where(and(eq(friendships.userIdLow, userIdLow), eq(friendships.userIdHigh, userIdHigh)));
     isFriend = !!friendshipRow;
+
+    // Senza questo controllo il bottone mostrava sempre "+ Aggiungi amico" anche con una
+    // richiesta già inviata (o ricevuta) in sospeso — bastava andare sul profilo per non avere
+    // alcun modo di saperlo, a differenza della lista amici che invece lo mostra correttamente
+    // già oggi (FriendsTab, tramite getFriendsAndRequests). Segnalato dall'utente il 2026-08-06.
+    if (!isFriend) {
+      const [outgoing] = await db
+        .select({ id: friendRequests.id })
+        .from(friendRequests)
+        .where(
+          and(
+            eq(friendRequests.richiedenteId, viewerId),
+            eq(friendRequests.destinatarioId, userId),
+            eq(friendRequests.stato, "pending"),
+          ),
+        );
+      outgoingRequestId = outgoing?.id ?? null;
+
+      const [incoming] = await db
+        .select({ id: friendRequests.id })
+        .from(friendRequests)
+        .where(
+          and(
+            eq(friendRequests.richiedenteId, userId),
+            eq(friendRequests.destinatarioId, viewerId),
+            eq(friendRequests.stato, "pending"),
+          ),
+        );
+      incomingRequestId = incoming?.id ?? null;
+    }
   }
 
   const myCampaignRows = await db
@@ -102,7 +134,15 @@ export async function getPublicProfile(userId: string) {
         )
     : [];
 
-  return { id: user.id, name: user.name, image: user.image, isFriend, sharedCampaigns };
+  return {
+    id: user.id,
+    name: user.name,
+    image: user.image,
+    isFriend,
+    outgoingRequestId,
+    incomingRequestId,
+    sharedCampaigns,
+  };
 }
 
 async function finalizeFriendship(userA: string, userB: string) {

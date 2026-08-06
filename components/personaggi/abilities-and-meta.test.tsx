@@ -50,6 +50,12 @@ vi.mock("@/components/personaggi/compendio-info-button", () => ({
   CompendioInfoButton: () => null,
 }));
 
+// SimpleEntryModal (usato da LocalInfoButton per i privilegi a usi limitati) importa EntriesBlock
+// da lib/fivetools/compendio-detail, stessa catena verso next-auth -> next/server di cui sopra.
+vi.mock("@/components/personaggi/simple-entry-modal", () => ({
+  SimpleEntryModal: () => null,
+}));
+
 function baseCharacter(overrides: Partial<Character> = {}): Character {
   return {
     ...newCharacter(),

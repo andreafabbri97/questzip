@@ -26,6 +26,7 @@ import {
   DualName,
   EntryDetail,
   SourceBadge,
+  bestItalianName,
   useItalianSearchIndex,
   type Entry,
   type Language,
@@ -159,10 +160,11 @@ export default function CompendiumPage() {
         if (!q) return true;
         if (entry.name.toLowerCase().includes(q)) return true;
         if (englishQuery && entry.name.toLowerCase().includes(englishQuery)) return true;
-        // Nome italiano reale (ufficiale o cache IA) per questa entry, quando disponibile —
-        // permette di trovarla digitando esattamente il nome del manuale italiano, non solo
-        // sperando che la traduzione al volo della query combaci col nome inglese grezzo.
-        const italianName = italianIndex.get(`${entry.name}|${entry.source}`);
+        // Nome italiano reale (ufficiale, ufficiale di un'altra fonte, o cache IA) per questa
+        // entry, quando disponibile — permette di trovarla digitando esattamente il nome del
+        // manuale italiano, non solo sperando che la traduzione al volo della query combaci col
+        // nome inglese grezzo.
+        const italianName = bestItalianName(italianIndex, entry.name, entry.source);
         return !!italianName && italianName.toLowerCase().includes(q);
       })
       .filter((entry) => {

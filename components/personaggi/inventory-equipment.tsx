@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IntField } from "@/components/int-field";
 import {
   CONDIZIONI_5E,
@@ -12,6 +12,8 @@ import {
   type KnownFeat,
 } from "@/lib/dnd";
 import { loadFeats, loadInventoryItems } from "@/lib/fivetools/data";
+import { DualName } from "@/lib/fivetools/compendio-detail";
+import { findCompendioMatch } from "@/lib/fivetools/mention-search";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
 
@@ -345,6 +347,38 @@ export function ActiveConditionsSection({
   );
 }
 
+// Il talento è salvato come nome libero (in inglese, quello scelto dall'Autocomplete), senza
+// fonte — a differenza del bottone "📖 Verifica" (CompendioInfoButton), che risolve il match e
+// mostra il nome ufficiale/IA dentro al modal, l'elenco stesso non mostrava alcuna traduzione:
+// stesso identico talento appariva in inglese qui e in italiano nel modal, segnalato dall'utente
+// come incoerenza ("sono la stessa cosa ma sono tradotti diversi"). Risolve il match una seconda
+// volta (stessa funzione di CompendioInfoButton, cache condivisa) per avere anche qui il source
+// esatto e quindi la stessa priorità ufficiale/IA usata ovunque nel Compendio, non solo la
+// traduzione live generica di DualName senza source.
+function TalentoNameHint({ nome }: { nome: string }) {
+  const [match, setMatch] = useState<{ name: string; source: string } | null>(null);
+  const trimmed = nome.trim();
+
+  useEffect(() => {
+    if (!trimmed) return;
+    let cancelled = false;
+    findCompendioMatch("talenti", trimmed).then((found) => {
+      if (!cancelled) setMatch(found);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [trimmed]);
+
+  if (!trimmed || !match) return null;
+
+  return (
+    <p className="px-0.5 text-xs text-muted">
+      <DualName text={match.name} kind="talenti" source={match.source} inline />
+    </p>
+  );
+}
+
 export function TalentiSection({
   character,
   onChange,
@@ -394,6 +428,7 @@ export function TalentiSection({
                 ×
               </button>
             </div>
+            <TalentoNameHint nome={talento.nome} />
             <CompendioInfoButton kind="talenti" nome={talento.nome} />
           </div>
         ))}
