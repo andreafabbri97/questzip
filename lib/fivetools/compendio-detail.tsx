@@ -239,16 +239,22 @@ export function DualName({
 }: {
   text: string;
   inline?: boolean;
-  /** Se presenti insieme, il nome tradotto viene cercato prima nella cache IA (voci di primo
-   * livello del Compendio) prima di ricadere sulla traduzione live — solo dove ha senso: le
-   * caratteristiche di classe, le azioni dei mostri ecc. non hanno una voce propria nella cache
-   * IA e continuano a usare solo la traduzione live passando questi due prop. */
+  /** Se presenti insieme, il nome tradotto viene cercato prima nel testo ufficiale del manuale
+   * (quando la voce è collegata via nomeInglese/fonteInglese), poi nella cache IA, prima di
+   * ricadere sulla traduzione live — stessa identica priorità usata per la ricerca
+   * (useItalianSearchIndex) e per il corpo del dettaglio. Bug corretto: prima si appoggiava
+   * SOLO alla cache IA, quindi anche per voci con testo ufficiale già collegato (es. "Eldritch
+   * Blast"/PHB -> "Deflagrazione Occulta") mostrava la traduzione IA di qualità inferiore
+   * ("Blast Occulto") — segnalato dall'utente con screenshot. Solo dove ha senso: le
+   * caratteristiche di classe, le azioni dei mostri ecc. non hanno una voce propria nel
+   * Compendio e continuano a usare solo la traduzione live passando questi due prop. */
   kind?: CompendiumKind;
   source?: string;
 }) {
-  const ia = useTraduzioneIa(kind ?? "incantesimi", text, source ?? "", !!(kind && source));
+  const italianIndex = useItalianSearchIndex(kind ?? "incantesimi", !!(kind && source));
   const liveTranslated = useTranslatedText(text, "en", "it");
-  const translated = ia?.nomeIta ?? liveTranslated;
+  const translated =
+    (kind && source ? italianIndex.get(`${text}|${source}`) : undefined) ?? liveTranslated;
   if (!translated || translated.toLowerCase() === text.toLowerCase()) return <>{text}</>;
   if (inline) {
     return (
