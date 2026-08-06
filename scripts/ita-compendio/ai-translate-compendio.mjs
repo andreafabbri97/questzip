@@ -60,7 +60,10 @@ function resolveTag(tag, content) {
     case "recharge": return parts[0] ? `(Recharge ${parts[0]}-6)` : "(Recharge 6)";
     case "chance": return `${parts[0]}%`;
     case "book": case "filter": case "link": return parts[0];
-    default: return parts.length >= 3 ? parts[parts.length - 1] : parts[0];
+    // Vedi commento sul default in self-translate-fetch.mjs: parts[0] è sempre il nome corretto,
+    // "ultima parte se 3+" prendeva il codice del manuale ripetuto in coda per tag come
+    // {@subclass}/{@classFeature}.
+    default: return parts[0];
   }
 }
 function stripTags(text) {
@@ -142,6 +145,46 @@ async function loadEnglishBackgrounds() {
 async function loadEnglishConditions() {
   const file = await fetchJson(`${RAW_BASE}/conditionsdiseases.json`);
   return file?.condition ?? [];
+}
+
+// Molte ristampe nel mirror 5etools (varianti di manuali di avventura, NPC con equip diverso...)
+// non hanno trait/action propri: sono un riferimento "_copy" a un altro mostro base, più un
+// "_mod" che applica un piccolo patch (aggiunge/rimuove/sostituisce singole voci). Senza risolverlo
+// qui, raw.trait/action/... risultano vuoti e la voce viene silenziosamente saltata per sempre.
+function applyMod(baseArr, mod) {
+  let arr = baseArr ? [...baseArr] : [];
+  for (const m of Array.isArray(mod) ? mod : [mod]) {
+    if (!m || typeof m !== "object") continue;
+    const items = m.items == null ? [] : Array.isArray(m.items) ? m.items : [m.items];
+    if (m.mode === "prependArr") arr = [...items, ...arr];
+    else if (m.mode === "appendArr") arr = [...arr, ...items];
+    else if (m.mode === "insertArr") arr.splice(typeof m.index === "number" ? m.index : arr.length, 0, ...items);
+    else if (m.mode === "replaceArr") {
+      const idx = arr.findIndex((x) => x?.name?.toLowerCase() === String(m.replace).toLowerCase());
+      if (idx >= 0) arr.splice(idx, 1, ...items);
+      else arr = [...arr, ...items];
+    } else if (m.mode === "removeArr") {
+      const names = new Set((Array.isArray(m.names) ? m.names : [m.replace]).filter(Boolean).map((n) => String(n).toLowerCase()));
+      arr = arr.filter((x) => !names.has(x?.name?.toLowerCase()));
+    }
+  }
+  return arr;
+}
+const MOD_FIELDS = ["trait", "action", "bonus", "reaction", "legendary"];
+function resolveMonster(entry, rawByKey, cache, depth = 0) {
+  if (!entry?._copy || depth > 5) return entry;
+  const key = `${entry.name}|${entry.source}`;
+  if (cache.has(key)) return cache.get(key);
+  const base = rawByKey.get(`${entry._copy.name}|${entry._copy.source}`);
+  if (!base) return entry;
+  const resolvedBase = resolveMonster(base, rawByKey, cache, depth + 1);
+  const merged = { ...resolvedBase, ...entry };
+  delete merged._copy;
+  for (const field of MOD_FIELDS) {
+    if (entry._copy._mod?.[field]) merged[field] = applyMod(resolvedBase[field], entry._copy._mod[field]);
+  }
+  cache.set(key, merged);
+  return merged;
 }
 
 // Testo descrittivo inglese appiattito, un estrattore per categoria perché la forma dei dati
@@ -373,8 +416,10 @@ async function translateDescriptionsForCategory(kind, rawByKey, dryRun) {
   class StopForToday extends Error {}
 
   try {
+    const copyCache = new Map();
     for (const row of pending) {
-      const raw = rawByKey.get(`${row.name}|${row.source}`);
+      let raw = rawByKey.get(`${row.name}|${row.source}`);
+      if (raw && kind === "mostri") raw = resolveMonster(raw, rawByKey, copyCache);
       const text = raw ? englishText(kind, raw) : "";
       if (!text) {
         if (!dryRun) {

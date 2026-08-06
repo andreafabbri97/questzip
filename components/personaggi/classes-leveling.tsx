@@ -27,7 +27,7 @@ import {
   type RawRace,
   type RawSubclass,
 } from "@/lib/fivetools/data";
-import { DualName, EntriesBlock } from "@/lib/fivetools/compendio-detail";
+import { DualName, EntriesBlock, parseIaClassText, useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
 import { RenderEntries } from "@/lib/fivetools/entries";
 import { Autocomplete } from "./autocomplete";
 import { loadClassNames, rollDie } from "./helpers";
@@ -196,9 +196,12 @@ function SubclassFeaturesToggle({
   className: string;
 }) {
   const [showFeatures, setShowFeatures] = useState(false);
+  const [subclassSource, setSubclassSource] = useState<string | null>(null);
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
   >(null);
+  const ia = useTraduzioneIa("classi", subclassName, subclassSource ?? "", !!subclassSource);
+  const iaFeatures = ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +212,7 @@ function SubclassFeaturesToggle({
       );
       if (!subclass) return;
       setFeatures(resolveSubclassFeatures(data, subclass));
+      setSubclassSource(subclass.source);
     });
     return () => {
       cancelled = true;
@@ -221,26 +225,43 @@ function SubclassFeaturesToggle({
         onClick={() => setShowFeatures((prev) => !prev)}
         className="text-xs font-bold text-accent-strong hover:underline"
       >
-        {/* Le sottoclassi non hanno una voce propria nella cache ufficiale/IA (solo le 12 classi
-            base del Manuale del Giocatore ce l'hanno) — DualName senza kind/source ricade sulla
-            sola traduzione live, stesso trattamento dei nomi dei privilegi qui sotto. */}
-        {showFeatures ? "Nascondi" : "Come funziona"} <DualName text={subclassName} inline />
+        {/* kind+source qui abilita la priorità sulla cache IA (vedi DualName); ricade sulla
+            traduzione live se la sottoclasse non è ancora stata tradotta. */}
+        {showFeatures ? "Nascondi" : "Come funziona"}{" "}
+        {subclassSource ? (
+          <DualName text={subclassName} kind="classi" source={subclassSource} inline />
+        ) : (
+          subclassName
+        )}
       </button>
       {showFeatures && (
         <div className="mt-2 space-y-3 border-t border-edge pt-3">
           {!features && <p className="text-sm text-muted">Caricamento…</p>}
-          {features?.map((feature) => (
-            <div
-              key={`${feature.name}-${feature.level}`}
-              className="rounded-lg border border-edge bg-surface p-3"
-            >
-              <p className="text-sm font-bold text-foreground mb-1.5">
-                <DualName text={feature.name} inline />{" "}
-                <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
-              </p>
-              <EntriesBlock entries={feature.entries} language="it" />
-            </div>
-          ))}
+          {iaFeatures
+            ? iaFeatures.map((feature, index) => (
+                <div
+                  key={`${feature.name}-${feature.level}-${index}`}
+                  className="rounded-lg border border-edge bg-surface p-3"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    {feature.name}{" "}
+                    <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
+                </div>
+              ))
+            : features?.map((feature) => (
+                <div
+                  key={`${feature.name}-${feature.level}`}
+                  className="rounded-lg border border-edge bg-surface p-3"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    <DualName text={feature.name} inline />{" "}
+                    <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+                  </p>
+                  <EntriesBlock entries={feature.entries} language="it" />
+                </div>
+              ))}
         </div>
       )}
     </div>
@@ -268,6 +289,8 @@ function ClassFeaturesToggle({ className }: { className: string }) {
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
   >(null);
+  const ia = useTraduzioneIa("classi", className, classSource ?? "", !!classSource);
+  const iaFeatures = ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -298,18 +321,33 @@ function ClassFeaturesToggle({ className }: { className: string }) {
       {showFeatures && (
         <div className="mt-2 space-y-3 border-t border-edge pt-3">
           {!features && <p className="text-sm text-muted">Caricamento…</p>}
-          {features?.map((feature) => (
-            <div
-              key={`${feature.name}-${feature.level}`}
-              className="rounded-lg border border-edge bg-surface-raised p-3"
-            >
-              <p className="text-sm font-bold text-foreground mb-1.5">
-                <DualName text={feature.name} inline />{" "}
-                <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
-              </p>
-              <EntriesBlock entries={feature.entries} language="it" />
-            </div>
-          ))}
+          {/* La cache IA (compendio_traduzione_ia) ha priorità sulla traduzione live: stesso
+              principio di ClassDetail in compendio-detail.tsx, altrimenti qui si vedrebbe sempre
+              e solo la traduzione automatica al volo anche per le classi già tradotte a mano. */}
+          {iaFeatures
+            ? iaFeatures.map((feature, index) => (
+                <div
+                  key={`${feature.name}-${feature.level}-${index}`}
+                  className="rounded-lg border border-edge bg-surface-raised p-3"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    {feature.name} <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
+                </div>
+              ))
+            : features?.map((feature) => (
+                <div
+                  key={`${feature.name}-${feature.level}`}
+                  className="rounded-lg border border-edge bg-surface-raised p-3"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    <DualName text={feature.name} inline />{" "}
+                    <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+                  </p>
+                  <EntriesBlock entries={feature.entries} language="it" />
+                </div>
+              ))}
         </div>
       )}
     </div>
@@ -525,6 +563,7 @@ export function LevelUpWizard({
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
   >(null);
+  const [classSource, setClassSource] = useState<string | null>(null);
   const [hitDieFaces, setHitDieFaces] = useState<number | null>(null);
   const [hpGain, setHpGain] = useState<number | null>(null);
   const [asiMode, setAsiMode] = useState<"plus2" | "plus1x2" | "talento">("plus2");
@@ -541,6 +580,10 @@ export function LevelUpWizard({
   const conModifier = abilityModifier(character.caratteristiche.costituzione);
   const averageHp = hitDieFaces ? Math.max(1, Math.floor(hitDieFaces / 2) + 1 + conModifier) : null;
   const displayedHpGain = hpGain ?? averageHp ?? 0;
+  const ia = useTraduzioneIa("classi", targetClass?.nome ?? "", classSource ?? "", !!classSource);
+  const iaFeatures = ia?.descrizioneIta
+    ? parseIaClassText(ia.descrizioneIta).filter((f) => f.level === newLevel)
+    : null;
 
   // il dado vita dipende dalla classe scelta nel dropdown (multiclasse): se il PG cambia classe
   // a metà wizard un tiro già fatto per il dado vita precedente (es. d8) resterebbe appiccicato
@@ -560,10 +603,12 @@ export function LevelUpWizard({
       if (!cls) {
         setFeatures([]);
         setHitDieFaces(null);
+        setClassSource(null);
         return;
       }
       setFeatures(resolveClassFeatures(data, cls).filter((f) => f.level === newLevel));
       setHitDieFaces(cls.hd?.faces ?? null);
+      setClassSource(cls.source);
     });
     return () => {
       cancelled = true;
@@ -749,17 +794,27 @@ export function LevelUpWizard({
             {features?.length === 0 && (
               <p className="text-sm text-muted">Nessun privilegio nuovo a questo livello.</p>
             )}
-            {features?.map((feature) => (
-              <div
-                key={feature.name}
-                className="rounded-lg border border-edge bg-surface p-3 mt-1.5"
-              >
-                <p className="text-sm font-bold text-foreground mb-1.5">
-                  <DualName text={feature.name} inline />
-                </p>
-                <EntriesBlock entries={feature.entries} language="it" />
-              </div>
-            ))}
+            {iaFeatures && iaFeatures.length > 0
+              ? iaFeatures.map((feature, index) => (
+                  <div
+                    key={`${feature.name}-${index}`}
+                    className="rounded-lg border border-edge bg-surface p-3 mt-1.5"
+                  >
+                    <p className="text-sm font-bold text-foreground mb-1.5">{feature.name}</p>
+                    <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
+                  </div>
+                ))
+              : features?.map((feature) => (
+                  <div
+                    key={feature.name}
+                    className="rounded-lg border border-edge bg-surface p-3 mt-1.5"
+                  >
+                    <p className="text-sm font-bold text-foreground mb-1.5">
+                      <DualName text={feature.name} inline />
+                    </p>
+                    <EntriesBlock entries={feature.entries} language="it" />
+                  </div>
+                ))}
           </div>
           <div className="flex items-center gap-3">
             <button

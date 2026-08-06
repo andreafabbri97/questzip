@@ -480,6 +480,20 @@ function parseIaCreatureText(text: string): Map<string, { name: string; text: st
   return groups;
 }
 
+// Formato scritto da self-translate-fetch.mjs per kind "classi": una riga per caratteristica,
+// "Nome (Liv. N): testo" — stessa idea di parseIaCreatureText sopra, ma con il livello al posto
+// del prefisso azione/reazione (le classi non hanno quella distinzione).
+const CLASS_FEATURE_LINE_RE = /^(.*?) \(Liv\. (\d+)\): ([\s\S]*)$/;
+export function parseIaClassText(text: string): { name: string; level: number; text: string }[] {
+  const items: { name: string; level: number; text: string }[] = [];
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    const match = line.match(CLASS_FEATURE_LINE_RE);
+    if (match) items.push({ name: match[1], level: Number(match[2]), text: match[3] });
+  }
+  return items;
+}
+
 function CreatureDetail({ creature, language }: { creature: RawCreature; language: Language }) {
   const abilities: [string, number][] = [
     ["FOR", creature.str],
@@ -891,6 +905,20 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   const ia = useTraduzioneIa("classi", cls.name, cls.source, language === "it");
   const liveTranslatedName = useTranslatedText(cls.name, "en", "it");
   const translatedName = ia?.nomeIta ?? liveTranslatedName;
+  const iaFeatures = useMemo(
+    () => (ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null),
+    [ia],
+  );
+  const iaFeaturesByLevel = useMemo(() => {
+    if (!iaFeatures) return null;
+    const map = new Map<number, { name: string; text: string }[]>();
+    for (const f of iaFeatures) {
+      const list = map.get(f.level) ?? [];
+      list.push({ name: f.name, text: f.text });
+      map.set(f.level, list);
+    }
+    return map;
+  }, [iaFeatures]);
   const [itaClassi, setItaClassi] = useState<Awaited<ReturnType<typeof getClassiIta>> | null>(
     null,
   );
@@ -984,6 +1012,26 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
               ))}
           </div>
         </div>
+        {iaFeaturesByLevel && (
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-widest text-muted">Caratteristiche di classe</p>
+            {livelli
+              .filter((l) => (iaFeaturesByLevel.get(l.livello) ?? []).length > 0)
+              .map((l) =>
+                iaFeaturesByLevel.get(l.livello)!.map((feature, index) => (
+                  <div
+                    key={`${l.livello}-${feature.name}-${index}`}
+                    className="rounded-lg border border-edge bg-surface-raised p-3"
+                  >
+                    <p className="text-sm font-bold text-foreground mb-1.5">
+                      <span className="text-accent-strong">Liv. {l.livello}</span> · {feature.name}
+                    </p>
+                    <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
+                  </div>
+                )),
+              )}
+          </div>
+        )}
         {subclassesBlock}
       </>
     );
@@ -1060,7 +1108,10 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
                       </td>
                     ))}
                     <td className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-foreground">
-                      {(featuresByLevel.get(level) ?? []).join(", ") || "—"}
+                      {(iaFeaturesByLevel?.get(level)?.map((f) => f.name) ??
+                        featuresByLevel.get(level) ??
+                        []
+                      ).join(", ") || "—"}
                     </td>
                   </tr>
                 ))}
@@ -1073,18 +1124,30 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
       {classFeatures.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-widest text-muted">Caratteristiche di classe</p>
-          {classFeatures.map((feature) => (
-            <div
-              key={`${feature.name}-${feature.level}`}
-              className="rounded-lg border border-edge bg-surface-raised p-3"
-            >
-              <p className="text-sm font-bold text-foreground mb-1.5">
-                <span className="text-accent-strong">Liv. {feature.level}</span> ·{" "}
-                <DualName text={feature.name} inline />
-              </p>
-              <EntriesBlock entries={feature.entries} language={language} />
-            </div>
-          ))}
+          {language === "it" && iaFeatures
+            ? iaFeatures.map((feature, index) => (
+                <div
+                  key={`${feature.name}-${feature.level}-${index}`}
+                  className="rounded-lg border border-edge bg-surface-raised p-3"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    <span className="text-accent-strong">Liv. {feature.level}</span> · {feature.name}
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
+                </div>
+              ))
+            : classFeatures.map((feature) => (
+                <div
+                  key={`${feature.name}-${feature.level}`}
+                  className="rounded-lg border border-edge bg-surface-raised p-3"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    <span className="text-accent-strong">Liv. {feature.level}</span> ·{" "}
+                    <DualName text={feature.name} inline />
+                  </p>
+                  <EntriesBlock entries={feature.entries} language={language} />
+                </div>
+              ))}
         </div>
       )}
 
@@ -1107,6 +1170,11 @@ function SubclassAccordion({
     () => resolveSubclassFeatures(classData, subclass),
     [classData, subclass],
   );
+  const ia = useTraduzioneIa("classi", subclass.name, subclass.source, language === "it");
+  const iaFeatures = useMemo(
+    () => (ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null),
+    [ia],
+  );
 
   return (
     <div className="rounded-lg border border-edge bg-surface-raised overflow-hidden">
@@ -1115,7 +1183,7 @@ function SubclassAccordion({
         className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-surface transition-colors"
       >
         <span className="text-sm font-bold text-foreground">
-          <DualName text={subclass.name} inline />
+          <DualName text={subclass.name} kind="classi" source={subclass.source} inline />
         </span>
         <span className="text-muted text-xs shrink-0">{open ? "▲" : "▼"}</span>
       </button>
@@ -1124,15 +1192,24 @@ function SubclassAccordion({
           {features.length === 0 && (
             <p className="text-sm text-muted">Nessuna caratteristica trovata.</p>
           )}
-          {features.map((feature) => (
-            <div key={`${feature.name}-${feature.level}`}>
-              <p className="text-sm font-bold text-foreground mb-1.5">
-                <span className="text-accent-strong">Liv. {feature.level}</span> ·{" "}
-                <DualName text={feature.name} inline />
-              </p>
-              <EntriesBlock entries={feature.entries} language={language} />
-            </div>
-          ))}
+          {iaFeatures
+            ? iaFeatures.map((feature, index) => (
+                <div key={`${feature.name}-${feature.level}-${index}`}>
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    <span className="text-accent-strong">Liv. {feature.level}</span> · {feature.name}
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
+                </div>
+              ))
+            : features.map((feature) => (
+                <div key={`${feature.name}-${feature.level}`}>
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    <span className="text-accent-strong">Liv. {feature.level}</span> ·{" "}
+                    <DualName text={feature.name} inline />
+                  </p>
+                  <EntriesBlock entries={feature.entries} language={language} />
+                </div>
+              ))}
         </div>
       )}
     </div>
