@@ -7,39 +7,47 @@
 // estratto dai PDF ufficiali dell'utente per il resto della pipeline) — non un'altra traduzione
 // indovinata, per lo stesso motivo per cui in generale preferiamo il testo ufficiale a qualsiasi
 // resa automatica. Aggiungere una voce e rilanciare: rilanciabile in sicurezza, salta le righe già
-// corrette; se "descrizioneIta" è omesso, si limita a sostituire il vecchio nome col nuovo ovunque
-// compaia nella descrizione esistente invece di sostituirla per intero.
+// corrette.
+//
+// ATTENZIONE kind="classi": descrizioneIta per le classi/sottoclassi NON è un paragrafo semplice,
+// è multi-riga "Nome (Liv. N): testo" (una riga per privilegio, letto da parseIaClassText in
+// lib/fivetools/compendio-detail.tsx per l'elenco espandibile in scheda) — per questo kind, se
+// serve correggere anche la descrizione, USARE SEMPRE "descrizioneIta" per sostituire l'INTERO
+// campo con tutte le righe ricostruite a mano (vedi parse-subclasses-pdf.mjs per l'estrazione
+// automatica della sola prima riga, che preserva le altre) — mai un paragrafo semplice, altrimenti
+// l'elenco per livello sparisce (bug già capitato una volta, 2026-08-06, corretto a mano). Per
+// altri kind (incantesimi, mostri, oggetti...) descrizioneIta è invece un paragrafo semplice, va
+// benissimo sostituirlo per intero.
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { compendioTraduzioniIa } from "../../lib/db/schema.ts";
 import { and, eq } from "drizzle-orm";
 
 const CORRECTIONS = [
-  {
-    kind: "classi",
-    name: "The Hexblade",
-    source: "XGE",
-    nomeIta: "La Lama del Sortilegio",
-    descrizioneIta:
-      "Il warlock ha stipulato il suo patto con una misteriosa entità della Coltre Oscura: una forza che si manifesta in armi di magia senzienti e ricavate dalla materia d'ombra. La possente spada Lama Nera è la più famosa di queste armi, che nell'arco dei secoli si sono diffuse in tutto il multiverso. La forza d'ombra all'origine di queste armi può offrire il suo potere a quei warlock che stipulano un patto con lei. Molti warlock della lama del sortilegio creano armi che emulano quelle forgiate sulla Coltre Oscura. Altri rinunciano a queste armi e si accontentano di infondere la magia oscura di quel piano negli incantesimi che lanciano. Poiché è noto che sia stata la Regina Corvo a forgiare la prima di queste armi, molti sapienti ipotizzano che lei e la forza siano la stessa cosa e che quelle armi, assieme ai warlock della lama del sortilegio, siano gli strumenti che usa per manipolare gli eventi del Piano Materiale per i suoi scopi imperscrutabili.",
-    note: "Guida Omnicomprensiva di Xanathar (patrono Warlock), pag. 58 — segnalato dall'utente il 2026-08-06, era 'La Lama Incantata' (traduzione IA)",
-  },
-  {
-    kind: "classi",
-    name: "Arcane Trickster",
-    source: "PHB",
-    nomeIta: "Mistificatore Arcano",
-    descrizioneIta:
-      "Alcuni ladri potenziano le loro sopraffine abilità furtive e di agilità con la magia, imparando alcuni trucchi di ammaliamento e di illusione. Questi ladri includono borseggiatori, scassinatori, burloni e combinaguai di ogni genere, e naturalmente un considerevole numero di avventurieri.",
-    note: "Manuale del Giocatore (archetipo ladresco), pag. 79 — segnalato dall'utente il 2026-08-06, era 'Ingannatore Arcano' (traduzione IA)",
-  },
-  {
-    kind: "classi",
-    name: "Arcane Trickster",
-    source: "XPHB",
-    nomeIta: "Mistificatore Arcano",
-    note: "Stesso nome ufficiale del 2014 (XPHB 2024 non ancora verificato riga per riga, solo il nome è stato allineato) — era 'Ingannatore Arcano'",
-  },
+  // Trovate confrontando le intestazioni reali del PHB (scripts/ita-compendio/extracted/phb.json)
+  // con le sottoclassi che parse-subclasses-pdf.mjs non riusciva ad abbinare — segno che il nome
+  // IA non combaciava affatto col manuale vero. Dopo questa correzione, rilanciare
+  // "parse-subclasses-pdf.mjs phb" per estrarre anche la descrizione reale (ora che il nome
+  // combacia con l'intestazione, l'abbinamento automatico funziona).
+  { kind: "classi", name: "Path of the Totem Warrior", source: "PHB", nomeIta: "Cammino del Combattente Totemico", note: "PHB pag. 50 — era 'Cammino del Guerriero Totemico'" },
+  { kind: "classi", name: "College of Lore", source: "PHB", nomeIta: "Collegio della Sapienza", note: "PHB pag. 54 — era 'Collegio del Sapere'" },
+  { kind: "classi", name: "Eldritch Knight", source: "PHB", nomeIta: "Cavaliere Mistico", note: "PHB pag. 74 — era 'Cavaliere Occulto'" },
+  { kind: "classi", name: "Thief", source: "PHB", nomeIta: "Furfante", note: "PHB pag. 79 — era 'Ladro' (nome della classe base, non dell'archetipo)" },
+  { kind: "classi", name: "Beast Master", source: "PHB", nomeIta: "Signore delle Bestie", note: "PHB pag. 106 — era 'Maestro delle Bestie'" },
+  { kind: "classi", name: "The Archfey", source: "PHB", nomeIta: "Il Signore Fatato", note: "PHB pag. 116 — era 'Il Fatato Supremo'" },
+  { kind: "classi", name: "The Fiend", source: "PHB", nomeIta: "L'Immondo", note: "PHB pag. 117 — era 'L'Infernale'" },
+
+  // Trovate allo stesso modo nella Guida Omnicomprensiva di Xanathar (extracted/xanathar.json) —
+  // un indice compatto classe/sottoclasse a pag. 28 ha reso il confronto rapido per tutte queste.
+  { kind: "classi", name: "Cavalier", source: "XGE", nomeIta: "Cavaliere Errante", note: "XGE pag. 28 — era solo 'Cavaliere'" },
+  { kind: "classi", name: "Oath of Conquest", source: "XGE", nomeIta: "Giuramento di Conquista", note: "XGE pag. 28 — era 'Giuramento della Conquista'" },
+  { kind: "classi", name: "Oath of Redemption", source: "XGE", nomeIta: "Giuramento di Redenzione", note: "XGE pag. 28 — era 'Giuramento della Redenzione'" },
+  { kind: "classi", name: "Horizon Walker", source: "XGE", nomeIta: "Viandante dell'Orizzonte", note: "XGE pag. 28 — era 'Camminatore dell'Orizzonte'" },
+  { kind: "classi", name: "Monster Slayer", source: "XGE", nomeIta: "Uccisore di Mostri", note: "XGE pag. 28 — era 'Sterminatore di Mostri'" },
+  { kind: "classi", name: "Inquisitive", source: "XGE", nomeIta: "Indagatore", note: "XGE pag. 28 — era 'Investigatore'" },
+  { kind: "classi", name: "Mastermind", source: "XGE", nomeIta: "Pianificatore", note: "XGE pag. 28 — era 'Mente Geniale'" },
+  { kind: "classi", name: "Shadow Magic", source: "XGE", nomeIta: "Magia delle Ombre", note: "XGE pag. 28 — era 'Magia dell'Ombra'" },
+  { kind: "classi", name: "War Magic", source: "XGE", nomeIta: "Magia della Guerra", note: "XGE pag. 28 — era 'Magia Bellica'" },
 ];
 
 const sql = neon(process.env.DATABASE_URL);
