@@ -80,6 +80,18 @@ export interface RawItem {
   reqAttune?: boolean | string;
   entries?: FiveEntry[];
   wondrous?: boolean;
+  // Statistiche meccaniche presenti per armi/armature comuni ("baseitem" in 5etools) — quasi mai
+  // hanno un "entries" descrittivo (vedi commento su ItemDetail in compendio-detail.tsx), quindi
+  // senza questi campi il dettaglio di un'arma comune non avrebbe alcun dato utile da mostrare.
+  weight?: number; // libbre
+  value?: number; // rame (1 mo = 100 rame)
+  dmg1?: string; // es. "1d8"
+  dmg2?: string; // danno con impugnatura a due mani, per le armi "versatili"
+  dmgType?: string; // codice singola lettera: S/P/B
+  ac?: number; // solo armature
+  strength?: string; // requisito di Forza, es. "13"
+  stealth?: boolean; // true = svantaggio a Furtività
+  range?: string; // es. "20/60" (piedi), solo armi a distanza/da lancio
 }
 
 export interface RawRace {

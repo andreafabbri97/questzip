@@ -271,6 +271,59 @@ export function formatRaceSpeed(
   );
 }
 
+// Conversione libbre->kg: 5etools ("weight") è sempre in libbre, l'app usa i kg ovunque
+// (peso inventario, capacità di trasporto) — 0,45 kg/libbra, stesso principio già in uso per
+// le distanze (conversione "pulita" ufficiale, non i decimali del valore reale).
+export function formatItemWeight(weightLb: number | undefined): string | null {
+  if (weightLb === undefined) return null;
+  const kg = Math.round(weightLb * 0.45 * 10) / 10;
+  return `${String(kg).replace(".", ",")} kg`;
+}
+
+// 5etools esprime il prezzo di un oggetto in monete di RAME (1 mo = 10 ma = 100 mr) — quasi
+// sempre un multiplo esatto di 100 (quindi mostrabile in mo, l'unità con cui i manuali indicano i
+// prezzi), ma non sempre (es. oggetti che costano poche monete d'argento/rame): scelta l'unità più
+// grande che divide il valore senza resto, altrimenti mo con decimali.
+export function formatItemValue(valueCopper: number | undefined): string | null {
+  if (valueCopper === undefined) return null;
+  if (valueCopper % 100 === 0) return `${valueCopper / 100} mo`;
+  if (valueCopper % 10 === 0) return `${valueCopper / 10} ma`;
+  return `${valueCopper} mr`;
+}
+
+const DAMAGE_TYPE_NAMES: Record<string, string> = {
+  S: "tagliente",
+  P: "perforante",
+  B: "contundente",
+  A: "acido",
+  C: "freddo",
+  F: "fuoco",
+  O: "forza",
+  L: "fulmine",
+  N: "necrotico",
+  I: "veleno",
+  Y: "psichico",
+  R: "radiante",
+  T: "tuono",
+};
+
+export function formatDamageType(code: string | undefined): string {
+  return code ? (DAMAGE_TYPE_NAMES[code] ?? code) : "";
+}
+
+// Gittata di un'arma a distanza/da lancio: "20/60" (piedi, corta/lunga) nel formato 5etools —
+// riusa formatFeet per restare coerente con la stessa conversione "pulita" già in uso ovunque
+// nell'app per le distanze (incantesimi, velocità...).
+export function formatWeaponRange(range: string | undefined, lang: "en" | "it" = "en"): string | null {
+  if (!range) return null;
+  const parts = range
+    .split("/")
+    .map(Number)
+    .filter((n) => !Number.isNaN(n));
+  if (parts.length === 0) return null;
+  return parts.map((ft) => formatFeet(ft, lang)).join(" / ");
+}
+
 export function formatProficiencyList(
   list: (string | { proficiency: string })[] | undefined,
 ): string {

@@ -34,4 +34,24 @@ test.describe("Compendio: tab Oggetti comuni", () => {
     await page.getByPlaceholder("Cerca (in inglese o italiano)…").fill("Halberd");
     await expect(page.getByText("Nessun risultato.")).toBeVisible({ timeout: 10000 });
   });
+
+  // Segnalato dall'utente subito dopo: un'arma comune si trovava correttamente ma il dettaglio
+  // era quasi vuoto (solo nome/tipo/fonte) — RawItem non modellava dado danno/peso/costo/CA, dati
+  // che le armi comuni ("baseitem" 5etools) hanno in campi dedicati invece che nel testo "entries"
+  // (quasi sempre assente per loro, a differenza degli oggetti magici).
+  test("il dettaglio di un'arma/armatura comune mostra dado danno, peso, costo e CA", async ({ page }) => {
+    await page.goto("/compendio");
+    await page.waitForFunction(() => !document.body.innerText.includes("Caricamento contenuti in corso"));
+    await page.getByRole("button", { name: /Oggetti comuni/ }).click();
+
+    await page.getByPlaceholder("Cerca (in inglese o italiano)…").fill("Longsword");
+    await page.getByText("Longsword", { exact: true }).first().click();
+    await expect(page.getByText("1d8", { exact: false })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("15 mo", { exact: false })).toBeVisible();
+
+    await page.getByPlaceholder("Cerca (in inglese o italiano)…").fill("Leather Armor");
+    await page.getByText("Leather Armor", { exact: true }).first().click();
+    const caValue = page.locator("p", { hasText: "CA" }).locator("xpath=following-sibling::p[1]");
+    await expect(caValue).toHaveText("11");
+  });
 });

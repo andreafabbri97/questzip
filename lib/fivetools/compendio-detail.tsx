@@ -32,10 +32,13 @@ import {
   formatChallengeRating,
   formatComponents,
   formatCreatureType,
+  formatDamageType,
   formatDuration,
   formatFeet,
   formatHP,
   formatHitDie,
+  formatItemValue,
+  formatItemWeight,
   formatMaterial,
   formatPrerequisite,
   formatProficiencyList,
@@ -46,6 +49,7 @@ import {
   formatSpeed,
   formatTableCell,
   formatTime,
+  formatWeaponRange,
 } from "@/lib/fivetools/format";
 import { abilityModifier, formatModifier, proficiencyBonus } from "@/lib/dnd";
 import {
@@ -868,6 +872,18 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
     );
   }
 
+  // Armi/armature comuni ("baseitem" 5etools) quasi mai hanno un "entries" descrittivo — i dati
+  // veri (dado danno, peso, costo...) vivono in campi separati che prima l'app non modellava né
+  // mostrava affatto: il dettaglio di un'arma comune era praticamente vuoto (solo nome/tipo/fonte)
+  // anche dopo aver reso armi/oggetti comuni cercabili/verificabili. Segnalato dall'utente.
+  const damage = item.dmg1
+    ? `${item.dmg1}${item.dmg2 ? `/${item.dmg2}` : ""} ${formatDamageType(item.dmgType)}`.trim()
+    : null;
+  const weight = formatItemWeight(item.weight);
+  const value = formatItemValue(item.value);
+  const range = formatWeaponRange(item.range, language);
+  const hasStats = damage || item.ac !== undefined || weight || value || range || item.strength;
+
   return (
     <>
       <p className="text-sm text-muted italic capitalize">
@@ -878,6 +894,17 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
             assistente IA coprono anche armi e attrezzatura comune serve filtrarlo esplicitamente. */}
         {[typeName, item.rarity !== "none" ? item.rarity : null, attunement].filter(Boolean).join(" · ")}
       </p>
+      {hasStats && (
+        <div className="grid grid-cols-2 @sm:grid-cols-4 gap-3">
+          <Stat label="Danno" value={damage} />
+          <Stat label="Gittata" value={range} />
+          <Stat label="CA" value={item.ac} />
+          <Stat label="Forza richiesta" value={item.strength ? `${item.strength}+` : undefined} />
+          <Stat label="Peso" value={weight} />
+          <Stat label="Costo" value={value} />
+          <Stat label="Furtività" value={item.stealth ? "Svantaggio" : undefined} />
+        </div>
+      )}
       <EntriesBlockOrIa entries={item.entries} language={language} iaText={ia?.descrizioneIta} />
     </>
   );
