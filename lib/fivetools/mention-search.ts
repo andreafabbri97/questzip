@@ -18,6 +18,7 @@ import {
   getTalentiIta,
   getTraduzioniIa,
 } from "@/app/actions/compendio-ita";
+import { bestItalianName, buildItalianNameIndex } from "@/lib/fivetools/italian-names";
 
 export interface MentionCandidate {
   kind: CompendiumKind;
@@ -67,63 +68,31 @@ const ITA_LOADERS: Partial<
 
 let allCandidatesPromise: Promise<MentionCandidate[]> | null = null;
 
-// Carica le 8 categorie inglesi + le 6 italiane abbinabili in parallelo una sola volta (i
+// Carica le 8 categorie inglesi + le righe ufficiali/IA abbinabili in parallelo una sola volta (i
 // singoli loader di lib/fivetools/data.ts hanno già una cache propria, condivisa anche con
-// /compendio) e le fonde in un elenco piatto — arricchendo un candidato inglese con "nameIta"
-// quando esiste un abbinamento, invece di avere due righe duplicate per la stessa voce.
+// /compendio) e arricchisce ogni candidato con "nameIta" tramite buildItalianNameIndex/
+// bestItalianName — la STESSA identica priorità (ufficiale fonte esatta > ufficiale qualsiasi
+// fonte > cache IA) usata dal Compendio stesso. Prima questo file aveva una fusione "ultima riga
+// vince" indipendente, senza il livello "ufficiale di un'altra fonte": una voce con nome
+// ufficiale collegato solo a una fonte gemella (es. ristampe XPHB 2024) poteva mostrare qui un
+// nome diverso da quello già corretto nel Compendio — segnalato dall'utente ("quei nomi si devono
+// rifare tutti al Compendio, sia in chat, sia l'assistente IA, sia nel personaggio").
 function loadAllMentionCandidates(): Promise<MentionCandidate[]> {
   if (!allCandidatesPromise) {
-    const english = Promise.all(
-      (Object.keys(MENTION_KIND_LOADERS) as CompendiumKind[]).map((kind) =>
-        MENTION_KIND_LOADERS[kind]().then((entries) =>
-          entries.map((e): MentionCandidate => ({ kind, name: e.name, source: e.source })),
-        ),
-      ),
+    allCandidatesPromise = Promise.all(
+      (Object.keys(MENTION_KIND_LOADERS) as CompendiumKind[]).map(async (kind) => {
+        const [entries, official, ia] = await Promise.all([
+          MENTION_KIND_LOADERS[kind](),
+          ITA_LOADERS[kind]?.() ?? Promise.resolve([]),
+          getTraduzioniIa(kind),
+        ]);
+        const index = buildItalianNameIndex(official, ia);
+        return entries.map((e): MentionCandidate => {
+          const nameIta = bestItalianName(index, e.name, e.source);
+          return nameIta ? { kind, name: e.name, source: e.source, nameIta } : { kind, name: e.name, source: e.source };
+        });
+      }),
     ).then((lists) => lists.flat());
-
-    const italian = Promise.all(
-      (Object.keys(ITA_LOADERS) as CompendiumKind[]).map((kind) =>
-        ITA_LOADERS[kind]!().then((rows) =>
-          rows
-            .filter((r) => r.nomeInglese && r.fonteInglese)
-            .map((r) => ({ kind, name: r.nomeInglese as string, source: r.fonteInglese as string, nameIta: r.nome })),
-        ),
-      ),
-    ).then((lists) => lists.flat());
-
-    // Voci autotradotte dall'IA (compendio_traduzione_ia): copre tutto ciò che non ha (ancora)
-    // testo ufficiale — senza questo, la ricerca delle menzioni in italiano trovava solo il
-    // piccolo sottoinsieme ufficiale (es. incantesimi PHB/Tasha/Xanathar) e falliva su tutto il
-    // resto, obbligando a cercare sempre in inglese.
-    const ia = Promise.all(
-      (Object.keys(MENTION_KIND_LOADERS) as CompendiumKind[]).map((kind) =>
-        getTraduzioniIa(kind).then((rows) =>
-          rows
-            .filter((r) => r.nomeIta)
-            .map((r) => ({ kind, name: r.name, source: r.source, nameIta: r.nomeIta as string })),
-        ),
-      ),
-    ).then((lists) => lists.flat());
-
-    allCandidatesPromise = Promise.all([english, italian, ia]).then(([englishCandidates, italianMatches, iaMatches]) => {
-      const byKey = new Map<string, MentionCandidate>();
-      for (const c of englishCandidates) byKey.set(`${c.kind}:${c.name}:${c.source}`, c);
-      // L'IA riempie nameIta per le voci senza testo ufficiale...
-      for (const m of iaMatches) {
-        const key = `${m.kind}:${m.name}:${m.source}`;
-        const existing = byKey.get(key);
-        if (existing) existing.nameIta = m.nameIta;
-        else byKey.set(key, m);
-      }
-      // ...ma il nome ufficiale, quando esiste, ha sempre l'ultima parola (sovrascrive quello IA).
-      for (const m of italianMatches) {
-        const key = `${m.kind}:${m.name}:${m.source}`;
-        const existing = byKey.get(key);
-        if (existing) existing.nameIta = m.nameIta;
-        else byKey.set(key, m);
-      }
-      return [...byKey.values()];
-    });
   }
   return allCandidatesPromise;
 }
@@ -149,35 +118,16 @@ const candidatesByKindPromise = new Map<CompendiumKind, Promise<MentionCandidate
 function loadMentionCandidatesForKind(kind: CompendiumKind): Promise<MentionCandidate[]> {
   let promise = candidatesByKindPromise.get(kind);
   if (!promise) {
-    const english = MENTION_KIND_LOADERS[kind]().then((entries) =>
-      entries.map((e): MentionCandidate => ({ kind, name: e.name, source: e.source })),
-    );
-    const italian = (ITA_LOADERS[kind]?.() ?? Promise.resolve([])).then((rows) =>
-      rows
-        .filter((r) => r.nomeInglese && r.fonteInglese)
-        .map((r) => ({ kind, name: r.nomeInglese as string, source: r.fonteInglese as string, nameIta: r.nome })),
-    );
-    const ia = getTraduzioniIa(kind).then((rows) =>
-      rows
-        .filter((r) => r.nomeIta)
-        .map((r) => ({ kind, name: r.name, source: r.source, nameIta: r.nomeIta as string })),
-    );
-    promise = Promise.all([english, italian, ia]).then(([englishCandidates, italianMatches, iaMatches]) => {
-      const byKey = new Map<string, MentionCandidate>();
-      for (const c of englishCandidates) byKey.set(`${c.name}:${c.source}`, c);
-      for (const m of iaMatches) {
-        const key = `${m.name}:${m.source}`;
-        const existing = byKey.get(key);
-        if (existing) existing.nameIta = m.nameIta;
-        else byKey.set(key, m);
-      }
-      for (const m of italianMatches) {
-        const key = `${m.name}:${m.source}`;
-        const existing = byKey.get(key);
-        if (existing) existing.nameIta = m.nameIta;
-        else byKey.set(key, m);
-      }
-      return [...byKey.values()];
+    promise = Promise.all([
+      MENTION_KIND_LOADERS[kind](),
+      ITA_LOADERS[kind]?.() ?? Promise.resolve([]),
+      getTraduzioniIa(kind),
+    ]).then(([entries, official, ia]) => {
+      const index = buildItalianNameIndex(official, ia);
+      return entries.map((e): MentionCandidate => {
+        const nameIta = bestItalianName(index, e.name, e.source);
+        return nameIta ? { kind, name: e.name, source: e.source, nameIta } : { kind, name: e.name, source: e.source };
+      });
     });
     candidatesByKindPromise.set(kind, promise);
   }

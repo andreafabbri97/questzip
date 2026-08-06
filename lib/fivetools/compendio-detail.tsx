@@ -58,6 +58,9 @@ import {
   getTraduzioniIa,
 } from "@/app/actions/compendio-ita";
 import type { CompendiumKind } from "@/lib/fivetools/data";
+import { bestItalianName, buildItalianNameIndex, type ItalianNameIndex } from "@/lib/fivetools/italian-names";
+export { bestItalianName } from "@/lib/fivetools/italian-names";
+export type { ItalianNameIndex } from "@/lib/fivetools/italian-names";
 
 export type Language = "en" | "it";
 
@@ -159,16 +162,6 @@ const OFFICIAL_LOADERS: Partial<
   classi: loadClassiIta,
 };
 
-export interface ItalianNameIndex {
-  /** "name|source" -> nome ufficiale, solo per righe collegate via nomeInglese/fonteInglese. */
-  official: Map<string, string>;
-  /** "name" (senza fonte) -> nome ufficiale, dalla PRIMA fonte trovata per quel nome — usato come
-   * ripiego quando la fonte esatta non ha testo ufficiale proprio. Vedi doc sotto. */
-  officialAny: Map<string, string>;
-  /** "name|source" -> nome dalla cache IA (traduzione automatica salvata, mai il testo ufficiale). */
-  ia: Map<string, string>;
-}
-
 /**
  * Indice nome-italiano per la ricerca nel Compendio (app/compendio/page.tsx) e per DualName: per
  * ogni entry inglese di 5etools, il miglior nome italiano disponibile, con priorità ufficiale
@@ -202,19 +195,7 @@ export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): I
     Promise.all([officialLoader ? officialLoader() : Promise.resolve([]), loadTraduzioniIa(kind)]).then(
       ([official, ia]) => {
         if (cancelled) return;
-        const officialMap = new Map<string, string>();
-        const officialAnyMap = new Map<string, string>();
-        for (const row of official) {
-          if (row.nomeInglese && row.fonteInglese) {
-            officialMap.set(`${row.nomeInglese}|${row.fonteInglese}`, row.nome);
-            if (!officialAnyMap.has(row.nomeInglese)) officialAnyMap.set(row.nomeInglese, row.nome);
-          }
-        }
-        const iaMap = new Map<string, string>();
-        for (const row of ia) {
-          if (row.nomeIta) iaMap.set(`${row.name}|${row.source}`, row.nomeIta);
-        }
-        setResult({ official: officialMap, officialAny: officialAnyMap, ia: iaMap });
+        setResult(buildItalianNameIndex(official, ia));
       },
     );
     return () => {
@@ -223,11 +204,6 @@ export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): I
   }, [kind, enabled]);
 
   return result;
-}
-
-/** Miglior nome italiano per una entry di 5etools, con la priorità documentata su useItalianSearchIndex. */
-export function bestItalianName(index: ItalianNameIndex, name: string, source: string): string | undefined {
-  return index.official.get(`${name}|${source}`) ?? index.officialAny.get(name) ?? index.ia.get(`${name}|${source}`);
 }
 
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
