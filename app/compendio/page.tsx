@@ -56,7 +56,7 @@ const EDITIONS: { value: EditionFilter; label: string }[] = [
   { value: "2024", label: "2024/25" },
 ];
 
-type SortMode = "nome" | "cr" | "rarita" | "manuale";
+type SortMode = "nome" | "cr" | "rarita" | "livello" | "manuale";
 
 function crToNumber(cr: RawCreature["cr"]): number {
   const s = typeof cr === "string" ? cr : (cr?.cr ?? "");
@@ -180,6 +180,10 @@ export default function CompendiumPage() {
           const diff =
             RARITY_ORDER.indexOf((a as RawItem).rarity ?? "none") -
             RARITY_ORDER.indexOf((b as RawItem).rarity ?? "none");
+          if (diff !== 0) return diff;
+        }
+        if (sortMode === "livello" && kind === "incantesimi") {
+          const diff = (a as RawSpell).level - (b as RawSpell).level;
           if (diff !== 0) return diff;
         }
         if (sortMode === "manuale") {
@@ -306,6 +310,7 @@ export default function CompendiumPage() {
                 { value: "nome", label: "Nome" },
                 ...(kind === "mostri" ? [{ value: "cr", label: "GS" } as const] : []),
                 ...(kind === "oggetti" ? [{ value: "rarita", label: "Rarità" } as const] : []),
+                ...(kind === "incantesimi" ? [{ value: "livello", label: "Livello" } as const] : []),
                 { value: "manuale", label: "Manuale" },
               ] as { value: SortMode; label: string }[]
             ).map((option) => (

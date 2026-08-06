@@ -520,18 +520,46 @@ export function RaceTraits({ razza }: { razza: string }) {
   const [itaRazze, setItaRazze] = useState<Awaited<ReturnType<typeof loadRazzeIta>> | null>(null);
 
   useEffect(() => {
-    const name = razza.trim();
-    if (!name) return;
+    const raw = razza.trim();
+    if (!raw) return;
+    // Un'annotazione personale tra parentesi (es. "Rinato (ex umano)", per ricordarsi la razza di
+    // partenza prima di un lignaggio come Rinato/Sangue Strigo) non fa parte del nome della razza
+    // — va staccata prima di cercare un match, altrimenti nessuna razza reale combacia mai.
+    // Segnalato dall'utente: "Rinato" è un lignaggio VERO (Van Richten's Guide to Ravenloft),
+    // non homebrew — "ex umano" era solo la sua nota personale sulla razza di partenza.
+    const cleaned = raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
     let cancelled = false;
-    loadRaces().then((races) => {
+    Promise.all([loadRaces(), loadRazzeIta()]).then(([races, itaRazze]) => {
       if (cancelled) return;
+      const byEnglishName = (name: string) =>
+        races.filter((r) => r.name.toLowerCase() === name.toLowerCase());
       // Alcune fonti (es. "LFL") ridefiniscono una razza già esistente altrove via "_copy" senza
       // portare con sé i tratti veri (entries mancante) — .find() da solo può pescare quella
-      // invece della fonte "piena" (es. PHB), mostrando zero privilegi per una razza che invece
-      // ne ha. Tra i nomi che combaciano, preferisce quello con contenuto reale.
-      const matches = races.filter((r) => r.name.toLowerCase() === name.toLowerCase());
-      const withEntries = matches.find((r) => Array.isArray(r.entries) && r.entries.length > 0);
-      setRace(withEntries ?? matches[0] ?? null);
+      // invece della fonte "piena", mostrando zero privilegi per una razza che invece ne ha. E
+      // quando PIÙ fonti hanno entrambe contenuto reale (es. "Reborn" esiste sia come VRGR sia
+      // come ristampa RHW), va preferita quella per cui esiste testo ufficiale italiano collegato
+      // — altrimenti si rischia di agganciare la fonte "gemella" senza traduzione invece di
+      // quella con la traduzione vera già pronta (visto proprio con Reborn/VRGR vs Reborn/RHW).
+      const bestOf = (matches: RawRace[]) => {
+        const withEntries = matches.filter((r) => Array.isArray(r.entries) && r.entries.length > 0);
+        const withUfficiale = withEntries.find((r) =>
+          itaRazze.some((u) => u.nomeInglese === r.name && u.fonteInglese === r.source),
+        );
+        return withUfficiale ?? withEntries[0] ?? matches[0] ?? null;
+      };
+
+      let matches = byEnglishName(raw);
+      if (matches.length === 0) matches = byEnglishName(cleaned);
+      if (matches.length === 0) {
+        // Il testo scritto potrebbe essere il nome ufficiale ITALIANO (es. "Rinato") invece di
+        // quello inglese usato dall'autocompletamento (es. "Reborn") — risali alla voce inglese
+        // tramite il collegamento nomeInglese della riga ufficiale.
+        const officialMatch = itaRazze.find(
+          (r) => r.nomeInglese && r.nome.toLowerCase() === cleaned.toLowerCase(),
+        );
+        if (officialMatch?.nomeInglese) matches = byEnglishName(officialMatch.nomeInglese);
+      }
+      setRace(bestOf(matches));
     });
     return () => {
       cancelled = true;

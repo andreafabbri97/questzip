@@ -67,12 +67,33 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
     await expect(page.getByText(/penombra del sottobosco/)).toBeVisible();
   });
 
-  test("una razza non presente nel Compendio mostra un avviso invece di restare vuota", async ({ page }) => {
-    await injectTestCharacter(page, { razza: "Rinato (ex umano)" });
+  test("una razza davvero homebrew mostra un avviso invece di restare vuota", async ({ page }) => {
+    await injectTestCharacter(page, { razza: "Razza Inventata Che Non Esiste Nel Compendio" });
     await page.getByRole("button", { name: /Test E2E/ }).click();
     await page.getByRole("button", { name: "📖 Tratti & Talenti" }).click();
 
     await expect(page.getByText(/non è stata trovata nel Compendio/)).toBeVisible();
+  });
+
+  // Regressione: l'utente ha corretto la mia assunzione precedente — "Rinato" NON è homebrew, è un
+  // vero lignaggio del Van Richten's Guide to Ravenloft (5etools: "Reborn"/VRGR); "(ex umano)" è
+  // solo una nota personale del giocatore sulla razza di partenza prima del lignaggio, non parte
+  // del nome. Il match deve staccare l'annotazione tra parentesi E riconoscere anche il nome
+  // ufficiale ITALIANO scritto a mano (non solo quello inglese dell'autocompletamento).
+  test("'Rinato (ex umano)' risolve al vero lignaggio Rinato, non homebrew", async ({ page }) => {
+    await injectTestCharacter(page, { razza: "Rinato (ex umano)" });
+    await page.getByRole("button", { name: /Test E2E/ }).click();
+    await page.getByRole("button", { name: "📖 Tratti & Talenti" }).click();
+
+    await expect(page.getByText(/non è stata trovata nel Compendio/)).not.toBeVisible();
+    const toggle = page.getByRole("button", { name: /Come funziona Reborn \(Rinato\)/ });
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+
+    const row = page.getByText("Natura immortale", { exact: true });
+    await expect(row).toBeVisible();
+    await row.click();
+    await expect(page.getByText(/sfuggito alla morte/)).toBeVisible();
   });
 
   test("il talento mostra la stessa traduzione ufficiale sia in elenco sia nel modal Verifica", async ({
