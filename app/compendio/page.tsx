@@ -8,7 +8,7 @@ import {
   loadConditions,
   loadCreatures,
   loadFeats,
-  loadItems,
+  loadInventoryItems,
   loadRaces,
   loadSpells,
   type CompendiumKind,
@@ -27,6 +27,7 @@ import {
   EntryDetail,
   SourceBadge,
   bestItalianName,
+  formatItemTypeName,
   useItalianSearchIndex,
   type Entry,
   type Language,
@@ -39,15 +40,22 @@ import {
   formatSize,
 } from "@/lib/fivetools/format";
 
-const TABS: { kind: CompendiumKind; label: string; icon: string }[] = [
-  { kind: "incantesimi", label: "Incantesimi", icon: "✨" },
-  { kind: "mostri", label: "Mostri", icon: "🐉" },
-  { kind: "oggetti", label: "Oggetti magici", icon: "💍" },
-  { kind: "razze", label: "Razze", icon: "🧝" },
-  { kind: "talenti", label: "Talenti", icon: "🏅" },
-  { kind: "background", label: "Background", icon: "📜" },
-  { kind: "condizioni", label: "Condizioni", icon: "☠️" },
-  { kind: "classi", label: "Classi", icon: "⚔️" },
+// "Oggetti magici" e "Oggetti comuni" condividono lo stesso CompendiumKind ("oggetti" — stessa
+// forma dati RawItem, stesso caricatore loadInventoryItems, stessa ricerca/traduzione/Verifica di
+// tutto il resto del sito) e si distinguono solo per un filtro di rarità LOCALE a questa pagina
+// (itemFilter) — niente nuovo CompendiumKind, che avrebbe richiesto duplicare la logica di
+// mention-search/traduzioni/EntryDetail già unificata per "oggetti" in giri precedenti. "id" è la
+// chiave del tab in UI (per sapere qual è "attivo"), "kind" resta quella per i dati.
+const TABS: { id: string; kind: CompendiumKind; label: string; icon: string; itemFilter?: "magici" | "comuni" }[] = [
+  { id: "incantesimi", kind: "incantesimi", label: "Incantesimi", icon: "✨" },
+  { id: "mostri", kind: "mostri", label: "Mostri", icon: "🐉" },
+  { id: "oggetti-magici", kind: "oggetti", label: "Oggetti magici", icon: "💍", itemFilter: "magici" },
+  { id: "oggetti-comuni", kind: "oggetti", label: "Oggetti comuni", icon: "🎒", itemFilter: "comuni" },
+  { id: "razze", kind: "razze", label: "Razze", icon: "🧝" },
+  { id: "talenti", kind: "talenti", label: "Talenti", icon: "🏅" },
+  { id: "background", kind: "background", label: "Background", icon: "📜" },
+  { id: "condizioni", kind: "condizioni", label: "Condizioni", icon: "☠️" },
+  { id: "classi", kind: "classi", label: "Classi", icon: "⚔️" },
 ];
 
 const EDITIONS: { value: EditionFilter; label: string }[] = [
@@ -83,7 +91,7 @@ const COMPENDIO_LIST_MAX_HEIGHT = "lg:max-h-[calc(100dvh-19rem)] lg:min-h-[420px
 const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
   incantesimi: loadSpells,
   mostri: loadCreatures,
-  oggetti: loadItems,
+  oggetti: loadInventoryItems,
   razze: loadRaces,
   talenti: loadFeats,
   background: loadBackgrounds,
@@ -93,7 +101,10 @@ const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
 
 export default function CompendiumPage() {
   const [showRegole, setShowRegole] = useState(false);
-  const [kind, setKind] = useState<CompendiumKind>("incantesimi");
+  const [activeTabId, setActiveTabId] = useState<string>(TABS[0].id);
+  const activeTab = TABS.find((t) => t.id === activeTabId) ?? TABS[0];
+  const kind = activeTab.kind;
+  const itemFilter = activeTab.itemFilter;
   const [edition, setEdition] = useState<EditionFilter>("entrambe");
   const [language, setLanguage] = useState<Language>("it");
   const [query, setQuery] = useState("");
@@ -171,6 +182,14 @@ export default function CompendiumPage() {
         if (edition === "entrambe") return true;
         return books.get(entry.source)?.edition === edition;
       })
+      .filter((entry) => {
+        // Distingue "Oggetti magici" da "Oggetti comuni": stesso identico caricatore
+        // (loadInventoryItems, magici+mundani) per entrambi i tab, si dividono solo qui in base
+        // alla rarità — "none" è il valore 5etools per gli oggetti non magici.
+        if (kind !== "oggetti" || !itemFilter) return true;
+        const isMagico = ((entry as RawItem).rarity ?? "none") !== "none";
+        return itemFilter === "magici" ? isMagico : !isMagico;
+      })
       .sort((a, b) => {
         if (sortMode === "cr" && kind === "mostri") {
           const diff = crToNumber((a as RawCreature).cr) - crToNumber((b as RawCreature).cr);
@@ -194,7 +213,7 @@ export default function CompendiumPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind, italianIndex]);
+  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind, itemFilter, italianIndex]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
@@ -222,17 +241,17 @@ export default function CompendiumPage() {
       <div className="flex flex-wrap gap-2">
         {TABS.map((tab) => (
           <button
-            key={tab.kind}
+            key={tab.id}
             onClick={() => {
               setShowRegole(false);
-              setKind(tab.kind);
+              setActiveTabId(tab.id);
               setQuery("");
               setSelected(null);
               setPage(0);
               setSortMode("nome");
             }}
             className={`card-elevated-hover rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
-              !showRegole && kind === tab.kind
+              !showRegole && activeTabId === tab.id
                 ? "glow-accent border-accent bg-accent/15 text-accent-strong"
                 : "border-edge bg-surface-raised text-muted hover:text-foreground hover:border-accent/40"
             }`}
@@ -309,7 +328,9 @@ export default function CompendiumPage() {
               [
                 { value: "nome", label: "Nome" },
                 ...(kind === "mostri" ? [{ value: "cr", label: "GS" } as const] : []),
-                ...(kind === "oggetti" ? [{ value: "rarita", label: "Rarità" } as const] : []),
+                // Ha senso solo per "Oggetti magici": gli oggetti comuni hanno tutti la stessa
+                // rarità ("none"), ordinarli per rarità non farebbe nulla.
+                ...(itemFilter === "magici" ? [{ value: "rarita", label: "Rarità" } as const] : []),
                 ...(kind === "incantesimi" ? [{ value: "livello", label: "Livello" } as const] : []),
                 { value: "manuale", label: "Manuale" },
               ] as { value: SortMode; label: string }[]
@@ -715,7 +736,11 @@ function EntrySubtitle({ kind, entry }: { kind: CompendiumKind; entry: Entry }) 
   }
   if (kind === "oggetti") {
     const item = entry as RawItem;
-    return <span className="text-xs text-muted capitalize">{item.rarity}</span>;
+    // rarity "none" è il valore reale per gli oggetti mundani (non magici, vedi tab "Oggetti
+    // comuni") — mostrarlo testualmente sarebbe "None"; il tipo (Arma da mischia, Attrezzatura...)
+    // è un'informazione più utile in quel caso, stessa etichetta della scheda di dettaglio.
+    const label = item.rarity && item.rarity !== "none" ? item.rarity : formatItemTypeName(item);
+    return <span className="text-xs text-muted capitalize">{label}</span>;
   }
   if (kind === "razze") {
     const race = entry as RawRace;

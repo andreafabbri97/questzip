@@ -784,11 +784,38 @@ const ITEM_TYPE_NAMES: Record<string, string> = {
   HA: "Armatura pesante",
   S: "Scudo",
   INS: "Strumento",
+  // Codici aggiuntivi per l'attrezzatura comune (armi/armature/oggetti mundani) — non servivano
+  // finché ItemDetail era raggiungibile solo per oggetti magici (vedi loadInventoryItems vs
+  // loadItems), ora che "Verifica"/mention/tab "Oggetti comuni" li mostrano anche loro.
+  G: "Attrezzatura da avventuriero",
+  T: "Strumenti",
+  AT: "Strumenti da artigiano",
+  GS: "Set da gioco",
+  MNT: "Cavalcatura",
+  VEH: "Veicolo",
+  SHP: "Imbarcazione",
+  TAH: "Bardatura",
+  TG: "Bene commerciabile",
+  FD: "Cibo e bevande",
+  EXP: "Esplosivo",
+  SPC: "Focus da incantatore",
 };
 
+/** Nome leggibile del tipo di un oggetto (arma/armatura/attrezzatura/...) — stesso identico
+ * fallback sia per la scheda di dettaglio sia per la riga compatta dell'elenco, così un tipo non
+ * mappato mostra comunque lo stesso codice grezzo nei due punti invece di comportarsi diverso.
+ * Gli oggetti ristampati nel Player's Handbook 2024 codificano il tipo come "M|XPHB" invece del
+ * semplice "M" del 2014 (stessa convenzione 5etools usata per le proprietà arma, es. "H|XPHB") —
+ * senza staccare il suffisso qui, il codice composito intero (mai una vera parola italiana)
+ * finiva mostrato letteralmente al posto del tipo (es. "M|XPHB" invece di "Arma da mischia"),
+ * scoperto verificando "Halberd"/XPHB nella nuova tab "Oggetti comuni". */
+export function formatItemTypeName(item: RawItem): string | undefined {
+  const type = item.type?.split("|")[0];
+  return (type && ITEM_TYPE_NAMES[type]) || (item.wondrous ? "Oggetto meraviglioso" : type);
+}
+
 function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
-  const typeName =
-    (item.type && ITEM_TYPE_NAMES[item.type]) || (item.wondrous ? "Oggetto meraviglioso" : item.type);
+  const typeName = formatItemTypeName(item);
   const attunement =
     item.reqAttune === true
       ? "richiede sintonia"
