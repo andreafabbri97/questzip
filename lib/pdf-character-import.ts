@@ -400,6 +400,7 @@ function parseSpells(text: Map<string, string>, check: Map<string, boolean>): Kn
       nome,
       livello: meta.level,
       preparato: meta.level === 0 || prepared.get(`${meta.level}-${meta.row}`) === true,
+      dadoDanno: "",
     });
   }
   return spells;

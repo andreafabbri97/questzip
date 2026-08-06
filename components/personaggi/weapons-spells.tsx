@@ -8,6 +8,8 @@ import {
   canonicalClassName,
   formatModifier,
   multiclassCasterLevel,
+  primaryCastingAbility,
+  spellAttackBonus,
   totalLevel,
   warlockLevel,
   weaponAbilityModifier,
@@ -224,15 +226,49 @@ export function SpellListSection({
 }) {
   const casterLevel = multiclassCasterLevel(character.classi);
   const wlLevel = warlockLevel(character.classi);
+
+  // Stesso modal dadi delle armi (vedi WeaponsSection sopra): il bonus attacco è quello globale da
+  // incantatore (CD/Bonus attacco già mostrati in cima alla sezione Slot incantesimi), il dado
+  // danno invece va compilato per singolo incantesimo perché varia troppo (Palla di Fuoco 8d6,
+  // Dardo Incantato 1d10, molti incantesimi non infliggono danni diretti) per essere derivato.
+  // Dichiarato prima dell'uscita anticipata sotto: gli Hook React non possono essere condizionali.
+  const [dicePreset, setDicePreset] = useState<DiceRollerPreset | null>(null);
+
   if (casterLevel === 0 && wlLevel === 0) return null;
+
+  const level = totalLevel(character.classi);
+  const castingAbility = primaryCastingAbility(character.classi);
+  const attackBonus = castingAbility
+    ? spellAttackBonus(level, character.caratteristiche[castingAbility])
+    : 0;
 
   const setIncantesimi = (incantesimi: KnownSpell[]) => onChange({ ...character, incantesimi });
 
   const addSpell = () =>
     setIncantesimi([
       ...character.incantesimi,
-      { id: crypto.randomUUID(), nome: "", livello: 0, preparato: false },
+      { id: crypto.randomUUID(), nome: "", livello: 0, preparato: false, dadoDanno: "" },
     ]);
+
+  const openSpellAttackRoll = (spellName: string) => {
+    setDicePreset({
+      label: `${spellName.trim() || "Incantesimo"} — Attacco`,
+      groups: [{ die: 20, quantity: 1 }],
+      modifier: attackBonus,
+    });
+  };
+
+  const openSpellDamageRoll = (spellName: string, dadoDanno: string) => {
+    const match = dadoDanno.trim().match(/^(\d+)d(\d+)$/i);
+    if (!match) return;
+    const quantity = Math.min(20, Math.max(1, Number(match[1])));
+    const die = Number(match[2]);
+    setDicePreset({
+      label: `${spellName.trim() || "Incantesimo"} — Danno`,
+      groups: [{ die, quantity }],
+      modifier: 0,
+    });
+  };
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -242,6 +278,7 @@ export function SpellListSection({
           + Aggiungi incantesimo
         </button>
       </div>
+      <DiceRollerModal preset={dicePreset} onClose={() => setDicePreset(null)} />
       {character.incantesimi.length === 0 && (
         <p className="text-sm text-muted">Nessun incantesimo aggiunto ancora.</p>
       )}
@@ -299,7 +336,42 @@ export function SpellListSection({
                 ×
               </button>
             </div>
-            <CompendioInfoButton kind="incantesimi" nome={spell.nome} />
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CompendioInfoButton kind="incantesimi" nome={spell.nome} />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <input
+                  value={spell.dadoDanno}
+                  onChange={(event) =>
+                    setIncantesimi(
+                      character.incantesimi.map((s) =>
+                        s.id === spell.id ? { ...s, dadoDanno: event.target.value } : s,
+                      ),
+                    )
+                  }
+                  placeholder="dado danno"
+                  aria-label={`Dado danno di ${spell.nome || "incantesimo"}`}
+                  className="w-20 rounded-md border border-edge bg-surface px-1.5 py-1 text-xs text-foreground"
+                />
+                {castingAbility && (
+                  <button
+                    onClick={() => openSpellAttackRoll(spell.nome)}
+                    aria-label={`Tira per colpire con ${spell.nome || "incantesimo"}`}
+                    className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                  >
+                    🎲 Attacco
+                  </button>
+                )}
+                {/^\d+d\d+$/i.test(spell.dadoDanno.trim()) && (
+                  <button
+                    onClick={() => openSpellDamageRoll(spell.nome, spell.dadoDanno)}
+                    aria-label={`Tira danno con ${spell.nome || "incantesimo"}`}
+                    className="rounded-lg border border-edge px-2 py-1 text-xs text-muted hover:text-accent-strong hover:border-accent transition-colors"
+                  >
+                    🎲 Danno
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         ))}
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
+import { useItalianSearchIndex, useTraduzioneIa } from "@/lib/fivetools/compendio-detail";
 import { type CompendiumKind } from "@/lib/fivetools/data";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 
@@ -49,16 +49,23 @@ export function Autocomplete<T extends { name: string; source: string }>({
 
   const translatedQuery = itQuery && itQuery.query === query && itQuery.en !== query ? itQuery.en : null;
 
+  // Nome italiano reale (ufficiale o cache IA) per ciascuna opzione, quando disponibile — stesso
+  // principio di app/compendio/page.tsx: la traduzione al volo della query sopra non sempre
+  // combacia col nome ufficiale del manuale, quindi confrontiamo anche direttamente contro i
+  // nomi italiani veri, non solo contro la resa live.
+  const italianIndex = useItalianSearchIndex(kind ?? "incantesimi", !!kind);
+
   const suggestions =
     options && query.length >= 2
       ? Array.from(
           new Map(
             options
-              .filter(
-                (o) =>
-                  o.name.toLowerCase().includes(query) ||
-                  (translatedQuery && o.name.toLowerCase().includes(translatedQuery)),
-              )
+              .filter((o) => {
+                if (o.name.toLowerCase().includes(query)) return true;
+                if (translatedQuery && o.name.toLowerCase().includes(translatedQuery)) return true;
+                const italianName = italianIndex.get(`${o.name}|${o.source}`);
+                return !!italianName && italianName.toLowerCase().includes(query);
+              })
               .map((o) => [o.name, o]),
           ).values(),
         ).slice(0, 8)

@@ -146,6 +146,56 @@ export function useTraduzioneIa(
   return useMemo(() => rows?.find((r) => r.name === name && r.source === source) ?? null, [rows, name, source]);
 }
 
+const OFFICIAL_LOADERS: Partial<
+  Record<CompendiumKind, () => Promise<{ nome: string; nomeInglese: string | null; fonteInglese: string | null }[]>>
+> = {
+  incantesimi: loadIncantesimiIta,
+  mostri: loadMostriIta,
+  oggetti: loadOggettiIta,
+  razze: loadRazzeIta,
+  talenti: loadTalentiIta,
+  classi: loadClassiIta,
+};
+
+/**
+ * Indice nome-italiano per la ricerca nel Compendio (app/compendio/page.tsx): per ogni entry
+ * inglese di 5etools (chiave "name|source"), il miglior nome italiano disponibile — quello
+ * ufficiale se la riga è collegata via nomeInglese/fonteInglese, altrimenti il nome della cache
+ * IA. Prima la ricerca traduceva dal vivo solo la query digitata (IT->EN) confrontandola col
+ * nome inglese grezzo: cercare il nome esatto del manuale italiano falliva spesso perché quella
+ * traduzione al volo non sempre combacia col termine ufficiale (stesso problema del match
+ * ufficiale sopra). Qui invece si confronta la query direttamente contro i nomi italiani reali.
+ */
+export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): Map<string, string> {
+  const [index, setIndex] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const officialLoader = OFFICIAL_LOADERS[kind];
+    Promise.all([officialLoader ? officialLoader() : Promise.resolve([]), loadTraduzioniIa(kind)]).then(
+      ([official, ia]) => {
+        if (cancelled) return;
+        const map = new Map<string, string>();
+        for (const row of ia) {
+          if (row.nomeIta) map.set(`${row.name}|${row.source}`, row.nomeIta);
+        }
+        for (const row of official) {
+          if (row.nomeInglese && row.fonteInglese) {
+            map.set(`${row.nomeInglese}|${row.fonteInglese}`, row.nome);
+          }
+        }
+        setIndex(map);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [kind, enabled]);
+
+  return index;
+}
+
 // confronta i nomi ignorando maiuscole/accenti/punteggiatura, per far combaciare il nome
 // italiano ufficiale con la traduzione automatica del nome inglese di 5etools
 function normalizeItaName(name: string): string {
@@ -154,6 +204,26 @@ function normalizeItaName(name: string): string {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]/g, "");
+}
+
+// Trova la voce ufficiale corrispondente a un'entry inglese di 5etools. Preferisce il
+// collegamento diretto name+source (nomeInglese/fonteInglese, popolato una tantum da
+// scripts/ita-compendio/match-english-names.mjs — vedi commento sullo schema): è una chiave
+// esatta, non soggetta a imprecisioni di traduzione. Se il collegamento manca (non ancora
+// abbinato), ricade sul confronto per nome tradotto — meno affidabile, perché il nome ufficiale
+// del manuale a volte differisce dalla resa automatica del nome inglese (es. "Fiotto Acido"
+// ufficiale vs "Spruzzo Acido" prodotto dalla traduzione automatica di "Acid Splash").
+function findUfficiale<T extends { nome: string; nomeInglese: string | null; fonteInglese: string | null }>(
+  list: T[],
+  translatedName: string | null,
+  entryName: string,
+  entrySource: string,
+): T | null {
+  const byKey = list.find((r) => r.nomeInglese === entryName && r.fonteInglese === entrySource);
+  if (byKey) return byKey;
+  if (!translatedName) return null;
+  const target = normalizeItaName(translatedName);
+  return list.find((r) => normalizeItaName(r.nome) === target) ?? null;
 }
 
 /**
@@ -374,10 +444,9 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
   }, [language]);
 
   const ufficiale = useMemo(() => {
-    if (language !== "it" || !itaSpells || !translatedName) return null;
-    const target = normalizeItaName(translatedName);
-    return itaSpells.find((s) => normalizeItaName(s.nome) === target) ?? null;
-  }, [language, itaSpells, translatedName]);
+    if (language !== "it" || !itaSpells) return null;
+    return findUfficiale(itaSpells, translatedName, spell.name, spell.source);
+  }, [language, itaSpells, translatedName, spell.name, spell.source]);
 
   if (ufficiale) {
     return (
@@ -525,10 +594,9 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
   }, [language]);
 
   const ufficiale = useMemo(() => {
-    if (language !== "it" || !itaMostri || !translatedName) return null;
-    const target = normalizeItaName(translatedName);
-    return itaMostri.find((m) => normalizeItaName(m.nome) === target) ?? null;
-  }, [language, itaMostri, translatedName]);
+    if (language !== "it" || !itaMostri) return null;
+    return findUfficiale(itaMostri, translatedName, creature.name, creature.source);
+  }, [language, itaMostri, translatedName, creature.name, creature.source]);
 
   if (ufficiale) {
     const itaAbilities: [string, { score: number; mod: string } | null][] = [
@@ -714,10 +782,9 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
   }, [language]);
 
   const ufficiale = useMemo(() => {
-    if (language !== "it" || !itaOggetti || !translatedName) return null;
-    const target = normalizeItaName(translatedName);
-    return itaOggetti.find((o) => normalizeItaName(o.nome) === target) ?? null;
-  }, [language, itaOggetti, translatedName]);
+    if (language !== "it" || !itaOggetti) return null;
+    return findUfficiale(itaOggetti, translatedName, item.name, item.source);
+  }, [language, itaOggetti, translatedName, item.name, item.source]);
 
   if (ufficiale) {
     return (
@@ -769,10 +836,9 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
   }, [language]);
 
   const ufficiale = useMemo(() => {
-    if (language !== "it" || !itaRazze || !translatedName) return null;
-    const target = normalizeItaName(translatedName);
-    return itaRazze.find((r) => normalizeItaName(r.nome) === target) ?? null;
-  }, [language, itaRazze, translatedName]);
+    if (language !== "it" || !itaRazze) return null;
+    return findUfficiale(itaRazze, translatedName, race.name, race.source);
+  }, [language, itaRazze, translatedName, race.name, race.source]);
 
   if (ufficiale) {
     return (
@@ -851,10 +917,9 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
   }, [language]);
 
   const ufficiale = useMemo(() => {
-    if (language !== "it" || !itaTalenti || !translatedName) return null;
-    const target = normalizeItaName(translatedName);
-    return itaTalenti.find((t) => normalizeItaName(t.nome) === target) ?? null;
-  }, [language, itaTalenti, translatedName]);
+    if (language !== "it" || !itaTalenti) return null;
+    return findUfficiale(itaTalenti, translatedName, feat.name, feat.source);
+  }, [language, itaTalenti, translatedName, feat.name, feat.source]);
 
   if (ufficiale) {
     return (
@@ -945,12 +1010,11 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   }, [language]);
 
   const ufficiale = useMemo(() => {
-    if (language !== "it" || !itaClassi || !translatedName) return null;
-    const target = normalizeItaName(translatedName);
-    const match = itaClassi.find((c) => normalizeItaName(c.nome) === target);
+    if (language !== "it" || !itaClassi) return null;
+    const match = findUfficiale(itaClassi, translatedName, cls.name, cls.source);
     if (!match || Object.keys(match.tabellaLivelli).length === 0) return null;
     return match;
-  }, [language, itaClassi, translatedName]);
+  }, [language, itaClassi, translatedName, cls.name, cls.source]);
 
   const subclasses = useMemo(() => {
     if (!classData) return [];

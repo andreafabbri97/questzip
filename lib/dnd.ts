@@ -92,6 +92,10 @@ export const knownSpellSchema = z.object({
   nome: z.string(),
   livello: z.number().int().min(0).max(9).default(0),
   preparato: z.boolean().default(false),
+  // Dado danno facoltativo (es. "8d6" per Palla di Fuoco) — stesso formato libero "NdM" del campo
+  // analogo sulle armi, compilato a mano perché varia troppo per incantesimo/livello per essere
+  // derivato in automatico. Vuoto di default: mostra il bottone 🎲 Danno solo se compilato.
+  dadoDanno: z.string().default(""),
 });
 export type KnownSpell = z.infer<typeof knownSpellSchema>;
 
@@ -180,6 +184,14 @@ const rawCharacterSchema = z.object({
   trsCompetenti: z.array(z.enum(ABILITIES)).default([]),
   abilitaCompetenti: z.array(z.string()).default([]),
   abilitaEsperte: z.array(z.string()).default([]),
+  // Bonus extra per singolo tiro salvezza/abilità (chiave = nome caratteristica o abilità), stesso
+  // principio di iniziativaBonus/percezionePassivaBonus sopra ma per riga invece che un unico
+  // valore: il calcolo RAW (mod. caratteristica + competenza) resta sempre corretto da solo dopo
+  // un level up, questo è solo ciò che un oggetto magico/talento aggiunge sopra (es. Manto della
+  // Protezione: +1 a tutti i tiri salvezza). Chiavi assenti = 0, nessuna voce per il caso comune
+  // "nessun bonus" invece di dover inizializzare tutte le 6+18 chiavi a 0.
+  trsBonus: z.record(z.string(), z.number().int()).default({}),
+  abilitaBonus: z.record(z.string(), z.number().int()).default({}),
   slotUsati: z.array(z.number().int().min(0)).length(9).default([0, 0, 0, 0, 0, 0, 0, 0, 0]),
   slotPattoUsati: z.number().int().min(0).default(0),
   tiriMorteSuccessi: z.number().int().min(0).max(3).default(0),
@@ -352,6 +364,8 @@ export function newCharacter(): Character {
     trsCompetenti: [],
     abilitaCompetenti: [],
     abilitaEsperte: [],
+    trsBonus: {},
+    abilitaBonus: {},
     slotUsati: [0, 0, 0, 0, 0, 0, 0, 0, 0],
     slotPattoUsati: 0,
     tiriMorteSuccessi: 0,
@@ -391,6 +405,49 @@ export function newCharacter(): Character {
     infusioniConosciute: [],
     note: "",
     aggiornatoAl: Date.now(),
+  };
+}
+
+/**
+ * Riposo lungo RAW: PF ripristinati al massimo, metà dei dadi vita totali recuperati
+ * (arrotondato per eccesso), tutti gli slot incantesimo/patto magico ripristinati, i tiri
+ * salvezza contro la morte azzerati (i PF sono di nuovo sopra 0), e ogni privilegio a usi
+ * limitati con recupero "riposo breve", "riposo lungo" o "alba" torna disponibile — un riposo
+ * lungo copre anche tutto ciò che un riposo breve recupererebbe, ed essendo notturno normalmente
+ * arriva fino all'alba. Funzione pura: chi la chiama decide se/come chiedere conferma.
+ */
+export function applyLongRest(character: Character): Character {
+  const totale = totalLevel(character.classi);
+  const dadiVitaRecuperati = Math.ceil(totale / 2);
+  return {
+    ...character,
+    hpAttuali: character.hpMax,
+    dadiVitaUsati: Math.max(0, character.dadiVitaUsati - dadiVitaRecuperati),
+    slotUsati: character.slotUsati.map(() => 0),
+    slotPattoUsati: 0,
+    tiriMorteSuccessi: 0,
+    tiriMorteFallimenti: 0,
+    privilegiLimitati: character.privilegiLimitati.map((f) =>
+      f.recupero === "riposoBreve" || f.recupero === "riposoLungo" || f.recupero === "alba"
+        ? { ...f, usiUsati: 0 }
+        : f,
+    ),
+  };
+}
+
+/**
+ * Riposo breve RAW: solo gli slot Patto Magico del Warlock (che si recuperano SOLO con un riposo
+ * breve, non con uno lungo) e i privilegi a usi limitati con recupero "riposo breve" tornano
+ * disponibili. I PF non si ripristinano da soli (servono i Dadi Vita, gestiti a parte in
+ * HitDiceTracker — spenderli per curarsi resta un'azione manuale perché richiede un tiro).
+ */
+export function applyShortRest(character: Character): Character {
+  return {
+    ...character,
+    slotPattoUsati: 0,
+    privilegiLimitati: character.privilegiLimitati.map((f) =>
+      f.recupero === "riposoBreve" ? { ...f, usiUsati: 0 } : f,
+    ),
   };
 }
 

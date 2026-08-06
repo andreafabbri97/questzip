@@ -26,6 +26,7 @@ import {
   DualName,
   EntryDetail,
   SourceBadge,
+  useItalianSearchIndex,
   type Entry,
   type Language,
 } from "@/lib/fivetools/compendio-detail";
@@ -138,6 +139,13 @@ export default function CompendiumPage() {
 
   const categoryData = dataByKind[kind] ?? null;
   const loadingCategory = categoryData === null;
+  // Indice per la RICERCA (nomi italiani ufficiali/IA), da tenere sempre attivo — è indipendente
+  // dalla lingua in cui si vogliono LEGGERE i risultati (var. "language" sopra, toggle 🇬🇧/🇮🇹):
+  // agganciarlo a "language === 'it'" (bug trovato dall'utente) lo teneva vuoto quando la lingua
+  // di lettura restava sul default inglese, facendo ripiegare la ricerca sulla sola traduzione al
+  // volo della query — inaffidabile per frasi parziali (es. "palla di" non trovava "Fireball",
+  // che pure ha "Palla di Fuoco" come nome ufficiale già collegato).
+  const italianIndex = useItalianSearchIndex(kind, true);
 
   const filtered = useMemo(() => {
     if (!categoryData || !books) return [];
@@ -147,12 +155,16 @@ export default function CompendiumPage() {
         ? translatedQuery.english.toLowerCase()
         : null;
     return categoryData
-      .filter(
-        (entry) =>
-          !q ||
-          entry.name.toLowerCase().includes(q) ||
-          (englishQuery && entry.name.toLowerCase().includes(englishQuery)),
-      )
+      .filter((entry) => {
+        if (!q) return true;
+        if (entry.name.toLowerCase().includes(q)) return true;
+        if (englishQuery && entry.name.toLowerCase().includes(englishQuery)) return true;
+        // Nome italiano reale (ufficiale o cache IA) per questa entry, quando disponibile —
+        // permette di trovarla digitando esattamente il nome del manuale italiano, non solo
+        // sperando che la traduzione al volo della query combaci col nome inglese grezzo.
+        const italianName = italianIndex.get(`${entry.name}|${entry.source}`);
+        return !!italianName && italianName.toLowerCase().includes(q);
+      })
       .filter((entry) => {
         if (edition === "entrambe") return true;
         return books.get(entry.source)?.edition === edition;
@@ -176,7 +188,7 @@ export default function CompendiumPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind]);
+  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind, italianIndex]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);

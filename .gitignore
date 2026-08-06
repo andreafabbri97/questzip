@@ -54,3 +54,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright — playwright/.auth/user.json è una sessione già loggata (cookie), non una password,
+# ma vale comunque come un accesso live all'account: mai da committare/condividere.
+/playwright/.auth/
+/playwright-report/
+/test-results/

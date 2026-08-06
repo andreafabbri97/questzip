@@ -81,6 +81,7 @@ function mapAiResultToCharacter(parsed: unknown): Character {
       nome: asString(s.nome),
       livello: clamp(Math.round(asNumber(s.livello, 0)), 0, 9),
       preparato: false,
+      dadoDanno: "",
     }))
     .filter((s) => s.nome);
 

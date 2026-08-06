@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { IntField } from "@/components/int-field";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   ABILITIES,
   ABILITY_CODE_TO_KEY,
@@ -12,6 +14,8 @@ import {
   SKILLS,
   STANDARD_ARRAY,
   abilityModifier,
+  applyLongRest,
+  applyShortRest,
   calculateMulticlassHitPoints,
   canonicalClassName,
   formatModifier,
@@ -33,9 +37,9 @@ import {
   type MagicItem,
 } from "@/lib/dnd";
 import { loadClassData, loadItems, resolveClassFeatures, resolveSubclassFeatures } from "@/lib/fivetools/data";
+import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
-import { rollDie } from "./helpers";
 import { LocalInfoButton } from "./local-info-button";
 import type { SimpleEntryData } from "./simple-entry-modal";
 
@@ -245,6 +249,161 @@ export function HitDiceTracker({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Riposo breve/lungo: prima viveva solo nella scheda Incantesimi e sistemava solo gli slot
+ * (applyLongRest/applyShortRest in lib/dnd.ts ora coprono anche PF, dadi vita, tiri contro la
+ * morte e privilegi a usi limitati) — spostato in ⚔️ Combattimento perché riguarda tutto il
+ * personaggio, non solo chi lancia incantesimi. Chiede sempre conferma spiegando cosa cambierà,
+ * prima di applicare qualcosa di potenzialmente irreversibile per la sessione di gioco in corso.
+ */
+export function RestSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const [pending, setPending] = useState<"breve" | "lungo" | null>(null);
+  const wlLevel = warlockLevel(character.classi);
+  const casterLevel = multiclassCasterLevel(character.classi);
+  const totale = totalLevel(character.classi);
+
+  const buildSummary = (type: "breve" | "lungo"): string[] => {
+    const lines: string[] = [];
+    if (type === "lungo") {
+      if (character.hpAttuali < character.hpMax) {
+        lines.push(`Punti ferita ripristinati al massimo (${character.hpMax}).`);
+      }
+      const dadiRecuperati = Math.min(character.dadiVitaUsati, Math.ceil(totale / 2));
+      if (dadiRecuperati > 0) {
+        lines.push(
+          `${dadiRecuperati} dado/i vita recuperato/i (metà del totale, arrotondato per eccesso).`,
+        );
+      }
+      const slotUsatiTotali = character.slotUsati.reduce((sum, v) => sum + v, 0);
+      if (casterLevel > 0 && slotUsatiTotali > 0) lines.push("Tutti gli slot incantesimo ripristinati.");
+      if (wlLevel > 0 && character.slotPattoUsati > 0) lines.push("Slot Patto Magico ripristinati.");
+      if (character.tiriMorteSuccessi > 0 || character.tiriMorteFallimenti > 0) {
+        lines.push("Tiri salvezza contro la morte azzerati.");
+      }
+      const privilegi = character.privilegiLimitati.filter(
+        (f) =>
+          f.usiUsati > 0 &&
+          (f.recupero === "riposoBreve" || f.recupero === "riposoLungo" || f.recupero === "alba"),
+      );
+      if (privilegi.length > 0) {
+        lines.push(
+          `Privilegi a usi limitati ripristinati: ${privilegi.map((f) => f.nome || "senza nome").join(", ")}.`,
+        );
+      }
+    } else {
+      if (wlLevel > 0 && character.slotPattoUsati > 0) {
+        lines.push("Slot Patto Magico ripristinati (si recuperano solo con un riposo breve).");
+      }
+      const privilegi = character.privilegiLimitati.filter(
+        (f) => f.usiUsati > 0 && f.recupero === "riposoBreve",
+      );
+      if (privilegi.length > 0) {
+        lines.push(
+          `Privilegi a usi limitati ripristinati: ${privilegi.map((f) => f.nome || "senza nome").join(", ")}.`,
+        );
+      }
+      lines.push("I punti ferita non si ripristinano da soli: spendi Dadi Vita qui sopra per curarti.");
+    }
+    if (lines.length === 0) lines.push("Non c'è nulla da ripristinare al momento.");
+    return lines;
+  };
+
+  const confirm = () => {
+    if (pending === "lungo") onChange(applyLongRest(character));
+    else if (pending === "breve") onChange(applyShortRest(character));
+    setPending(null);
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {wlLevel > 0 && (
+        <button
+          onClick={() => setPending("breve")}
+          className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-xs font-bold text-accent-strong hover:border-accent transition-colors"
+        >
+          😴 Riposo breve
+        </button>
+      )}
+      <button
+        onClick={() => setPending("lungo")}
+        className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-xs font-bold text-accent-strong hover:border-accent transition-colors"
+      >
+        🌙 Riposo lungo
+      </button>
+      {pending && (
+        <RestConfirmModal
+          title={pending === "lungo" ? "Riposo lungo" : "Riposo breve"}
+          lines={buildSummary(pending)}
+          onConfirm={confirm}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RestConfirmModal({
+  title,
+  lines,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  lines: string[];
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useBodyScrollLock(true);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-overlay-in"
+      onClick={onCancel}
+    >
+      <div
+        className="card-elevated w-full max-w-sm rounded-xl border border-edge bg-background p-5 space-y-4 animate-modal-in"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="text-lg font-display font-bold text-accent-strong">{title}</h2>
+        <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+          {lines.map((line, index) => (
+            <li key={index}>{line}</li>
+          ))}
+        </ul>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onConfirm}
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
+          >
+            Conferma
+          </button>
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-edge px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+          >
+            Annulla
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -745,16 +904,33 @@ export function SavingThrowsAndSkills({
     if (abilities.length > 0) onChange({ ...character, trsCompetenti: abilities });
   };
 
-  const [roll, setRoll] = useState<{ label: string; die: number; mod: number; total: number } | null>(
-    null,
-  );
+  // Stesso modal dadi (3D fisico incluso) usato per le armi (vedi WeaponsSection in
+  // weapons-spells.tsx), al posto del tiro istantaneo "invisibile" di prima.
+  const [dicePreset, setDicePreset] = useState<DiceRollerPreset | null>(null);
   const rollCheck = (label: string, mod: number) => {
-    const die = rollDie(20);
-    setRoll({ label, die, mod, total: die + mod });
+    setDicePreset({ label, groups: [{ die: 20, quantity: 1 }], modifier: mod });
+  };
+
+  // Bonus extra per tiro salvezza/abilità (es. Manto della Protezione: +1 a tutti i TS) — il
+  // calcolo RAW sotto (savingThrowModifier/skillModifier) resta sempre corretto da solo, questo si
+  // somma sopra. Chiave assente = 0, la rimuoviamo invece di scrivere uno 0 esplicito per tenere
+  // l'oggetto piccolo nel caso comune "nessun bonus".
+  const setTrsBonus = (ability: Ability, value: number) => {
+    const next = { ...character.trsBonus };
+    if (value === 0) delete next[ability];
+    else next[ability] = value;
+    onChange({ ...character, trsBonus: next });
+  };
+  const setAbilitaBonus = (skill: string, value: number) => {
+    const next = { ...character.abilitaBonus };
+    if (value === 0) delete next[skill];
+    else next[skill] = value;
+    onChange({ ...character, abilitaBonus: next });
   };
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
+      <DiceRollerModal preset={dicePreset} onClose={() => setDicePreset(null)} />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm uppercase tracking-widest text-muted">Tiri salvezza</h2>
         <button
@@ -764,16 +940,12 @@ export function SavingThrowsAndSkills({
           Suggerisci dalla classe di origine
         </button>
       </div>
-      {roll && (
-        <p className="text-sm font-bold text-accent-strong">
-          🎲 {roll.label}: {roll.die} {formatModifier(roll.mod)} ={" "}
-          <span className="text-lg">{roll.total}</span>
-        </p>
-      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {ABILITIES.map((ability) => {
           const proficient = character.trsCompetenti.includes(ability);
-          const mod = savingThrowModifier(character.caratteristiche[ability], proficient, level);
+          const bonus = character.trsBonus[ability] ?? 0;
+          const mod =
+            savingThrowModifier(character.caratteristiche[ability], proficient, level) + bonus;
           return (
             <div key={ability} className="flex items-stretch gap-1">
               <button
@@ -790,6 +962,14 @@ export function SavingThrowsAndSkills({
                 </span>
                 <span className="font-bold">{formatModifier(mod)}</span>
               </button>
+              <IntField
+                value={bonus}
+                onChange={(value) => setTrsBonus(ability, value)}
+                aria-label={`Bonus extra al tiro salvezza su ${ABILITY_LABELS[ability]}`}
+                placeholder="+0"
+                title="Bonus extra (oggetti magici, talenti…)"
+                className="w-10 shrink-0 rounded-lg border border-edge bg-surface-raised px-1 text-center text-xs text-foreground"
+              />
               <button
                 onClick={() => rollCheck(ABILITY_LABELS[ability], mod)}
                 aria-label={`Tira salvezza su ${ABILITY_LABELS[ability]}`}
@@ -812,12 +992,10 @@ export function SavingThrowsAndSkills({
         {SKILLS.map((skill) => {
           const competente = character.abilitaCompetenti.includes(skill.nome);
           const esperto = character.abilitaEsperte.includes(skill.nome);
-          const mod = skillModifier(
-            character.caratteristiche[skill.abilita],
-            competente,
-            esperto,
-            level,
-          );
+          const bonus = character.abilitaBonus[skill.nome] ?? 0;
+          const mod =
+            skillModifier(character.caratteristiche[skill.abilita], competente, esperto, level) +
+            bonus;
           return (
             <div key={skill.nome} className="flex items-stretch gap-1">
               <button
@@ -843,6 +1021,14 @@ export function SavingThrowsAndSkills({
                 </span>
                 <span className="font-bold shrink-0">{formatModifier(mod)}</span>
               </button>
+              <IntField
+                value={bonus}
+                onChange={(value) => setAbilitaBonus(skill.nome, value)}
+                aria-label={`Bonus extra a ${skill.nome}`}
+                placeholder="+0"
+                title="Bonus extra (oggetti magici, talenti…)"
+                className="w-10 shrink-0 rounded-lg border border-edge bg-surface-raised px-1 text-center text-xs text-foreground"
+              />
               <button
                 onClick={() => rollCheck(skill.nome, mod)}
                 aria-label={`Tira ${skill.nome}`}
@@ -928,30 +1114,13 @@ export function SpellSlotsSection({
     onChange({ ...character, slotPattoUsati: Math.min(pact.slots, Math.max(0, used)) });
   };
 
-  const longRest = () =>
-    onChange({ ...character, slotUsati: [0, 0, 0, 0, 0, 0, 0, 0, 0], slotPattoUsati: 0 });
-  const shortRest = () => onChange({ ...character, slotPattoUsati: 0 });
-
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm uppercase tracking-widest text-muted">Slot incantesimi</h2>
-        <div className="flex gap-3">
-          {wlLevel > 0 && (
-            <button
-              onClick={shortRest}
-              className="text-xs font-bold text-accent-strong hover:underline"
-            >
-              Riposo breve
-            </button>
-          )}
-          <button
-            onClick={longRest}
-            className="text-xs font-bold text-accent-strong hover:underline"
-          >
-            Riposo lungo
-          </button>
-        </div>
+        <p className="text-xs text-muted">
+          Il riposo si gestisce dalla scheda ⚔️ Combattimento (ripristina tutto, non solo gli slot).
+        </p>
       </div>
 
       {castingAbility && (

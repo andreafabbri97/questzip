@@ -50,6 +50,7 @@ import {
   InspirationToggle,
   LimitedFeaturesSection,
   PhysicalDescriptionSection,
+  RestSection,
   SavingThrowsAndSkills,
   SpellSlotsSection,
 } from "./abilities-and-meta";
@@ -289,6 +290,7 @@ export function CharacterSheet({
 
       {tab === "combattimento" && (
         <div className="space-y-6">
+          <RestSection character={character} onChange={onChange} />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <InspirationToggle character={character} onChange={onChange} />
             <HitDiceTracker character={character} onChange={onChange} />
