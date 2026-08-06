@@ -79,7 +79,12 @@ export function DiceRollerModal({
             ×
           </button>
         </div>
-        <div className="overflow-y-auto p-4">
+        {/* flex-1 min-h-0 (non solo overflow-y-auto): senza min-h-0 un figlio flex non si
+            restringe mai sotto l'altezza del suo contenuto (default min-height: auto), quindi lo
+            scroll interno non scattava mai — il pannello (max-h-[85vh] overflow-hidden) tagliava
+            semplicemente il resto invece di farlo scorrere. Bug segnalato dall'utente su un
+            portatile 15" 1080p, dove il contenuto del tiro dadi è più alto dei 85vh disponibili. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
           {preset && (
             <DiceRoller key={presetKey} initialGroups={preset.groups} initialModifier={preset.modifier} />
           )}

@@ -44,12 +44,12 @@ export function DiceModal({ open, onClose }: { open: boolean; onClose: () => voi
       onClick={onClose}
     >
       <div
-        className={`card-elevated w-full max-w-lg rounded-xl border border-edge bg-background p-5 space-y-4 ${
+        className={`card-elevated w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-edge bg-background overflow-hidden ${
           open ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-5 pt-5 shrink-0">
           <h2 className="text-lg font-display font-bold text-accent-strong">Tira dadi</h2>
           <button
             onClick={onClose}
@@ -59,7 +59,13 @@ export function DiceModal({ open, onClose }: { open: boolean; onClose: () => voi
             ×
           </button>
         </div>
-        <DiceRoller />
+        {/* flex-1 min-h-0: senza, un figlio flex non si restringe mai sotto l'altezza del suo
+            contenuto e lo scroll interno non scatta mai — stesso bug (e stessa correzione) di
+            DiceRollerModal, segnalato dall'utente su un portatile 15" 1080p dove il contenuto
+            del tiro dadi è più alto dei 85vh disponibili. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+          <DiceRoller />
+        </div>
       </div>
     </div>,
     document.body,
