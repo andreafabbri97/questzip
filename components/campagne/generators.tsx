@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { IntField } from "@/components/int-field";
 import { addCombatant } from "@/app/actions/encounters";
 import { loadCreatures, loadItems, type RawCreature, type RawItem } from "@/lib/fivetools/data";
+import { bestItalianName, useItalianSearchIndex } from "@/lib/fivetools/compendio-detail";
+import { translateText } from "@/lib/fivetools/translate";
 import { generateName, NAME_RACES, type NameRace } from "@/lib/names";
 import {
   adjustedEncounterXp,
@@ -380,6 +382,50 @@ function creatureXp(creature: RawCreature): number {
   return XP_BY_CR[typeof creature.cr === "string" ? creature.cr : (creature.cr?.cr ?? "")] ?? 0;
 }
 
+// Il bestiario (5etools) ha solo nomi inglesi — cercare "orco"/"drago" contro "orc"/"dragon" non
+// trovava nulla, gli unici due punti di ricerca mostri dell'app (piazzamento token sulla mappa,
+// aggiunta rapida al combattimento) erano rimasti indietro rispetto al resto del sito (Compendio,
+// autocompletamento Personaggi, mention in chat) dopo che quei punti erano stati corretti per
+// cercare anche in italiano. Stessa tecnica riusata qui: traduzione IT->EN della query (debounced)
+// più il nome italiano reale (ufficiale o cache IA) di ciascun mostro, non solo il nome inglese
+// grezzo. Segnalato dall'utente: la ricerca deve funzionare in italiano "ovunque nell'app".
+function useCreatureSuggestions(query: string, open: boolean) {
+  const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
+  useEffect(() => {
+    if (!open || creatures) return;
+    loadCreatures().then(setCreatures);
+  }, [open, creatures]);
+
+  const q = query.trim().toLowerCase();
+  const [itQuery, setItQuery] = useState<{ query: string; en: string } | null>(null);
+  useEffect(() => {
+    if (q.length < 2) return;
+    const timer = setTimeout(() => {
+      translateText(q, "it", "en").then((result) => {
+        if (result) setItQuery({ query: q, en: result.trim().toLowerCase() });
+      });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [q]);
+  const translatedQuery = itQuery && itQuery.query === q && itQuery.en !== q ? itQuery.en : null;
+
+  const italianIndex = useItalianSearchIndex("mostri", true);
+
+  const suggestions =
+    creatures && q.length >= 2
+      ? creatures
+          .filter((c) => {
+            if (c.name.toLowerCase().includes(q)) return true;
+            if (translatedQuery && c.name.toLowerCase().includes(translatedQuery)) return true;
+            const italianName = bestItalianName(italianIndex, c.name, c.source);
+            return !!italianName && italianName.toLowerCase().includes(q);
+          })
+          .slice(0, 6)
+      : [];
+
+  return { creatures, suggestions };
+}
+
 export function MonsterTokenSearch({
   onPick,
   picked,
@@ -387,20 +433,9 @@ export function MonsterTokenSearch({
   onPick: (name: string) => void;
   picked: string | null;
 }) {
-  const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open || creatures) return;
-    loadCreatures().then(setCreatures);
-  }, [open, creatures]);
-
-  const q = query.trim().toLowerCase();
-  const suggestions =
-    creatures && q.length >= 2
-      ? creatures.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 6)
-      : [];
+  const { suggestions } = useCreatureSuggestions(query, open);
 
   return (
     <div className="relative flex items-center gap-1.5">
@@ -446,20 +481,9 @@ export function MonsterQuickAdd({
 }: {
   onPick: (name: string, hp: number, legendaryActions: number, xp: number) => void;
 }) {
-  const [creatures, setCreatures] = useState<RawCreature[] | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open || creatures) return;
-    loadCreatures().then(setCreatures);
-  }, [open, creatures]);
-
-  const q = query.trim().toLowerCase();
-  const suggestions =
-    creatures && q.length >= 2
-      ? creatures.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 6)
-      : [];
+  const { creatures, suggestions } = useCreatureSuggestions(query, open);
 
   return (
     <div className="relative">

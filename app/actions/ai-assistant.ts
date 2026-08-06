@@ -6,7 +6,7 @@ import {
   loadConditions,
   loadCreatures,
   loadFeats,
-  loadItems,
+  loadInventoryItems,
   loadRaces,
   loadSpells,
 } from "@/lib/fivetools/data";
@@ -91,10 +91,14 @@ async function buildEntryContext(candidate: MentionCandidate): Promise<string | 
       return `${label} "${displayName}" (${candidate.source}) — Grado Sfida ${cr ?? "?"}, CA ${ac ?? "?"}, PF ${hp ?? "?"}, caratteristiche FOR ${creature.str} DES ${creature.dex} COS ${creature.con} INT ${creature.int} SAG ${creature.wis} CAR ${creature.cha}.`;
     }
     case "oggetti": {
-      const item = (await loadItems()).find(matchesCandidate);
+      // loadInventoryItems, non loadItems (solo magici): copre anche armi/armature/attrezzatura
+      // comune, altrimenti l'assistente non trovava mai dati veri per un oggetto non magico
+      // citato nella domanda, pur avendolo individuato come candidato pertinente.
+      const item = (await loadInventoryItems()).find(matchesCandidate);
       if (!item) return null;
       const text = truncate(flattenEntries(item.entries).join(" "), MAX_EXCERPT_CHARS);
-      return `${label} "${displayName}" (${candidate.source}) — rarità ${item.rarity ?? "sconosciuta"}${item.reqAttune ? ", richiede sintonia" : ""}. ${text}`;
+      const rarity = item.rarity && item.rarity !== "none" ? `, rarità ${item.rarity}` : "";
+      return `${label} "${displayName}" (${candidate.source})${rarity}${item.reqAttune ? ", richiede sintonia" : ""}. ${text}`;
     }
     case "razze": {
       const race = (await loadRaces()).find(matchesCandidate);

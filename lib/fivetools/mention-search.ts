@@ -4,7 +4,7 @@ import {
   loadConditions,
   loadCreatures,
   loadFeats,
-  loadItems,
+  loadInventoryItems,
   loadRaces,
   loadSpells,
   type CompendiumKind,
@@ -42,10 +42,16 @@ export const MENTION_KIND_LABELS: Record<CompendiumKind, string> = {
   classi: "Classe",
 };
 
+// "oggetti" usa loadInventoryItems (magici + mundani: armi, armature, attrezzatura comune) e non
+// il loadItems del Compendio (solo magici, la tab "Oggetti magici" resta intenzionalmente così) —
+// altrimenti il bottone "📖 Verifica"/le menzioni "#Nome" in chat/l'assistente IA non trovavano MAI
+// un'arma o un oggetto comune (es. "Halberd"/Alabarda), anche scrivendone il nome esatto: la
+// verifica deve coprire tutto ciò che l'autocompletamento di Personaggi (Armi/Inventario, che usa
+// già loadInventoryItems) può suggerire, non solo il sottoinsieme magico. Segnalato dall'utente.
 export const MENTION_KIND_LOADERS: Record<CompendiumKind, () => Promise<{ name: string; source: string }[]>> = {
   incantesimi: loadSpells,
   mostri: loadCreatures,
-  oggetti: loadItems,
+  oggetti: loadInventoryItems,
   razze: loadRaces,
   talenti: loadFeats,
   background: loadBackgrounds,

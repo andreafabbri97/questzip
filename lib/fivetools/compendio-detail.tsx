@@ -844,7 +844,12 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
   return (
     <>
       <p className="text-sm text-muted italic capitalize">
-        {[typeName, item.rarity, attunement].filter(Boolean).join(" · ")}
+        {/* rarity "none" è il valore 5etools per gli oggetti mundani (non magici) — un dato
+            reale, non un placeholder, ma non ha senso mostrarlo come se fosse una rarità
+            ("None"): prima non capitava mai di arrivare qui con un oggetto mundano (ItemDetail
+            era raggiungibile solo per oggetti magici), ora che "Verifica"/mention in chat/
+            assistente IA coprono anche armi e attrezzatura comune serve filtrarlo esplicitamente. */}
+        {[typeName, item.rarity !== "none" ? item.rarity : null, attunement].filter(Boolean).join(" · ")}
       </p>
       <EntriesBlockOrIa entries={item.entries} language={language} iaText={ia?.descrizioneIta} />
     </>

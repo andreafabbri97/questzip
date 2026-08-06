@@ -95,7 +95,7 @@ export default function CompendiumPage() {
   const [showRegole, setShowRegole] = useState(false);
   const [kind, setKind] = useState<CompendiumKind>("incantesimi");
   const [edition, setEdition] = useState<EditionFilter>("entrambe");
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>("it");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Entry | null>(null);

@@ -20,7 +20,7 @@ import {
   type Weapon,
 } from "@/lib/dnd";
 import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
-import { loadInfusions, loadSpells, type RawOptionalFeature, type RawSpell } from "@/lib/fivetools/data";
+import { loadInfusions, loadInventoryItems, loadSpells, type RawOptionalFeature, type RawSpell } from "@/lib/fivetools/data";
 import { guessDamageDice } from "@/lib/fivetools/entries";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
@@ -106,12 +106,16 @@ export function WeaponsSection({
           return (
             <div key={weapon.id} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <input
-                  value={weapon.nome}
-                  onChange={(event) => updateWeapon(weapon.id, { nome: event.target.value })}
-                  placeholder="Nome arma"
-                  className="flex-1 min-w-0 rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
-                />
+                <div className="flex-1 min-w-0">
+                  <Autocomplete
+                    value={weapon.nome}
+                    onChange={(nome) => updateWeapon(weapon.id, { nome })}
+                    loader={loadInventoryItems}
+                    placeholder="Spada lunga, Alabarda…"
+                    inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                    kind="oggetti"
+                  />
+                </div>
                 <button
                   onClick={() => setArmi(character.armi.filter((w) => w.id !== weapon.id))}
                   className="text-muted hover:text-danger text-sm shrink-0"
@@ -120,6 +124,7 @@ export function WeaponsSection({
                   ×
                 </button>
               </div>
+              <CompendioInfoButton kind="oggetti" nome={weapon.nome} />
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <label className="block">
                   <span className="text-[10px] uppercase tracking-widest text-muted">Caratteristica</span>
