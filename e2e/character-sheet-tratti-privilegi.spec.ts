@@ -23,16 +23,16 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
   test("i privilegi di classe si fermano al livello del personaggio, mostrati come elenco compatto", async ({
     page,
   }) => {
-    const toggle = page.getByRole("button", { name: /Come funziona Sorcerer/ });
+    const toggle = page.getByRole("button", { name: /Come funziona Stregone/ });
     await toggle.click();
 
     // Metamagia arriva al 3° livello (il livello del personaggio): deve esserci. Aspetta che la
-    // riga esatta "Metamagic (Metamagia)" sia visibile (non solo un sottostringa "Metamagia", che
-    // combacia anche con "Metamagic Options (Opzioni di Metamagia)") — questo conferma anche che
+    // riga esatta "Metamagia (Metamagic)" sia visibile (non solo un sottostringa "Metamagia", che
+    // combacia anche con "Opzioni di Metamagia (Metamagic Options)") — questo conferma anche che
     // la traduzione ufficiale/IA sia arrivata prima di cliccare, altrimenti un click troppo rapido
     // aprirebbe il modal con la traduzione dal vivo di riserva invece del testo IA di qualità
     // migliore (race condition vista durante lo sviluppo, non un bug del componente).
-    const metamagicRow = page.getByRole("button", { name: "Metamagic (Metamagia) Liv. 3" });
+    const metamagicRow = page.getByRole("button", { name: "Metamagia (Metamagic) Liv. 3" });
     await expect(metamagicRow).toBeVisible();
     // Affinità Elementale/Elemental Affinity (sottoclasse) arriva solo al 6° livello: NON deve
     // comparire — prima di questa modifica l'elenco mostrava sempre tutti e 20 i livelli.
@@ -86,7 +86,7 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
     await page.getByRole("button", { name: "📖 Tratti & Talenti" }).click();
 
     await expect(page.getByText(/non è stata trovata nel Compendio/)).not.toBeVisible();
-    const toggle = page.getByRole("button", { name: /Come funziona Reborn \(Rinato\)/ });
+    const toggle = page.getByRole("button", { name: /Come funziona Rinato \(Reborn\)/ });
     await expect(toggle).toBeVisible();
     await toggle.click();
 
@@ -99,7 +99,7 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
   test("il talento mostra la stessa traduzione ufficiale sia in elenco sia nel modal Verifica", async ({
     page,
   }) => {
-    await expect(page.getByText("Alert (Allerta)", { exact: false })).toBeVisible();
+    await expect(page.getByText("Allerta (Alert)", { exact: false })).toBeVisible();
 
     await page.getByRole("button", { name: "📖 Verifica" }).click();
     await expect(page.getByText("Allerta", { exact: false }).first()).toBeVisible();

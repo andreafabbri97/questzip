@@ -402,7 +402,7 @@ export default function CompendiumPage() {
                   }`}
                 >
                   <span className="min-w-0 font-bold text-foreground">
-                    <DualName text={entry.name} kind={kind} source={entry.source} />
+                    <DualName text={entry.name} kind={kind} source={entry.source} language={language} />
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
                     <EntrySubtitle kind={kind} entry={entry} />

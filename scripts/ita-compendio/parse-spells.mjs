@@ -61,12 +61,46 @@ function fixDigitLetterConfusion(raw) {
 // artefatto distinto da fixDigitLetterConfusion sopra (quello copre 0/1 scambiati per O/I
 // DENTRO una parola con altre lettere, per i NOMI): nel corpo del testo la cifra "1" della
 // notazione dei dadi ("1d4", "1d6"...) viene spesso estratta come lettera "l" minuscola isolata
-// ("ld4"), mai il contrario — trovato analizzando "Vita Falsata" ("ld4 + 4 punti ferita") ma
-// presente in decine di altri incantesimi (148 occorrenze solo tra PHB e Xanathar). "l" seguita
-// da "d" e cifre non è mai una parola italiana vera, quindi il fix è sicuro senza serie di
-// eccezioni.
+// ("ld4"), a volte insieme anche alla cifra "0" letta come "O" maiuscola ("ldlO" invece di
+// "1d10", trovato dall'utente su "Eldritch Blast"/Deflagrazione Occulta) — a volte con uno spazio
+// spurio in mezzo ("l 0d6", "4dl 0"). Quattro passate, in ordine: (1) ricongiunge lo spazio
+// spurio dentro un numero spezzato, prima/dopo la "d"; (2) conteggio corrotto ma isolato ("l"
+// singola, mai incollata a un'altra cifra reale — quella è una riga di TABELLA non una frase,
+// es. "2ld6" nella progressione del Ladro, lasciata volutamente intatta perché lì "2" e "1d6"
+// sono colonne diverse senza spazio tra loro, e provare a separarle rischierebbe di produrre
+// "21d6"), taglia già pulita; (3) taglia corrotta (10/12/20) con un conteggio NON ambiguo (cifre
+// vere o "l"/"I" isolata); (4) conteggio "10" corrotto (l0/lO) isolato, con la taglia ancora
+// corrotta. Ogni normalizzazione valida il risultato contro le taglie di dado reali di D&D
+// (1,2,3,4,6,8,10,12,20,100) prima di sostituire, per non toccare mai testo che non è davvero
+// notazione dadi.
+const VALID_DICE_SIZES = new Set([1, 2, 3, 4, 6, 8, 10, 12, 20, 100]);
+function toDigits(s) {
+  return s.replace(/[oO]/g, "0").replace(/[lI]/g, "1");
+}
 function fixDiceNotation(text) {
-  return text.replace(/\bld(\d+)\b/g, "1d$1");
+  let out = text;
+  // 'd' non deve essere preceduta da una lettera vera (blocca "quando", "guardando"...) — solo da
+  // una cifra reale, l'inizio testo o un separatore: altrimenti questa passata mangiava lo spazio
+  // reale dopo parole come "Quando" (matchava la "d" di "Quando" invece che quella di un dado).
+  out = out.replace(/(?<![a-zA-Zà-ÿ])d([0-9oOlI])\s+([0-9oOlI])\b/g, "d$1$2");
+  out = out.replace(/\b([0-9oOlI])\s+([0-9oOlI])d/g, "$1$2d");
+  out = out.replace(/\bld(\d+)\b/g, "1d$1");
+  out = out.replace(/\b(\d{1,2}|[lI])d([lI0-9][oO0-9]?)\b/g, (m, count, size) => {
+    const c = Number(toDigits(count));
+    const s = Number(toDigits(size));
+    if (!VALID_DICE_SIZES.has(s) || c < 1 || c > 99) return m;
+    return `${c}d${s}`;
+  });
+  out = out.replace(/\b([lI])([oO0])d([lI0-9][oO0-9]?)\b/g, (m, _l, _z, size) => {
+    const s = Number(toDigits(size));
+    return VALID_DICE_SIZES.has(s) ? `10d${s}` : m;
+  });
+  // stesso spazio spurio, stavolta dentro un ORDINALE a due cifre spezzato in due ("1 1°" invece
+  // di "11°") — trovato confrontando "Fiotto Acido" con dungeonsanddragons.fandom.com/it (stesso
+  // testo ufficiale, ma senza questo artefatto). Sicuro: una cifra seguita da spazio, un'altra
+  // cifra e "°" è sempre un ordinale spezzato, mai due numeri distinti.
+  out = out.replace(/\b(\d) (\d°)/g, "$1$2");
+  return out;
 }
 
 // spazi spuri e parole tronche note, trovate ispezionando l'elenco completo delle voci estratte

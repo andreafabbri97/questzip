@@ -26,7 +26,11 @@ test("il sottotitolo italiano di un incantesimo con testo ufficiale usa il nome 
   await expect(page.getByText("Deflagrazione Occulta").first()).toBeVisible({ timeout: 15000 });
 
   await row.click();
-  await expect(page.locator("h2", { hasText: "Eldritch Blast" })).toContainText(
-    "Deflagrazione Occulta",
-  );
+  const heading = page.locator("h2", { hasText: "Eldritch Blast" });
+  await expect(heading).toContainText("Deflagrazione Occulta");
+  // L'italiano è la lingua predefinita di tutta l'app (non solo del Compendio): il nome italiano
+  // deve comparire per primo/in grande, l'inglese come sottotitolo — non il contrario. Prima
+  // DualName non teneva conto della lingua selezionata e mostrava sempre l'inglese per primo,
+  // anche a lingua italiana selezionata (il default). Segnalato dall'utente su uno screenshot.
+  await expect(heading.locator("span").first()).toHaveText("Deflagrazione Occulta");
 });

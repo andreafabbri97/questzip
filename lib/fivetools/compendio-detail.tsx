@@ -250,6 +250,7 @@ export function DualName({
   inline = false,
   kind,
   source,
+  language = "it",
 }: {
   text: string;
   inline?: boolean;
@@ -264,23 +265,31 @@ export function DualName({
    * Compendio e continuano a usare solo la traduzione live passando questi due prop. */
   kind?: CompendiumKind;
   source?: string;
+  /** Quale nome è quello "primario" (grande/prima) e quale il sottotitolo — di default l'italiano,
+   * dato che l'app ha l'italiano come lingua predefinita ovunque. Nel Compendio, dove esiste un
+   * vero toggle EN/IT, va passata la lingua effettivamente selezionata: con "en" torna il nome
+   * inglese in primo piano, coerente con l'utente che ha scelto di leggere in inglese. Prima non
+   * esisteva questo parametro e l'inglese era SEMPRE mostrato per primo, anche a lingua italiana
+   * selezionata (di default!) — segnalato dall'utente su una ricerca il cui default è l'italiano. */
+  language?: Language;
 }) {
   const italianIndex = useItalianSearchIndex(kind ?? "incantesimi", !!(kind && source));
   const liveTranslated = useTranslatedText(text, "en", "it");
   const translated =
     (kind && source ? bestItalianName(italianIndex, text, source) : undefined) ?? liveTranslated;
   if (!translated || translated.toLowerCase() === text.toLowerCase()) return <>{text}</>;
+  const [primary, secondary] = language === "it" ? [translated, text] : [text, translated];
   if (inline) {
     return (
       <>
-        {text} <span className="text-muted font-normal">({translated})</span>
+        {primary} <span className="text-muted font-normal">({secondary})</span>
       </>
     );
   }
   return (
     <>
-      <span className="block truncate">{text}</span>
-      <span className="block truncate text-xs font-normal text-muted">{translated}</span>
+      <span className="block truncate">{primary}</span>
+      <span className="block truncate text-xs font-normal text-muted">{secondary}</span>
     </>
   );
 }
@@ -404,7 +413,7 @@ export function EntryDetail({
       </button>
       <div className="flex items-start justify-between gap-3">
         <h2 className="heading-ornate text-2xl font-display font-bold text-accent-strong">
-          <DualName text={entry.name} kind={kind} source={entry.source} />
+          <DualName text={entry.name} kind={kind} source={entry.source} language={language} />
         </h2>
         <SourceBadge source={entry.source} books={books} />
       </div>
@@ -1345,7 +1354,7 @@ function SubclassAccordion({
         className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-surface transition-colors"
       >
         <span className="text-sm font-bold text-foreground">
-          <DualName text={subclass.name} kind="classi" source={subclass.source} inline />
+          <DualName text={subclass.name} kind="classi" source={subclass.source} inline language={language} />
         </span>
         <span className="text-muted text-xs shrink-0">{open ? "▲" : "▼"}</span>
       </button>
