@@ -6,6 +6,7 @@ import { IntField } from "@/components/int-field";
 import { formatModifier } from "@/lib/dnd";
 import { clearMyDiceRolls, deleteDiceRoll, getMyDiceRolls, saveDiceRoll } from "@/app/actions/dice";
 import { Dice3D, type Dice3DHandle, type Dice3DStatus } from "@/components/dice-3d";
+import { playDiceRollSound } from "@/lib/dice-sound";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
@@ -126,7 +127,24 @@ export function DiceRoller({
     let cancelled = false;
     getMyDiceRolls()
       .then((rows) => {
-        if (!cancelled) setHistory(rows.map(rowToResult));
+        if (cancelled) return;
+        // Bug segnalato dall'utente: il primissimo tiro (cronologia ancora vuota) a volte
+        // spariva subito dopo essere apparso, finché non se ne faceva un secondo. Causa: questo
+        // GET parte al mount e può risolversi DOPO che l'utente ha già tirato in modo ottimistico
+        // (vedi addResult) — sovrascrivendo `history` con l'istantanea del server presa PRIMA di
+        // quel tiro (che quindi non la contiene ancora), cancellandolo silenziosamente. Dal
+        // secondo tiro in poi il problema non si ripresenta più: questo effetto gira una sola
+        // volta, quindi non può più competere con tiri successivi. Fix: unione per id invece di
+        // sovrascrittura — i tiri locali non ancora presenti nell'istantanea del server (il caso
+        // comune: il salvataggio non aveva ancora fatto in tempo) restano, ordinati insieme al
+        // resto per data.
+        setHistory((prev) => {
+          const freshIds = new Set(rows.map((r) => r.id));
+          const localOnly = prev.filter((entry) => !freshIds.has(entry.id));
+          return [...localOnly, ...rows.map(rowToResult)]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 30);
+        });
       })
       .catch(() => {});
     return () => {
@@ -167,7 +185,14 @@ export function DiceRoller({
       usedDice3D: result.usedDice3D,
     })
       .then((row) => {
-        setHistory((prev) => prev.map((entry) => (entry.id === result.id ? rowToResult(row) : entry)));
+        setHistory((prev) => {
+          const updated = prev.map((entry) => (entry.id === result.id ? rowToResult(row) : entry));
+          // Caso limite raro: se il GET iniziale (vedi l'effetto sopra) si era già portato dietro
+          // questa stessa riga vera (arrivata nel frattempo sul server), dopo la riconciliazione
+          // ci sarebbero due entry con lo stesso id — tiene solo la prima occorrenza.
+          const seen = new Set<string>();
+          return updated.filter((entry) => (seen.has(entry.id) ? false : (seen.add(entry.id), true)));
+        });
         return row;
       })
       .catch(() => null);
@@ -175,6 +200,10 @@ export function DiceRoller({
   };
 
   const roll = async () => {
+    // Chiamata qui, dentro il gestore di click: l'AudioContext richiede una vera gesture utente
+    // per partire, un click è l'ultimo punto sicuro prima che parta l'animazione (sia 3D che
+    // fallback numerico) — meglio farlo partire subito che aspettare la fine del tiro.
+    playDiceRollSound();
     const effectiveMode = modeEnabled ? mode : "normale";
     // In vantaggio/svantaggio (possibile solo con un singolo gruppo 1d20, vedi modeEnabled) si
     // animano comunque 2 dadi fisici/finti — uno dei due viene scartato, non ha senso animarne di
