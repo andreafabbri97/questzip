@@ -22,7 +22,11 @@ const PARSED_DIR = path.join(SCRIPT_DIR, "parsed");
 const FIELD_LABELS = ["Tempo di Lancio", "Gittata", "Componenti", "Durata"];
 const FIELD_RE = new RegExp(`^(${FIELD_LABELS.join("|")}):\\s*(.*)$`);
 
-const SUBTITLE_LEVELED_RE = /^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-']*?)\s+di\s+(\d)°\s*livello(\s*\(rituale\))?$/;
+// tra la cifra del livello e il simbolo "°" a volte il PDF inserisce uno spazio spurio (es.
+// "1 °  livello" invece di "1° livello", stesso artefatto di estrazione già noto altrove) — senza
+// \s* qui il sottotitolo non veniva riconosciuto e l'incantesimo intero andava perso (trovato con
+// "Vita Falsata"/False Life, mancante dal PHB nonostante presente nel testo grezzo).
+const SUBTITLE_LEVELED_RE = /^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-']*?)\s+di\s+(\d)\s*°\s*livello(\s*\(rituale\))?$/;
 const SUBTITLE_CANTRIP_RE = /^Trucchetto\s+di\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-']*)$/;
 
 // le 8 scuole di magia ufficiali (terminologia PHB ITA): usate per scartare i falsi positivi,
@@ -54,6 +58,17 @@ function fixDigitLetterConfusion(raw) {
     .join("");
 }
 
+// artefatto distinto da fixDigitLetterConfusion sopra (quello copre 0/1 scambiati per O/I
+// DENTRO una parola con altre lettere, per i NOMI): nel corpo del testo la cifra "1" della
+// notazione dei dadi ("1d4", "1d6"...) viene spesso estratta come lettera "l" minuscola isolata
+// ("ld4"), mai il contrario — trovato analizzando "Vita Falsata" ("ld4 + 4 punti ferita") ma
+// presente in decine di altri incantesimi (148 occorrenze solo tra PHB e Xanathar). "l" seguita
+// da "d" e cifre non è mai una parola italiana vera, quindi il fix è sicuro senza serie di
+// eccezioni.
+function fixDiceNotation(text) {
+  return text.replace(/\bld(\d+)\b/g, "1d$1");
+}
+
 // spazi spuri e parole tronche note, trovate ispezionando l'elenco completo delle voci estratte
 // (stesso artefatto: il font inserisce uno spazio indebito, es. "C Omunione" invece di "Comunione")
 const NAME_FIXES = new Map([
@@ -66,6 +81,7 @@ const NAME_FIXES = new Map([
   ["evocaa immondo", "Evoca Immondo"],
   ["evoca non mortto", "Evoca Non Morto"],
   ["parola del p otere d olore", "Parola del Potere Dolore"],
+  ["purificare crno e bevande", "Purificare Cibo e Bevande"],
 ]);
 
 function titleCaseItalian(raw) {
@@ -167,7 +183,8 @@ function extractFields(lines, start, end) {
     if (startsNewParagraph) paragraphs.push(line);
     else paragraphs[paragraphs.length - 1] += " " + line;
   }
-  const descrizione = paragraphs.join("\n\n");
+  const descrizione = fixDiceNotation(paragraphs.join("\n\n"));
+  for (const label of FIELD_LABELS) fields[label] = fixDiceNotation(fields[label]);
   return { fields, descrizione, bodyStart };
 }
 

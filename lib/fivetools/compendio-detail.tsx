@@ -448,6 +448,12 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
   const ia = useTraduzioneIa("incantesimi", spell.name, spell.source, language === "it");
   const liveTranslatedName = useTranslatedText(spell.name, "en", "it");
   const translatedName = ia?.nomeIta ?? liveTranslatedName;
+  // "Materiali" resta un campo a sé (non fa parte di "entries", che EntriesBlockOrIa già
+  // traduce) — senza questa traduzione dedicata restava sempre in inglese anche quando il resto
+  // della scheda (nome, descrizione) era in italiano. Usata solo nel ramo di fallback qui sotto:
+  // quando esiste testo ufficiale, i suoi "componenti" (stringa già in italiano) la sostituiscono.
+  const liveTranslatedMaterial = useTranslatedText(material ?? undefined, "en", "it");
+  const translatedMaterial = language === "it" ? (liveTranslatedMaterial ?? material) : material;
   const [itaSpells, setItaSpells] = useState<Awaited<ReturnType<typeof getIncantesimiIta>> | null>(
     null,
   );
@@ -504,7 +510,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
         <Stat label="Componenti" value={formatComponents(spell.components)} />
         <Stat label="Durata" value={formatDuration(spell.duration)} />
       </div>
-      {material && <p className="text-sm text-muted italic">Materiali: {material}</p>}
+      {material && <p className="text-sm text-muted italic">Materiali: {translatedMaterial}</p>}
       <div className="border-t border-edge pt-3 space-y-2">
         <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
         <EntriesBlockOrIa entries={spell.entries} language={language} iaText={ia?.descrizioneIta} />

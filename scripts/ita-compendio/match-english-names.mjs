@@ -110,6 +110,20 @@ const KNOWN_TALENTI_PHB = {
   "tenace": "Durable",
 };
 
+// Nomi di incantesimo per cui la traduzione automatica IT->EN produce un sinonimo plausibile ma
+// diverso dal nome ufficiale 5etools, quindi né il confronto esatto né quello per somiglianza di
+// token (jaccard) riescono a collegarli — stesso principio di KNOWN_TALENTI_PHB sopra, ma qui il
+// problema non è spaziatura rotta, è proprio scelta lessicale del traduttore (es. "Deflagrazione
+// Occulta" -> "Occult Blast" invece di "Eldritch Blast", zero token in comune con "Eldritch").
+// Coppie note per aver rotto tre E2E (compendio-official-names, compendio-cross-source-names,
+// mention-name-consistency) quando un reseed ha azzerato il collegamento nomeInglese/fonteInglese
+// precedentemente stabilito — prima non c'era un modo per lo script di ricostruirle da solo.
+const KNOWN_INCANTESIMI_PHB = {
+  "deflagrazione occulta": "Eldritch Blast",
+  "fiotto acido": "Acid Splash",
+  "punizione collerica": "Wrathful Smite",
+};
+
 async function translateItToEn(text, cache, overrides = {}) {
   const normalizedKey = text.trim().toLowerCase();
   const override = overrides[normalizedKey];
@@ -312,7 +326,14 @@ async function main() {
 
   const categories = {
     incantesimi: () =>
-      matchCategory({ label: "Incantesimi", table: compendioItaIncantesimi, loadEnglish: loadEnglishSpells, cache, dryRun }),
+      matchCategory({
+        label: "Incantesimi",
+        table: compendioItaIncantesimi,
+        loadEnglish: loadEnglishSpells,
+        cache,
+        overrides: KNOWN_INCANTESIMI_PHB,
+        dryRun,
+      }),
     mostri: () =>
       matchCategory({ label: "Mostri", table: compendioItaMostri, loadEnglish: loadEnglishCreatures, cache, dryRun }),
     razze: () =>
