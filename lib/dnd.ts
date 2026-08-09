@@ -169,6 +169,12 @@ const rawCharacterSchema = z.object({
   // Attento: +5 alla percezione passiva), stesso principio di "bonusExtra" sulle armi.
   iniziativaBonus: z.number().int().default(0),
   percezionePassivaBonus: z.number().int().default(0),
+  // Stesso principio: CD/Bonus attacco degli incantesimi erano SOLO calcolati (Caratteristica +
+  // Competenza), senza modo di aggiustarli per un talento/oggetto che li tocca direttamente (es.
+  // un oggetto che dà +1 alla CD dei tiri salvezza dei propri incantesimi) — segnalato dall'utente
+  // ("voglio che siano editabili come tutti gli altri numeri della scheda").
+  cdIncantesimiBonus: z.number().int().default(0),
+  attaccoIncantesimiBonus: z.number().int().default(0),
   // Raggio di visione in metri — suggerito dalla scurovisione della razza (via Compendio) ma
   // sempre modificabile a mano, per restare valido anche quando non deriva dalla razza (talenti,
   // incantesimi, invocazioni). Si applica solo se "scurovisione" è spuntata: il numero da solo
@@ -350,6 +356,8 @@ export function newCharacter(): Character {
     velocita: 9,
     iniziativaBonus: 0,
     percezionePassivaBonus: 0,
+    cdIncantesimiBonus: 0,
+    attaccoIncantesimiBonus: 0,
     visioneRadius: 0,
     scurovisione: false,
     vedeOscuritaMagica: false,

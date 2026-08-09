@@ -107,11 +107,23 @@ export function MessageList({
   }
 
   return (
-    // flex flex-col justify-end: quando i messaggi non riempiono il riquadro (poche righe di
-    // conversazione), li ancora in fondo vicino al composer invece di lasciarli appesi in alto
-    // con un vuoto enorme sotto — lo scroll continua a funzionare normalmente quando straboccano
-    // (bottomRef più sotto porta comunque all'ultimo messaggio).
-    <div className="flex-1 overflow-y-auto flex flex-col justify-end space-y-0.5 p-3">
+    // min-h-0: senza, questo figlio flex non si restringe mai sotto l'altezza del proprio
+    // contenuto (default CSS min-height:auto) — con una conversazione lunga l'intero riquadro
+    // chat cresceva oltre l'altezza disponibile invece di scorrere al suo interno, facendo
+    // scrollare la PAGINA intera. Stesso identico bug già corretto per i modal dei dadi.
+    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col space-y-0.5 p-3">
+      {/* Ancora i messaggi in fondo vicino al composer quando la conversazione è corta, SENZA
+          "justify-content: flex-end" sul contenitore — quella proprietà rompe silenziosamente lo
+          scroll con tante righe: il browser calcola scrollHeight ignorando il contenuto che
+          straborda PRIMA dell'inizio del riquadro (bug noto di flexbox, non specifico di questo
+          progetto), risultando in scrollHeight===clientHeight anche con decine di messaggi fuori
+          vista — lo scroll sembrava "non fare nulla" perché per il browser non c'era nulla da
+          scorrere. Uno spacer con margin-top:auto ottiene lo stesso ancoraggio in fondo senza
+          quel bug: assorbe lo spazio vuoto quando i messaggi sono pochi, senza mai interferire col
+          calcolo dell'overflow quando invece sono tanti. Segnalato dall'utente ("non funziona lo
+          scroll, scrolla solo la pagina intera").
+      */}
+      <div className="mt-auto" />
       {messages.length === 0 && (
         <p className="text-sm text-muted text-center py-6">Nessun messaggio ancora — scrivi il primo!</p>
       )}
@@ -126,7 +138,13 @@ export function MessageList({
         const replyAuthor = message.replyToAuthorId ? resolveAuthor(message.replyToAuthorId) : null;
 
         return (
-          <div key={message.id}>
+          // shrink-0: senza, questo elemento è un figlio flex del contenitore scrollabile (anche
+          // lui flex-col) e per default può RESTRINGERSI sotto la propria altezza naturale per
+          // stare tutto dentro lo spazio disponibile invece di farlo scorrere — con tanti
+          // messaggi il riquadro li comprimeva silenziosamente pur senza errori visibili,
+          // scrollHeight restava sempre uguale a clientHeight e lo scroll non serviva mai perché
+          // "non c'era" overflow, non perché i messaggi ci stessero davvero tutti.
+          <div key={message.id} className="shrink-0">
             {showDateSeparator && (
               <div className="flex justify-center py-2.5">
                 <span className="rounded-full bg-surface-raised px-3 py-1 text-[10px] uppercase tracking-widest text-muted">

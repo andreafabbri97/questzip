@@ -8,10 +8,12 @@ import {
   newCharacter,
   savingThrowModifier,
   skillModifier,
+  spellAttackBonus,
+  spellSaveDC,
   totalLevel,
   type Character,
 } from "@/lib/dnd";
-import { RestSection, SavingThrowsAndSkills } from "./abilities-and-meta";
+import { RestSection, SavingThrowsAndSkills, SpellSlotsSection } from "./abilities-and-meta";
 import type { DiceRollerPreset } from "@/components/dice-roller-modal";
 
 // DiceRollerModal monta il vero DiceRoller (dadi 3D BabylonJS, server actions per la cronologia
@@ -124,6 +126,42 @@ describe("SavingThrowsAndSkills", () => {
     const expectedMod = skillModifier(16, true, false, totalLevel(character.classi));
     expect(screen.getByTestId("dice-label")).toHaveTextContent("Acrobazia");
     expect(screen.getByTestId("dice-modifier")).toHaveTextContent(String(expectedMod));
+  });
+});
+
+describe("SpellSlotsSection", () => {
+  // Personaggio incantatore: baseCharacter() di default è un Guerriero (non lancia incantesimi),
+  // serve una classe con caratteristica da incantatore per far comparire CD/Bonus attacco.
+  function caster(overrides: Partial<Character> = {}) {
+    return baseCharacter({ classi: [{ nome: "Mago", livello: 5 }], ...overrides });
+  }
+
+  it("CD tiro salvezza e Bonus attacco degli incantesimi sono editabili e si sommano al calcolo RAW", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [character, setCharacter] = useState(caster());
+      return <SpellSlotsSection character={character} onChange={setCharacter} />;
+    }
+    render(<Harness />);
+
+    const rawCd = spellSaveDC(5, 10); // intelligenza 10 di baseCharacter()
+    const rawAttack = spellAttackBonus(5, 10);
+    expect(screen.getByText(String(rawCd))).toBeInTheDocument();
+
+    const cdField = screen.getByLabelText("Bonus extra alla CD tiro salvezza degli incantesimi");
+    await user.clear(cdField);
+    await user.type(cdField, "2");
+    cdField.blur();
+    expect(await screen.findByText(String(rawCd + 2))).toBeInTheDocument();
+
+    const attackField = screen.getByLabelText("Bonus extra al bonus di attacco degli incantesimi");
+    await user.clear(attackField);
+    await user.type(attackField, "1");
+    attackField.blur();
+    const expectedAttack = rawAttack + 1;
+    expect(
+      await screen.findByText(expectedAttack >= 0 ? `+${expectedAttack}` : String(expectedAttack)),
+    ).toBeInTheDocument();
   });
 });
 

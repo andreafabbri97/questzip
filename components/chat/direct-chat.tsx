@@ -250,7 +250,11 @@ export function DirectChat({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    // min-h-0: senza, questo contenitore non si restringe mai sotto l'altezza del proprio
+    // contenuto (default CSS min-height:auto) dentro il riquadro chat ad altezza fissa che lo
+    // ospita — impediva a MessageList di restringersi e far scattare il proprio scroll interno,
+    // facendo scorrere l'intera pagina invece della sola lista messaggi.
+    <div className="flex flex-col h-full min-h-0">
       <div className="border-b border-edge px-3 py-2 shrink-0">
         <Link
           href={`/profilo/${otherUserId}`}

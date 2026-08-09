@@ -27,6 +27,11 @@ type UnifiedThread =
 // Offset diverso da sm in su: sotto quella soglia c'è anche la barra di navigazione fissa in
 // fondo (vedi Nav) e main ha pb-24 invece di pb-10 per non finirci sotto.
 const CHAT_PANEL_HEIGHT = "h-[calc(100dvh-19rem)] sm:h-[calc(100dvh-15rem)] min-h-[420px]";
+// Sotto sm, quando il titolo "Chat"/i tab Messaggi-Amici sono nascosti (conversazione aperta —
+// vedi ChatPageInner), lo spazio che occupavano è libero: un budget più piccolo dà quello spazio
+// in più al riquadro invece di lasciarlo vuoto sopra "← Conversazioni".
+const CHAT_PANEL_HEIGHT_THREAD_OPEN =
+  "h-[calc(100dvh-11rem)] sm:h-[calc(100dvh-15rem)] min-h-[420px]";
 
 // Anteprima stile WhatsApp: nei gruppi (campagna) col nome di chi ha scritto, nelle DM no (è
 // ovvio chi sia, essendo una conversazione 1-a-1) — "Tu:" in entrambi i casi se l'ultimo l'ho
@@ -58,12 +63,23 @@ function ChatPageInner() {
   // Sollevato qui (non dentro MessagesTab) così il bottone "Chatta" nella tab Amici può aprire
   // una DM specifica cambiando anche tab, non solo selezione.
   const [forceOpenDmUserId, setForceOpenDmUserId] = useState<string | null>(null);
+  // Su mobile, quando una conversazione è aperta, il titolo "Chat" e i tab Messaggi/Amici qui
+  // sopra sono ridondanti (c'è già "← Conversazioni" dentro il riquadro) e rubano spazio verticale
+  // prezioso su uno schermo piccolo — nascosti solo lì (da lg: in su restano sempre visibili,
+  // c'è spazio) quando MessagesTab segnala che una thread è selezionata. Ottimizzazione mobile
+  // richiesta dall'utente.
+  const [threadOpen, setThreadOpen] = useState(false);
+  const hideHeaderOnMobile = tab === "messaggi" && threadOpen;
 
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto">
-      <h1 className="heading-ornate text-3xl font-bold text-accent-strong">Chat</h1>
+      <h1
+        className={`heading-ornate text-3xl font-bold text-accent-strong ${hideHeaderOnMobile ? "hidden lg:block" : ""}`}
+      >
+        Chat
+      </h1>
 
-      <div className="flex gap-1.5">
+      <div className={`flex gap-1.5 ${hideHeaderOnMobile ? "hidden lg:flex" : ""}`}>
         {(["messaggi", "amici"] as Tab[]).map((t) => (
           <button
             key={t}
@@ -83,6 +99,7 @@ function ChatPageInner() {
         <MessagesTab
           forceOpenDmUserId={forceOpenDmUserId}
           onConsumeForceOpen={() => setForceOpenDmUserId(null)}
+          onThreadOpenChange={setThreadOpen}
         />
       ) : (
         <FriendsTab
@@ -99,9 +116,11 @@ function ChatPageInner() {
 function MessagesTab({
   forceOpenDmUserId,
   onConsumeForceOpen,
+  onThreadOpenChange,
 }: {
   forceOpenDmUserId: string | null;
   onConsumeForceOpen: () => void;
+  onThreadOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -120,6 +139,13 @@ function MessagesTab({
     getMyCampaigns().then(setCampaigns);
     getFriendsAndRequests().then((data) => setFriends(data.friends));
   }, []);
+
+  // Segnala al genitore (ChatPageInner) se una conversazione è aperta, per nascondere il
+  // titolo/tab ridondanti su mobile — vedi commento lì.
+  useEffect(() => {
+    onThreadOpenChange(!!selected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   // Preseleziona da ?thread=campaign:<id>|dm:<id> (link "Apri chat" da Campagne) o dal bottone
   // "Chatta" nella tab Amici — sempre durante il render, mai in un effetto, per non chiamare
@@ -250,7 +276,7 @@ function MessagesTab({
 
       <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>
         {selected ? (
-          <div className={`rounded-xl border border-edge bg-surface overflow-hidden flex flex-col ${CHAT_PANEL_HEIGHT}`}>
+          <div className={`rounded-xl border border-edge bg-surface overflow-hidden flex flex-col ${CHAT_PANEL_HEIGHT_THREAD_OPEN}`}>
             <button
               onClick={() => setSelected(null)}
               className="lg:hidden text-sm text-muted hover:text-foreground px-3 pt-2 text-left shrink-0"

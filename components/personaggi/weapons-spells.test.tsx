@@ -1,10 +1,23 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { newCharacter, spellAttackBonus, weaponAbilityModifier, weaponAttackBonus, type Character } from "@/lib/dnd";
 import { SpellListSection, WeaponsSection } from "./weapons-spells";
 import type { DiceRollerPreset } from "@/components/dice-roller-modal";
+import { loadSpells } from "@/lib/fivetools/data";
+import { findCompendioMatch } from "@/lib/fivetools/mention-search";
+
+// loadSpells reale farebbe una richiesta di rete vera (dati 5etools) — troppo lento/instabile per
+// un test unitario. Mockato qui invece che a vuoto come le altre funzioni dello stesso modulo
+// (loadInventoryItems/loadInfusions, mai chiamate davvero perché Autocomplete è sostituito con lo
+// stub sotto) perché SpellListSection la chiama direttamente, non solo tramite Autocomplete, per
+// precompilare il dado danno degli incantesimi già in elenco (vedi test dedicato più sotto).
+vi.mock("@/lib/fivetools/data", () => ({
+  loadSpells: vi.fn().mockResolvedValue([]),
+  loadInventoryItems: vi.fn().mockResolvedValue([]),
+  loadInfusions: vi.fn().mockResolvedValue([]),
+}));
 
 vi.mock("@/components/dice-roller-modal", () => ({
   DiceRollerModal: ({ preset }: { preset: DiceRollerPreset | null }) =>
@@ -63,6 +76,14 @@ vi.mock("@/components/personaggi/compendio-info-button", () => ({
 // next-auth -> next/server — non risolvibile sotto Vitest/jsdom, stesso motivo dei due mock sopra.
 vi.mock("@/components/personaggi/simple-entry-modal", () => ({
   SimpleEntryModal: () => null,
+}));
+
+// findCompendioMatch (usato da SpellListSection per precompilare il dado danno degli incantesimi
+// già in elenco, non solo quelli appena scelti dal menu) importa le stesse server action, stessa
+// catena verso next-auth. Nessun match di default: i test che non riguardano esplicitamente il
+// riempimento retroattivo non devono dipendere da una ricerca vera.
+vi.mock("@/lib/fivetools/mention-search", () => ({
+  findCompendioMatch: vi.fn().mockResolvedValue(null),
 }));
 
 function baseCharacter(overrides: Partial<Character> = {}): Character {
@@ -250,5 +271,50 @@ describe("SpellListSection", () => {
     render(<SpellListSection character={character} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: "Lancia Luce come incantesimo" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tira danno con Luce" })).not.toBeInTheDocument();
+  });
+
+  it("precompila da solo il dado danno di un incantesimo già in elenco (non scelto ora dal menu)", async () => {
+    vi.mocked(findCompendioMatch).mockResolvedValueOnce({ name: "Fire Bolt", source: "PHB" });
+    vi.mocked(loadSpells).mockResolvedValueOnce([
+      {
+        name: "Fire Bolt",
+        source: "PHB",
+        level: 0,
+        entries: ["Infliggi {@damage 1d10} danni da fuoco."],
+      },
+    ] as never);
+
+    function Harness() {
+      const [character, setCharacter] = useState(
+        baseCharacter({
+          classi: [{ nome: "Mago", livello: 5 }],
+          incantesimi: [{ id: "s1", nome: "Fire Bolt", livello: 0, preparato: true, dadoDanno: "" }],
+        }),
+      );
+      return <SpellListSection character={character} onChange={setCharacter} />;
+    }
+    render(<Harness />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Dado danno di Fire Bolt")).toHaveValue("1d10"),
+    );
+  });
+
+  it("non sovrascrive un dado danno già compilato a mano per un incantesimo esistente", async () => {
+    vi.mocked(findCompendioMatch).mockResolvedValueOnce({ name: "Fire Bolt", source: "PHB" });
+    vi.mocked(loadSpells).mockResolvedValueOnce([
+      { name: "Fire Bolt", source: "PHB", level: 0, entries: ["{@damage 1d10} danni da fuoco."] },
+    ] as never);
+
+    const character = baseCharacter({
+      classi: [{ nome: "Mago", livello: 5 }],
+      incantesimi: [{ id: "s1", nome: "Fire Bolt", livello: 0, preparato: true, dadoDanno: "9d9" }],
+    });
+    render(<SpellListSection character={character} onChange={() => {}} />);
+
+    // Dà tempo a un eventuale (indesiderato) riempimento automatico di scattare, poi verifica che
+    // il valore scelto dal giocatore sia rimasto intatto.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByLabelText("Dado danno di Fire Bolt")).toHaveValue("9d9");
   });
 });

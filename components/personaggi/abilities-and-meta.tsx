@@ -1128,14 +1128,31 @@ export function SpellSlotsSection({
           <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
             <span className="text-[10px] uppercase tracking-widest text-muted">CD tiro salvezza</span>
             <p className="text-lg font-bold text-foreground">
-              {spellSaveDC(level, character.caratteristiche[castingAbility])}
+              {spellSaveDC(level, character.caratteristiche[castingAbility]) + character.cdIncantesimiBonus}
             </p>
+            <IntField
+              value={character.cdIncantesimiBonus}
+              onChange={(value) => onChange({ ...character, cdIncantesimiBonus: value })}
+              className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-center text-xs text-foreground"
+              placeholder="bonus"
+              aria-label="Bonus extra alla CD tiro salvezza degli incantesimi"
+            />
           </div>
           <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
             <span className="text-[10px] uppercase tracking-widest text-muted">Bonus attacco</span>
             <p className="text-lg font-bold text-foreground">
-              {formatModifier(spellAttackBonus(level, character.caratteristiche[castingAbility]))}
+              {formatModifier(
+                spellAttackBonus(level, character.caratteristiche[castingAbility]) +
+                  character.attaccoIncantesimiBonus,
+              )}
             </p>
+            <IntField
+              value={character.attaccoIncantesimiBonus}
+              onChange={(value) => onChange({ ...character, attaccoIncantesimiBonus: value })}
+              className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-center text-xs text-foreground"
+              placeholder="bonus"
+              aria-label="Bonus extra al bonus di attacco degli incantesimi"
+            />
           </div>
         </div>
       )}

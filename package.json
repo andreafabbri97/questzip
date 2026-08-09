@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "dotenv -e .env.local -- playwright test",
     "test:e2e:login": "dotenv -e .env.local -- node scripts/e2e-login.mjs",
     "db:push": "dotenv -e .env.local -- drizzle-kit push",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",

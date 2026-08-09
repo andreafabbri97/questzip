@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
@@ -22,6 +22,7 @@ import {
 import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
 import { loadInfusions, loadInventoryItems, loadSpells, type RawOptionalFeature, type RawSpell } from "@/lib/fivetools/data";
 import { guessDamageDice } from "@/lib/fivetools/entries";
+import { findCompendioMatch } from "@/lib/fivetools/mention-search";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
 import { LocalInfoButton } from "./local-info-button";
@@ -240,12 +241,64 @@ export function SpellListSection({
   // Dichiarato prima dell'uscita anticipata sotto: gli Hook React non possono essere condizionali.
   const [dicePreset, setDicePreset] = useState<DiceRollerPreset | null>(null);
 
+  // Riferimento sempre aggiornato al personaggio corrente: l'effetto sotto fa ricerche async
+  // (una per incantesimo senza dado danno) che possono richiedere più di un render — leggere da
+  // qui invece che dalla "character" catturata al momento in cui l'effetto è partito evita di
+  // sovrascrivere con dati vecchi eventuali modifiche fatte dal giocatore nel frattempo.
+  const characterRef = useRef(character);
+  useEffect(() => {
+    characterRef.current = character;
+  });
+
+  // Precompila il dado danno per gli incantesimi già in elenco che non l'hanno mai avuto — prima
+  // succedeva SOLO scegliendo l'incantesimo dal menu di autocompletamento (onSelect qui sotto), non
+  // per quelli già presenti (importati, scritti a mano, o aggiunti prima che questa funzione
+  // esistesse) — segnalato dall'utente con screenshot ("non viene riconosciuto... dove possibile").
+  const targets = character.incantesimi.filter((s) => s.nome.trim() && !s.dadoDanno.trim());
+  // Chiave di dipendenza invece dell'array intero: cambia solo quando cambia davvero l'INSIEME
+  // degli incantesimi senza dado, non ad ogni modifica di un campo qualsiasi del personaggio.
+  const missingDiceKey = targets.map((s) => `${s.id}:${s.nome.trim().toLowerCase()}`).join("|");
+  useEffect(() => {
+    if (!missingDiceKey) return;
+    const targetIds = targets.map((s) => s.id);
+    let cancelled = false;
+    (async () => {
+      const allSpells = await loadSpells();
+      const updates = new Map<string, string>();
+      for (const id of targetIds) {
+        const spell = characterRef.current.incantesimi.find((s) => s.id === id);
+        if (!spell || !spell.nome.trim() || spell.dadoDanno.trim()) continue;
+        const match = await findCompendioMatch("incantesimi", spell.nome);
+        if (!match) continue;
+        const full = allSpells.find((sp) => sp.name === match.name && sp.source === match.source);
+        if (!full) continue;
+        const dice = guessDamageDice(full.entries, full.entriesHigherLevel);
+        if (dice) updates.set(id, dice);
+      }
+      if (cancelled || updates.size === 0) return;
+      const current = characterRef.current;
+      onChange({
+        ...current,
+        incantesimi: current.incantesimi.map((s) =>
+          updates.has(s.id) && !s.dadoDanno.trim() ? { ...s, dadoDanno: updates.get(s.id)! } : s,
+        ),
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingDiceKey]);
+
   if (casterLevel === 0 && wlLevel === 0) return null;
 
   const level = totalLevel(character.classi);
   const castingAbility = primaryCastingAbility(character.classi);
+  // + attaccoIncantesimiBonus: stesso bonus extra editabile mostrato/impostato in SpellSlotsSection
+  // (scheda Incantesimi, in cima) — il tiro deve riflettere lo stesso numero mostrato lì, non solo
+  // il calcolo RAW.
   const attackBonus = castingAbility
-    ? spellAttackBonus(level, character.caratteristiche[castingAbility])
+    ? spellAttackBonus(level, character.caratteristiche[castingAbility]) + character.attaccoIncantesimiBonus
     : 0;
 
   const setIncantesimi = (incantesimi: KnownSpell[]) => onChange({ ...character, incantesimi });
