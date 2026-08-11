@@ -314,7 +314,7 @@ export default function GuidaPage() {
             <>Switch 🇬🇧/🇮🇹 in alto: mostra <strong>tutto</strong> originale o <strong>tutto</strong> tradotto, mai mischiato — per evitare confusione dato che la traduzione automatica non è perfetta.</>,
             <>Le voci con il badge &quot;📖 Testo ufficiale&quot; usano il testo estratto direttamente dai manuali italiani ufficiali (non una traduzione automatica) — copre incantesimi/mostri/razze/classi/talenti/oggetti principali.</>,
             <>La ricerca funziona in entrambe le lingue: scrivere &quot;elfo&quot; trova le stesse voci di &quot;elf&quot;.</>,
-            <>Sezione &quot;📚 Regole&quot; separata per regole generali/lore (estratte via OCR da scansioni, qualità del testo leggermente inferiore, segnalato con un badge).</>,
+            <>Sezione &quot;📚 Regole&quot; separata: regole vere del Manuale del Giocatore (multiclasse, punteggi di caratteristica, avventura, combattimento, magia) e del Manuale del Master (condurre il gioco, inseguimenti, malattie/veleni/follia, creazione di mostri/incantesimi/oggetti magici/razze/classi/background), più Regole Principali e Costa della Spada. Le prime due sono testo digitale vero o trascritto a mano (badge &quot;✓ Verificato&quot;); le ultime due sono OCR da scansioni, qualità leggermente inferiore (badge &quot;📷 OCR&quot;).</>,
           ]}
         />
       </Sezione>

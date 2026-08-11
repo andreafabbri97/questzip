@@ -203,7 +203,7 @@ async function main() {
   }
   await seedRazze("phb");
   await seedClassi("phb");
-  for (const book of ["regole_base", "costa_spada", "oggetti_magici"]) {
+  for (const book of ["regole_base", "costa_spada", "oggetti_magici", "phb", "dm_manuale"]) {
     await seedRegole(book);
   }
   await seedOggetti("oggetti_magici");

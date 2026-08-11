@@ -34,5 +34,9 @@
   "multiverso": {
     "nome": "Mordenkainen presenta Mostri del Multiverso",
     "file": "Manuali DM/(Razze mostruose) Mordenkainen_presenta_Mostri_del_Multiverso.pdf"
+  },
+  "dm_manuale": {
+    "nome": "Manuale del Dungeon Master",
+    "file": "Manuali DM/D&D 5e - Manuale del Dungeon Master.pdf"
   }
 }
