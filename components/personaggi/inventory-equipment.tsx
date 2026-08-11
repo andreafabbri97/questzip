@@ -11,8 +11,9 @@ import {
   type InventoryItem,
   type KnownFeat,
 } from "@/lib/dnd";
-import { loadFeats, loadInventoryItems } from "@/lib/fivetools/data";
+import { loadFeats, loadInventoryItems, type RawItem } from "@/lib/fivetools/data";
 import { DualName } from "@/lib/fivetools/compendio-detail";
+import { weightLbToKg } from "@/lib/fivetools/format";
 import { findCompendioMatch } from "@/lib/fivetools/mention-search";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
@@ -179,6 +180,28 @@ export function InventorySection({
                     onChange={(nome) =>
                       setInventario(
                         character.inventario.map((i) => (i.id === item.id ? { ...i, nome } : i)),
+                      )
+                    }
+                    onSelect={(option: RawItem, nomeScelto: string) =>
+                      setInventario(
+                        character.inventario.map((i) =>
+                          i.id === item.id
+                            ? {
+                                ...i,
+                                nome: nomeScelto,
+                                // Precompila il peso da quello VERO dell'oggetto nel Compendio,
+                                // SOLO se ancora a zero — non sovrascrivere un valore che il
+                                // giocatore ha già eventualmente corretto a mano (stesso
+                                // principio del dado danno degli incantesimi). Segnalato
+                                // dall'utente: "deve aggiornarsi automaticamente il peso in base
+                                // agli oggetti che ho".
+                                peso:
+                                  i.peso === 0 && option.weight !== undefined
+                                    ? weightLbToKg(option.weight)
+                                    : i.peso,
+                              }
+                            : i,
+                        ),
                       )
                     }
                     loader={loadInventoryItems}

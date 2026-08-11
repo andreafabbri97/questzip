@@ -217,7 +217,10 @@ function SubclassFeaturesToggle({
   subclassName: string;
   className: string;
 }) {
-  const [showFeatures, setShowFeatures] = useState(false);
+  // Espanso di default (non più chiuso finché non si clicca) — richiesto esplicitamente
+  // dall'utente: le informazioni "come funziona" sono la prima cosa che serve leggere aprendo la
+  // scheda, non qualcosa da scoprire con un click in più.
+  const [showFeatures, setShowFeatures] = useState(true);
   const [subclassSource, setSubclassSource] = useState<string | null>(null);
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
@@ -319,7 +322,10 @@ type LeveledFeature = {
 };
 
 function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
-  const [showFeatures, setShowFeatures] = useState(false);
+  // Espanso di default (non più chiuso finché non si clicca) — richiesto esplicitamente
+  // dall'utente: le informazioni "come funziona" sono la prima cosa che serve leggere aprendo la
+  // scheda, non qualcosa da scoprire con un click in più.
+  const [showFeatures, setShowFeatures] = useState(true);
   const [selected, setSelected] = useState<SimpleEntryData | null>(null);
   const [classSource, setClassSource] = useState<string | null>(null);
   const [subclassSource, setSubclassSource] = useState<string | null>(null);
@@ -527,7 +533,8 @@ export function VisionField({
 type NamedTrait = { name: string; textIt?: string[]; entries: FiveEntry[] };
 
 export function RaceTraits({ razza }: { razza: string }) {
-  const [showTraits, setShowTraits] = useState(false);
+  // Espanso di default, stesso motivo di showFeatures sopra.
+  const [showTraits, setShowTraits] = useState(true);
   const [selected, setSelected] = useState<SimpleEntryData | null>(null);
   const [race, setRace] = useState<RawRace | null | undefined>(undefined);
   const [itaRazze, setItaRazze] = useState<Awaited<ReturnType<typeof loadRazzeIta>> | null>(null);
@@ -668,7 +675,8 @@ export function RaceTraits({ razza }: { razza: string }) {
 }
 
 export function BackgroundTraits({ background }: { background: string }) {
-  const [showTraits, setShowTraits] = useState(false);
+  // Espanso di default, stesso motivo di showFeatures sopra.
+  const [showTraits, setShowTraits] = useState(true);
   const [data, setData] = useState<RawBackground | null | undefined>(undefined);
 
   useEffect(() => {

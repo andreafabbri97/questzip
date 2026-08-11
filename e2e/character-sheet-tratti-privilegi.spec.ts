@@ -23,8 +23,10 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
   test("i privilegi di classe si fermano al livello del personaggio, mostrati come elenco compatto", async ({
     page,
   }) => {
-    const toggle = page.getByRole("button", { name: /Come funziona Stregone/ });
-    await toggle.click();
+    // Espanso di default (richiesto esplicitamente dall'utente) — niente più click per rivelarlo,
+    // basta verificare che il bottone di collasso sia presente. Da espanso il testo del bottone è
+    // "Nascondi X" (non più "Come funziona X", quello compare solo da chiuso).
+    await expect(page.getByRole("button", { name: /Nascondi Stregone/ })).toBeVisible();
 
     // Metamagia arriva al 3° livello (il livello del personaggio): deve esserci. Aspetta che la
     // riga esatta "Metamagia (Metamagic)" sia visibile (non solo un sottostringa "Metamagia", che
@@ -57,9 +59,8 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
   });
 
   test("i privilegi di razza sono presenti e mostrano il testo ufficiale italiano", async ({ page }) => {
-    const toggle = page.getByRole("button", { name: /Come funziona Elf/ });
-    await expect(toggle).toBeVisible();
-    await toggle.click();
+    // Espanso di default — niente più click per rivelarlo. Da espanso il bottone dice "Nascondi X".
+    await expect(page.getByRole("button", { name: /Nascondi Elf/ })).toBeVisible();
 
     const scurovisione = page.getByText("Scurovisione", { exact: true });
     await expect(scurovisione).toBeVisible();
@@ -86,9 +87,8 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
     await page.getByRole("button", { name: "📖 Tratti & Talenti" }).click();
 
     await expect(page.getByText(/non è stata trovata nel Compendio/)).not.toBeVisible();
-    const toggle = page.getByRole("button", { name: /Come funziona Rinato \(Reborn\)/ });
-    await expect(toggle).toBeVisible();
-    await toggle.click();
+    // Espanso di default — niente più click per rivelarlo. Da espanso il bottone dice "Nascondi X".
+    await expect(page.getByRole("button", { name: /Nascondi Rinato \(Reborn\)/ })).toBeVisible();
 
     const row = page.getByText("Natura immortale", { exact: true });
     await expect(row).toBeVisible();

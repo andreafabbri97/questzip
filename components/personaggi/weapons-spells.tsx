@@ -353,14 +353,29 @@ export function SpellListSection({
                       character.incantesimi.map((s) => (s.id === spell.id ? { ...s, nome } : s)),
                     )
                   }
-                  onSelect={(option: RawSpell) =>
+                  onSelect={(option: RawSpell, nomeScelto: string) =>
+                    // Anche il nome va riscritto qui, non solo il dado danno: Autocomplete chiama
+                    // onChange() e poi onSelect() in sequenza sincrona nello stesso click, ma
+                    // entrambi partono dalla STESSA istantanea (stantia) di character.incantesimi
+                    // — la seconda chiamata (onSelect) sovrascrive per intero il risultato della
+                    // prima (onChange), quindi il nome scritto da onChange andava perso, lasciando
+                    // il campo bloccato sul testo digitato invece del nome scelto dal menu. Bug
+                    // reale, non solo percezione — segnalato dall'utente ("deve effettivamente
+                    // autocompletarmi"). "nomeScelto" (non option.name, sempre inglese) è lo
+                    // stesso testo italiano-quando-disponibile già passato a onChange.
                     setIncantesimi(
                       character.incantesimi.map((s) =>
-                        // Precompila il dado danno SOLO se ancora vuoto: scegliere di nuovo lo
-                        // stesso incantesimo (o un altro) non deve mai sovrascrivere un valore che
-                        // il giocatore ha già eventualmente corretto a mano.
-                        s.id === spell.id && !s.dadoDanno.trim()
-                          ? { ...s, dadoDanno: guessDamageDice(option.entries, option.entriesHigherLevel) }
+                        s.id === spell.id
+                          ? {
+                              ...s,
+                              nome: nomeScelto,
+                              // Precompila il dado danno SOLO se ancora vuoto: scegliere di nuovo
+                              // lo stesso incantesimo (o un altro) non deve mai sovrascrivere un
+                              // valore che il giocatore ha già eventualmente corretto a mano.
+                              dadoDanno: s.dadoDanno.trim()
+                                ? s.dadoDanno
+                                : guessDamageDice(option.entries, option.entriesHigherLevel),
+                            }
                           : s,
                       ),
                     )

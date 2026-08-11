@@ -34,7 +34,14 @@ vi.mock("@/components/dice-roller-modal", () => ({
 // useEffect al mount — inutili e pesanti da simulare qui, dove interessa solo il comportamento dei
 // bottoni dado dell'elenco incantesimi. Sostituiti con stub minimi controllati — il bottone
 // "Scegli dal Compendio" simula il click su un suggerimento reale (a differenza di scrivere a
-// mano), per testare onSelect (usato per precompilare il dado danno).
+// mano), per testare onSelect (usato per precompilare il dado danno). Il nome dell'opzione scelta
+// è FISSO ("Fulmine") e VOLUTAMENTE diverso da qualunque testo digitato/preesistente nel campo —
+// un vero Autocomplete si comporta esattamente così (si digita "full" e si sceglie "Fulmine",
+// mai lo stesso testo battuto) — così i test possono verificare che il nome mostrato dopo il click
+// sia davvero quello scelto, non quello rimasto scritto prima. Con `name: value` (versione
+// precedente di questo mock, IDENTICI) un bug reale — onSelect sovrascriveva il nome aggiornato da
+// onChange nello stesso click, lasciando il campo bloccato sul testo digitato — sarebbe rimasto
+// invisibile a questa suite, perché digitato e scelto avrebbero sempre coinciso per costruzione.
 vi.mock("@/components/personaggi/autocomplete", () => ({
   Autocomplete: ({
     value,
@@ -44,7 +51,10 @@ vi.mock("@/components/personaggi/autocomplete", () => ({
   }: {
     value: string;
     onChange: (value: string) => void;
-    onSelect?: (option: { name: string; source: string; entries: unknown[] }) => void;
+    onSelect?: (
+      option: { name: string; source: string; entries: unknown[] },
+      nomeScelto: string,
+    ) => void;
     placeholder: string;
   }) => (
     <>
@@ -52,13 +62,21 @@ vi.mock("@/components/personaggi/autocomplete", () => ({
       {onSelect && (
         <button
           type="button"
-          onClick={() =>
-            onSelect({
-              name: value,
-              source: "PHB",
-              entries: ["Un raggio di energia sfreccia, infligge {@damage 8d6} danni da fuoco."],
-            })
-          }
+          onClick={() => {
+            // "Fulmine" simula il nome ITALIANO scelto dal menu (quello che l'utente vede e che
+            // ora finisce nel campo, non più l'inglese) — option.name resta "Lightning Bolt"
+            // (la chiave inglese vera, usata da altrove per l'abbinamento col Compendio) per
+            // verificare che i consumer usino "nomeScelto" e non "option.name" per il campo.
+            onChange("Fulmine");
+            onSelect(
+              {
+                name: "Lightning Bolt",
+                source: "PHB",
+                entries: ["Un raggio di energia sfreccia, infligge {@damage 8d6} danni da fuoco."],
+              },
+              "Fulmine",
+            );
+          }}
         >
           Scegli dal Compendio
         </button>
@@ -204,7 +222,33 @@ describe("SpellListSection", () => {
 
     await user.click(screen.getByRole("button", { name: "Scegli dal Compendio" }));
 
-    expect(screen.getByLabelText("Dado danno di Palla di Fuoco")).toHaveValue("8d6");
+    expect(screen.getByLabelText("Dado danno di Fulmine")).toHaveValue("8d6");
+  });
+
+  it("scegliere un incantesimo dal Compendio aggiorna anche il NOME, non solo il dado danno (bug reale: la seconda scrittura sincrona sovrascriveva la prima)", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [character, setCharacter] = useState(
+        baseCharacter({
+          classi: [{ nome: "Mago", livello: 5 }],
+          // Nome digitato a mano, DIVERSO da quello che verrà scelto dal menu (come nella realtà:
+          // si digita "full" e si sceglie "Fulmine", non lo stesso testo battuto).
+          incantesimi: [
+            { id: "s1", nome: "digitato a mano", livello: 3, preparato: true, dadoDanno: "" },
+          ],
+        }),
+      );
+      return <SpellListSection character={character} onChange={setCharacter} />;
+    }
+    render(<Harness />);
+
+    await user.click(screen.getByRole("button", { name: "Scegli dal Compendio" }));
+
+    // Il campo nome deve mostrare "Fulmine" (scelto dal menu), non essere rimasto bloccato su
+    // "digitato a mano" — e il dado danno deve comunque essersi precompilato nello stesso click.
+    expect(screen.getByDisplayValue("Fulmine")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("digitato a mano")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Dado danno di Fulmine")).toHaveValue("8d6");
   });
 
   it("scegliere di nuovo un incantesimo dal Compendio non sovrascrive un dado danno già compilato", async () => {
@@ -224,7 +268,7 @@ describe("SpellListSection", () => {
 
     await user.click(screen.getByRole("button", { name: "Scegli dal Compendio" }));
 
-    expect(screen.getByLabelText("Dado danno di Palla di Fuoco")).toHaveValue("2d10");
+    expect(screen.getByLabelText("Dado danno di Fulmine")).toHaveValue("2d10");
   });
 
   it("🎲 Attacco usa il bonus d'attacco da incantatore della classe primaria", async () => {

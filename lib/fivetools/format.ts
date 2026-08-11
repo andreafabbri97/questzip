@@ -273,11 +273,17 @@ export function formatRaceSpeed(
 
 // Conversione libbre->kg: 5etools ("weight") è sempre in libbre, l'app usa i kg ovunque
 // (peso inventario, capacità di trasporto) — 0,45 kg/libbra, stesso principio già in uso per
-// le distanze (conversione "pulita" ufficiale, non i decimali del valore reale).
+// le distanze (conversione "pulita" ufficiale, non i decimali del valore reale). Numero grezzo
+// esportato a sé (non solo la stringa formattata sotto) — serve anche per precompilare il campo
+// "Peso unitario" dell'inventario alla selezione di un oggetto dal Compendio, dove serve il
+// valore numerico vero, non un testo con la virgola già pronto per la UI.
+export function weightLbToKg(weightLb: number): number {
+  return Math.round(weightLb * 0.45 * 10) / 10;
+}
+
 export function formatItemWeight(weightLb: number | undefined): string | null {
   if (weightLb === undefined) return null;
-  const kg = Math.round(weightLb * 0.45 * 10) / 10;
-  return `${String(kg).replace(".", ",")} kg`;
+  return `${String(weightLbToKg(weightLb)).replace(".", ",")} kg`;
 }
 
 // 5etools esprime il prezzo di un oggetto in monete di RAME (1 mo = 10 ma = 100 mr) — quasi

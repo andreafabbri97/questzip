@@ -18,8 +18,18 @@ export function Autocomplete<T extends { name: string; source: string }>({
   onChange: (value: string) => void;
   // Chiamata SOLO quando l'utente sceglie un suggerimento dalla lista (non ad ogni tasto premuto
   // digitando a mano) — dà accesso alla voce intera del Compendio, non solo al nome, per chi
-  // vuole derivarne altri campi in automatico (es. il dado danno di un incantesimo).
-  onSelect?: (option: T) => void;
+  // vuole derivarne altri campi in automatico (es. il dado danno di un incantesimo). Riceve anche
+  // "nomeScelto": lo stesso testo (italiano se disponibile, altrimenti inglese) passato a
+  // onChange nello STESSO click — se il chiamante deve impostare il nome anche dentro onSelect
+  // (es. per farlo nello stesso aggiornamento di stato di un altro campo derivato, come il dado
+  // danno), va sempre usato "nomeScelto" e MAI "option.name" (quello resta sempre inglese, la
+  // chiave stabile del Compendio, non ciò che l'utente deve vedere in un campo dell'app). Nota
+  // architetturale: onChange(nomeScelto) e onSelect(option, nomeScelto) vengono chiamati IN
+  // SEQUENZA SINCRONA nello stesso click — se il chiamante aggiorna uno stato con un "map" che
+  // parte dalla stessa istantanea (non un updater funzionale), la seconda chiamata sovrascrive
+  // per intero il risultato della prima: bug reale trovato e corretto negli incantesimi
+  // (weapons-spells.tsx), il campo restava bloccato sul testo digitato invece del nome scelto.
+  onSelect?: (option: T, nomeScelto: string) => void;
   loader: () => Promise<T[]>;
   placeholder: string;
   inputClassName: string;
@@ -90,22 +100,13 @@ export function Autocomplete<T extends { name: string; source: string }>({
         <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-edge bg-surface-raised shadow-lg">
           {suggestions.map((option) => (
             <li key={`${option.source}-${option.name}`}>
-              <button
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange(option.name);
-                  onSelect?.(option);
-                  setOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface transition-colors"
-              >
-                {kind ? (
-                  <SuggestionLabel text={option.name} kind={kind} source={option.source} />
-                ) : (
-                  option.name
-                )}
-              </button>
+              <SuggestionButton
+                option={option}
+                kind={kind}
+                onChange={onChange}
+                onSelect={onSelect}
+                onPicked={() => setOpen(false)}
+              />
             </li>
           ))}
         </ul>
@@ -114,22 +115,55 @@ export function Autocomplete<T extends { name: string; source: string }>({
   );
 }
 
-// L'italiano è la lingua predefinita di TUTTA l'app (non solo del Compendio): mostra il nome
-// italiano per primo/in grande, l'inglese come sottotitolo tra parentesi — non il contrario.
-// Stessa priorità ufficiale (fonte esatta) > ufficiale (altra fonte) > cache IA > traduzione dal
-// vivo di DualName. Il valore che finisce nel campo alla selezione resta comunque quello inglese
-// (option.name, invariato) — è la chiave stabile usata per il resto della ricerca/abbinamento nel
-// Compendio, cambiarlo qui avrebbe un raggio d'azione ben più ampio di questo solo ordinamento
-// visivo, che è ciò che l'utente ha segnalato.
-function SuggestionLabel({ text, kind, source }: { text: string; kind: CompendiumKind; source: string }) {
-  const italianIndex = useItalianSearchIndex(kind, true);
-  const liveTranslated = useTranslatedText(text, "en", "it");
-  const translated = bestItalianName(italianIndex, text, source) ?? liveTranslated;
-  if (!translated || translated.toLowerCase() === text.toLowerCase()) return <>{text}</>;
+// L'italiano è la lingua predefinita di TUTTA l'app (non solo del Compendio, non solo la
+// visualizzazione): il testo che finisce nel campo alla selezione è l'ITALIANO quando disponibile
+// (ufficiale > cache IA > traduzione dal vivo), l'inglese solo come riserva — non più il
+// contrario. Segnalato esplicitamente dall'utente ("quando clicco l'autocompletamento mi mette
+// gli oggetti in inglese"): una scelta precedente teneva di proposito l'inglese come valore
+// salvato (chiave stabile per il resto della ricerca/abbinamento) — l'utente ha chiarito di
+// volere comunque l'italiano nel campo, e il resto dell'app (Verifica, menzioni, precompilazione
+// dado danno) risolve già i nomi digitati in ENTRAMBE le lingue tramite ricerca fuzzy
+// (findCompendioMatch/bestItalianName), quindi il campo può mostrare l'italiano senza rompere
+// nient'altro. Un solo componente (non più uno split fra bottone-contenitore e label interna)
+// così il nome MOSTRATO e quello effettivamente SCELTO sono garantiti identici per costruzione.
+function SuggestionButton<T extends { name: string; source: string }>({
+  option,
+  kind,
+  onChange,
+  onSelect,
+  onPicked,
+}: {
+  option: T;
+  kind: CompendiumKind | undefined;
+  onChange: (value: string) => void;
+  onSelect?: (option: T, nomeScelto: string) => void;
+  onPicked: () => void;
+}) {
+  const italianIndex = useItalianSearchIndex(kind ?? "incantesimi", !!kind);
+  const liveTranslated = useTranslatedText(option.name, "en", "it");
+  const translated = kind ? (bestItalianName(italianIndex, option.name, option.source) ?? liveTranslated) : null;
+  const hasItalian = !!translated && translated.toLowerCase() !== option.name.toLowerCase();
+  const primaryName = hasItalian ? translated! : option.name;
+
   return (
-    <>
-      {translated} <span className="text-xs text-muted">({text})</span>
-    </>
+    <button
+      type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => {
+        onChange(primaryName);
+        onSelect?.(option, primaryName);
+        onPicked();
+      }}
+      className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface transition-colors"
+    >
+      {primaryName}
+      {hasItalian && (
+        <>
+          {" "}
+          <span className="text-xs text-muted">({option.name})</span>
+        </>
+      )}
+    </button>
   );
 }
 
