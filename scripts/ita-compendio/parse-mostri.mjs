@@ -187,11 +187,24 @@ function parseBook(bookKey) {
     }
 
     const nomeMostro = lines[header.nameLineIndex];
-    // scarta falsi positivi ovvi: la riga "nome" non deve essere a sua volta una riga di campo
-    if (/^(Classe Armatura|Punti Ferita|Velocità|Sfida)/.test(nomeMostro)) {
+    // scarta falsi positivi ovvi: la riga "nome" non deve essere a sua volta una riga di campo,
+    // né un'intestazione di pagina/capitolo ripetuta ("CAPITOLO 2 I BESTIARIO", a volte con uno
+    // spazio indebito prima di "APITOLO" per lo stesso artefatto small-caps visto altrove) che
+    // per coincidenza precede un'ancora "Sfida" valida — bug reale trovato con un audit dei nomi
+    // (3 mostri fantasma "Capitolo 2 I Bestiario" in fonte "multiverso").
+    if (/^(Classe Armatura|Punti Ferita|Velocità|Sfida)/.test(nomeMostro) || /^C\s?APITOLO\s*\d/i.test(nomeMostro)) {
       skipped.push({ reason: "nome non plausibile", nomeMostro });
       continue;
     }
+    // Due nomi (su 342) con l'artefatto small-caps già noto altrove nella pipeline — trovati con
+    // un audit generale dei nomi, verificati a mano contro l'originale inglese: "n1"/"1" sono la
+    // stessa confusione cifra/lettera vista nei talenti (parse-talenti.mjs), qui applicata solo a
+    // questi due casi noti invece che a tutto il corpus (troppo rischioso distinguerla in modo
+    // affidabile da cifre vere in nomi che potrebbero contenerne).
+    const NOME_FIXES = {
+      "DRAGO n1 BRONZO Cucc10Lo": "Drago di Bronzo Cucciolo",
+      "ORSO P OLARE": "Orso Polare",
+    };
 
     let cursor = header.sizeTypeLineIndex + 1;
     const fields = {};
@@ -271,7 +284,7 @@ function parseBook(bookKey) {
       abilityValues.some((a) => a === null);
 
     monsters.push({
-      nome: nomeMostro,
+      nome: NOME_FIXES[nomeMostro] ?? nomeMostro,
       tipo: header.tipo,
       taglia: header.taglia,
       allineamento: header.allineamento,

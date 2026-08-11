@@ -39,6 +39,37 @@ function titleCaseItalian(raw) {
     .join(" ");
 }
 
+// L'artefatto small-caps ("spazi indebiti in mezzo", vedi commento in testa al file) non impedisce
+// il matching col nome inglese (che normalizza gli spazi), ma il nome MOSTRATO in UI restava
+// storpiato ("Mae Stro Degli Scudi") — segnalato dall'utente durante un audit generale
+// dell'impaginazione del Compendio. Dizionario piccolo e verificato a mano (17 dei 41 talenti,
+// gli unici colpiti da questo artefatto), non un'euristica generica sul testo: stesso principio
+// già in uso altrove nella pipeline per correzioni mirate e note (es. NAME_FIXES).
+// Chiavi verbatim: esattamente ciò che titleCaseItalian() produce oggi su questi dati (verificato
+// interrogando il DB già seminato), non una ricostruzione a mente — "a"/"di"/"in"/"su" restano
+// minuscoli perché sono STOPWORDS sopra, quindi non sempre la lettera dopo lo spazio indebito è
+// maiuscola.
+const NAME_FIXES = {
+  "Aggre S Sore Selvaggio": "Aggressore Selvaggio",
+  "Appo Stato": "Appostato",
+  "C Ombattente a Due Armi": "Combattente a Due Armi",
+  "C Ombattente in Sella": "Combattente in Sella",
+  "C Ondottiero i Spiratore": "Condottiero Ispiratore",
+  "C Orazze Leggere": "Corazze Leggere",
+  "C Orazze Medie": "Corazze Medie",
+  "C Orazze Pesanti": "Corazze Pesanti",
+  "C e C Chino Magico": "Cecchino Magico",
+  "Duellante D i Fensivo": "Duellante Difensivo",
+  "E Sperto di Balestre": "Esperto di Balestre",
+  "Lingui Sta": "Linguista",
+  "Mae Stro D 'Armi": "Maestro D'Armi",
+  "Mae Stro D 'Armi Pos Senti": "Maestro D'Armi Possenti",
+  "Mae Stro Degli Scudi": "Maestro degli Scudi",
+  "Mae Stro delle Armature Medie": "Maestro delle Armature Medie",
+  "Mae Stro delle Armi su Asta": "Maestro delle Armi su Asta",
+  "O S Servatore": "Osservatore",
+};
+
 // una riga-titolo è (quasi) tutta maiuscola, abbastanza corta, e non un'intestazione di
 // pagina/capitolo o un numero isolato. Il controllo di esclusione lavora sulla versione
 // "compatta" (senza spazi) perché lo stesso artefatto che spezza i nomi dei talenti
@@ -80,7 +111,8 @@ function findHeadings(lines) {
     // maiuscola (che sarebbe più probabilmente un titolo che va a capo su due righe fisiche)
     const next = lines[i + 1] ?? "";
     if (!next || isHeadingCandidate(next)) continue;
-    headings.push({ lineIndex: i, nome: titleCaseItalian(lines[i]) });
+    const nome = titleCaseItalian(lines[i]);
+    headings.push({ lineIndex: i, nome: NAME_FIXES[nome] ?? nome });
   }
   return headings;
 }

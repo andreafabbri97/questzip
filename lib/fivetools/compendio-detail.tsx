@@ -453,6 +453,83 @@ const ITA_SOURCE_NAMES: Record<string, string> = {
   oggetti_magici: "Manuale del DM (OCR)",
 };
 
+// Il testo lungo di questo modulo (regole trascritte a mano, oggetti magici OCR, talenti) era
+// mostrato come un unico blocco con whitespace-pre-wrap — "sembra copia incolla su un blocco
+// note" (feedback esplicito dell'utente, esteso poi a "tutto il compendio dove puoi"). Non è un
+// vero markup strutturato (il testo resta piatto nel DB, stesso principio delle altre fonti),
+// quindi qui si INFERISCE la struttura da pattern semplici e riconoscibili già presenti nel
+// testo: blocchi separati da riga vuota diventano paragrafi separati (invece di un flusso unico),
+// un blocco che inizia con "Tabella" diventa una card con righe "etichetta — descrizione", un
+// blocco di righe che iniziano con "- " diventa un elenco puntato vero, una riga singola e corta
+// senza punteggiatura finale diventa un sottotitolo. Contenuto già ben strutturato (o senza righe
+// vuote da riconoscere, come le fonti OCR pagina-per-pagina) ricade nel caso "paragrafo semplice"
+// — nessuna regressione lì, solo un miglioramento quando c'è struttura da cogliere.
+export function TestoStrutturato({ testo }: { testo: string }) {
+  const blocks = testo.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, i) => {
+        const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+
+        if (/^Tabella\b/.test(lines[0])) {
+          const [caption, ...rows] = lines;
+          return (
+            <div key={i} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-1.5">
+              <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">
+                {caption.replace(/^Tabella\s*[—-]\s*/, "").replace(/:$/, "")}
+              </p>
+              <div className="space-y-1 text-sm">
+                {rows.map((row, j) => {
+                  const cells = row.split(" — ");
+                  return (
+                    <p key={j} className="text-foreground leading-snug">
+                      {cells.length > 1 ? (
+                        <>
+                          <span className="font-bold">{cells[0]}</span>
+                          {" — "}
+                          {cells.slice(1).join(" — ")}
+                        </>
+                      ) : (
+                        row
+                      )}
+                    </p>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        const bulletLines = lines.filter((l) => l.startsWith("- "));
+        if (bulletLines.length >= lines.length / 2 && bulletLines.length > 1) {
+          return (
+            <ul key={i} className="list-disc pl-5 space-y-1 text-sm text-foreground leading-relaxed">
+              {lines.map((l, j) => (
+                <li key={j}>{l.replace(/^- /, "")}</li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (lines.length === 1 && lines[0].length < 70 && !/[.!?]$/.test(lines[0])) {
+          return (
+            <h4 key={i} className="font-bold text-accent-strong pt-1">
+              {lines[0]}
+            </h4>
+          );
+        }
+
+        return (
+          <p key={i} className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+            {block}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function SpellDetail({ spell, language }: { spell: RawSpell; language: Language }) {
   const material = formatMaterial(spell.components);
   const ia = useTraduzioneIa("incantesimi", spell.name, spell.source, language === "it");
@@ -877,9 +954,7 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
             .filter(Boolean)
             .join(" · ")}
         </p>
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-          {ufficiale.descrizione}
-        </p>
+        <TestoStrutturato testo={ufficiale.descrizione} />
         <p className="text-[10px] text-muted">
           ⚠️ testo estratto via OCR da un PDF privato di qualità bassa (screenshot, non
           scansione): può contenere errori di riconoscimento.
@@ -1036,9 +1111,7 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
         {ufficiale.prerequisito && <Stat label="Prerequisiti" value={ufficiale.prerequisito} />}
-        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-          {ufficiale.descrizione}
-        </p>
+        <TestoStrutturato testo={ufficiale.descrizione} />
       </>
     );
   }

@@ -70,41 +70,39 @@ const KNOWN_IT_TO_EN = {
   artefice: "Artificer",
 };
 
-// I 41 talenti hanno lo stesso artefatto di spaziatura già noto altrove in questa pipeline
-// (es. "C E C Chino Magico" invece di "Cecchino Magico") — tradurre il nome grezzo così com'è
-// produce risultati inutilizzabili (Google Translate segmenta sulle parole spezzate). Elenco PHB
-// fisso e noto, mappato a mano una volta sola invece di provare a "ripulire" la spaziatura
-// (impossibile distinguerla in modo affidabile da una spaziatura multi-parola vera).
+// 18 dei 41 talenti avevano lo stesso artefatto di spaziatura già noto altrove nella pipeline
+// (es. "C E C Chino Magico" invece di "Cecchino Magico") — corretto ora alla fonte con un
+// dizionario verificato a mano in parse-talenti.mjs (NAME_FIXES), quindi qui sotto le chiavi sono
+// già i nomi PULITI. Restano comunque override esplicite (non lasciate alla traduzione
+// automatica) perché anche col nome corretto la traduzione letterale spesso non combacia col
+// termine ufficiale del feat (es. "Carica" -> "Charge", non "Charger").
 const KNOWN_TALENTI_PHB = {
-  // Questi tre hanno il nome pulito (nessun artefatto di spaziatura) ma la traduzione
-  // automatica letterale non combacia col termine ufficiale del feat (es. "Carica" -> "Charge",
-  // non "Charger") — stesso principio degli altri override, non un problema di OCR qui.
   "abile": "Skilled",
   "carica": "Charger",
   "iniziato alla magia": "Magic Initiate",
-  "aggre s sore selvaggio": "Savage Attacker",
-  "c ombattente a due armi": "Dual Wielder",
-  "c ombattente in sella": "Mounted Combatant",
-  "c ondottiero i spiratore": "Inspiring Leader",
-  "c orazze leggere": "Lightly Armored",
-  "c orazze medie": "Moderately Armored",
-  "c orazze pesanti": "Heavily Armored",
-  "c e c chino magico": "Spell Sniper",
-  "duellante d i fensivo": "Defensive Duelist",
-  "e sperto di balestre": "Crossbow Expert",
+  "aggressore selvaggio": "Savage Attacker",
+  "combattente a due armi": "Dual Wielder",
+  "combattente in sella": "Mounted Combatant",
+  "condottiero ispiratore": "Inspiring Leader",
+  "corazze leggere": "Lightly Armored",
+  "corazze medie": "Moderately Armored",
+  "corazze pesanti": "Heavily Armored",
+  "cecchino magico": "Spell Sniper",
+  "duellante difensivo": "Defensive Duelist",
+  "esperto di balestre": "Crossbow Expert",
   "incantatore rituale": "Ritual Caster",
   "incantatore da guerra": "War Caster",
-  "lingui sta": "Linguist",
+  "linguista": "Linguist",
   "lottatore": "Grappler",
   "lottatore da taverna": "Tavern Brawler",
-  "mae stro d 'armi": "Weapon Master",
-  "mae stro d 'armi pos senti": "Great Weapon Master",
-  "mae stro degli scudi": "Shield Master",
-  "mae stro delle armature medie": "Medium Armor Master",
-  "mae stro delle armi su asta": "Polearm Master",
+  "maestro d'armi": "Weapon Master",
+  "maestro d'armi possenti": "Great Weapon Master",
+  "maestro degli scudi": "Shield Master",
+  "maestro delle armature medie": "Medium Armor Master",
+  "maestro delle armi su asta": "Polearm Master",
   "mente acuta": "Keen Mind",
   "mobilità": "Mobile",
-  "o s servatore": "Observant",
+  "osservatore": "Observant",
   "robusto": "Tough",
   "sterminatore di maghi": "Mage Slayer",
   "tenace": "Durable",

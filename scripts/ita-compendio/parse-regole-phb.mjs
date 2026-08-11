@@ -5,10 +5,16 @@
 // "Condizioni". A differenza di Regole Principali/Costa della Spada (OCR da scansioni, vedi
 // parse-regole.mjs), qui il testo è digitale VERO — stessa qualità del resto del compendio,
 // quindi niente badge "scansionato" e una sezione per CAPITOLO (non per pagina): il confine
-// capitolo è affidabile (verificato manualmente contro l'indice), i sotto-titoli interni
-// invece soffrono della stessa frammentazione small-caps vista altrove nella pipeline
-// ("PU NTEGGI" invece di "PUNTEGGI") — troppo rumorosa per un rilevamento automatico
-// affidabile, quindi un capitolo intero resta un'unica sezione ricercabile per testo.
+// capitolo è affidabile (verificato manualmente contro l'indice).
+//
+// RIFLUSSO IN PARAGRAFI (non solo pulizia riga per riga): l'estrazione grezza di 5etools/PyMuPDF
+// va a capo a ogni riga VISIVA del PDF (giustificato a due colonne), non a ogni vero paragrafo —
+// mostrare quelle righe una sotto l'altra così com'erano (bug segnalato dall'utente con
+// screenshot, "sembra copia incolla su un blocco note") non è leggibile. Qui le righe vengono
+// invece RICOMPOSTE in paragrafi fluidi: si accumulano finché non si incontra un vero punto
+// elenco ("•", glifo reale nel testo, non un'euristica indovinata) o il cambio di pagina, con un
+// controllo di continuità tra pagine (se la pagina successiva inizia con una minuscola, è la
+// prosecuzione dello stesso paragrafo interrotto dal salto pagina, non un paragrafo nuovo).
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,64 +36,98 @@ const CHAPTERS = [
 
 const data = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, "phb.json"), "utf-8"));
 
-function cleanPage(raw) {
-  return (raw ?? "")
-    .split("\n")
-    .filter((line) => {
-      const t = line.trim();
-      if (!t) return false;
-      if (/^CAPITOLO\s*\d/i.test(t)) return false; // intestazione di pagina ripetuta
-      if (/^APPENDICE\s*[A-Z]\s*[:�]/i.test(t) && t.length < 40) return false;
-      if (/^\d{1,3}$/.test(t)) return false; // numero di pagina isolato
-      return true;
-    })
-    .join("\n")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{2,}/g, "\n")
-    .trim();
+// Righe da scartare del tutto: intestazioni di pagina ripetute, numeri di pagina isolati, e un
+// singolo glifo decorativo "•"/"r" lasciato dal capolettera del capitolo (non un vero elenco).
+function isNoise(line) {
+  const t = line.trim();
+  if (!t) return true;
+  if (/^CAPITOLO\s*\d/i.test(t)) return true;
+  if (/^APPENDICE\s*[A-Z]\s*[:�]/i.test(t) && t.length < 40) return true;
+  if (/^\d{1,3}$/.test(t)) return true;
+  if (t === "•" || t === "r") return true;
+  return false;
+}
+
+// Ogni pagina diventa una lista di "blocchi" (paragrafo o punto elenco), riflludendo le righe
+// visive del PDF in prosa continua tramite spazi invece che a-capo.
+function pageBlocks(raw) {
+  const lines = (raw ?? "").split("\n").filter((l) => !isNoise(l));
+  const blocks = []; // { type: "p" | "li", text }
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const isBullet = line.startsWith("•");
+    const content = (isBullet ? line.slice(1) : line).trim();
+    if (isBullet) {
+      blocks.push({ type: "li", text: content });
+    } else if (blocks.length > 0) {
+      blocks[blocks.length - 1].text += (blocks[blocks.length - 1].text.endsWith("-") ? "" : " ") + content;
+    } else {
+      blocks.push({ type: "p", text: content });
+    }
+  }
+  return blocks;
+}
+
+function assembleChapter(start, end) {
+  const allBlocks = [];
+  for (let i = start; i < end; i++) {
+    const pageBlk = pageBlocks(data.pages[i].text);
+    if (pageBlk.length === 0) continue;
+    // Continuità tra pagine: se il primo blocco della pagina inizia con una minuscola, è la
+    // prosecuzione del blocco con cui la pagina precedente si era interrotta (stesso tipo).
+    const prev = allBlocks[allBlocks.length - 1];
+    const first = pageBlk[0];
+    if (prev && prev.type === first.type && /^[a-zàèéìòù]/.test(first.text)) {
+      prev.text += " " + first.text;
+      allBlocks.push(...pageBlk.slice(1));
+    } else {
+      allBlocks.push(...pageBlk);
+    }
+  }
+
+  // Righe "- voce" consecutive raggruppate in un unico blocco elenco (separate da "\n" semplice,
+  // così RegoleTesto le riconosce come lista); i paragrafi restano separati da riga vuota.
+  const parts = [];
+  let liBuffer = [];
+  const flushLi = () => {
+    if (liBuffer.length) {
+      parts.push(liBuffer.map((t) => `- ${t}`).join("\n"));
+      liBuffer = [];
+    }
+  };
+  for (const b of allBlocks) {
+    if (b.type === "li") {
+      liBuffer.push(b.text);
+    } else {
+      flushLi();
+      parts.push(b.text);
+    }
+  }
+  flushLi();
+  return parts.join("\n\n").replace(/[ \t]+/g, " ").trim();
 }
 
 // Ogni capitolo apre con un capolettera decorativo (prima lettera enorme, resto della prima
-// parola/riga in small-caps) — l'estrazione perde SEMPRE quella prima lettera (e a volte lascia
-// un glifo decorativo spurio su una riga a sé, es. "•"/"r") perché il capolettera è un elemento
-// grafico separato dal flusso di testo normale del PDF, non un carattere nel font small-caps
-// come il resto della riga. Pattern verificato a mano su tutti e 6 i capitoli (non un'euristica
-// generica applicata alla cieca): ogni prima riga sostituita per intero con quella corretta.
-const FIRST_LINE_FIXES = {
-  "Capitolo 6: Opzioni di Personalizzazione": [
-    "ENTRE LA COMBINAZIONE DI PUNTEGGI DI ",
-    "MENTRE LA COMBINAZIONE DI PUNTEGGI DI ",
-  ],
-  "Capitolo 7: Usare i Punteggi di Caratteristica": [
-    "E S E I CARATTERISTICHE FORNISCONO UNA DESCRIZIONE ",
-    "LE SEI CARATTERISTICHE FORNISCONO UNA DESCRIZIONE ",
-  ],
-  "Capitolo 9: Combattimento": ["L CLANGORE DI UNA SPADA CHE COZZA CONTRO ", "IL CLANGORE DI UNA SPADA CHE COZZA CONTRO "],
-  "Capitolo 10: Magia": ["A MAGIA PERMEA I MONDI DI D&D E SI MANIFESTA ", "LA MAGIA PERMEA I MONDI DI D&D E SI MANIFESTA "],
-  "Appendice A: Condizioni": [
-    "E CONDIZIONI ALTERANO LE CAPACITÀ DI UNA ",
-    "LE CONDIZIONI ALTERANO LE CAPACITÀ DI UNA ",
-  ],
+// parola/riga in small-caps) — l'estrazione perde SEMPRE quella prima lettera perché il
+// capolettera è un elemento grafico separato dal flusso di testo normale del PDF. Pattern
+// verificato a mano su tutti e 6 i capitoli (non un'euristica generica applicata alla cieca):
+// sostituzione del PREFISSO del primo paragrafo (non più dell'intera prima riga, dato che ora le
+// righe sono riaccorpate in blocchi di prosa).
+const FIRST_WORD_FIXES = {
+  "Capitolo 6: Opzioni di Personalizzazione": ["ENTRE", "MENTRE"],
+  "Capitolo 7: Usare i Punteggi di Caratteristica": ["E S E I", "LE SEI"],
+  "Capitolo 8: All'Avventura": ["VVENTURARSI", "AVVENTURARSI"],
+  "Capitolo 9: Combattimento": ["L CLANGORE", "IL CLANGORE"],
+  "Capitolo 10: Magia": ["A MAGIA", "LA MAGIA"],
+  "Appendice A: Condizioni": ["E CONDIZIONI", "LE CONDIZIONI"],
 };
-// Capitolo 8 ha anche una riga decorativa spuria ("•") subito prima del capolettera perso.
-const STRAY_DECORATION_LINES = new Set(["•", "r"]);
 
 const sections = CHAPTERS.map(({ titolo, start, end }) => {
-  let testo = data.pages
-    .slice(start, end)
-    .map((p) => cleanPage(p.text))
-    .filter(Boolean)
-    .join("\n\n");
-
-  const lines = testo.split("\n");
-  while (lines.length && STRAY_DECORATION_LINES.has(lines[0].trim())) lines.shift();
-  const fix = FIRST_LINE_FIXES[titolo];
-  if (fix && lines[0] === fix[0]) lines[0] = fix[1];
-  if (titolo === "Capitolo 8: All'Avventura" && lines[0] === "VVENTURARSI NELL'ANTICA TOM BA DEGLI ORRORI, ") {
-    lines[0] = "AVVENTURARSI NELL'ANTICA TOMBA DEGLI ORRORI, ";
-  }
-  testo = lines.join("\n");
-
+  let testo = assembleChapter(start, end);
+  const fix = FIRST_WORD_FIXES[titolo];
+  if (fix && testo.startsWith(fix[0])) testo = fix[1] + testo.slice(fix[0].length);
+  // Artefatto residuo del capolettera del Cap. 8, dentro la stessa prima parola.
+  testo = testo.replace("TOM BA DEGLI ORRORI", "TOMBA DEGLI ORRORI");
   return { titolo, testo, pagina: start + 1, fonte: "phb_regole" };
 });
 

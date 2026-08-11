@@ -26,6 +26,7 @@ import {
   DualName,
   EntryDetail,
   SourceBadge,
+  TestoStrutturato,
   bestItalianName,
   formatItemTypeName,
   useItalianSearchIndex,
@@ -589,83 +590,6 @@ function QuickReference() {
   );
 }
 
-// Il testo delle regole (soprattutto phb_regole/dm_regole, trascritti a mano) era mostrato come
-// un unico blocco con whitespace-pre-wrap — "sembra copia incolla su un blocco note" (feedback
-// esplicito dell'utente). Non è un vero markup strutturato (il testo resta piatto nel DB, stesso
-// principio delle altre fonti), quindi qui si INFERISCE la struttura da pattern semplici e
-// riconoscibili già presenti nel testo trascritto: blocchi separati da riga vuota diventano
-// paragrafi separati (invece di un flusso unico), un blocco che inizia con "Tabella" diventa una
-// card con righe "etichetta — descrizione", un blocco di righe che iniziano con "- " diventa un
-// elenco puntato vero, una riga singola e corta senza punteggiatura finale diventa un sottotitolo.
-// Le fonti OCR (regole_base/costa_spada, un'unica pagina senza paragrafi veri) restano invariate:
-// senza righe vuote da riconoscere ricadono nel caso "paragrafo semplice", stesso comportamento di
-// prima — nessuna regressione lì.
-function RegoleTesto({ testo }: { testo: string }) {
-  const blocks = testo.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-
-  return (
-    <div className="space-y-3">
-      {blocks.map((block, i) => {
-        const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
-
-        if (/^Tabella\b/.test(lines[0])) {
-          const [caption, ...rows] = lines;
-          return (
-            <div key={i} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-1.5">
-              <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">
-                {caption.replace(/^Tabella\s*[—-]\s*/, "").replace(/:$/, "")}
-              </p>
-              <div className="space-y-1 text-sm">
-                {rows.map((row, j) => {
-                  const cells = row.split(" — ");
-                  return (
-                    <p key={j} className="text-foreground leading-snug">
-                      {cells.length > 1 ? (
-                        <>
-                          <span className="font-bold">{cells[0]}</span>
-                          {" — "}
-                          {cells.slice(1).join(" — ")}
-                        </>
-                      ) : (
-                        row
-                      )}
-                    </p>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }
-
-        const bulletLines = lines.filter((l) => l.startsWith("- "));
-        if (bulletLines.length >= lines.length / 2 && bulletLines.length > 1) {
-          return (
-            <ul key={i} className="list-disc pl-5 space-y-1 text-sm text-foreground leading-relaxed">
-              {lines.map((l, j) => (
-                <li key={j}>{l.replace(/^- /, "")}</li>
-              ))}
-            </ul>
-          );
-        }
-
-        if (lines.length === 1 && lines[0].length < 70 && !/[.!?]$/.test(lines[0])) {
-          return (
-            <h4 key={i} className="font-bold text-accent-strong pt-1">
-              {lines[0]}
-            </h4>
-          );
-        }
-
-        return (
-          <p key={i} className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-            {block}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
 function RegoleSection() {
   const [sections, setSections] = useState<Awaited<ReturnType<typeof getRegoleIta>> | null>(null);
   const [fonte, setFonte] = useState<string>("tutte");
@@ -791,7 +715,7 @@ function RegoleSection() {
                   </span>
                 )}
               </div>
-              <RegoleTesto testo={selectedSection.testo} />
+              <TestoStrutturato testo={selectedSection.testo} />
             </div>
           ) : (
             <div className="flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">

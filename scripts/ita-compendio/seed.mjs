@@ -148,7 +148,15 @@ async function seedRegole(bookKey) {
   const filePath = path.join(PARSED_DIR, `${bookKey}-regole.json`);
   const sections = JSON.parse(readFileSync(filePath, "utf-8"));
 
-  await db.delete(compendioItaRegole).where(eq(compendioItaRegole.fonte, bookKey));
+  // Cancella per il VERO valore di "fonte" delle righe (non per bookKey/nome file): per
+  // phb/dm_manuale i due non coincidono (fonte "phb_regole"/"dm_regole" vs bookKey "phb"/
+  // "dm_manuale") — cancellare per bookKey era un no-op silenzioso, ogni reseed si limitava ad
+  // ACCUMULARE righe duplicate invece di sostituirle (bug reale: 3 run di seed.mjs in una sessione
+  // = ogni sezione tripla nel Compendio, segnalato dall'utente con screenshot).
+  const fonti = [...new Set(sections.map((s) => s.fonte))];
+  for (const fonte of fonti) {
+    await db.delete(compendioItaRegole).where(eq(compendioItaRegole.fonte, fonte));
+  }
   for (const s of sections) {
     await db.insert(compendioItaRegole).values({
       titolo: s.titolo,
