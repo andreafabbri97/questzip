@@ -41,7 +41,9 @@ test.describe("Italiano come lingua primaria nella scheda personaggio", () => {
           page
             .locator("select")
             .evaluateAll((selects) =>
-              selects.flatMap((s) => Array.from(s.options).map((o) => o.textContent)),
+              (selects as HTMLSelectElement[]).flatMap((s) =>
+                Array.from(s.options).map((o) => o.textContent),
+              ),
             )
             .then((options) => options.find((o) => o?.includes("Berserker")) ?? null),
         { timeout: 10000 },

@@ -74,6 +74,22 @@ export class CampaignRoom extends Server<Env> {
     "template",
   ]);
 
+  // Bug di robustezza segnalato dall'utente ("studia la chat vocale e migliorala"): senza questo,
+  // quando qualcuno perde la connessione (chiude la scheda, il browser va in crash, la rete cade)
+  // SENZA fare prima click su "Esci" — quindi senza che il client faccia in tempo a mandare un
+  // "voice-leave" volontario — gli altri partecipanti non vengono MAI avvisati. Il loro
+  // RTCPeerConnection se ne accorge da solo solo dopo il timeout ICE (spesso 20-30+ secondi,
+  // variabile per browser), lasciando un partecipante "fantasma" visibile come ancora in chiamata
+  // per tutto quel tempo. Un "voice-leave" sintetico ad ogni chiusura di connessione è innocuo se
+  // quell'utente non era in chiamata (removePeer in useVoiceChat è già un no-op silenzioso per un
+  // peerId sconosciuto) — quindi non serve tracciare qui se l'utente fosse davvero "in chiamata",
+  // basta annunciarlo sempre: il client filtra da sé i falsi positivi.
+  onClose(connection: Connection) {
+    const state = connection.state as { userId?: string } | null;
+    if (!state?.userId) return;
+    this.broadcast(JSON.stringify({ type: "voice-leave", userId: state.userId }));
+  }
+
   onMessage(connection: Connection, message: string) {
     // Relay per la lavagna condivisa: un giocatore muove il proprio token, tutti gli
     // altri client connessi ricevono l'evento. userId preso dalla connessione verificata

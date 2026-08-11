@@ -24,8 +24,10 @@ import {
   updateRollTable,
 } from "@/app/actions/roll-tables";
 import type { RollTableEntry } from "@/lib/db/schema";
-import { useVoiceChat } from "@/lib/use-voice-chat";
+import { microphoneErrorMessage } from "@/lib/microphone-error";
+import { useVoiceChat, type VoiceParticipant } from "@/lib/use-voice-chat";
 import { usePartyRoom } from "@/lib/use-party-room";
+import { useSpeaking } from "@/lib/use-speaking";
 import type { CampaignDetail } from "./types";
 
 function getYouTubeEmbedUrl(url: string): string | null {
@@ -218,6 +220,36 @@ export function JukeboxPlayer({
   );
 }
 
+// Anello colorato pulsante quando lo stream sta producendo voce sopra soglia (useSpeaking) —
+// stesso trattamento visivo sia per sé stessi sia per ogni partecipante, così l'occhio impara un
+// solo pattern invece di due diversi.
+function SpeakingRing({ stream, muted }: { stream: MediaStream | null; muted?: boolean }) {
+  const speaking = useSpeaking(muted ? null : stream);
+  return (
+    <span
+      className={`inline-block size-2 rounded-full shrink-0 transition-colors ${
+        speaking ? "bg-accent-strong shadow-[0_0_6px_2px_var(--color-accent)]" : "bg-muted/40"
+      }`}
+      aria-hidden="true"
+    />
+  );
+}
+
+function ParticipantRow({
+  participant,
+  name,
+}: {
+  participant: VoiceParticipant;
+  name: string;
+}) {
+  return (
+    <li className="flex items-center gap-2 text-sm text-foreground">
+      <SpeakingRing stream={participant.stream} />
+      <span className="truncate">{name}</span>
+    </li>
+  );
+}
+
 export function VoiceChatPanel({
   campaignId,
   myUserId,
@@ -227,14 +259,13 @@ export function VoiceChatPanel({
   myUserId: string | null;
   members: CampaignDetail["members"];
 }) {
-  const { inCall, muted, participants, join, leave, toggleMute } = useVoiceChat(
-    campaignId,
-    myUserId,
-  );
+  const { inCall, muted, participants, localStream, reconnecting, join, leave, toggleMute } =
+    useVoiceChat(campaignId, myUserId);
   const [error, setError] = useState<string | null>(null);
 
   const nameFor = (userId: string) =>
     members.find((m) => m.userId === userId)?.name ?? "Qualcuno";
+  const myName = members.find((m) => m.userId === myUserId)?.name ?? "Tu";
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-4 space-y-2">
@@ -259,8 +290,8 @@ export function VoiceChatPanel({
           <button
             onClick={() => {
               setError(null);
-              join().catch(() => {
-                setError("Non riesco ad accedere al microfono — controlla i permessi del browser.");
+              join().catch((err) => {
+                setError(microphoneErrorMessage(err));
               });
             }}
             className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97]"
@@ -270,12 +301,25 @@ export function VoiceChatPanel({
         )}
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
-      {inCall && (
-        <p className="text-sm text-muted">
-          {participants.size === 0
-            ? "Sei solo per ora — aspetta che qualcun altro entri."
-            : `Con te: ${Array.from(participants.keys()).map(nameFor).join(", ")}`}
+      {inCall && reconnecting && (
+        <p className="flex items-center gap-1.5 text-xs font-bold text-accent-strong">
+          <span className="inline-block size-1.5 rounded-full bg-accent-strong animate-pulse" />
+          Connessione persa, riprovo…
         </p>
+      )}
+      {inCall && (
+        <ul className="space-y-1">
+          <ParticipantRow
+            participant={{ userId: myUserId ?? "me", stream: muted ? null : localStream }}
+            name={`${myName} (tu)${muted ? " · silenziato" : ""}`}
+          />
+          {Array.from(participants.entries()).map(([userId, participant]) => (
+            <ParticipantRow key={userId} participant={participant} name={nameFor(userId)} />
+          ))}
+        </ul>
+      )}
+      {inCall && participants.size === 0 && (
+        <p className="text-xs text-muted">Sei solo per ora — aspetta che qualcun altro entri.</p>
       )}
       <p className="text-[10px] text-muted">
         Audio diretto tra browser (nessun server in mezzo) — funziona meglio se siete già tutti

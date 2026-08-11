@@ -249,6 +249,80 @@ export const campaignSessionNotes = pgTable("campaign_session_note", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
+// Le tre tabelle sotto sono strumenti SOLO per il master (a differenza di Handout/Tabelle, mai
+// mostrati ai giocatori neanche in parte — potrebbero contenere spoiler su identità segrete, esiti
+// non ancora rivelati, appunti grezzi) — richiesti dall'utente per colmare il vuoto tra la
+// campagna (un solo campo descrizione) e il Diario delle sessioni (retroattivo, "cosa è successo"):
+// mancava qualunque cosa per SCRIVERE la storia in anticipo o PREPARARE la prossima sessione.
+
+export const campaignNpcStatusEnum = pgEnum("campaign_npc_status", [
+  "vivo",
+  "morto",
+  "scomparso",
+  "sconosciuto",
+]);
+
+// Rubrica NPC: chi popola il mondo, a chi il master può accennare durante la sessione senza
+// doverselo ricordare a memoria. "Stato" copre il caso comune in D&D di un NPC che muore o
+// scompare a metà campagna — il master lo aggiorna invece di cancellare la voce (la storia di un
+// NPC morto resta comunque utile da consultare).
+export const campaignNpcs = pgTable("campaign_npc", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  nome: text("nome").notNull(),
+  descrizione: text("descrizione").notNull().default(""),
+  stato: campaignNpcStatusEnum("stato").notNull().default("vivo"),
+  posizione: text("posizione").notNull().default(""),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const campaignQuestStatusEnum = pgEnum("campaign_quest_status", [
+  "attiva",
+  "completata",
+  "fallita",
+  "in_pausa",
+]);
+
+// Tracciatore trame/quest: fili narrativi aperti (missione principale, secondarie, agganci non
+// ancora sviluppati) con uno stato esplicito — a differenza del Diario (un unico blocco di testo
+// per sessione, cronologico) qui ogni trama resta una voce a sé che il master aggiorna quando
+// avanza, invece di doverla ricercare tra le note di sessioni passate.
+export const campaignQuests = pgTable("campaign_quest", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  titolo: text("titolo").notNull(),
+  descrizione: text("descrizione").notNull().default(""),
+  stato: campaignQuestStatusEnum("stato").notNull().default("attiva"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+// Appunti di preparazione per la PROSSIMA sessione (checklist libera: incontri da preparare, NPC
+// da introdurre, agganci da ricordarsi) — deliberatamente distinti dal Diario delle sessioni sopra
+// (che è SEMPRE retroattivo, "cosa è già successo"): questa è l'unica sezione della campagna
+// rivolta al futuro invece che al passato.
+export const campaignSessionPrepItems = pgTable("campaign_session_prep_item", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  testo: text("testo").notNull(),
+  fatto: boolean("fatto").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
 // Snapshot del personaggio (di Personaggi, salvato in locale) portato in una campagna:
 // il giocatore lo aggiorna quando vuole con "Aggiorna nella campagna", non è sync live.
 export const campaignCharacters = pgTable(

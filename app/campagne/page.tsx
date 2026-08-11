@@ -33,6 +33,7 @@ import {
 } from "@/components/campagne/session-tools";
 import { DungeonSection } from "@/components/campagne/dungeon-editor";
 import { RegionalMapSection } from "@/components/campagne/regional-map";
+import { NpcSection, QuestSection, SessionPrepSection } from "@/components/campagne/story-tools";
 
 export default function CampaignsPage() {
   return (
@@ -576,6 +577,17 @@ function CampaignDetailView({
       <DungeonSection campaignId={campaignId} isDm={isDm} />
 
       <RegionalMapSection campaignId={campaignId} isDm={isDm} />
+
+      {/* Strumenti per SCRIVERE la storia (NPC, trame) e PREPARARE la prossima sessione, subito
+          prima del Diario (che invece guarda indietro) — richiesti esplicitamente dall'utente:
+          "mi sembra che vengano gestite bene le sessioni della campagna, ma manca la scrittura
+          della storia e la preparazione delle sessioni (momenti off session)". Tutti e tre
+          restano invisibili ai giocatori (vedi commento sullo schema in lib/db/schema.ts). */}
+      <NpcSection campaignId={campaignId} isDm={isDm} />
+
+      <QuestSection campaignId={campaignId} isDm={isDm} />
+
+      <SessionPrepSection campaignId={campaignId} isDm={isDm} />
 
       <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
         <h2 className="text-sm uppercase tracking-widest text-muted">Diario delle sessioni</h2>

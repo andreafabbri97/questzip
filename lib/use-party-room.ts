@@ -13,11 +13,33 @@ type PartyRoomArgs =
 // prova la membership sulla campagna (vedi app/api/party-token/route.ts). Se il realtime
 // non è configurato o il token non arriva, l'hook resta silenziosamente inattivo: il resto
 // dell'app funziona comunque con refresh manuale, com'era prima.
-export function usePartyRoom(args: PartyRoomArgs | null, onMessage: (data: unknown) => void) {
+export function usePartyRoom(
+  args: PartyRoomArgs | null,
+  onMessage: (data: unknown) => void,
+  // Chiamato ad OGNI apertura della connessione, non solo la prima — PartySocket si riconnette
+  // da sé dopo un blip di rete e ogni riconnessione riapre un socket nuovo, che rifà "open".
+  // Usato dalla chat vocale per ri-annunciarsi (vedi useVoiceChat): senza, dopo un blip di rete
+  // il canale di segnalazione torna su ma nessuno lo sa, e la chiamata resta silenziosamente
+  // rotta finché non si esce e rientra a mano.
+  onOpen?: () => void,
+  // Chiamato quando il socket si chiude in modo INASPETTATO (blip di rete, non lo smontaggio
+  // volontario del componente — quel caso è filtrato internamente) — usato dalla chat vocale per
+  // mostrare "riconnessione in corso" invece di lasciare l'utente a fissare uno stato "connesso"
+  // che in realtà per un momento non lo è più.
+  onClose?: () => void,
+) {
   const socketRef = useRef<PartySocket | null>(null);
   const onMessageRef = useRef(onMessage);
   useEffect(() => {
     onMessageRef.current = onMessage;
+  });
+  const onOpenRef = useRef(onOpen);
+  useEffect(() => {
+    onOpenRef.current = onOpen;
+  });
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
   });
 
   const key = args
@@ -53,6 +75,15 @@ export function usePartyRoom(args: PartyRoomArgs | null, onMessage: (data: unkno
         if (cancelled) return;
 
         socket = new PartySocket({ host, party: "main", room, query: { token } });
+        // Fira sia alla prima connessione sia ad ogni riconnessione automatica di PartySocket
+        // (un blip di rete riapre un socket NUOVO, che rifà "open") — vedi il commento sul
+        // parametro onOpen sopra.
+        socket.addEventListener("open", () => onOpenRef.current?.());
+        socket.addEventListener("close", () => {
+          // "cancelled" diventa true PRIMA che parta socket?.close() nel cleanup qui sotto: un
+          // vero smontaggio del componente non deve sembrare una perdita di connessione.
+          if (!cancelled) onCloseRef.current?.();
+        });
         socket.addEventListener("message", (event) => {
           try {
             onMessageRef.current(JSON.parse(event.data as string));

@@ -159,7 +159,11 @@ export default function GuidaPage() {
         <SottoTitolo>Cosa contiene</SottoTitolo>
         <ListaPuntata
           voci={[
-            <><strong>Diario delle sessioni</strong> — note condivise, una per sessione giocata.</>,
+            <><strong>Chat vocale</strong> — audio diretto tra browser (nessun server in mezzo), vedi <a href="#sessione" className="text-accent-strong hover:underline">Gestire una sessione dal vivo</a> più sotto per i dettagli.</>,
+            <><strong>Diario delle sessioni</strong> — note condivise, una per sessione giocata: guarda sempre indietro, &quot;cosa è già successo&quot;.</>,
+            <><strong>Rubrica NPC</strong> <em>(solo master)</em> — chi popola il mondo: nome, aspetto/personalità/segreti, dove si trova, se è vivo/morto/scomparso. Consultabile al volo durante la sessione invece di doverselo ricordare a memoria.</>,
+            <><strong>Trame e missioni</strong> <em>(solo master)</em> — fili narrativi aperti (missione principale, secondarie, agganci) con uno stato (attiva/completata/fallita/in pausa), separati dalle note di sessione così non si perdono tra un diario e l&apos;altro.</>,
+            <><strong>Preparazione prossima sessione</strong> <em>(solo master)</em> — l&apos;unica sezione della campagna rivolta al FUTURO invece che al passato: una checklist libera per quello che vuoi preparare prima di giocare di nuovo.</>,
             <><strong>Party</strong> — le schede dei personaggi collegati dai giocatori, in sola lettura per gli altri.</>,
             <><strong>Mappa regionale</strong> — un editor di mappe di ambientazione (terreno dipinto a mano + marcatori con etichetta/icona/note), pensata come riferimento statico che il master prepara con calma: nessun token, nessuna fog of war, non cambia mentre i giocatori guardano.</>,
             <><strong>Dungeon</strong> — mappe di gioco vere e proprie, vedi la sezione sotto.</>,
@@ -168,6 +172,11 @@ export default function GuidaPage() {
             <><strong>Tabelle casuali</strong> — tabelle personalizzate con voci pesate (utili per incontri casuali, bottino, eventi).</>,
           ]}
         />
+        <p className="text-sm text-muted">
+          Rubrica NPC, Trame e Preparazione sono visibili SOLO al master — non compaiono in nessuna
+          forma ai giocatori, nemmeno come sezione vuota, dato che possono contenere spoiler
+          (identità segrete, esiti non ancora rivelati).
+        </p>
       </Sezione>
 
       {/* ---------------------------------------------------------------- Gestire una sessione */}
@@ -223,12 +232,24 @@ export default function GuidaPage() {
 
         <SottoTitolo>Chat vocale e note</SottoTitolo>
         <p>
-          Se giocate a distanza, la chat vocale P2P (icona 🎙️ in campagna) collega i browser
-          direttamente fra loro, senza passare da un server audio — attivala solo se vi serve,
-          pensata per gruppi piccoli (5-8 persone). A fine sessione, aggiungi una nota nel diario
-          della campagna: è il modo più semplice per ritrovare &quot;dove eravamo rimasti&quot; alla
-          sessione successiva — se l&apos;IA è configurata, un bottone può proporne una bozza
-          leggendo la chat della sessione (vedi <a href="#assistenza-ia" className="text-accent-strong hover:underline">Assistenza IA</a>).
+          Se giocate a distanza, la chat vocale (sezione &quot;🎙️ Chat vocale&quot; in campagna)
+          collega i browser direttamente fra loro (P2P, nessun server audio in mezzo) — attivala
+          solo se vi serve, pensata per gruppi piccoli (5-8 persone). Ogni partecipante ha un
+          pallino che si accende quando sta parlando (utile per capire chi ha il turno senza
+          doversi accavallare) e la propria riga mostra se sei silenziato. Se la connessione
+          cade per un blip di rete, la chiamata prova a ristabilirsi da sola non appena torna —
+          non serve più uscire e rientrare a mano. Se il browser nega il permesso al microfono (o
+          non ne trova uno, o è già usato da un&apos;altra app), il messaggio d&apos;errore ti dice
+          esattamente cosa correggere.
+        </p>
+        <p>
+          A fine sessione, aggiungi una nota nel diario della campagna: è il modo più semplice per
+          ritrovare &quot;dove eravamo rimasti&quot; alla sessione successiva — se l&apos;IA è
+          configurata, un bottone può proporne una bozza leggendo la chat della sessione (vedi{" "}
+          <a href="#assistenza-ia" className="text-accent-strong hover:underline">Assistenza IA</a>).
+          Per preparare invece la sessione SUCCESSIVA, usa la checklist &quot;✅ Preparazione
+          prossima sessione&quot; (solo master) — appunta lì cosa vuoi ricordarti di introdurre o
+          preparare, e spuntalo quando è fatto.
         </p>
 
         <SottoTitolo>Esempio pratico: un&apos;imboscata in una stanza nascosta</SottoTitolo>
@@ -382,6 +403,11 @@ export default function GuidaPage() {
             <>
               <strong>Bozze per gli Handout</strong> — bottone &quot;✨ Genera bozza&quot; quando
               crei un handout: propone il testo del documento in base al titolo.
+            </>,
+            <>
+              <strong>Bozze per NPC e Trame</strong> — stesso bottone &quot;✨ Genera bozza&quot;
+              nella Rubrica NPC (in base al nome, propone aspetto/personalità/segreto) e nel
+              Tracciatore trame (in base al titolo, propone obiettivo/motore/possibile svolta).
             </>,
           ]}
         />

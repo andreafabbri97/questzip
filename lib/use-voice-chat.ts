@@ -39,6 +39,10 @@ export function useVoiceChat(campaignId: string, myUserId: string | null) {
   const [inCall, setInCall] = useState(false);
   const [muted, setMuted] = useState(false);
   const [participants, setParticipants] = useState<Map<string, VoiceParticipant>>(new Map());
+  // Duplicato in stato oltre che nel ref sotto: il ref serve per l'accesso sincrono dentro le
+  // callback (join/leave/toggleMute), lo stato serve a chi fuori da questo hook vuole reagire ai
+  // cambi (es. useSpeaking per l'indicatore "sto parlando" di sé stessi in session-tools.tsx).
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -143,9 +147,36 @@ export function useVoiceChat(campaignId: string, myUserId: string | null) {
     [myUserId, createPeer, removePeer],
   );
 
+  // Bug segnalato dall'utente ("migliora la connettività della chat vocale"): dopo un blip di
+  // rete il canale di segnalazione si riconnette da sé (PartySocket), ma prima di questo fix
+  // nessuno lo sapeva — la chiamata restava silenziosamente rotta (le connessioni WebRTC verso
+  // gli altri partecipanti, una volta perse, non si riformavano mai) finché non si usciva e
+  // rientrava a mano. Reset pulito invece di provare a capire quali RTCPeerConnection siano
+  // ancora vive e quali no (impossibile saperlo in modo economico da qui): chiude tutto, si
+  // annuncia di nuovo, chi è ancora in chiamata rialza le connessioni verso di noi — un piccolo
+  // sobbalzo audio per tutti è un compromesso ben migliore di una chiamata rotta per sempre.
+  const [reconnecting, setReconnecting] = useState(false);
+
+  const onSignalReopen = useCallback(() => {
+    setReconnecting(false);
+    if (!inCallRef.current) return;
+    peersRef.current.forEach((pc) => pc.close());
+    peersRef.current.clear();
+    setParticipants(new Map());
+    sendRef.current({ type: "voice-join" });
+  }, []);
+
+  // Solo per mostrare "riconnessione in corso" nella UI (VoiceChatPanel) mentre si è in
+  // chiamata — un blip prima di essersi mai uniti non è interessante da segnalare.
+  const onSignalClose = useCallback(() => {
+    if (inCallRef.current) setReconnecting(true);
+  }, []);
+
   const { send } = usePartyRoom(
     campaignId && myUserId ? { kind: "combat", campaignId } : null,
     handleMessage,
+    onSignalReopen,
+    onSignalClose,
   );
 
   useEffect(() => {
@@ -156,6 +187,7 @@ export function useVoiceChat(campaignId: string, myUserId: string | null) {
     if (inCallRef.current) return;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     localStreamRef.current = stream;
+    setLocalStream(stream);
     inCallRef.current = true;
     setInCall(true);
     send({ type: "voice-join" });
@@ -171,6 +203,7 @@ export function useVoiceChat(campaignId: string, myUserId: string | null) {
     setParticipants(new Map());
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
+    setLocalStream(null);
     setMuted(false);
   }, [send]);
 
@@ -193,5 +226,5 @@ export function useVoiceChat(campaignId: string, myUserId: string | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { inCall, muted, participants, join, leave: leaveCall, toggleMute };
+  return { inCall, muted, participants, localStream, reconnecting, join, leave: leaveCall, toggleMute };
 }
