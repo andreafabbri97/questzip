@@ -109,10 +109,12 @@ export function InventorySection({
       { id: crypto.randomUUID(), nome: "", quantita: 1, note: "", peso: 0 },
     ]);
 
-  const pesoTrasportato = character.inventario.reduce(
-    (sum, item) => sum + item.peso * item.quantita,
-    0,
-  );
+  // Arrotondato a 1 decimale: sommare più float (es. 5.9 + 0.5 + 24.8) può produrre un residuo
+  // di precisione binaria tipo 31.200000000000003, altrimenti mostrato alla lettera in UI.
+  const pesoTrasportato =
+    Math.round(
+      character.inventario.reduce((sum, item) => sum + item.peso * item.quantita, 0) * 10,
+    ) / 10;
   const pesoSuggerito = carryingCapacityKg(character.caratteristiche.forza);
   const sovraccarico = character.pesoMassimo > 0 && pesoTrasportato > character.pesoMassimo;
 

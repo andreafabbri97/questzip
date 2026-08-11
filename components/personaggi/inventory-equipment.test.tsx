@@ -117,4 +117,21 @@ describe("InventorySection", () => {
     const pesoInput = screen.getByLabelText(/Peso unitario/) as HTMLInputElement;
     expect(pesoInput.value).toBe("5");
   });
+
+  // Regressione segnalata dall'utente con screenshot (11/08/2026): "Peso trasportato" mostrava
+  // 31.200000000000003 invece di 31.2 — sommare più float (5.9 + 0.5 + 24.8, gli stessi pesi dello
+  // screenshot) produce un residuo di precisione binaria che prima finiva alla lettera in UI.
+  it("il peso totale trasportato è arrotondato, senza residui di virgola mobile", () => {
+    const character = baseCharacter({
+      inventario: [
+        { id: "i1", nome: "Armatura di cuoio borchiato", quantita: 1, note: "", peso: 5.9 },
+        { id: "i2", nome: "Attrezzi da Scasso", quantita: 1, note: "", peso: 0.5 },
+        { id: "i3", nome: "Zaino da Esploratore", quantita: 1, note: "", peso: 24.8 },
+      ],
+    });
+    render(<InventorySection character={character} onChange={() => {}} />);
+
+    expect(screen.getByText(/31\.2 \//)).toBeInTheDocument();
+    expect(screen.queryByText(/31\.200000000000003/)).not.toBeInTheDocument();
+  });
 });
