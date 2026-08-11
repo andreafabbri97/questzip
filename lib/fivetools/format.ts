@@ -332,3 +332,44 @@ export function formatProficiencyList(
     .map((entry) => (typeof entry === "string" ? stripTags(entry) : stripTags(entry.proficiency)))
     .join(", ");
 }
+
+// Etichetta della sezione sottoclassi (es. "Roguish Archetype", "Otherworldly Patron") — campo
+// 5etools `subclassTitle`, sempre in inglese, mai passato da un endpoint di traduzione (non è un
+// nome di entità cercabile nel Compendio, solo un'intestazione di sezione) — set piccolo e fisso
+// (una per classe base + un fallback generico "<Classe> Subclass" per le classi 2024/XPHB), tenuto
+// a mano come le altre mappe di questo file invece di affidarsi alla traduzione automatica.
+// Segnalato dall'utente: l'italiano deve essere la lingua primaria in TUTTA l'app, non solo nel
+// Compendio — questa intestazione restava sempre in inglese, senza nemmeno un sottotitolo.
+const SUBCLASS_TITLE_NAMES: Record<string, string> = {
+  "Artificer Specialist": "Specializzazione dell'Artefice",
+  "Barbarian Subclass": "Sottoclasse del Barbaro",
+  "Primal Path": "Cammino Primordiale",
+  "Bard College": "Collegio Bardico",
+  "Bard Subclass": "Sottoclasse del Bardo",
+  "Divine Domain": "Dominio Divino",
+  "Cleric Subclass": "Sottoclasse del Chierico",
+  "Druid Circle": "Circolo Druidico",
+  "Druid Subclass": "Sottoclasse del Druido",
+  "Martial Archetype": "Archetipo Marziale",
+  "Fighter Subclass": "Sottoclasse del Guerriero",
+  "Monastic Tradition": "Tradizione Monastica",
+  "Monk Subclass": "Sottoclasse del Monaco",
+  "Sacred Oath": "Giuramento Sacro",
+  "Paladin Subclass": "Sottoclasse del Paladino",
+  "Ranger Archetype": "Archetipo del Ranger",
+  "Ranger Conclave": "Consesso del Ranger",
+  "Ranger Subclass": "Sottoclasse del Ranger",
+  "Roguish Archetype": "Archetipo Furtivo",
+  "Rogue Subclass": "Sottoclasse del Ladro",
+  "Sorcerous Origin": "Origine Stregonesca",
+  "Sorcerer Subclass": "Sottoclasse dello Stregone",
+  "Otherworldly Patron": "Patrono Ultraterreno",
+  "Warlock Subclass": "Sottoclasse del Warlock",
+  "Arcane Tradition": "Tradizione Arcana",
+  "Wizard Subclass": "Sottoclasse del Mago",
+};
+
+export function formatSubclassTitle(title: string | undefined): string {
+  if (!title) return "Sottoclasse";
+  return SUBCLASS_TITLE_NAMES[title] ?? title;
+}

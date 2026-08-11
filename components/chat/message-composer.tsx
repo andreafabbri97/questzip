@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MENTION_KIND_LABELS,
+  prefetchMentionCandidates,
   searchMentionCandidates,
   type MentionCandidate,
 } from "@/lib/fivetools/mention-search";
@@ -18,14 +19,19 @@ const CARET_ANCHOR = "​";
 // mano necessaria), e porta con sé tipo+fonte come data-attribute, invece di doverli ritrovare
 // per nome al momento dell'invio (l'ambiguità che aveva la vecchia versione a solo testo: due
 // candidati con lo stesso nome visualizzato ma fonte diversa sarebbero stati indistinguibili).
-function createMentionChip(candidate: { name: string; kind: MentionCandidate["kind"]; source: string }) {
+function createMentionChip(candidate: MentionCandidate) {
   const span = document.createElement("span");
   span.contentEditable = "false";
   span.className = MENTION_CHIP_CLASS;
   span.dataset.mentionName = candidate.name;
   span.dataset.mentionKind = candidate.kind;
   span.dataset.mentionSource = candidate.source;
-  span.textContent = `#${candidate.name}`;
+  // Il token resta sempre quello inglese (chiave stabile, vedi mention-search.ts), ma la chip
+  // MOSTRATA mentre si scrive va tenuta coerente col menu a tendina appena usato per sceglierla
+  // (già italiano-primario) e con come la stessa menzione appare una volta inviata (MentionText) —
+  // altrimenti l'utente sceglie "Palla di Fuoco (Fireball)" dal menu e si ritrova "#Fireball" nella
+  // chip, un'incoerenza visiva pura (il testo del token sotto non cambia).
+  span.textContent = `#${candidate.nameIta ?? candidate.name}`;
   return span;
 }
 
@@ -114,13 +120,27 @@ export function MessageComposer({
   // "#" seguito da testo senza spazi, esattamente al cursore — la query di menzione attiva.
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionResults, setMentionResults] = useState<MentionCandidate[]>([]);
+  // Query a cui "mentionResults" si riferisce davvero — finché non combacia con mentionQuery, la
+  // ricerca per la query CORRENTE è ancora in volo (derivato al render, non un secondo stato
+  // scritto a mano nell'effetto: evitare un setState sincrono in testa all'effetto, che
+  // causerebbe un render a cascata in più senza motivo).
+  const [resolvedQuery, setResolvedQuery] = useState<string | null>(null);
+  const searching = mentionQuery !== null && mentionQuery.length > 0 && resolvedQuery !== mentionQuery;
+
+  // Riscalda la cache non appena il composer compare (non solo quando si preme "#") — vedi il
+  // commento su prefetchMentionCandidates.
+  useEffect(() => {
+    prefetchMentionCandidates();
+  }, []);
 
   useEffect(() => {
     // searchMentionCandidates ritorna [] subito per una query vuota (senza caricare tutte le
     // categorie) — non serve un ramo sincrono a parte per "svuota i risultati".
     let cancelled = false;
     searchMentionCandidates(mentionQuery ?? "").then((results) => {
-      if (!cancelled) setMentionResults(results);
+      if (cancelled) return;
+      setMentionResults(results);
+      setResolvedQuery(mentionQuery);
     });
     return () => {
       cancelled = true;
@@ -210,6 +230,14 @@ export function MessageComposer({
 
   return (
     <div className="border-t border-edge p-3 space-y-2 shrink-0 relative">
+      {mentionQuery !== null && mentionQuery.length > 0 && searching && mentionResults.length === 0 && (
+        // Senza questo, durante il primo giro di rete dopo un reload (può richiedere un secondo o
+        // più, vedi prefetchMentionCandidates) il menu restava vuoto/invisibile — indistinguibile
+        // da "nessun risultato trovato", segnalato dall'utente come "a volte non lo prende bene".
+        <div className="absolute bottom-full left-3 right-3 mb-1 rounded-lg border border-edge bg-surface-raised shadow-lg px-3 py-2 text-sm text-muted">
+          Cerco nel Compendio…
+        </div>
+      )}
       {mentionQuery !== null && mentionResults.length > 0 && (
         <div className="absolute bottom-full left-3 right-3 mb-1 rounded-lg border border-edge bg-surface-raised shadow-lg max-h-48 overflow-y-auto">
           {mentionResults.map((candidate) => (

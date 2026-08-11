@@ -275,7 +275,7 @@ function RegionalMapViewer({
                 : "border-edge bg-surface-raised text-muted hover:text-foreground"
             }`}
           >
-            {editMode ? "Modifica terreno: ON" : "Modifica terreno"}
+            {editMode ? "Modifica terreno (attivo)" : "Modifica terreno"}
           </button>
           <button
             onClick={() => {
@@ -288,7 +288,7 @@ function RegionalMapViewer({
                 : "border-edge bg-surface-raised text-muted hover:text-foreground"
             }`}
           >
-            {markerMode ? "Piazza luogo: ON" : "Piazza luogo"}
+            {markerMode ? "Piazza luogo (attivo)" : "Piazza luogo"}
           </button>
 
           {editMode && (

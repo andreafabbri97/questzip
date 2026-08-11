@@ -100,8 +100,11 @@ export function Autocomplete<T extends { name: string; source: string }>({
                 }}
                 className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface transition-colors"
               >
-                {option.name}
-                {kind && <ItalianHint text={option.name} kind={kind} source={option.source} />}
+                {kind ? (
+                  <SuggestionLabel text={option.name} kind={kind} source={option.source} />
+                ) : (
+                  option.name
+                )}
               </button>
             </li>
           ))}
@@ -111,14 +114,22 @@ export function Autocomplete<T extends { name: string; source: string }>({
   );
 }
 
-function ItalianHint({ text, kind, source }: { text: string; kind: CompendiumKind; source: string }) {
-  // Stessa priorità ufficiale (fonte esatta) > ufficiale (altra fonte) > cache IA > traduzione dal
-  // vivo di DualName — prima qui mancava perfino il controllo del testo ufficiale, mostrando
-  // sempre e solo IA/live anche per voci con un nome ufficiale collegato.
+// L'italiano è la lingua predefinita di TUTTA l'app (non solo del Compendio): mostra il nome
+// italiano per primo/in grande, l'inglese come sottotitolo tra parentesi — non il contrario.
+// Stessa priorità ufficiale (fonte esatta) > ufficiale (altra fonte) > cache IA > traduzione dal
+// vivo di DualName. Il valore che finisce nel campo alla selezione resta comunque quello inglese
+// (option.name, invariato) — è la chiave stabile usata per il resto della ricerca/abbinamento nel
+// Compendio, cambiarlo qui avrebbe un raggio d'azione ben più ampio di questo solo ordinamento
+// visivo, che è ciò che l'utente ha segnalato.
+function SuggestionLabel({ text, kind, source }: { text: string; kind: CompendiumKind; source: string }) {
   const italianIndex = useItalianSearchIndex(kind, true);
   const liveTranslated = useTranslatedText(text, "en", "it");
   const translated = bestItalianName(italianIndex, text, source) ?? liveTranslated;
-  if (!translated || translated.toLowerCase() === text.toLowerCase()) return null;
-  return <span className="ml-2 text-xs text-muted">({translated})</span>;
+  if (!translated || translated.toLowerCase() === text.toLowerCase()) return <>{text}</>;
+  return (
+    <>
+      {translated} <span className="text-xs text-muted">({text})</span>
+    </>
+  );
 }
 

@@ -713,7 +713,7 @@ function XpDistributor({
             checked={autoLevelUp}
             onChange={(event) => setAutoLevelUp(event.target.checked)}
           />
-          Level up automatico se possibile
+          Sali di livello automaticamente se possibile
         </label>
         <button
           onClick={grant}
@@ -774,7 +774,7 @@ export function GrantXpInline({
           checked={autoLevelUp}
           onChange={(event) => setAutoLevelUp(event.target.checked)}
         />
-        auto level up
+        sali di livello auto
       </label>
       <button
         onClick={async () => {

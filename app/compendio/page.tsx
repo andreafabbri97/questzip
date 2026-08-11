@@ -550,7 +550,7 @@ function QuickReference() {
         onClick={() => setOpen((prev) => !prev)}
         className="w-full flex items-center justify-between text-left"
       >
-        <span className="text-sm font-bold text-accent-strong">⚡ Quick reference per il master</span>
+        <span className="text-sm font-bold text-accent-strong">⚡ Riferimento rapido per il master</span>
         <span className="text-xs text-muted">{open ? "Nascondi" : "Mostra"}</span>
       </button>
       {open && (

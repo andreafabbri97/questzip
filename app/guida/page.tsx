@@ -205,17 +205,18 @@ export default function GuidaPage() {
             "Dalla campagna, avvia un combattimento e aggiungi il party (un click) e i mostri — cercali dal Compendio (PF precompilati) oppure genera un incontro casuale in base a livello del party e difficoltà desiderata (bilanciamento XP standard).",
             "Il tracker calcola/ordina l'iniziativa e gestisce turni e round. Tutti i giocatori vedono ordine e PF di tutti in tempo reale, senza dover ricaricare la pagina.",
             "Per i PF usa il campo quantità + i bottoni \"Danno\"/\"Cura\": applicano l'importo in un colpo (il danno consuma prima i PF temporanei, poi quelli veri, regola RAW) — niente più click ripetuti uno a uno.",
-            "A fine scontro, il master vede la somma XP dei mostri sconfitti già calcolata (divisibile per il party, modificabile a mano) e può scegliere \"level up automatico se possibile\".",
+            "A fine scontro, il master vede la somma XP dei mostri sconfitti già calcolata (divisibile per il party, modificabile a mano) e può scegliere \"sali di livello automaticamente se possibile\".",
           ]}
         />
 
-        <SottoTitolo>Dopo il combattimento: XP e level up</SottoTitolo>
+        <SottoTitolo>Dopo il combattimento: XP e salita di livello</SottoTitolo>
         <p>
           L&apos;XP assegnata finisce in una &quot;casella postale&quot; sul personaggio del
           giocatore: lui la vede come banner sulla propria scheda e la applica quando vuole (se hai
           scelto &quot;automatico&quot; e il personaggio non è multiclasse, il livello si aggiorna da
-          solo; i PF restano comunque un passo manuale del wizard di level-up, che tira o fa la media
-          del dado vita + Costituzione). Puoi anche assegnare XP a un singolo giocatore in qualsiasi
+          solo; i PF restano comunque un passo manuale della procedura guidata di salita di livello,
+          che tira o fa la media del dado vita + Costituzione). Puoi anche assegnare XP a un singolo
+          giocatore in qualsiasi
           momento, non solo dopo un combattimento — utile per premiare un&apos;idea furba o del
           roleplay ben giocato.
         </p>

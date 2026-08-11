@@ -103,6 +103,17 @@ function loadAllMentionCandidates(): Promise<MentionCandidate[]> {
   return allCandidatesPromise;
 }
 
+// Riscalda la cache (8 categorie, ~4500 mostri inclusi) PRIMA che l'utente digiti "#" — chiamata
+// al mount di MessageComposer, così il primo giro di rete pesante parte mentre l'utente sta ancora
+// leggendo/scrivendo, non nel momento in cui preme "#" e si aspetta risultati immediati. Segnalato
+// dall'utente ("a volte non lo prende bene quando ricarico la pagina... o forse ci mette solo
+// tanto a cercare?") — la seconda ipotesi era quella giusta: senza cache calda (subito dopo un
+// reload) questo primo giro può richiedere un secondo o più, e durante l'attesa il menu restava
+// semplicemente vuoto/invisibile, indistinguibile da "nessun risultato trovato".
+export function prefetchMentionCandidates(): void {
+  loadAllMentionCandidates().catch(() => {});
+}
+
 export async function searchMentionCandidates(query: string, limit = 8): Promise<MentionCandidate[]> {
   const q = query.trim().toLowerCase();
   if (q.length === 0) return [];

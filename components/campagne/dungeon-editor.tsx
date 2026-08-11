@@ -1019,7 +1019,7 @@ function DungeonViewer({
               checked={dungeon.fogOfWar}
               onChange={toggleFogOfWar}
             />
-            🌫️ Fog of war
+            🌫️ Nebbia di guerra
           </label>
           {dungeon.fogOfWar && (
             <span className="text-[10px] text-muted">

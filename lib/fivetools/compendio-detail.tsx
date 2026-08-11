@@ -47,6 +47,7 @@ import {
   formatSchool,
   formatSize,
   formatSpeed,
+  formatSubclassTitle,
   formatTableCell,
   formatTime,
   formatWeaponRange,
@@ -1134,7 +1135,7 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   const subclassesBlock = classData && subclasses.length > 0 && (
     <div className="space-y-2">
       <p className="text-xs uppercase tracking-widest text-muted">
-        {cls.subclassTitle ?? "Sottoclassi"}
+        {formatSubclassTitle(cls.subclassTitle)}
       </p>
       {subclasses.map((sub) => (
         <SubclassAccordion key={sub.name} subclass={sub} classData={classData} language={language} />

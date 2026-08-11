@@ -28,15 +28,18 @@ import {
   type RawSubclass,
 } from "@/lib/fivetools/data";
 import {
+  bestItalianName,
   DualName,
   EntriesBlock,
   findUfficiale,
   loadRazzeIta,
   parseIaClassText,
   parseIaRaceText,
+  useItalianSearchIndex,
   useTraduzioneIa,
 } from "@/lib/fivetools/compendio-detail";
 import type { FiveEntry } from "@/lib/fivetools/entries";
+import { formatSubclassTitle } from "@/lib/fivetools/format";
 import { Autocomplete } from "./autocomplete";
 import { loadClassNames, rollDie } from "./helpers";
 import { SimpleEntryModal, type SimpleEntryData } from "./simple-entry-modal";
@@ -155,6 +158,11 @@ function ClassSubclassPicker({
 }) {
   const [subclasses, setSubclasses] = useState<RawSubclass[] | null>(null);
   const [title, setTitle] = useState("Sottoclasse");
+  // <option> non può contenere componenti come DualName (solo testo semplice) — l'indice va
+  // quindi caricato qui e interrogato a mano per ciascuna voce, stesso principio "italiano prima,
+  // inglese tra parentesi" del resto dell'app. Prima le opzioni mostravano SOLO il nome inglese
+  // ("The Archfey"), mai una parola in italiano — segnalato dall'utente.
+  const italianIndex = useItalianSearchIndex("classi", true);
 
   useEffect(() => {
     const name = canonicalClassName(className).toLowerCase();
@@ -164,7 +172,7 @@ function ClassSubclassPicker({
       if (cancelled) return;
       const cls = data.classes.find((c) => c.name.toLowerCase() === name);
       if (!cls) return;
-      setTitle(cls.subclassTitle ?? "Sottoclasse");
+      setTitle(formatSubclassTitle(cls.subclassTitle));
       const names = new Set<string>();
       const matches = data.subclasses.filter(
         (s) => s.className === cls.name && s.classSource === cls.source,
@@ -187,11 +195,16 @@ function ClassSubclassPicker({
         className={inputClassName}
       >
         <option value="">— nessuna —</option>
-        {subclasses.map((s) => (
-          <option key={s.name} value={s.name}>
-            {s.name}
-          </option>
-        ))}
+        {subclasses.map((s) => {
+          const italiano = bestItalianName(italianIndex, s.name, s.source);
+          return (
+            <option key={s.name} value={s.name}>
+              {italiano && italiano.toLowerCase() !== s.name.toLowerCase()
+                ? `${italiano} (${s.name})`
+                : s.name}
+            </option>
+          );
+        })}
       </select>
     </label>
   );
@@ -874,7 +887,7 @@ export function LevelUpWizard({
         </button>
       ) : (
         <div className="mt-2 space-y-3 rounded-lg border border-accent-strong bg-surface-raised p-3">
-          <p className="text-sm font-bold text-foreground">Level up!</p>
+          <p className="text-sm font-bold text-foreground">Sali di livello!</p>
           {character.classi.length > 1 && (
             <label className="block">
               <span className="text-[10px] uppercase tracking-widest text-muted">Classe che sale</span>
@@ -962,7 +975,7 @@ export function LevelUpWizard({
                   value={asiFeat}
                   onChange={setAsiFeat}
                   loader={loadFeats}
-                  placeholder="Alert, Lucky, Tough…"
+                  placeholder="Es. Allerta, Fortunato, Robusto…"
                   inputClassName="w-full rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-sm text-foreground"
                   kind="talenti"
                 />
