@@ -465,7 +465,13 @@ const ITA_SOURCE_NAMES: Record<string, string> = {
 // vuote da riconoscere, come le fonti OCR pagina-per-pagina) ricade nel caso "paragrafo semplice"
 // — nessuna regressione lì, solo un miglioramento quando c'è struttura da cogliere.
 export function TestoStrutturato({ testo }: { testo: string }) {
-  const blocks = testo.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+  // useMemo: senza, il parsing (split + regex per blocco) rigira da zero a ogni render del
+  // genitore, anche quando "testo" non è cambiato — inconsistente con lo stile già in uso nel
+  // resto di questo file. Trovato con una code review.
+  const blocks = useMemo(
+    () => testo.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean),
+    [testo],
+  );
 
   return (
     <div className="space-y-3">
@@ -501,8 +507,13 @@ export function TestoStrutturato({ testo }: { testo: string }) {
           );
         }
 
+        // "bulletLines.length > 1" scartava per errore gli elenchi con un SOLO punto (comuni: molti
+        // talenti hanno un unico beneficio) — restava il trattino "- " visibile come testo semplice
+        // invece di un elenco puntato vero (es. il talento Allerta, verificato dal vivo). Un blocco
+        // con anche un solo "- " reale (il segnale non è ambiguo: nessuna frase italiana di regole
+        // inizia per caso con un trattino) va comunque trattato come elenco.
         const bulletLines = lines.filter((l) => l.startsWith("- "));
-        if (bulletLines.length >= lines.length / 2 && bulletLines.length > 1) {
+        if (bulletLines.length >= lines.length / 2 && bulletLines.length >= 1) {
           return (
             <ul key={i} className="list-disc pl-5 space-y-1 text-sm text-foreground leading-relaxed">
               {lines.map((l, j) => (

@@ -144,16 +144,37 @@ async function seedClassi(bookKey) {
   console.log(`${classes.length} classi caricate da ${bookKey}.`);
 }
 
+// Fonte/i storicamente prodotte da ciascun bookKey, usate come rete di sicurezza in
+// seedRegole() insieme al fonte letto dal file appena parsato — vedi il commento lì sotto.
+const FONTI_STORICHE_PER_BOOK = {
+  regole_base: ["regole_base"],
+  costa_spada: ["costa_spada"],
+  oggetti_magici: ["oggetti_magici"],
+  phb: ["phb_regole"],
+  dm_manuale: ["dm_regole"],
+};
+
 async function seedRegole(bookKey) {
   const filePath = path.join(PARSED_DIR, `${bookKey}-regole.json`);
   const sections = JSON.parse(readFileSync(filePath, "utf-8"));
+  // Se il parser produce un file vuoto (bug a monte, o rilanciato prima di rigenerare l'output),
+  // fermarsi qui invece di procedere: con sections vuoto sia la cancellazione sotto sia l'inserimento
+  // diventerebbero dei no-op silenziosi, lasciando le righe vecchie intatte ma facendo credere che
+  // il reseed sia andato a buon fine. Trovato con una code review (fragilità, non ancora un bug
+  // attivo: nessun parser produce oggi un output vuoto).
+  if (sections.length === 0) {
+    throw new Error(`${bookKey}-regole.json è vuoto: reseed interrotto per non lasciare righe vecchie orfane senza sostituirle.`);
+  }
 
   // Cancella per il VERO valore di "fonte" delle righe (non per bookKey/nome file): per
   // phb/dm_manuale i due non coincidono (fonte "phb_regole"/"dm_regole" vs bookKey "phb"/
   // "dm_manuale") — cancellare per bookKey era un no-op silenzioso, ogni reseed si limitava ad
   // ACCUMULARE righe duplicate invece di sostituirle (bug reale: 3 run di seed.mjs in una sessione
-  // = ogni sezione tripla nel Compendio, segnalato dall'utente con screenshot).
-  const fonti = [...new Set(sections.map((s) => s.fonte))];
+  // = ogni sezione tripla nel Compendio, segnalato dall'utente con screenshot). Il fonte letto dal
+  // file è unito a quello storicamente noto per questo bookKey (FONTI_STORICHE_PER_BOOK): così,
+  // anche se un futuro cambio del parser rinominasse "fonte" o omettesse una sezione, le righe
+  // rimaste sotto il vecchio nome vengono comunque ripulite invece di restare orfane.
+  const fonti = new Set([...(FONTI_STORICHE_PER_BOOK[bookKey] ?? []), ...sections.map((s) => s.fonte)]);
   for (const fonte of fonti) {
     await db.delete(compendioItaRegole).where(eq(compendioItaRegole.fonte, fonte));
   }

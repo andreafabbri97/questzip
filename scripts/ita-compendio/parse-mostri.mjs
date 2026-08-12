@@ -54,6 +54,17 @@ function normalizeModifier(raw) {
 // "Sfida -" (senza PE) è usata per PNG/creature senza minaccia in alcuni libri
 const CHALLENGE_RE = /^Sfida\s+([\d/]+|-)\s*(?:\(\s*([\d.,]+)\s*PE\))?/i;
 
+// Due nomi (su 342) con l'artefatto small-caps già noto altrove nella pipeline — trovati con un
+// audit generale dei nomi, verificati a mano contro l'originale inglese: "n1"/"1" sono la stessa
+// confusione cifra/lettera vista nei talenti (parse-talenti.mjs), qui applicata solo a questi due
+// casi noti invece che a tutto il corpus (troppo rischioso distinguerla in modo affidabile da
+// cifre vere in nomi che potrebbero contenerne). A livello di modulo (non dentro il loop per
+// mostro): è una costante statica, ricrearla a ogni iterazione non serve a nulla.
+const NOME_FIXES = {
+  "DRAGO n1 BRONZO Cucc10Lo": "Drago di Bronzo Cucciolo",
+  "ORSO P OLARE": "Orso Polare",
+};
+
 // alcuni libri usano "Lingue"/minuscole invece di "Linguaggi"/maiuscole: alias + case-insensitive
 const OPTIONAL_FIELD_LABELS = [
   "Tiri Salvezza|Tiri salvezza",
@@ -196,15 +207,6 @@ function parseBook(bookKey) {
       skipped.push({ reason: "nome non plausibile", nomeMostro });
       continue;
     }
-    // Due nomi (su 342) con l'artefatto small-caps già noto altrove nella pipeline — trovati con
-    // un audit generale dei nomi, verificati a mano contro l'originale inglese: "n1"/"1" sono la
-    // stessa confusione cifra/lettera vista nei talenti (parse-talenti.mjs), qui applicata solo a
-    // questi due casi noti invece che a tutto il corpus (troppo rischioso distinguerla in modo
-    // affidabile da cifre vere in nomi che potrebbero contenerne).
-    const NOME_FIXES = {
-      "DRAGO n1 BRONZO Cucc10Lo": "Drago di Bronzo Cucciolo",
-      "ORSO P OLARE": "Orso Polare",
-    };
 
     let cursor = header.sizeTypeLineIndex + 1;
     const fields = {};

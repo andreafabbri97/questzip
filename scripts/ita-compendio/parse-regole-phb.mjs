@@ -56,8 +56,20 @@ function isNoise(line) {
   return false;
 }
 
+// Unisce due frammenti di testo separati da un a-capo del PDF originale: se il frammento
+// precedente finisce con "-" è una parola spezzata a fine riga (es. "legge-" + "ra" -> "leggera",
+// non "legge-ra") — il trattino va tolto, non solo lo spazio. Bug reale trovato con una code
+// review: il vecchio codice evitava già di aggiungere uno spazio in questo caso, ma dimenticava
+// di togliere il trattino stesso, lasciandolo visibile in mezzo alla parola.
+function joinAcrossLineBreak(prevText, content) {
+  return prevText.endsWith("-") ? prevText.slice(0, -1) + content : prevText + " " + content;
+}
+
 // Ogni pagina diventa una lista di "blocchi" (paragrafo o punto elenco), riflludendo le righe
-// visive del PDF in prosa continua tramite spazi invece che a-capo.
+// visive del PDF in prosa continua tramite spazi invece che a-capo. Il TIPO del primissimo
+// blocco di una pagina (se non inizia con un bullet "•") non è determinabile qui: potrebbe essere
+// la prosecuzione di un punto elenco interrotto dalla pagina precedente — resta "p" solo come
+// valore di default, `assembleChapter` lo corregge quando ricuce le pagine tra loro.
 function pageBlocks(raw) {
   const lines = (raw ?? "").split("\n").filter((l) => !isNoise(l));
   const blocks = []; // { type: "p" | "li", text }
@@ -68,7 +80,8 @@ function pageBlocks(raw) {
     if (isBullet) {
       blocks.push({ type: "li", text: content });
     } else if (blocks.length > 0) {
-      blocks[blocks.length - 1].text += (blocks[blocks.length - 1].text.endsWith("-") ? "" : " ") + content;
+      const last = blocks[blocks.length - 1];
+      last.text = joinAcrossLineBreak(last.text, content);
     } else {
       blocks.push({ type: "p", text: content });
     }
@@ -81,12 +94,21 @@ function assembleChapter(start, end) {
   for (let i = start; i < end; i++) {
     const pageBlk = pageBlocks(data.pages[i].text);
     if (pageBlk.length === 0) continue;
-    // Continuità tra pagine: se il primo blocco della pagina inizia con una minuscola, è la
-    // prosecuzione del blocco con cui la pagina precedente si era interrotta (stesso tipo).
     const prev = allBlocks[allBlocks.length - 1];
     const first = pageBlk[0];
-    if (prev && prev.type === first.type && /^[a-zàèéìòù]/.test(first.text)) {
-      prev.text += " " + first.text;
+    // Continuità tra pagine: un blocco che comincia con una minuscola e NON è un bullet vero
+    // (type "p", il default assegnato da pageBlocks a un primo blocco senza "•") è quasi certamente
+    // la prosecuzione del blocco — di QUALSIASI tipo, incluso un punto elenco "li" — con cui la
+    // pagina precedente si era interrotta. Bug reale trovato con una code review: la versione
+    // precedente richiedeva `prev.type === first.type`, quindi (a) un elenco puntato interrotto a
+    // metà voce da un salto pagina perdeva il collegamento (la prosecuzione, priva di bullet,
+    // veniva etichettata "p" e il confronto falliva) apparendo come un paragrafo estraneo, e (b)
+    // una pagina che iniziava con un bullet VERO ma minuscolo veniva erroneamente fusa nel bullet
+    // precedente invece di restare un punto elenco a sé (perché type "li" combaciava con "li" e la
+    // minuscola faceva scattare la fusione). Il controllo su `first.type === "p"` risolve entrambi:
+    // un bullet vero ha sempre type "li" e non entra mai in questo ramo.
+    if (prev && first.type === "p" && /^[a-zàèéìòù]/.test(first.text)) {
+      prev.text = joinAcrossLineBreak(prev.text, first.text);
       allBlocks.push(...pageBlk.slice(1));
     } else {
       allBlocks.push(...pageBlk);
@@ -94,7 +116,7 @@ function assembleChapter(start, end) {
   }
 
   // Righe "- voce" consecutive raggruppate in un unico blocco elenco (separate da "\n" semplice,
-  // così RegoleTesto le riconosce come lista); i paragrafi restano separati da riga vuota.
+  // così TestoStrutturato le riconosce come lista); i paragrafi restano separati da riga vuota.
   const parts = [];
   let liBuffer = [];
   const flushLi = () => {

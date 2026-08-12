@@ -122,9 +122,25 @@ const KNOWN_INCANTESIMI_PHB = {
   "punizione collerica": "Wrathful Smite",
 };
 
+// Cerca "text" nel dizionario di override, tollerando anche lo spazio indebito small-caps già
+// noto in questa pipeline (es. "mae stro degli scudi" invece di "maestro degli scudi") — capita
+// se questo script gira su righe del DB non ancora riseedate dopo un fix del nome alla fonte
+// (parse-talenti.mjs). Senza questa rete di sicurezza, un nome ancora corrotto mancherebbe
+// l'override per un semplice disallineamento di chiave e cadrebbe sulla traduzione automatica dal
+// vivo, proprio l'esito che l'override esiste per evitare. Trovato con una code review.
+function lookupOverride(text, overrides) {
+  const normalizedKey = text.trim().toLowerCase();
+  if (overrides[normalizedKey]) return overrides[normalizedKey];
+  const compact = normalizedKey.replace(/\s+/g, "");
+  for (const [key, value] of Object.entries(overrides)) {
+    if (key.replace(/\s+/g, "") === compact) return value;
+  }
+  return null;
+}
+
 async function translateItToEn(text, cache, overrides = {}) {
   const normalizedKey = text.trim().toLowerCase();
-  const override = overrides[normalizedKey];
+  const override = lookupOverride(text, overrides);
   if (override) return override;
 
   const known = KNOWN_IT_TO_EN[normalizedKey];

@@ -52,6 +52,21 @@ describe("TestoStrutturato", () => {
     expect(items[0]).toHaveTextContent("Prima voce");
   });
 
+  it("un elenco con un SOLO punto elenco diventa comunque una lista vera, non testo con '- ' visibile", () => {
+    // Regressione trovata verificando dal vivo il talento "Allerta" (un solo beneficio): la
+    // condizione richiedeva più di un punto elenco per riconoscere il blocco come lista, quindi un
+    // blocco con un unico "- " restava un paragrafo semplice con il trattino visibile alla lettera.
+    render(
+      <TestoStrutturato
+        testo={"Frase introduttiva.\n\n- Unico beneficio del talento, in una singola frase."}
+      />,
+    );
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent("Unico beneficio del talento");
+    expect(screen.queryByText(/^- Unico beneficio/)).not.toBeInTheDocument();
+  });
+
   it("una riga singola e corta senza punteggiatura finale diventa un sottotitolo", () => {
     render(<TestoStrutturato testo={"Il Ruolo dei Dadi"} />);
     const heading = screen.getByText("Il Ruolo dei Dadi");
