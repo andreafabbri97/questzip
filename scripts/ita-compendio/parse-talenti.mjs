@@ -127,8 +127,13 @@ function extractFeat(lines, start, end) {
   const bodyLines = lines.slice(bodyStart, end);
   const paragraphs = [];
   for (const line of bodyLines) {
-    const startsNewParagraph = /^•/.test(line) || paragraphs.length === 0;
-    if (startsNewParagraph) paragraphs.push(line);
+    const isBullet = /^•/.test(line);
+    const startsNewParagraph = isBullet || paragraphs.length === 0;
+    // "- " invece del glifo "•" grezzo: è la convenzione che TestoStrutturato (Compendio)
+    // riconosce come elenco puntato vero — trovato con un audit del testo generato: senza questo
+    // il "•" restava alla lettera nel paragrafo mostrato in UI (es. il talento Allerta), invece di
+    // diventare un elenco. Stesso principio già in uso in parse-regole-phb.mjs.
+    if (startsNewParagraph) paragraphs.push(isBullet ? line.replace(/^•\s*/, "- ") : line);
     else paragraphs[paragraphs.length - 1] += " " + line;
   }
   return { prerequisito, descrizione: paragraphs.join("\n\n") };

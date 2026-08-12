@@ -38,11 +38,19 @@ const data = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, "phb.json"), "utf-
 
 // Righe da scartare del tutto: intestazioni di pagina ripetute, numeri di pagina isolati, e un
 // singolo glifo decorativo "•"/"r" lasciato dal capolettera del capitolo (non un vero elenco).
+// Le intestazioni ripetute ("CAPITOLO N I Titolo") a volte hanno lo stesso artefatto di
+// spaziatura small-caps visto altrove nella pipeline ("C A P I TOLO" invece di "CAPITOLO") — un
+// confronto sulla riga letterale le lasciava passare, finendo nel mezzo del testo riflussato
+// (numeri di pagina compresi, es. "...seguenti: CA PITOLO 6 I OPZION I DI PERSONALIZZAZI O N E 1
+// 69"). Bug reale trovato con un audit del testo generato, non a occhio. Confronto sulla versione
+// COMPATTA (spazi rimossi), stesso principio già in uso in parse-mostri.mjs/parse-talenti.mjs per
+// lo stesso artefatto.
 function isNoise(line) {
   const t = line.trim();
   if (!t) return true;
-  if (/^CAPITOLO\s*\d/i.test(t)) return true;
-  if (/^APPENDICE\s*[A-Z]\s*[:�]/i.test(t) && t.length < 40) return true;
+  const compact = t.replace(/\s+/g, "");
+  if (/^CAPITOLO\d/i.test(compact)) return true;
+  if (/^APPENDICE[A-Z]/i.test(compact) && compact.length < 40) return true;
   if (/^\d{1,3}$/.test(t)) return true;
   if (t === "•" || t === "r") return true;
   return false;
