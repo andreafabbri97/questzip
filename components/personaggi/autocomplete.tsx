@@ -3,18 +3,14 @@
 import { useEffect, useState } from "react";
 import { bestItalianName, useItalianSearchIndex } from "@/lib/fivetools/compendio-detail";
 import { type CompendiumKind } from "@/lib/fivetools/data";
+import { matchScore } from "@/lib/fivetools/search-rank";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 
-// Esportata per essere testabile in isolamento (vedi autocomplete.test.ts) senza dover montare
-// l'intero componente (che tira in useItalianSearchIndex/next-auth). 0 = corrispondenza esatta,
-// 1 = "inizia con", 2 = "contiene" — un nome comune come "Dagger" deve sempre battere una variante
-// più lunga come "Dagger of Venom" quando entrambe combaciano con la stessa query.
-export function matchScore(name: string, needle: string): number {
-  const lower = name.toLowerCase();
-  if (lower === needle) return 0;
-  if (lower.startsWith(needle)) return 1;
-  return 2;
-}
+// Ri-esportata per compatibilità con chi già la importava da qui (es. autocomplete.test.ts) — la
+// definizione vera vive in lib/fivetools/search-rank.ts, un modulo SENZA "use client", perché ora
+// la riusa anche lib/fivetools/mention-search.ts (usato da una server action, app/actions/
+// ai-assistant.ts) per lo stesso identico bug di ranking sulle menzioni "#Nome" in chat.
+export { matchScore };
 
 export function Autocomplete<T extends { name: string; source: string }>({
   value,

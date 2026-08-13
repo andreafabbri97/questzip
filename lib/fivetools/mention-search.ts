@@ -19,6 +19,7 @@ import {
   getTraduzioniIa,
 } from "@/app/actions/compendio-ita";
 import { bestItalianName, buildItalianNameIndex } from "@/lib/fivetools/italian-names";
+import { matchScore } from "@/lib/fivetools/search-rank";
 
 export interface MentionCandidate {
   kind: CompendiumKind;
@@ -114,13 +115,27 @@ export function prefetchMentionCandidates(): void {
   loadAllMentionCandidates().catch(() => {});
 }
 
+// Ordinate per rilevanza (matchScore, stesso principio già corretto per la ricerca armi nella
+// scheda Personaggio) invece di prendere le prime "limit" nell'ordine grezzo del catalogo — senza
+// questo, un nome comune come "Dagger" può restare escluso dal menzionabile "#Nome" in chat (o dal
+// contesto passato all'assistente IA, dove limit è ancora più basso) se il catalogo elenca prima
+// decine di varianti magiche che contengono lo stesso testo come sottostringa.
 export async function searchMentionCandidates(query: string, limit = 8): Promise<MentionCandidate[]> {
   const q = query.trim().toLowerCase();
   if (q.length === 0) return [];
   const all = await loadAllMentionCandidates();
   return all
-    .filter((c) => c.name.toLowerCase().includes(q) || c.nameIta?.toLowerCase().includes(q))
-    .slice(0, limit);
+    .map((c) => {
+      const scores = [
+        c.name.toLowerCase().includes(q) ? matchScore(c.name, q) : null,
+        c.nameIta && c.nameIta.toLowerCase().includes(q) ? matchScore(c.nameIta, q) : null,
+      ].filter((s): s is number => s !== null);
+      return scores.length > 0 ? { candidate: c, score: Math.min(...scores) } : null;
+    })
+    .filter((entry): entry is { candidate: MentionCandidate; score: number } => entry !== null)
+    .sort((a, b) => a.score - b.score)
+    .slice(0, limit)
+    .map((entry) => entry.candidate);
 }
 
 const candidatesByKindPromise = new Map<CompendiumKind, Promise<MentionCandidate[]>>();

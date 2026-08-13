@@ -36,8 +36,16 @@ const PROMPT = `Sei un assistente che estrae dati da una scheda di personaggio d
   "armi": [{ "nome": string, "dadoDanno": string }],
   "inventario": [string],
   "talenti": [string],
+  "infusioniConosciute": [string],
+  "scelteClasse": [string],
   "note": string
 }
+
+"infusioniConosciute" e "scelteClasse" vanno compilati SOLO se la scheda li elenca esplicitamente:
+"infusioniConosciute" per le Infusioni dell'Artefice, "scelteClasse" per le suppliche occulte/voto
+del patto del Warlock, lo stile di combattimento, la metamagia dello Stregone o scelte simili di
+altre classi — array vuoto se la scheda non ne mostra o se il personaggio non ha una classe con
+questo tipo di scelte.
 
 Traduci in italiano se la scheda originale è in un'altra lingua. Per ogni campo che non riesci a leggere con sicurezza, usa una stringa vuota, un array vuoto o 0 — non inventare un valore plausibile al posto di un dato mancante o illeggibile. Eccezione: se "hpAttuali" non è scritto esplicitamente sulla scheda, usa lo stesso valore di "hpMax" invece di 0 (un personaggio appena creato ha i punti ferita pieni, non a zero).`;
 
@@ -112,6 +120,16 @@ function mapAiResultToCharacter(parsed: unknown): Character {
     .filter(Boolean)
     .map((nome) => ({ id: crypto.randomUUID(), nome }));
 
+  const infusioniConosciute: KnownFeat[] = asArray(obj.infusioniConosciute)
+    .map((v) => asString(v))
+    .filter(Boolean)
+    .map((nome) => ({ id: crypto.randomUUID(), nome }));
+
+  const scelteClasse: KnownFeat[] = asArray(obj.scelteClasse)
+    .map((v) => asString(v))
+    .filter(Boolean)
+    .map((nome) => ({ id: crypto.randomUUID(), nome }));
+
   const linguaggi = asArray(obj.linguaggi)
     .map((v) => asString(v))
     .filter(Boolean);
@@ -145,6 +163,8 @@ function mapAiResultToCharacter(parsed: unknown): Character {
     armi,
     inventario,
     talenti,
+    infusioniConosciute,
+    scelteClasse,
     note: asString(obj.note),
   };
 }

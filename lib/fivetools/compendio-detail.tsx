@@ -959,7 +959,10 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
             .filter(Boolean)
             .join(" · ")}
         </p>
-        <TestoStrutturato testo={ufficiale.descrizione} />
+        <div className="border-t border-edge pt-3 space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
+          <TestoStrutturato testo={ufficiale.descrizione} />
+        </div>
         <p className="text-[10px] text-muted">
           ⚠️ testo estratto via OCR da un PDF privato di qualità bassa (screenshot, non
           scansione): può contenere errori di riconoscimento.
@@ -1116,7 +1119,10 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
         {ufficiale.prerequisito && <Stat label="Prerequisiti" value={ufficiale.prerequisito} />}
-        <TestoStrutturato testo={ufficiale.descrizione} />
+        <div className="border-t border-edge pt-3 space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
+          <TestoStrutturato testo={ufficiale.descrizione} />
+        </div>
       </>
     );
   }
