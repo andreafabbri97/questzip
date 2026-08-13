@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireDm, requireUserId } from "@/lib/campaign-auth";
 import { campaignNpcs } from "@/lib/db/schema";
+import type { Character } from "@/lib/dnd";
 
 // Solo per il master, come le altre due tabelle di app/actions/quests.ts e
 // app/actions/session-prep.ts — vedi il commento sullo schema (lib/db/schema.ts) per il perché.
@@ -30,6 +31,33 @@ export async function createNpc(
       nome: (nome.trim() || "NPC senza nome").slice(0, 100),
       descrizione: descrizione.slice(0, 10000),
       posizione: posizione.trim().slice(0, 200),
+    })
+    .returning();
+  return npc;
+}
+
+// Porta una scheda Personaggio COMPLETA (creata in Personaggi, con classe/statistiche vere) nella
+// Rubrica NPC come villain o alleato — a differenza di syncCharacterToCampaign (app/actions/
+// characters.ts) NON tocca campaignCharacters/Party: quella tabella è un utente reale (userId,
+// una riga per persona), un NPC no. Il personaggio arriva già intero dal client (Personaggi vive
+// solo in localStorage, il server non ce l'ha), qui si copia solo il sottoinsieme rilevante per un
+// NPC — descrizione/posizione restano vuote apposta, il master le scrive dal punto di vista
+// dell'NPC nel mondo, non riusa le note personali del personaggio originale.
+export async function importCharacterAsNpc(campaignId: string, character: Character) {
+  const userId = await requireUserId();
+  await requireDm(campaignId, userId);
+  const [npc] = await db
+    .insert(campaignNpcs)
+    .values({
+      campaignId,
+      createdBy: userId,
+      nome: character.nome.slice(0, 100) || "NPC senza nome",
+      razza: character.razza,
+      classi: character.classi,
+      hpMax: character.hpMax,
+      hpAttuali: character.hpAttuali,
+      classeArmatura: character.classeArmatura,
+      caratteristiche: character.caratteristiche,
     })
     .returning();
   return npc;

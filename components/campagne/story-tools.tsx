@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { isAiAvailable } from "@/app/actions/ai";
 import { generateNpcDraft, generateQuestDraft } from "@/app/actions/ai-content-draft";
-import { createNpc, deleteNpc, getNpcsForCampaign, updateNpc } from "@/app/actions/npcs";
+import {
+  createNpc,
+  deleteNpc,
+  getNpcsForCampaign,
+  importCharacterAsNpc,
+  updateNpc,
+} from "@/app/actions/npcs";
 import { createQuest, deleteQuest, getQuestsForCampaign, updateQuest } from "@/app/actions/quests";
 import {
   addPrepItem,
@@ -11,6 +17,15 @@ import {
   getPrepItemsForCampaign,
   togglePrepItem,
 } from "@/app/actions/session-prep";
+import { useLocalCollection } from "@/lib/storage";
+import {
+  abilityModifier,
+  characterSchema,
+  formatModifier,
+  totalLevel,
+  type Ability,
+  type ClassEntry,
+} from "@/lib/dnd";
 
 // Le tre sezioni sotto sono SOLO per il master (mai mostrate ai giocatori, nemmeno come sezione
 // vuota) — vedi il commento su schema.ts per il perché. Da qui in giù "isDm" non è solo
@@ -33,9 +48,11 @@ const NPC_STATUS_CLASSES: Record<string, string> = {
 
 type Npc = Awaited<ReturnType<typeof getNpcsForCampaign>>[number];
 
+type NpcSectionMode = "none" | "new" | "import";
+
 export function NpcSection({ campaignId, isDm }: { campaignId: string; isDm: boolean }) {
   const [npcs, setNpcs] = useState<Npc[] | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [mode, setMode] = useState<NpcSectionMode>("none");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const refresh = () => {
@@ -47,27 +64,46 @@ export function NpcSection({ campaignId, isDm }: { campaignId: string; isDm: boo
   if (!isDm || npcs === null) return null;
 
   const selected = npcs.find((n) => n.id === selectedId) ?? null;
+  const closeForms = () => setMode("none");
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-sm uppercase tracking-widest text-muted">🧑‍🤝‍🧑 Rubrica NPC</h2>
-        <button
-          onClick={() => setShowForm((prev) => !prev)}
-          className="text-xs font-bold text-accent-strong hover:underline"
-        >
-          {showForm ? "Annulla" : "+ Nuovo NPC"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMode((prev) => (prev === "import" ? "none" : "import"))}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            {mode === "import" ? "Annulla" : "Importa da Personaggi"}
+          </button>
+          <button
+            onClick={() => setMode((prev) => (prev === "new" ? "none" : "new"))}
+            className="text-xs font-bold text-accent-strong hover:underline"
+          >
+            {mode === "new" ? "Annulla" : "+ Nuovo NPC"}
+          </button>
+        </div>
       </div>
       <p className="text-[10px] text-muted -mt-2">
         Solo il master la vede — non compare in nessuna forma per i giocatori.
       </p>
 
-      {showForm && (
+      {mode === "new" && (
         <NewNpcForm
           campaignId={campaignId}
           onCreated={() => {
-            setShowForm(false);
+            closeForms();
+            refresh();
+          }}
+        />
+      )}
+
+      {mode === "import" && (
+        <ImportCharacterForm
+          campaignId={campaignId}
+          onImported={() => {
+            closeForms();
             refresh();
           }}
         />
@@ -188,6 +224,119 @@ function NewNpcForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
   );
 }
 
+// Porta una scheda Personaggio completa (classe/statistiche vere) nella Rubrica NPC come villain o
+// alleato — DIVERSO da "Porta in campagna" nella scheda Personaggio (quello finisce nel Party,
+// questo qui resta un NPC: non un membro del gruppo, solo il master lo vede). Personaggi vive solo
+// in localStorage (mai sul server, vedi lib/storage.ts), quindi la scelta è lato client e il
+// personaggio intero viaggia già completo verso il server nella chiamata di import.
+function ImportCharacterForm({
+  campaignId,
+  onImported,
+}: {
+  campaignId: string;
+  onImported: () => void;
+}) {
+  const { items: personaggi, loaded } = useLocalCollection("questzip:personaggi", characterSchema);
+  const [selectedId, setSelectedId] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  const importSelected = async () => {
+    const character = personaggi.find((p) => p.id === selectedId);
+    if (!character || importing) return;
+    setImporting(true);
+    try {
+      await importCharacterAsNpc(campaignId, character);
+      onImported();
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+      <p className="text-xs text-muted">
+        Porta una scheda già creata in Personaggi (classe, PF, CA, caratteristiche) come NPC — utile
+        per un villain o un alleato con statistiche vere, che però NON fa parte del party. Resta un
+        NPC a sé: non è un membro del gruppo e non compare in Personaggi/Party.
+      </p>
+      {!loaded ? (
+        <p className="text-xs text-muted">Carico i personaggi salvati…</p>
+      ) : personaggi.length === 0 ? (
+        <p className="text-xs text-muted">
+          Nessun personaggio salvato su questo dispositivo — creane uno da Personaggi prima.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={selectedId}
+            onChange={(event) => setSelectedId(event.target.value)}
+            className="input-focus flex-1 min-w-40 rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+          >
+            <option value="">Scegli un personaggio…</option>
+            {personaggi.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome} · {[p.razza, p.classi.map((c) => `${c.nome} ${c.livello}`).join("/")]
+                  .filter(Boolean)
+                  .join(" ")}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={importSelected}
+            disabled={!selectedId || importing}
+            className="glow-accent rounded-lg bg-accent text-background font-bold px-3 py-1.5 text-xs hover:bg-accent-strong transition-colors active:scale-[0.97] disabled:opacity-50"
+          >
+            {importing ? "Importo…" : "Importa"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Stesso layout compatto del riquadro Party in app/campagne/page.tsx (razza+classi, PF/CA/livello,
+// griglia modificatori) — qui senza slot incantesimo/XP, che per un NPC non hanno senso.
+function NpcStatBlock({
+  razza,
+  classi,
+  hpMax,
+  hpAttuali,
+  classeArmatura,
+  caratteristiche,
+}: {
+  razza: string | null;
+  classi: ClassEntry[];
+  hpMax: number;
+  hpAttuali: number;
+  classeArmatura: number | null;
+  caratteristiche: Record<Ability, number>;
+}) {
+  const classSummary = classi.map((c) => `${c.nome} ${c.livello}`).join(" / ");
+  return (
+    <div className="rounded-lg border border-edge/60 bg-surface p-2 space-y-1.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+        <span className="text-muted">{[razza, classSummary].filter(Boolean).join(" · ")}</span>
+        <span className="text-muted">
+          PF {hpAttuali}/{hpMax}
+          {classeArmatura != null && ` · CA ${classeArmatura}`} · Liv. {totalLevel(classi)}
+        </span>
+      </div>
+      <div className="grid grid-cols-6 gap-1.5">
+        {(["forza", "destrezza", "costituzione", "intelligenza", "saggezza", "carisma"] as Ability[]).map(
+          (ability) => (
+            <div key={ability} className="text-center">
+              <p className="text-[9px] uppercase tracking-widest text-muted">{ability.slice(0, 3)}</p>
+              <p className="text-xs font-bold text-foreground">
+                {formatModifier(abilityModifier(caratteristiche[ability]))}
+              </p>
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
 function NpcDetail({
   npc,
   onChanged,
@@ -282,6 +431,16 @@ function NpcDetail({
           </button>
         </div>
       </div>
+      {npc.hpMax != null && npc.classi && npc.caratteristiche && (
+        <NpcStatBlock
+          razza={npc.razza}
+          classi={npc.classi}
+          hpMax={npc.hpMax}
+          hpAttuali={npc.hpAttuali ?? npc.hpMax}
+          classeArmatura={npc.classeArmatura}
+          caratteristiche={npc.caratteristiche}
+        />
+      )}
       <div className="flex flex-wrap gap-1.5">
         {(Object.keys(NPC_STATUS_LABELS) as (typeof stato)[]).map((value) => (
           <button

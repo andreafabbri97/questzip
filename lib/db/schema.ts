@@ -266,6 +266,13 @@ export const campaignNpcStatusEnum = pgEnum("campaign_npc_status", [
 // doverselo ricordare a memoria. "Stato" copre il caso comune in D&D di un NPC che muore o
 // scompare a metà campagna — il master lo aggiorna invece di cancellare la voce (la storia di un
 // NPC morto resta comunque utile da consultare).
+//
+// I campi da razza a caratteristiche sono NULLABLE apposta: la maggior parte degli NPC è pura
+// scheda narrativa (nome/descrizione), solo quelli importati da una scheda Personaggio completa
+// (villain o alleato con classe/statistiche vere, vedi importCharacterAsNpc in app/actions/npcs.ts)
+// li ha valorizzati. Stesso sottoinsieme di campi di campaignCharacters (Party) per coerenza, ma
+// una tabella VOLUTAMENTE separata: un NPC non è un utente reale (niente userId/FK a users, niente
+// vincolo di riga unica per persona) e resta sempre e solo visibile al master, mai al giocatore.
 export const campaignNpcs = pgTable("campaign_npc", {
   id: uuid("id").primaryKey().defaultRandom(),
   campaignId: uuid("campaign_id")
@@ -278,6 +285,12 @@ export const campaignNpcs = pgTable("campaign_npc", {
   descrizione: text("descrizione").notNull().default(""),
   stato: campaignNpcStatusEnum("stato").notNull().default("vivo"),
   posizione: text("posizione").notNull().default(""),
+  razza: text("razza"),
+  classi: jsonb("classi").$type<ClassEntry[]>(),
+  hpMax: integer("hp_max"),
+  hpAttuali: integer("hp_attuali"),
+  classeArmatura: integer("classe_armatura"),
+  caratteristiche: jsonb("caratteristiche").$type<Record<Ability, number>>(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
