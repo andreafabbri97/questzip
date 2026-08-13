@@ -56,6 +56,108 @@ function isNoise(line) {
   return false;
 }
 
+// Sottotitoli veri dentro il testo (es. "MULTICLASSE", "COMPETENZE DEI MULTICLASSE") — il libro li
+// stampa in small-caps, quindi restano SEMPRE su una riga propria del PDF senza alcuna lettera
+// minuscola. Riconosciuti così: nessuna minuscola nella riga e almeno 3 lettere maiuscole (esclude
+// righe di soli numeri/simboli, es. i valori della tabella slot incantesimo a pagina 165, che
+// hanno zero lettere maiuscole). Bug reale trovato con uno screenshot ("perché il Manuale del
+// Master è impaginato bene e il Giocatore no?"): finora queste righe finivano incollate in mezzo
+// al paragrafo corrente invece di diventare un sottotitolo a sé — un intero capitolo diventava
+// pochi blocchi enormi (12000+ caratteri) invece di tante sezioni leggibili.
+function isHeadingCandidate(line) {
+  const t = line.trim();
+  if (!t || /[a-zàèéìòù]/.test(t)) return false;
+  return (t.match(/[A-ZÀ-Ý]/g) ?? []).length >= 3;
+}
+
+// Stesso artefatto di spaziatura small-caps già noto altrove nella pipeline (es. nomi di talenti/
+// mostri corrotti), qui applicato ai sottotitoli — il pattern è troppo irregolare per un fix
+// automatico sicuro (a volte spezza dopo una singola lettera, a volte a metà parola), quindi
+// dizionario verificato a mano invece di un'euristica generica, stesso principio già stabilito nel
+// progetto. Chiavi = testo grezzo esatto della riga (dopo trim), verificate contro
+// compendio_ita_talento per i nomi dei talenti già corretti in un giro precedente.
+const HEADING_FIXES = {
+  "MULTICLAS SE": "MULTICLASSE",
+  "ESE M PIO DI M U LTICLASSE": "ESEMPIO DI MULTICLASSE",
+  "PREREQUI SITI": "PREREQUISITI",
+  "PR E R EQ U I S IT I  D I  M U LTI CLASSE": "PREREQUISITI DI MULTICLASSE",
+  "PUNTI E SPERIENZA": "PUNTI ESPERIENZA",
+  "BONUS DI C OMPETENZA": "BONUS DI COMPETENZA",
+  "C OM PETENZE": "COMPETENZE",
+  "CO M PETE N Z E  D E I  M U LT I C LASS E": "COMPETENZE DEI MULTICLASSE",
+  "PRIVILEGI DI C LASSE": "PRIVILEGI DI CLASSE",
+  "I N CA N TATO R E  M U LTICLASSE:": "INCANTATORE MULTICLASSE:",
+  "SLOT I N CANTES I M O  PER LIVELLO D I  I N CANTES I M O": "SLOT INCANTESIMO PER LIVELLO DI INCANTESIMO",
+  "AGGRE S SORE SELVAGGIO": "AGGRESSORE SELVAGGIO",
+  "APPO STATO": "APPOSTATO",
+  "C E C CHINO MAGICO": "CECCHINO MAGICO",
+  "C OMBATTENTE A DUE ARMI": "COMBATTENTE A DUE ARMI",
+  "C OMBATTENTE IN SELLA": "COMBATTENTE IN SELLA",
+  "C ONDOTTIERO I SPIRATORE": "CONDOTTIERO ISPIRATORE",
+  "C ORAZZE LEGGERE": "CORAZZE LEGGERE",
+  "C ORAZZE MEDIE": "CORAZZE MEDIE",
+  "C ORAZZE PESANTI": "CORAZZE PESANTI",
+  "DUELLANTE D I FENSIVO": "DUELLANTE DIFENSIVO",
+  "E SPERTO DI BALESTRE": "ESPERTO DI BALESTRE",
+  "LINGUI STA": "LINGUISTA",
+  "MAE STRO D 'ARMI": "MAESTRO D'ARMI",
+  "MAE STRO D 'ARMI POS SENTI": "MAESTRO D'ARMI POSSENTI",
+  "MAE STRO DEGLI SCUDI": "MAESTRO DEGLI SCUDI",
+  "MAE STRO DELLE ARMATURE MEDIE": "MAESTRO DELLE ARMATURE MEDIE",
+  "MAE STRO DELLE ARMI SU ASTA": "MAESTRO DELLE ARMI SU ASTA",
+  "O S SERVATORE": "OSSERVATORE",
+  "PU NTEG G I  D I  CARATT E R I ST I CA E M O D I F I CATO R I": "PUNTEGGI DI CARATTERISTICA E MODIFICATORI",
+  "PASSO D I  VIAG G I O": "PASSO DI VIAGGIO",
+  "DIVI DERE I L  GRU PPO": "DIVIDERE IL GRUPPO",
+  "I NTERPRETAZIONE DEL RUOLO": "INTERPRETAZIONE DEL RUOLO",
+  "SPE SE DELLO STILE DI VITA": "SPESE DELLO STILE DI VITA",
+  "L0RDINE DI COMBATTIMENTO": "L'ORDINE DI COMBATTIMENTO",
+  "I PASSI DEL COM BATTI M E NTO": "I PASSI DEL COMBATTIMENTO",
+  "I L  TURNO DI UN PERSONAGGIO": "IL TURNO DI UN PERSONAGGIO",
+  "C REATURE PRONE": "CREATURE PRONE",
+  "I NTERAG I R E  CON CLI 0CC ETTI CIRCOSTANTI": "INTERAGIRE CON GLI OGGETTI CIRCOSTANTI",
+  "CATEG O R I E  D I  TAG L I A": "CATEGORIE DI TAGLIA",
+  "D I SI MPEGNO": "DISIMPEGNO",
+  "LANCIARE UN INCANTE SIMO": "LANCIARE UN INCANTESIMO",
+  "NASC ONDERSI": "NASCONDERSI",
+  "I M PROVVISARE U N 'AZIONE": "IMPROVVISARE UN'AZIONE",
+  "EFFETTUARE UN ATTAC C O": "EFFETTUARE UN ATTACCO",
+  "TIRI PER C OLPIRE": "TIRI PER COLPIRE",
+  "MODIFICATORI AL TÌRO": "MODIFICATORI AL TIRO",
+  "ATTAC CHI A DI STANZA": "ATTACCHI A DISTANZA",
+  "ATTAC CHI I N  MISCHIA": "ATTACCHI IN MISCHIA",
+  "CONTESE I N  COM BATTI M E NTO": "CONTESE IN COMBATTIMENTO",
+  "C OPERTURA": "COPERTURA",
+  "SCENDERE A 0 PUNTI FERITA": "SCENDERE A 0 PUNTI FERITA",
+  "DESCRIVERE CLI EFFETTI DEI DAN N I": "DESCRIVERE GLI EFFETTI DEI DANNI",
+  "TRAMORTIRE UNA C REATURA": "TRAMORTIRE UNA CREATURA",
+  "C OMBATTERE IN SELLA": "COMBATTERE IN SELLA",
+  "C ONTROLLARE UNA CAVALCATURA": "CONTROLLARE UNA CAVALCATURA",
+  "C OMBATTERE SOTT'AC QUA": "COMBATTERE SOTT'ACQUA",
+  "LIVELLO DELL' I NCANTE SIMO": "LIVELLO DELL'INCANTESIMO",
+  "SLOT I NCANTE SIMO": "SLOT INCANTESIMO",
+  "TRUC CHETTI": "TRUCCHETTI",
+  "LANCIARE I N CANTES I M I  I N  ARMATU RA": "LANCIARE INCANTESIMI IN ARMATURA",
+  "C OMPONENTI": "COMPONENTI",
+  "LE SCUOLE DI MAG IA": "LE SCUOLE DI MAGIA",
+  "C OMBINARE EFFETTI MAGICI": "COMBINARE EFFETTI MAGICI",
+  "LA TRAMA DELLA MAC IA": "LA TRAMA DELLA MAGIA",
+  "P I E T R I F I C ATO": "PIETRIFICATO",
+  "I N V I S I B I L E": "INVISIBILE",
+  "I N DEBOLI M E NTO": "INDEBOLIMENTO",
+  "P R I V O  D I  S E N S I": "PRIVO DI SENSI",
+  "TR ATT E N U T O": "TRATTENUTO",
+  "TROVARE UN 0CC ETTO NASCOSTO": "TROVARE UN OGGETTO NASCOSTO",
+  "C O STITUZIONE": "COSTITUZIONE",
+  "I NTELLIGENZA": "INTELLIGENZA",
+  "D E STREZZA": "DESTREZZA",
+  "C ONTE SE": "CONTESE",
+  "PROVE PAS SIVE": "PROVE PASSIVE",
+  "C OLLABORARE": "COLLABORARE",
+  "NASCO NDERSI": "NASCONDERSI",
+  "VARIANTE: GIOCARE SU U NA GRIGLIA": "VARIANTE: GIOCARE SU UNA GRIGLIA",
+};
+
 // Unisce due frammenti di testo separati da un a-capo del PDF originale: se il frammento
 // precedente finisce con "-" è una parola spezzata a fine riga (es. "legge-" + "ra" -> "leggera",
 // non "legge-ra") — il trattino va tolto, non solo lo spazio. Bug reale trovato con una code
@@ -72,18 +174,35 @@ function joinAcrossLineBreak(prevText, content) {
 // valore di default, `assembleChapter` lo corregge quando ricuce le pagine tra loro.
 function pageBlocks(raw) {
   const lines = (raw ?? "").split("\n").filter((l) => !isNoise(l));
-  const blocks = []; // { type: "p" | "li", text }
+  const blocks = []; // { type: "p" | "li" | "h", text }
   for (const rawLine of lines) {
     const line = rawLine.trim();
     const isBullet = line.startsWith("•");
     const content = (isBullet ? line.slice(1) : line).trim();
     if (isBullet) {
       blocks.push({ type: "li", text: content });
-    } else if (blocks.length > 0) {
+    } else if (isHeadingCandidate(line)) {
+      // Un sottotitolo non si fonde MAI con quello che viene prima (altrimenti sparirebbe in
+      // mezzo al paragrafo precedente) — sempre un blocco NUOVO a sé, mai un'appendice.
+      blocks.push({ type: "h", text: HEADING_FIXES[content] ?? content });
+    } else if (blocks.length > 0 && blocks[blocks.length - 1].type !== "h") {
       const last = blocks[blocks.length - 1];
       last.text = joinAcrossLineBreak(last.text, content);
     } else {
       blocks.push({ type: "p", text: content });
+    }
+  }
+
+  // Falso positivo dell'euristica sottotitolo: la primissima riga di ogni capitolo è il capolettera
+  // decorativo (small-caps, es. "ENTRE LA COMBINAZIONE DI PUNTEGGI DI") che continua a metà frase
+  // sulla riga successiva ("caratteristica, classe e background...") — non un vero sottotitolo, la
+  // prosecuzione con lettera minuscola lo tradisce. Ricongiunta al blocco successivo invece di
+  // restare un "sottotitolo" isolato di una riga sola.
+  for (let i = 0; i < blocks.length - 1; i++) {
+    if (blocks[i].type === "h" && /^[a-zàèéìòù]/.test(blocks[i + 1].text)) {
+      blocks[i + 1].text = joinAcrossLineBreak(blocks[i].text, blocks[i + 1].text);
+      blocks.splice(i, 1);
+      i--;
     }
   }
   return blocks;
