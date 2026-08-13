@@ -41,7 +41,7 @@ import {
   PersonalitySection,
   TalentiSection,
 } from "./inventory-equipment";
-import { InfusionsSection, SpellListSection, WeaponsSection } from "./weapons-spells";
+import { ClassChoicesSection, InfusionsSection, SpellListSection, WeaponsSection } from "./weapons-spells";
 import {
   AbilityScoreSection,
   AttunedItemsSection,
@@ -404,8 +404,14 @@ export function CharacterSheet({
                   />
                 </label>
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4">
+                <div className="rounded-lg border border-edge bg-surface-raised px-2 sm:px-3 py-2 text-center">
+                  <span className={labelClass}>Bonus competenza</span>
+                  <p className="text-lg font-bold text-foreground">
+                    {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-edge bg-surface-raised px-2 sm:px-3 py-2 text-center">
                   <span className={labelClass}>Iniziativa</span>
                   <p className="text-lg font-bold text-foreground">
                     {formatModifier(
@@ -420,7 +426,7 @@ export function CharacterSheet({
                     aria-label="Bonus extra all'iniziativa"
                   />
                 </div>
-                <div className="rounded-lg border border-edge bg-surface-raised px-3 py-2 text-center">
+                <div className="rounded-lg border border-edge bg-surface-raised px-2 sm:px-3 py-2 text-center">
                   <span className={labelClass}>Percezione passiva</span>
                   <p className="text-lg font-bold text-foreground">
                     {passivePerception(
@@ -477,6 +483,7 @@ export function CharacterSheet({
           <SpellSlotsSection character={character} onChange={onChange} />
           <SpellListSection character={character} onChange={onChange} />
           <InfusionsSection character={character} onChange={onChange} />
+          <ClassChoicesSection character={character} onChange={onChange} />
         </div>
       )}
 

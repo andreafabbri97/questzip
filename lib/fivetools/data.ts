@@ -333,6 +333,16 @@ export interface ClassData {
   classFeatures: RawClassFeature[];
 }
 
+let optionalFeaturesPromise: Promise<RawOptionalFeature[]> | null = null;
+function loadAllOptionalFeatures(): Promise<RawOptionalFeature[]> {
+  if (!optionalFeaturesPromise) {
+    optionalFeaturesPromise = fetchJson<OptionalFeaturesFile>(`${RAW_BASE}/optionalfeatures.json`).then(
+      (file) => file?.optionalfeature ?? [],
+    );
+  }
+  return optionalFeaturesPromise;
+}
+
 let infusionsPromise: Promise<RawOptionalFeature[]> | null = null;
 /**
  * Infusioni dell'Artefice — 5etools non le modella come una categoria a sé ma come "optional
@@ -341,11 +351,40 @@ let infusionsPromise: Promise<RawOptionalFeature[]> | null = null;
  */
 export function loadInfusions(): Promise<RawOptionalFeature[]> {
   if (!infusionsPromise) {
-    infusionsPromise = fetchJson<OptionalFeaturesFile>(`${RAW_BASE}/optionalfeatures.json`).then(
-      (file) => (file?.optionalfeature ?? []).filter((f) => f.featureType?.includes("AI")),
-    );
+    infusionsPromise = loadAllOptionalFeatures().then((all) => all.filter((f) => f.featureType?.includes("AI")));
   }
   return infusionsPromise;
+}
+
+// Scelte opzionali per classe (Compendio, vedi ClassChoicesSection in components/personaggi/
+// weapons-spells.tsx): stesso file optionalfeatures.json di loadInfusions sopra, filtrato per
+// classe invece che sempre sullo stesso tipo fisso. Solo i tipi disponibili alla classe BASE
+// (non legati a una sottoclasse specifica, es. Manovre del Guerriero Combattente in Prima Linea o
+// Discipline Elementali del Monaco Via dei Quattro Elementi — questa scheda non traccia la
+// sottoclasse come campo strutturato, mostrarle a TUTTI i Guerrieri/Monaci sarebbe fuorviante per
+// chi non ha quella sottoclasse) — coerente col principio "meglio onesto e parziale che sbagliato".
+export const CLASS_OPTIONAL_FEATURE_TYPES: Record<string, { label: string; types: string[] }> = {
+  warlock: { label: "Suppliche occulte e Voto del Patto", types: ["EI", "PB"] },
+  fighter: { label: "Stile di combattimento", types: ["FS:F"] },
+  paladin: { label: "Stile di combattimento", types: ["FS:P"] },
+  ranger: { label: "Stile di combattimento", types: ["FS:R"] },
+  bard: { label: "Stile di combattimento", types: ["FS:B"] },
+  sorcerer: { label: "Metamagia", types: ["MM"] },
+};
+
+let optionalFeatureLoadersByKey: Map<string, Promise<RawOptionalFeature[]>> | null = null;
+/** Carica le optional feature per un insieme di tipi (es. ["EI","PB"] per un Warlock) — cache per
+ * combinazione esatta di tipi, così due chiamate con la stessa combinazione riusano la stessa
+ * promise invece di rifiltrare/rifetchare ad ogni render. */
+export function loadOptionalFeaturesByTypes(types: string[]): Promise<RawOptionalFeature[]> {
+  optionalFeatureLoadersByKey ??= new Map();
+  const key = [...types].sort().join(",");
+  let promise = optionalFeatureLoadersByKey.get(key);
+  if (!promise) {
+    promise = loadAllOptionalFeatures().then((all) => all.filter((f) => f.featureType?.some((t) => types.includes(t))));
+    optionalFeatureLoadersByKey.set(key, promise);
+  }
+  return promise;
 }
 
 let classDataPromise: Promise<ClassData> | null = null;

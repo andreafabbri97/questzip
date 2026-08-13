@@ -352,15 +352,13 @@ function EntriesBlockOrIa({
   iaText?: string | null;
 }) {
   if (language === "it" && iaText) {
-    return (
-      <div className="space-y-2">
-        {iaText.split("\n\n").map((paragrafo, index) => (
-          <p key={index} className="text-sm text-foreground leading-relaxed">
-            {paragrafo}
-          </p>
-        ))}
-      </div>
-    );
+    // La cache (compendio_traduzione_ia) separa nome/corpo di ogni tratto con un singolo "\n" (vedi
+    // scripts/ita-compendio/self-translate-fetch.mjs), MAI "\n\n" — trattarlo come un blocco unico
+    // (comportamento precedente) mostrava un intero muro di testo senza andare mai a capo, es. la
+    // razza Aasimar con "Età...Taglia...Scurovisione..." tutto incollato. Normalizzato a "\n\n" così
+    // TestoStrutturato (già usato per le Regole) riconosce ogni nome di tratto corto come sottotitolo
+    // e ogni corpo come paragrafo a sé — nessuna ritraduzione richiesta, è solo una riformattazione.
+    return <TestoStrutturato testo={iaText.split("\n").filter(Boolean).join("\n\n")} />;
   }
   return <EntriesBlock entries={entries} language={language} />;
 }

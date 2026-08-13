@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { newCharacter, spellAttackBonus, weaponAbilityModifier, weaponAttackBonus, type Character } from "@/lib/dnd";
-import { SpellListSection, WeaponsSection } from "./weapons-spells";
+import { ClassChoicesSection, SpellListSection, WeaponsSection } from "./weapons-spells";
 import type { DiceRollerPreset } from "@/components/dice-roller-modal";
 import { loadSpells } from "@/lib/fivetools/data";
 import { findCompendioMatch } from "@/lib/fivetools/mention-search";
@@ -13,11 +13,19 @@ import { findCompendioMatch } from "@/lib/fivetools/mention-search";
 // (loadInventoryItems/loadInfusions, mai chiamate davvero perché Autocomplete è sostituito con lo
 // stub sotto) perché SpellListSection la chiama direttamente, non solo tramite Autocomplete, per
 // precompilare il dado danno degli incantesimi già in elenco (vedi test dedicato più sotto).
-vi.mock("@/lib/fivetools/data", () => ({
-  loadSpells: vi.fn().mockResolvedValue([]),
-  loadInventoryItems: vi.fn().mockResolvedValue([]),
-  loadInfusions: vi.fn().mockResolvedValue([]),
-}));
+// importOriginal invece di un factory "a vuoto": CLASS_OPTIONAL_FEATURE_TYPES (usata da
+// ClassChoicesSection per decidere se mostrarsi affatto, in modo sincrono) deve restare la mappa
+// VERA, solo le funzioni che fanno fetch di rete vanno mockate.
+vi.mock("@/lib/fivetools/data", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/fivetools/data")>();
+  return {
+    ...actual,
+    loadSpells: vi.fn().mockResolvedValue([]),
+    loadInventoryItems: vi.fn().mockResolvedValue([]),
+    loadInfusions: vi.fn().mockResolvedValue([]),
+    loadOptionalFeaturesByTypes: vi.fn().mockResolvedValue([]),
+  };
+});
 
 vi.mock("@/components/dice-roller-modal", () => ({
   DiceRollerModal: ({ preset }: { preset: DiceRollerPreset | null }) =>
@@ -360,5 +368,46 @@ describe("SpellListSection", () => {
     // il valore scelto dal giocatore sia rimasto intatto.
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.getByLabelText("Dado danno di Fire Bolt")).toHaveValue("9d9");
+  });
+});
+
+describe("ClassChoicesSection", () => {
+  it("non si mostra per una classe senza scelte opzionali mappate (es. Ladro)", () => {
+    const character = baseCharacter({ classi: [{ nome: "Ladro", livello: 5 }] });
+    render(<ClassChoicesSection character={character} onChange={() => {}} />);
+    expect(screen.queryByText("Scelte di classe")).not.toBeInTheDocument();
+  });
+
+  it("mostra le suppliche occulte e il voto del patto per un Warlock", () => {
+    const character = baseCharacter({ classi: [{ nome: "Warlock", livello: 5 }] });
+    render(<ClassChoicesSection character={character} onChange={() => {}} />);
+    expect(screen.getByText("Scelte di classe")).toBeInTheDocument();
+    expect(screen.getByText("Suppliche occulte e Voto del Patto")).toBeInTheDocument();
+  });
+
+  it("un personaggio multiclasse Warlock/Guerriero vede entrambe le etichette insieme", () => {
+    const character = baseCharacter({
+      classi: [
+        { nome: "Warlock", livello: 3 },
+        { nome: "Guerriero", livello: 2 },
+      ],
+    });
+    render(<ClassChoicesSection character={character} onChange={() => {}} />);
+    expect(screen.getByText(/Suppliche occulte e Voto del Patto/)).toBeInTheDocument();
+    expect(screen.getByText(/Stile di combattimento/)).toBeInTheDocument();
+  });
+
+  it("aggiungere una scelta chiama onChange con una nuova voce vuota in scelteClasse", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const character = baseCharacter({ classi: [{ nome: "Warlock", livello: 5 }] });
+    render(<ClassChoicesSection character={character} onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as Character;
+    expect(next.scelteClasse).toHaveLength(1);
+    expect(next.scelteClasse[0].nome).toBe("");
   });
 });

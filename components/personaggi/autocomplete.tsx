@@ -5,6 +5,17 @@ import { bestItalianName, useItalianSearchIndex } from "@/lib/fivetools/compendi
 import { type CompendiumKind } from "@/lib/fivetools/data";
 import { translateText, useTranslatedText } from "@/lib/fivetools/translate";
 
+// Esportata per essere testabile in isolamento (vedi autocomplete.test.ts) senza dover montare
+// l'intero componente (che tira in useItalianSearchIndex/next-auth). 0 = corrispondenza esatta,
+// 1 = "inizia con", 2 = "contiene" — un nome comune come "Dagger" deve sempre battere una variante
+// più lunga come "Dagger of Venom" quando entrambe combaciano con la stessa query.
+export function matchScore(name: string, needle: string): number {
+  const lower = name.toLowerCase();
+  if (lower === needle) return 0;
+  if (lower.startsWith(needle)) return 1;
+  return 2;
+}
+
 export function Autocomplete<T extends { name: string; source: string }>({
   value,
   onChange,
@@ -70,20 +81,37 @@ export function Autocomplete<T extends { name: string; source: string }>({
   // nomi italiani veri, non solo contro la resa live.
   const italianIndex = useItalianSearchIndex(kind ?? "incantesimi", !!kind);
 
+  // Punteggio di rilevanza (0 = migliore): senza, un nome comune come "Dagger"/"Pugnale" resta
+  // sempre fuori dagli 8 suggerimenti quando esistono decine di varianti magiche che lo contengono
+  // come sottostringa (es. "Dagger of Venom", "Bracer of Flying Daggers") — bug reale segnalato
+  // dall'utente ("se scrivo dagger/pugnale non mi trova il pugnale semplice"), identico sia in
+  // italiano sia in inglese: non è la traduzione a fallire, è il taglio ai primi 8 risultati che
+  // arriva PRIMA di raggiungere la voce comune nell'ordine grezzo del catalogo (oggetti magici
+  // elencati per primi, oggetti comuni dopo, vedi loadInventoryItems). Corrispondenza esatta e
+  // "inizia con" hanno sempre priorità su "contiene", a prescindere da quale campo (nome inglese,
+  // query tradotta, nome italiano) ha prodotto il match.
+  // null = nessuna corrispondenza su nessuno dei tre campi (nome inglese, query tradotta, nome
+  // italiano) — l'opzione va scartata, non solo ordinata in fondo.
+  function bestMatchScore(o: T): number | null {
+    const italianName = bestItalianName(italianIndex, o.name, o.source);
+    const scores = [
+      o.name.toLowerCase().includes(query) ? matchScore(o.name, query) : null,
+      translatedQuery && o.name.toLowerCase().includes(translatedQuery)
+        ? matchScore(o.name, translatedQuery)
+        : null,
+      italianName && italianName.toLowerCase().includes(query) ? matchScore(italianName, query) : null,
+    ].filter((s): s is number => s !== null);
+    return scores.length > 0 ? Math.min(...scores) : null;
+  }
+
   const suggestions =
     options && query.length >= 2
-      ? Array.from(
-          new Map(
-            options
-              .filter((o) => {
-                if (o.name.toLowerCase().includes(query)) return true;
-                if (translatedQuery && o.name.toLowerCase().includes(translatedQuery)) return true;
-                const italianName = bestItalianName(italianIndex, o.name, o.source);
-                return !!italianName && italianName.toLowerCase().includes(query);
-              })
-              .map((o) => [o.name, o]),
-          ).values(),
-        ).slice(0, 8)
+      ? Array.from(new Map(options.map((o) => [o.name, o])).values())
+          .map((option) => ({ option, score: bestMatchScore(option) }))
+          .filter((entry): entry is { option: T; score: number } => entry.score !== null)
+          .sort((a, b) => a.score - b.score)
+          .slice(0, 8)
+          .map((entry) => entry.option)
       : [];
 
   return (

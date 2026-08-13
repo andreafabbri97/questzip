@@ -189,6 +189,43 @@ function resolveMonster(entry, rawByKey, cache, depth = 0) {
 
 // Testo descrittivo inglese appiattito, un estrattore per categoria perché la forma dei dati
 // grezzi 5etools è diversa per ciascuna (vedi RawSpell/RawCreature/... in lib/fivetools/data.ts).
+// Come flattenEntries, ma raggruppa nome+corpo di ogni tratto in UN'unica stringa "Nome: corpo" —
+// stessa correzione applicata in self-translate-fetch.mjs (che duplica questi estrattori), vedi
+// il commento lì per il bug reale che questo risolve (razze/talenti/ecc mostrati come muro di testo).
+function namedUnits(entries) {
+  if (!entries) return [];
+  const units = [];
+  for (const entry of entries) {
+    if (typeof entry === "string") {
+      units.push(stripTags(entry));
+      continue;
+    }
+    switch (entry.type) {
+      case "list":
+        for (const item of entry.items ?? []) units.push(listItemText(item));
+        break;
+      case "entries":
+      case "section":
+        if (entry.name) {
+          const body = flattenEntries(entry.entries).join(" ");
+          units.push(body ? `${stripTags(entry.name)}: ${body}` : stripTags(entry.name));
+        } else {
+          units.push(...namedUnits(entry.entries));
+        }
+        break;
+      case "item":
+        units.push(listItemText(entry));
+        break;
+      case "quote":
+        units.push(...namedUnits(entry.entries));
+        break;
+      default:
+        break;
+    }
+  }
+  return units;
+}
+
 function englishText(kind, raw) {
   if (kind === "mostri") {
     const parts = [];
@@ -200,7 +237,7 @@ function englishText(kind, raw) {
     return parts.join("\n");
   }
   if (kind === "classi") return ""; // nessun testo descrittivo nel loader attuale (solo crunch meccanico)
-  return flattenEntries(raw.entries).join("\n");
+  return namedUnits(raw.entries).join("\n\n");
 }
 
 // Testo ufficiale già nel DB, appiattito nello stesso spirito — un estrattore per categoria dato

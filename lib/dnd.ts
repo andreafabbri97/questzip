@@ -259,6 +259,13 @@ const rawCharacterSchema = z.object({
   // di "talenti" (solo nome), mostrate in UI solo se il personaggio ha almeno un livello da
   // Artefice fra le proprie classi.
   infusioniConosciute: z.array(knownFeatSchema).default([]),
+  // Scelte opzionali di classe (suppliche occulte/voto del patto del Warlock, stile di
+  // combattimento di Guerriero/Paladino/Ranger/Bardo, metamagia dello Stregone...) — stesso
+  // formato di "talenti", un'unica lista non differenziata per tipo: un personaggio multiclasse
+  // (es. Warlock/Guerriero) le vede semplicemente tutte insieme in una sola sezione "Scelte di
+  // classe", mostrata solo se almeno una delle classi del personaggio ne ha di disponibili (vedi
+  // CLASS_OPTIONAL_FEATURE_TYPES in lib/fivetools/data.ts).
+  scelteClasse: z.array(knownFeatSchema).default([]),
   note: z.string().default(""),
   // Timestamp (epoch ms) dell'ultima modifica — non mostrato in UI, serve solo al backup su
   // account (vedi app/actions/character-sync.ts) per capire, fra la copia locale e quella sul
@@ -411,6 +418,7 @@ export function newCharacter(): Character {
     armi: [],
     talenti: [],
     infusioniConosciute: [],
+    scelteClasse: [],
     note: "",
     aggiornatoAl: Date.now(),
   };

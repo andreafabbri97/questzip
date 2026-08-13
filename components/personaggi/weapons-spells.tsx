@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
@@ -20,7 +20,15 @@ import {
   type Weapon,
 } from "@/lib/dnd";
 import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
-import { loadInfusions, loadInventoryItems, loadSpells, type RawOptionalFeature, type RawSpell } from "@/lib/fivetools/data";
+import {
+  CLASS_OPTIONAL_FEATURE_TYPES,
+  loadInfusions,
+  loadInventoryItems,
+  loadOptionalFeaturesByTypes,
+  loadSpells,
+  type RawOptionalFeature,
+  type RawSpell,
+} from "@/lib/fivetools/data";
 import { guessDamageDice } from "@/lib/fivetools/entries";
 import { findCompendioMatch } from "@/lib/fivetools/mention-search";
 import { Autocomplete } from "./autocomplete";
@@ -540,6 +548,95 @@ export function InfusionsSection({
               </button>
             </div>
             <LocalInfoButton nome={infusione.nome} loadCandidates={loadInfusionCandidates} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Scelte opzionali di classe (suppliche occulte e voto del patto del Warlock, stile di
+ * combattimento di Guerriero/Paladino/Ranger/Bardo, metamagia dello Stregone...) — richiesto
+ * dall'utente ("le suppliche se un pg è un warlock! o altre cose per altre classi... la scheda
+ * deve capirlo in maniera intelligente tanto c'è segnato classe"). Stesso pattern di
+ * InfusionsSection sopra (lista libera con autocompletamento sul Compendio), ma generalizzato: le
+ * classi rilevanti e i tipi di "optional feature" 5etools da cercare vivono in un'unica mappa
+ * (CLASS_OPTIONAL_FEATURE_TYPES, lib/fivetools/data.ts) invece di un componente a sé per ognuna —
+ * estendere ad altre classi in futuro è solo una riga in quella mappa. Un personaggio multiclasse
+ * (es. Warlock/Guerriero) vede tutte le sue scelte disponibili in un'unica lista combinata invece
+ * di una sezione separata per classe: `scelteClasse` non traccia a quale classe appartiene ogni
+ * voce, stessa scelta già presa per "talenti" (nessuna categorizzazione forzata).
+ */
+export function ClassChoicesSection({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange: (character: Character) => void;
+}) {
+  const types = new Set<string>();
+  const labels = new Set<string>();
+  for (const classe of character.classi) {
+    const entry = CLASS_OPTIONAL_FEATURE_TYPES[canonicalClassName(classe.nome).toLowerCase()];
+    if (!entry) continue;
+    entry.types.forEach((t) => types.add(t));
+    labels.add(entry.label);
+  }
+  const typesKey = [...types].sort().join(",");
+
+  // useCallback (non una funzione inline ricreata ad ogni render): Autocomplete rilancia il
+  // fetch/filtro ogni volta che l'identità di "loader" cambia (vedi il suo useEffect([loader])) —
+  // senza questo, ogni render di questo componente farebbe ripartire la richiesta anche se le
+  // classi del personaggio non sono cambiate. Stabile finché typesKey resta la stessa stringa.
+  const loadChoices = useCallback(() => loadOptionalFeaturesByTypes(typesKey.split(",")), [typesKey]);
+
+  if (types.size === 0) return null;
+
+  const setScelte = (scelteClasse: KnownFeat[]) => onChange({ ...character, scelteClasse });
+  const addScelta = () => setScelte([...character.scelteClasse, { id: crypto.randomUUID(), nome: "" }]);
+
+  const loadChoiceCandidates = async (): Promise<SimpleEntryData[]> => {
+    const features = await loadChoices();
+    return features.map((f) => ({ title: f.name, meta: f.source, entries: f.entries }));
+  };
+
+  return (
+    <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-widest text-muted">Scelte di classe</h2>
+        <button onClick={addScelta} className="text-xs font-bold text-accent-strong hover:underline">
+          + Aggiungi
+        </button>
+      </div>
+      <p className="text-xs text-muted -mt-2">{[...labels].join(" · ")}</p>
+      {character.scelteClasse.length === 0 && (
+        <p className="text-sm text-muted">Nessuna scelta aggiunta ancora.</p>
+      )}
+      <div className="space-y-2">
+        {character.scelteClasse.map((scelta) => (
+          <div key={scelta.id} className="rounded-lg border border-edge bg-surface-raised p-2.5 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Autocomplete
+                  value={scelta.nome}
+                  onChange={(nome) =>
+                    setScelte(character.scelteClasse.map((s) => (s.id === scelta.id ? { ...s, nome } : s)))
+                  }
+                  loader={loadChoices}
+                  placeholder="Agonizing Blast, Archery…"
+                  inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                />
+              </div>
+              <button
+                onClick={() => setScelte(character.scelteClasse.filter((s) => s.id !== scelta.id))}
+                className="text-muted hover:text-danger text-sm shrink-0"
+                aria-label={`Rimuovi ${scelta.nome || "scelta"}`}
+              >
+                ×
+              </button>
+            </div>
+            <LocalInfoButton nome={scelta.nome} loadCandidates={loadChoiceCandidates} />
           </div>
         ))}
       </div>

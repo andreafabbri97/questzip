@@ -156,7 +156,88 @@ const HEADING_FIXES = {
   "C OLLABORARE": "COLLABORARE",
   "NASCO NDERSI": "NASCONDERSI",
   "VARIANTE: GIOCARE SU U NA GRIGLIA": "VARIANTE: GIOCARE SU UNA GRIGLIA",
+  "CLASS I D I F F I CO LTÀ TI P I C H E": "CLASSI DIFFICOLTÀ TIPICHE",
 };
+
+// Tabelle vere (non prosa) che l'estrazione lineare del PDF non può ricostruire — stesso limite
+// già noto per le tabelle di progressione classi (vedi extract_class_table.py): colonne multiple
+// diventano una sequenza piatta di numeri senza righe, irrecuperabile dal solo testo. Qui il
+// contenuto numerico è però regola di gioco FISSA e già verificata altrove nel codice (non testo
+// con copyright da preservare alla lettera), quindi sostituita in blocco con una versione pulita
+// invece di provare a "decifrare" la sequenza corrotta — stesso principio delle tabelle XP/slot
+// incantesimo già hardcoded in lib/dnd-tables.ts. Chiave = testo grezzo ESATTO del blocco corrotto
+// (verificato contro l'output reale del parser prima di scriverlo), valore = tabella sostitutiva
+// nel formato "Tabella — ..." che TestoStrutturato riconosce.
+const TABLE_FIXES = [
+  [
+    "Classe Punteggio di Caratteristica Minimo Barbaro Forza 1 3 Bardo Carisma 1 3 Chierico Saggezza 1 3 Druido Saggezza 1 3 Guerriero Forza 1 3 o Destrezza 1 3 Ladro Destrezza 1 3 Mago I ntelligenza 1 3 Monaco Destrezza 1 3 e Saggezza 1 3 Paladino Forza 13 e Carisma 13 Ranger Destrezza 13 e Saggezza 1 3 Stregone Carisma 1 3 Warlock Carisma 1 3",
+    [
+      "Tabella — Prerequisiti di Multiclasse",
+      "Barbaro — Forza 13",
+      "Bardo — Carisma 13",
+      "Chierico — Saggezza 13",
+      "Druido — Saggezza 13",
+      "Guerriero — Forza 13 o Destrezza 13",
+      "Ladro — Destrezza 13",
+      "Mago — Intelligenza 13",
+      "Monaco — Destrezza 13 e Saggezza 13",
+      "Paladino — Forza 13 e Carisma 13",
+      "Ranger — Destrezza 13 e Saggezza 13",
+      "Stregone — Carisma 13",
+      "Warlock — Carisma 13",
+    ].join("\n"),
+  ],
+  [
+    "INCANTATORE MULTICLASSE: SLOT INCANTESIMO PER LIVELLO DI INCANTESIMO\n\nLivello i · 2· 3° 4• s· 7° s· 9• l o 2· 3• 4• s· 7° g• 9• l i o· , , . 1 2° 1 30 1 4° 1 5° 1 6° 1 7° 1 8° 1 9° l 20·",
+    [
+      "Tabella — Incantatore Multiclasse: Slot Incantesimo per Livello",
+      // Stessi valori di FULL_CASTER_SLOTS in lib/dnd-tables.ts (indice 0 = livello 1), elencati
+      // solo gli slot di livello incantesimo effettivamente disponibili per riga.
+      "Livello 1 — 1° liv. 2",
+      "Livello 2 — 1° liv. 3",
+      "Livello 3 — 1° liv. 4, 2° liv. 2",
+      "Livello 4 — 1° liv. 4, 2° liv. 3",
+      "Livello 5 — 1° liv. 4, 2° liv. 3, 3° liv. 2",
+      "Livello 6 — 1° liv. 4, 2° liv. 3, 3° liv. 3",
+      "Livello 7 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 1",
+      "Livello 8 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 2",
+      "Livello 9 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 1",
+      "Livello 10 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 2",
+      "Livello 11 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 2, 6° liv. 1",
+      "Livello 12 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 2, 6° liv. 1",
+      "Livello 13 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 2, 6° liv. 1, 7° liv. 1",
+      "Livello 14 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 2, 6° liv. 1, 7° liv. 1",
+      "Livello 15 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 2, 6° liv. 1, 7° liv. 1, 8° liv. 1",
+      "Livello 16 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 2, 6° liv. 1, 7° liv. 1, 8° liv. 1",
+      "Livello 17 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 3, 6° liv. 1, 7° liv. 1, 8° liv. 1, 9° liv. 1",
+      "Livello 18 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 3, 6° liv. 2, 7° liv. 1, 8° liv. 1, 9° liv. 1",
+      "Livello 19 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 3, 6° liv. 2, 7° liv. 2, 8° liv. 1, 9° liv. 1",
+      "Livello 20 — 1° liv. 4, 2° liv. 3, 3° liv. 3, 4° liv. 3, 5° liv. 3, 6° liv. 2, 7° liv. 2, 8° liv. 1, 9° liv. 1",
+    ].join("\n"),
+  ],
+  [
+    "Punteggio Modificatore Punteggio Modificatore -5 1 6-1 7 +3 2-3 -4 1 8-1 9 +4 4-5 -3 20-21 +5 6-7 -2 22-23 +6 8-9 -1 24-25 +7 1 0-1 1 +O 26-27 +8 +l 28-29 +9 +2 +1 0 Per determinare",
+    [
+      "Tabella — Punteggio di Caratteristica e Modificatore",
+      "1 — -5",
+      "2-3 — -4",
+      "4-5 — -3",
+      "6-7 — -2",
+      "8-9 — -1",
+      "10-11 — +0",
+      "12-13 — +1",
+      "14-15 — +2",
+      "16-17 — +3",
+      "18-19 — +4",
+      "20-21 — +5",
+      "22-23 — +6",
+      "24-25 — +7",
+      "26-27 — +8",
+      "28-29 — +9",
+      "30 — +10",
+    ].join("\n") + "\n\nPer determinare",
+  ],
+];
 
 // Unisce due frammenti di testo separati da un a-capo del PDF originale: se il frammento
 // precedente finisce con "-" è una parola spezzata a fine riga (es. "legge-" + "ra" -> "leggera",
@@ -202,6 +283,17 @@ function pageBlocks(raw) {
     if (blocks[i].type === "h" && /^[a-zàèéìòù]/.test(blocks[i + 1].text)) {
       blocks[i + 1].text = joinAcrossLineBreak(blocks[i].text, blocks[i + 1].text);
       blocks.splice(i, 1);
+      i--;
+    }
+  }
+
+  // Un titolo che va a capo nel PDF (es. "PUNTEGGI DI CARATTERISTICA" + "E MODIFICATORI") produce
+  // due sottotitoli consecutivi invece di uno solo — fusi con uno spazio, stesso sottotitolo unico
+  // che il lettore vedrebbe stampato sulla pagina vera.
+  for (let i = 0; i < blocks.length - 1; i++) {
+    if (blocks[i].type === "h" && blocks[i + 1].type === "h") {
+      blocks[i].text = `${blocks[i].text} ${blocks[i + 1].text}`;
+      blocks.splice(i + 1, 1);
       i--;
     }
   }
@@ -277,6 +369,7 @@ const sections = CHAPTERS.map(({ titolo, start, end }) => {
   if (fix && testo.startsWith(fix[0])) testo = fix[1] + testo.slice(fix[0].length);
   // Artefatto residuo del capolettera del Cap. 8, dentro la stessa prima parola.
   testo = testo.replace("TOM BA DEGLI ORRORI", "TOMBA DEGLI ORRORI");
+  for (const [search, replace] of TABLE_FIXES) testo = testo.split(search).join(replace);
   return { titolo, testo, pagina: start + 1, fonte: "phb_regole" };
 });
 

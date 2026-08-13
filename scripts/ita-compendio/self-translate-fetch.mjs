@@ -174,6 +174,47 @@ function resolveMonster(entry, rawByKey, cache, depth = 0) {
   return merged;
 }
 
+// Come flattenEntries, ma raggruppa nome+corpo di ogni tratto in UN'unica stringa "Nome: corpo"
+// invece di lasciarli come due elementi separati dell'array — bug reale trovato dall'utente
+// (screenshot della razza Aasimar): il vecchio flattenEntries(...).join("\n") produceva "Età\nGli
+// aasimar...\nTaglia\nGli aasimar..." senza alcun modo di distinguere un nome da un corpo una volta
+// tradotto e salvato, mostrato poi come un unico muro di testo. Stesso principio già in uso per
+// "mostri"/"classi" qui sotto, generalizzato per razze/talenti/oggetti/incantesimi/background/
+// condizioni (l'unico ramo che prima usava il flattenEntries "piatto").
+function namedUnits(entries) {
+  if (!entries) return [];
+  const units = [];
+  for (const entry of entries) {
+    if (typeof entry === "string") {
+      units.push(stripTags(entry));
+      continue;
+    }
+    switch (entry.type) {
+      case "list":
+        for (const item of entry.items ?? []) units.push(listItemText(item));
+        break;
+      case "entries":
+      case "section":
+        if (entry.name) {
+          const body = flattenEntries(entry.entries).join(" ");
+          units.push(body ? `${stripTags(entry.name)}: ${body}` : stripTags(entry.name));
+        } else {
+          units.push(...namedUnits(entry.entries));
+        }
+        break;
+      case "item":
+        units.push(listItemText(entry));
+        break;
+      case "quote":
+        units.push(...namedUnits(entry.entries));
+        break;
+      default:
+        break;
+    }
+  }
+  return units;
+}
+
 function englishText(kind, raw) {
   if (kind === "mostri") {
     const parts = [];
@@ -193,7 +234,7 @@ function englishText(kind, raw) {
       .map((f) => `${stripTags(f.name)} (Liv. ${f.level}): ${flattenEntries(f.entries).join(" ")}`)
       .join("\n");
   }
-  return flattenEntries(raw.entries).join("\n");
+  return namedUnits(raw.entries).join("\n\n");
 }
 
 const LOADERS = {
