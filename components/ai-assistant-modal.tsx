@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { askRulesAssistant } from "@/app/actions/ai-assistant";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { useVisualViewportHeight } from "@/lib/use-visual-viewport-height";
 
 interface Exchange {
   id: string;
@@ -26,6 +27,11 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useBodyScrollLock(open);
+  // vh/dvh non si aggiornano in modo affidabile all'apertura della tastiera in alcuni browser
+  // in-app (Instagram/Facebook, motore Android WebView) — segnalato con screenshot: il modal
+  // restava dimensionato per lo schermo intero, con un vuoto enorme sopra l'input. Quando
+  // l'API è disponibile, l'altezza reale visibile (tastiera esclusa) sovrascrive la classe CSS.
+  const visualViewportHeight = useVisualViewportHeight();
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +59,13 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
     setQuestion("");
     setAsking(true);
     try {
-      const result = await askRulesAssistant(trimmed);
+      // `history` (chiusura sullo stato PRIMA dell'aggiornamento appena sopra) sono gli scambi già
+      // completati mostrati in chat — passati come contesto così una domanda di seguito tipo "e a
+      // un livello più alto?" viene interpretata correttamente invece di ripartire da zero.
+      const previousExchanges = history
+        .filter((entry): entry is typeof entry & { answer: string } => !!entry.answer)
+        .map((entry) => ({ question: entry.question, answer: entry.answer }));
+      const result = await askRulesAssistant(trimmed, previousExchanges);
       setHistory((prev) =>
         prev.map((entry) =>
           entry.id !== id
@@ -82,6 +94,14 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
     >
       <div
         className="card-elevated flex h-[min(34rem,82dvh)] w-full max-w-lg flex-col rounded-xl border border-edge bg-surface overflow-hidden animate-modal-in"
+        style={
+          // Sovrascrive la classe h-[...dvh] con l'altezza REALE misurata da visualViewport
+          // (tastiera esclusa) quando l'API è disponibile — 96px è il margine verticale del
+          // wrapper esterno (pt-16 + p-4 su mobile), 34rem resta il tetto massimo desktop.
+          visualViewportHeight != null
+            ? { height: `min(34rem, ${Math.max(320, visualViewportHeight - 96)}px)` }
+            : undefined
+        }
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-edge px-4 py-2.5 shrink-0">

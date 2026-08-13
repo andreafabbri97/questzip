@@ -31,6 +31,21 @@ export async function generateNpcDraft(nome: string, hint: string): Promise<stri
   return askGemini({ prompt });
 }
 
+/** Bozza di ambientazione/trama per una NUOVA campagna (form di creazione) — stesso principio di
+ * generateHandoutDraft: mai salvata da sola, finisce nel campo descrizione e il futuro master la
+ * rivede/modifica prima di premere "Crea". A differenza degli altri generatori qui sopra non c'è
+ * ancora nessun dato di campagna nel Compendio da ancorare: il prompt lavora solo dal nome. */
+export async function generateCampaignDraft(nome: string, hint: string): Promise<string | null> {
+  const trimmedName = nome.trim();
+  if (!trimmedName) return null;
+
+  const prompt = `Sei l'assistente di un aspirante master di Dungeons & Dragons 5ª edizione che sta per creare una nuova campagna intitolata "${trimmedName}". Scrivi una breve presentazione della campagna ad uso del master: ambientazione e tono generale, la situazione di partenza, un gancio di trama iniziale per coinvolgere il gruppo.${
+    hint.trim() ? ` Indicazioni aggiuntive del master: ${hint.trim()}.` : ""
+  } Scrivi in italiano. Massimo 120 parole. Non usare markdown (niente **asterischi**, niente # per i titoli): il testo finisce in un campo semplice, non renderizzato. Rispondi SOLO col testo della presentazione, senza titoli, virgolette o spiegazioni aggiuntive.`;
+
+  return askGemini({ prompt });
+}
+
 /** Bozza di descrizione/aggancio per una trama (tracciatore quest del master) — stesso principio
  * di generateHandoutDraft: mai salvata da sola, il master la rivede prima di confermare. */
 export async function generateQuestDraft(titolo: string, hint: string): Promise<string | null> {

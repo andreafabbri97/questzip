@@ -135,14 +135,30 @@ async function buildEntryContext(candidate: MentionCandidate): Promise<string | 
   }
 }
 
+export interface RulesAssistantExchange {
+  question: string;
+  answer: string;
+}
+
+// Quanti scambi precedenti si allegano come contesto — un tetto basso perché serve solo a capire
+// domande di seguito ellittiche ("e a un livello più alto?", "e per un mago invece?"), non a
+// sostenere una conversazione lunga: più scambi vecchi nel prompt non migliorano la risposta e
+// costano solo caratteri.
+const MAX_HISTORY = 3;
+
 /** Assistente regole D&D 5e in chat — pensato per una domanda veloce al tavolo ("quanto danno fa
- * X", "come funziona Y"), non una conversazione multi-turno. Ancorato ai dati veri del Compendio
- * di QuestZip quando la domanda cita qualcosa che vi compare (statistiche/testo descrittivo, non
- * solo il nome — vedi buildEntryContext), così le risposte su numeri precisi (danni, CA, GS...)
- * vengono dai dati ufficiali invece che dalla memoria del modello. Ritorna null se l'IA non è
- * disponibile o se qualcosa va storto: la risposta compare comunque accompagnata da un avviso di
- * verificare le regole ufficiali in caso di dubbio (vedi il componente che la mostra). */
-export async function askRulesAssistant(question: string): Promise<string | null> {
+ * X", "come funziona Y"). Ancorato ai dati veri del Compendio di QuestZip quando la domanda cita
+ * qualcosa che vi compare (statistiche/testo descrittivo, non solo il nome — vedi
+ * buildEntryContext), così le risposte su numeri precisi (danni, CA, GS...) vengono dai dati
+ * ufficiali invece che dalla memoria del modello. `history` (opzionale) sono gli scambi precedenti
+ * già mostrati in UI: la conversazione appare come una chat, quindi il modello deve poter capire
+ * un rimando a una domanda precedente invece di ripartire da zero ogni volta. Ritorna null se
+ * l'IA non è disponibile o se qualcosa va storto: la risposta compare comunque accompagnata da un
+ * avviso di verificare le regole ufficiali in caso di dubbio (vedi il componente che la mostra). */
+export async function askRulesAssistant(
+  question: string,
+  history: RulesAssistantExchange[] = [],
+): Promise<string | null> {
   const trimmed = question.trim().slice(0, 500);
   if (!trimmed) return null;
 
@@ -155,7 +171,13 @@ export async function askRulesAssistant(question: string): Promise<string | null
       ? `Dati ufficiali dal Compendio di QuestZip, pertinenti alla domanda (usali come fonte primaria per qualunque dettaglio numerico o di regole — se la domanda chiede altro, ignorali):\n${excerpts.map((e) => `- ${e}`).join("\n")}\n\n`
       : "";
 
-  const prompt = `Sei un mega-esperto di Dungeons & Dragons 5ª edizione (sia edizione 2014 sia 2024): conosci a fondo regole, incantesimi, mostri, classi, oggetti magici e ogni dettaglio meccanico del gioco. Rispondi in italiano, in modo breve, diretto e preciso (massimo 4-5 frasi, niente titoli/elenchi puntati a meno che non aiutino davvero la chiarezza). Se hai a disposizione dati ufficiali del Compendio qui sotto, usali come fonte primaria invece di affidarti solo alla memoria, specialmente per numeri esatti (danni, CA, GS, DC...). Non usare markdown (niente **asterischi** per il grassetto, niente # per i titoli): la risposta viene mostrata come testo semplice, non renderizzata. Se la domanda non riguarda le regole di D&D 5e, dillo chiaramente invece di rispondere a caso.\n\n${context}Domanda: ${trimmed}`;
+  const recentHistory = history.slice(-MAX_HISTORY);
+  const historyBlock =
+    recentHistory.length > 0
+      ? `Scambi precedenti in questa stessa conversazione, per capire domande di seguito che fanno riferimento a quanto già chiesto (es. "e a un livello più alto?"):\n${recentHistory.map((h) => `D: ${h.question}\nR: ${h.answer}`).join("\n")}\n\n`
+      : "";
+
+  const prompt = `Sei un mega-esperto di Dungeons & Dragons 5ª edizione (sia edizione 2014 sia 2024): conosci a fondo regole, incantesimi, mostri, classi, oggetti magici e ogni dettaglio meccanico del gioco. Rispondi in italiano, in modo breve, diretto e preciso (massimo 4-5 frasi, niente titoli/elenchi puntati a meno che non aiutino davvero la chiarezza). Se hai a disposizione dati ufficiali del Compendio qui sotto, usali come fonte primaria invece di affidarti solo alla memoria, specialmente per numeri esatti (danni, CA, GS, DC...). Se la domanda fa riferimento a uno scambio precedente della conversazione, usalo per interpretarla correttamente. Non usare markdown (niente **asterischi** per il grassetto, niente # per i titoli): la risposta viene mostrata come testo semplice, non renderizzata. Se la domanda non riguarda le regole di D&D 5e, dillo chiaramente invece di rispondere a caso.\n\n${historyBlock}${context}Domanda: ${trimmed}`;
 
   return askGemini({ prompt });
 }

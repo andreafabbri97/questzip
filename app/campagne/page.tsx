@@ -20,6 +20,7 @@ import {
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign } from "@/app/actions/characters";
 import { isAiAvailable } from "@/app/actions/ai";
+import { generateCampaignDraft } from "@/app/actions/ai-content-draft";
 import { summarizeSession } from "@/app/actions/ai-session-summary";
 import { abilityModifier, formatModifier, totalLevel, type Ability } from "@/lib/dnd";
 import type { CampaignDetail, CampaignSummary } from "@/components/campagne/types";
@@ -182,6 +183,12 @@ function CreateOrJoin({
   const [nome, setNome] = useState("");
   const [descrizione, setDescrizione] = useState("");
   const [code, setCode] = useState("");
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    isAiAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
+  }, []);
 
   const create = async () => {
     if (!nome.trim()) return;
@@ -192,6 +199,17 @@ function CreateOrJoin({
       onCreated(campaign.id);
     } catch (err) {
       onError((err as Error).message);
+    }
+  };
+
+  const generateDraft = async () => {
+    if (!nome.trim() || generating) return;
+    setGenerating(true);
+    try {
+      const draft = await generateCampaignDraft(nome, descrizione);
+      if (draft) setDescrizione(draft);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -223,6 +241,16 @@ function CreateOrJoin({
           rows={2}
           className="w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground"
         />
+        {aiAvailable && (
+          <button
+            onClick={generateDraft}
+            disabled={!nome.trim() || generating}
+            title="Scrive una bozza di ambientazione/trama in base al nome — la rivedi e modifichi prima di creare la campagna"
+            className="text-xs font-bold text-accent-strong hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
+          >
+            {generating ? "Scrivo…" : "✨ Genera bozza"}
+          </button>
+        )}
         <button
           onClick={create}
           className="w-full glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
