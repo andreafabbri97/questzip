@@ -169,7 +169,14 @@ function SuggestionButton<T extends { name: string; source: string }>({
 }) {
   const italianIndex = useItalianSearchIndex(kind ?? "incantesimi", !!kind);
   const liveTranslated = useTranslatedText(option.name, "en", "it");
-  const translated = kind ? (bestItalianName(italianIndex, option.name, option.source) ?? liveTranslated) : null;
+  // Bug reale trovato dall'utente ("le scelte di classe funzionano solo in inglese"): per un
+  // Autocomplete SENZA kind (infusioni dell'Artefice, scelte di classe — non sono una categoria a
+  // sé del Compendio, vedi ClassChoicesSection) "translated" restava sempre null anche se
+  // liveTranslated (che NON dipende da kind, vedi useTranslatedText sopra) aveva già una traduzione
+  // dal vivo pronta — scartata inutilmente dal guard "kind ?" invece di essere usata come riserva.
+  // bestItalianName tollera già un indice vuoto (kind assente = enabled=false su
+  // useItalianSearchIndex, ritorna semplicemente null), nessun bisogno di quel guard.
+  const translated = bestItalianName(italianIndex, option.name, option.source) ?? liveTranslated;
   const hasItalian = !!translated && translated.toLowerCase() !== option.name.toLowerCase();
   const primaryName = hasItalian ? translated! : option.name;
 

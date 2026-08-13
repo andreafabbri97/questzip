@@ -324,19 +324,19 @@ export function EntriesBlock({
     return <RenderEntries entries={entries} />;
   }
 
-  return (
-    <div className="space-y-2">
-      {translated ? (
-        translated.map((text, index) => (
-          <p key={index} className="text-sm text-foreground leading-relaxed">
-            {text}
-          </p>
-        ))
-      ) : (
+  if (!translated) {
+    return (
+      <div className="space-y-2">
         <p className="text-sm text-muted">Traduzione in corso…</p>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  // Stesso trattamento della cache IA (EntriesBlockOrIa) e del testo ufficiale — TestoStrutturato
+  // riconosce da sé un nome di tratto corto (es. "Età") come sottotitolo quando è un blocco a sé,
+  // così anche il fallback "traduzione dal vivo" (voci non ancora raggiunte dalla cache IA) mostra
+  // sottotitoli invece di un elenco di paragrafi piatti senza distinzione nome/corpo.
+  return <TestoStrutturato testo={translated.join("\n\n")} />;
 }
 
 /** Come EntriesBlock, ma usa il testo tradotto dall'IA (cache compendio_traduzione_ia) quando
@@ -586,11 +586,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
         </div>
         <div className="border-t border-edge pt-3 space-y-2">
           <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
-          {ufficiale.descrizione.split("\n\n").map((paragrafo, index) => (
-            <p key={index} className="text-sm text-foreground leading-relaxed">
-              {paragrafo}
-            </p>
-          ))}
+          <TestoStrutturato testo={ufficiale.descrizione} />
         </div>
       </>
     );
