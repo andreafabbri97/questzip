@@ -1,0 +1,9 @@
+# Vercel CLI non eredita sempre .gitignore in modo affidabile per deploy da sorgente locale
+# (vedi incidente 13/08/2026: `vercel --prod` ha tentato di caricare 2.3GB includendo i PDF
+# ufficiali sottostanti, mai da esporre a un servizio cloud terzo) — elenco esplicito qui.
+/Manuali DND 5E giocatore e DM/
+/scripts/ita-compendio/extracted/
+/scripts/ita-compendio/parsed/
+/node_modules
+/.next/
+/.git
