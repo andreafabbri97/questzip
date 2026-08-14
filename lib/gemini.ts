@@ -1,4 +1,7 @@
 import { ApiError, GoogleGenAI, createPartFromBase64, createUserContent, type Content } from "@google/genai";
+import { sql } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { geminiUsageDaily } from "@/lib/db/schema";
 
 /**
  * Wrapper minimo per Gemini (server-side only, mai importato da un componente client — la chiave
@@ -42,6 +45,24 @@ const MODEL_FALLBACK_CHAIN = [
   "gemini-2.5-flash",
 ];
 
+// Solo informativo (mostrato in Guida/vicino alle funzioni IA, vedi app/actions/gemini-usage.ts) —
+// un errore qui non deve MAI far fallire una risposta IA già riuscita, per questo è avvolto in un
+// try/catch che inghiotte tutto. CURRENT_DATE è calcolato da Postgres, non in JS, per restare
+// coerente a prescindere dal fuso orario dell'istanza serverless che esegue questa funzione.
+async function recordUsage(model: string): Promise<void> {
+  try {
+    await db
+      .insert(geminiUsageDaily)
+      .values({ date: sql`CURRENT_DATE`, model, count: 1 })
+      .onConflictDoUpdate({
+        target: [geminiUsageDaily.date, geminiUsageDaily.model],
+        set: { count: sql`${geminiUsageDaily.count} + 1` },
+      });
+  } catch {
+    // vedi commento sopra: mai propagare un errore di conteggio
+  }
+}
+
 export interface AskGeminiInput {
   prompt: string;
   /** Un file allegato (es. un PDF) da far leggere al modello insieme al prompt — Gemini accetta
@@ -70,7 +91,9 @@ export async function askGemini({ prompt, attachment }: AskGeminiInput): Promise
   for (const model of models) {
     try {
       const response = await ai.models.generateContent({ model, contents });
-      return response.text?.trim() || null;
+      const text = response.text?.trim() || null;
+      if (text) await recordUsage(model);
+      return text;
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) continue;
       return null;

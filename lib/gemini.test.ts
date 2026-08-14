@@ -24,6 +24,21 @@ vi.mock("@google/genai", () => ({
   createUserContent: vi.fn((parts: unknown) => ({ role: "user", parts: Array.isArray(parts) ? parts : [parts] })),
 }));
 
+// Contatore di utilizzo (recordUsage in gemini.ts, vedi app/actions/gemini-usage.ts per la
+// lettura) — mockato con una catena insert().values().onConflictDoUpdate() che registra solo
+// QUANTE volte viene chiamata, non il contenuto esatto (già coperto dalla lettura reale della
+// tabella, qui interessa solo "è stato incrementato sì/no").
+const onConflictDoUpdateMock = vi.fn();
+vi.mock("@/lib/db", () => ({
+  db: {
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: onConflictDoUpdateMock,
+      })),
+    })),
+  },
+}));
+
 // getClient() in lib/gemini.ts cache il client Gemini in una variabile di modulo — per testare
 // scenari con GEMINI_API_KEY/GEMINI_MODEL diversi serve un'istanza FRESCA del modulo per ogni
 // test (vi.resetModules() + import dinamico), altrimenti il secondo test riuserebbe silenziosamente
@@ -38,6 +53,7 @@ describe("askGemini", () => {
 
   beforeEach(() => {
     generateContentMock.mockReset();
+    onConflictDoUpdateMock.mockReset();
     process.env = { ...ORIGINAL_ENV };
   });
 
@@ -114,6 +130,37 @@ describe("askGemini", () => {
     expect(result).toBeNull();
     expect(generateContentMock).toHaveBeenCalledTimes(1);
     expect(generateContentMock.mock.calls[0][0].model).toBe("gemini-2.5-pro");
+  });
+
+  it("registra una richiesta riuscita nel contatore giornaliero", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    generateContentMock.mockResolvedValueOnce({ text: "risposta ok" });
+    const { askGemini } = await importGemini();
+
+    await askGemini({ prompt: "ciao" });
+
+    expect(onConflictDoUpdateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("non registra nulla se la chiamata fallisce del tutto (nessuna quota consumata da tracciare)", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    generateContentMock.mockRejectedValueOnce(new Error("rete assente"));
+    const { askGemini } = await importGemini();
+
+    await askGemini({ prompt: "ciao" });
+
+    expect(onConflictDoUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("un errore nel contatore non fa fallire una risposta IA già riuscita", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    generateContentMock.mockResolvedValueOnce({ text: "risposta ok" });
+    onConflictDoUpdateMock.mockRejectedValueOnce(new Error("DB non raggiungibile"));
+    const { askGemini } = await importGemini();
+
+    const result = await askGemini({ prompt: "ciao" });
+
+    expect(result).toBe("risposta ok");
   });
 });
 

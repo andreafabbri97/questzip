@@ -6,6 +6,7 @@ import {
   getMyCharacters,
   syncCharacterRemote,
 } from "@/app/actions/character-sync";
+import { AiUsageHint } from "@/components/ai-usage-hint";
 import { isAiAvailable } from "@/app/actions/ai";
 import { importCharacterFromPdfWithAi } from "@/app/actions/character-pdf-ai";
 import { useLocalCollection } from "@/lib/storage";
@@ -176,6 +177,7 @@ function ExportImport({
               Annulla
             </button>
           </div>
+          <AiUsageHint />
         </div>
       )}
     </div>

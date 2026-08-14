@@ -19,6 +19,7 @@ import {
   setMemberRole,
 } from "@/app/actions/campaigns";
 import { getPartyForCampaign } from "@/app/actions/characters";
+import { AiUsageHint } from "@/components/ai-usage-hint";
 import { isAiAvailable } from "@/app/actions/ai";
 import { generateCampaignDraft } from "@/app/actions/ai-content-draft";
 import { summarizeSession } from "@/app/actions/ai-session-summary";
@@ -251,6 +252,7 @@ function CreateOrJoin({
             {generating ? "Scrivo…" : "✨ Genera bozza"}
           </button>
         )}
+        {aiAvailable && <AiUsageHint />}
         <button
           onClick={create}
           className="w-full glow-accent rounded-lg bg-accent text-background font-bold px-4 py-2 text-sm hover:bg-accent-strong transition-colors active:scale-[0.97]"
@@ -651,6 +653,7 @@ function CampaignDetailView({
               </button>
             )}
           </div>
+          {aiAvailable && <AiUsageHint />}
           {summaryError && <p className="text-xs text-danger">{summaryError}</p>}
         </div>
 

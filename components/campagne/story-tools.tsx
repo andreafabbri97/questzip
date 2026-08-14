@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AiUsageHint } from "@/components/ai-usage-hint";
 import { isAiAvailable } from "@/app/actions/ai";
 import { generateNpcDraft, generateQuestDraft } from "@/app/actions/ai-content-draft";
 import {
@@ -213,6 +214,7 @@ function NewNpcForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
           {generating ? "Scrivo…" : "✨ Genera bozza"}
         </button>
       )}
+      {aiAvailable && <AiUsageHint />}
       <button
         onClick={create}
         disabled={creating || !nome.trim()}
@@ -614,6 +616,7 @@ function NewQuestForm({ campaignId, onCreated }: { campaignId: string; onCreated
           {generating ? "Scrivo…" : "✨ Genera bozza"}
         </button>
       )}
+      {aiAvailable && <AiUsageHint />}
       <button
         onClick={create}
         disabled={creating || !titolo.trim()}

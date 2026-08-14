@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { askRulesAssistant } from "@/app/actions/ai-assistant";
+import { AiUsageHint } from "@/components/ai-usage-hint";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useVisualViewportHeight } from "@/lib/use-visual-viewport-height";
 
@@ -13,10 +14,17 @@ interface Exchange {
   error: string | null;
 }
 
+// Quanti scambi precedenti passiamo all'IA come contesto — deve combaciare con MAX_HISTORY in
+// app/actions/ai-assistant.ts (non importato da lì apposta: quel file è "use server", questo file
+// è "use client", e il numero serve solo per il testo mostrato qui, non per la logica vera).
+const REMEMBERED_EXCHANGES = 3;
+
 /** Domanda veloce sulle regole D&D 5e durante la sessione ("quanto danno fa X", "come funziona
- * Y") — ogni domanda resta indipendente lato IA (nessun contesto di conversazione passato al
- * prompt, vedi askRulesAssistant), ma le mostriamo impilate come in una chat perché è più
- * naturale da leggere di un singolo riquadro che si sovrascrive ad ogni domanda. Aperto
+ * Y") — mostrate impilate come in una chat perché è più naturale da leggere di un singolo
+ * riquadro che si sovrascrive ad ogni domanda. Gli ultimi REMEMBERED_EXCHANGES scambi vengono
+ * passati all'IA come contesto (vedi askRulesAssistant) così una domanda di seguito tipo "e a un
+ * livello più alto?" viene interpretata correttamente — oltre quella soglia, l'IA non "ricorda"
+ * più gli scambi più vecchi della stessa conversazione. Aperto
  * dall'icona 🤖 in header (vedi components/nav.tsx), mostrata solo quando l'IA è configurata. La
  * cronologia resta in memoria finché non si ricarica la pagina: il componente non si smonta mai
  * alla chiusura (stesso principio di DiceModal), solo "open" ne nasconde il rendering. */
@@ -191,7 +199,9 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
           </div>
           <p className="text-center text-[10px] text-muted">
             Risposte generate da un&apos;IA — verifica sempre le regole ufficiali in caso di dubbio.
+            Ricorda gli ultimi {REMEMBERED_EXCHANGES} scambi di questa conversazione, non l&apos;intera cronologia.
           </p>
+          <AiUsageHint className="text-center" refreshKey={`${history.length}:${asking}`} />
         </div>
       </div>
     </div>,

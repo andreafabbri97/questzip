@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   boolean,
   index,
+  date,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 import type { Ability, Character, ClassEntry } from "@/lib/dnd";
@@ -863,4 +864,23 @@ export const compendioTraduzioniIa = pgTable(
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.kind, table.name, table.source] })],
+);
+
+// Contatore di richieste IA riuscite per giorno/modello — Google non espone un endpoint per
+// leggere la quota RESIDUA del piano gratuito in tempo reale (solo la dashboard aistudio.google.com/
+// rate-limit, ad accesso umano), quindi QuestZip tiene un proprio conteggio di quante richieste ha
+// fatto lei stessa oggi, come approssimazione onesta mostrata in Guida e vicino alle funzioni IA —
+// non è "quota rimasta secondo Google", è "richieste fatte da QuestZip oggi". Per modello (non un
+// solo totale) perché askGemini prova più modelli in fallback (lib/gemini.ts) con quote giornaliere
+// separate: sapere quale modello ha risposto oggi permette di stimare quanta riserva resta su
+// ciascuno. "date" è la data Postgres del server al momento dell'incremento (CURRENT_DATE), non
+// calcolata in JS, per restare coerente a prescindere dal fuso orario dell'istanza che scrive.
+export const geminiUsageDaily = pgTable(
+  "gemini_usage_daily",
+  {
+    date: date("date").notNull(),
+    model: text("model").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.date, table.model] })],
 );

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { IntField } from "@/components/int-field";
+import { AiUsageHint } from "@/components/ai-usage-hint";
 import { isAiAvailable } from "@/app/actions/ai";
 import { generateHandoutDraft } from "@/app/actions/ai-content-draft";
 import {
@@ -498,6 +499,7 @@ function NewHandoutForm({
           {generating ? "Scrivo…" : "✨ Genera bozza"}
         </button>
       )}
+      {aiAvailable && <AiUsageHint />}
       <input
         value={immagineUrl}
         onChange={(event) => setImmagineUrl(event.target.value)}

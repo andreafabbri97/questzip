@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getGeminiUsageToday } from "@/app/actions/gemini-usage";
 
 export const metadata: Metadata = {
   title: "Guida e FAQ",
 };
+
+// Il conteggio richieste IA di oggi (getGeminiUsageToday) va letto ad ogni visita, non congelato
+// nell'HTML prerenderizzato al momento del build — senza questo, Next.js ottimizza la pagina come
+// statica (nessun altro dato dinamico qui la farebbe capire da sola) e il numero mostrato
+// resterebbe quello di quando è stata fatta l'ultima build, non quello vero di oggi.
+export const dynamic = "force-dynamic";
 
 const indice = [
   { href: "#primi-passi", label: "🚀 Primi passi" },
@@ -19,7 +26,8 @@ const indice = [
   { href: "#problemi", label: "🔧 Problemi comuni" },
 ];
 
-export default function GuidaPage() {
+export default async function GuidaPage() {
+  const usoIa = await getGeminiUsageToday();
   return (
     <div className="space-y-10 max-w-2xl lg:max-w-3xl 2xl:max-w-4xl mx-auto">
       <section className="space-y-3">
@@ -393,7 +401,14 @@ export default function GuidaPage() {
             <>
               <strong>Assistente regole</strong> — icona 🤖 in header, apre una domanda/risposta
               veloce sulle regole di D&amp;D 5e ancorata (dove possibile) alle voci vere del
-              Compendio.
+              Compendio. Ricorda gli <strong>ultimi 3 scambi</strong> della stessa conversazione
+              (così una domanda di seguito tipo &quot;e a un livello più alto?&quot; viene capita),
+              ma non l&apos;intera cronologia: oltre quella soglia va ripetuto il contesto.
+            </>,
+            <>
+              <strong>Bozza trama per una nuova campagna</strong> — bottone &quot;✨ Genera
+              bozza&quot; nel form &quot;Nuova campagna&quot;: propone ambientazione/tono/gancio
+              iniziale in base al nome scelto.
             </>,
             <>
               <strong>Riassunto sessioni</strong> — bottone &quot;✨ Genera riassunto IA&quot; nel
@@ -418,6 +433,29 @@ export default function GuidaPage() {
           apposito. Le risposte dell&apos;assistente regole sono generate, non tratte da un testo
           ufficiale: in caso di dubbio importante, verifica sempre sul Compendio o sul manuale.
         </Suggerimento>
+
+        <div className="rounded-lg border border-edge bg-surface-raised p-4 space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted">Quante richieste IA abbiamo oggi</p>
+          {usoIa.total > 0 ? (
+            <p className="text-sm text-foreground">
+              Oggi QuestZip ha fatto <strong>{usoIa.total}</strong> richiest{usoIa.total === 1 ? "a" : "e"}{" "}
+              IA riuscit{usoIa.total === 1 ? "a" : "e"} (su tutte le funzioni sopra insieme).
+            </p>
+          ) : (
+            <p className="text-sm text-foreground">Nessuna richiesta IA ancora oggi.</p>
+          )}
+          <p className="text-sm text-muted">
+            Il piano gratuito di Google concede circa 500 richieste al giorno sul modello
+            principale usato da QuestZip, con una riserva aggiuntiva di backup su altri modelli se
+            quello finisce prima di fine giornata (vedi{" "}
+            <a href="#faq" className="text-accent-strong hover:underline">
+              come funziona il fallback
+            </a>{" "}
+            più sotto). Il numero qui sopra è un conteggio <strong>nostro</strong>, non la quota
+            ufficiale di Google — Google non offre un modo per leggerla in tempo reale dall&apos;app,
+            solo dalla dashboard di chi gestisce la chiave.
+          </p>
+        </div>
       </Sezione>
 
       {/* ---------------------------------------------------------------- FAQ */}
@@ -454,6 +492,14 @@ export default function GuidaPage() {
             precisione assoluta: per le regole che contano davvero (es. il testo esatto di un
             incantesimo in un dubbio importante), fai sempre riferimento all&apos;inglese o al
             manuale cartaceo.
+          </Faq>
+          <Faq domanda="Come funziona il fallback multi-modello dell'IA?">
+            Ogni modello Gemini gratuito ha una propria quota di richieste giornaliere, separata
+            dalle altre. Invece di affidarsi a un solo modello, QuestZip ne prova in ordine una
+            piccola catena: se il primo (quello con la quota più ampia) segnala che la sua quota è
+            esaurita per oggi, si passa automaticamente al successivo, invece di mostrare subito
+            &quot;IA non disponibile&quot;. Su un errore diverso dalla quota esaurita (rete, chiave
+            non valida) si ferma comunque subito, senza provare tutta la catena inutilmente.
           </Faq>
           <Faq domanda="I miei dati sono al sicuro / visibili ad altri?">
             Personaggi e cronologia dadi sono privati, legati al tuo account. Le campagne sono
