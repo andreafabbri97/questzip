@@ -23,7 +23,7 @@ import { AiUsageHint } from "@/components/ai-usage-hint";
 import { isAiAvailable } from "@/app/actions/ai";
 import { generateCampaignDraft } from "@/app/actions/ai-content-draft";
 import { summarizeSession } from "@/app/actions/ai-session-summary";
-import { abilityModifier, formatModifier, totalLevel, type Ability } from "@/lib/dnd";
+import { abilityModifier, formatModifier, totalLevel, type Ability, type KnownFeat } from "@/lib/dnd";
 import type { CampaignDetail, CampaignSummary } from "@/components/campagne/types";
 import { EncounterTracker, GrantXpInline, PartySpellSlots } from "@/components/campagne/combat-tracker";
 import {
@@ -36,6 +36,7 @@ import {
 import { DungeonSection } from "@/components/campagne/dungeon-editor";
 import { RegionalMapSection } from "@/components/campagne/regional-map";
 import { NpcSection, QuestSection, SessionPrepSection } from "@/components/campagne/story-tools";
+import { HomebrewSection } from "@/components/campagne/homebrew";
 
 export default function CampaignsPage() {
   return (
@@ -280,6 +281,41 @@ function CreateOrJoin({
   );
 }
 
+// Prima il master vedeva solo caratteristiche/PF/CA/slot di un personaggio in Party — non la
+// build completa (talenti presi, infusioni dell'Artefice, scelte di classe come suppliche
+// occulte/stile di combattimento), segnalato dall'utente. Sola lettura: queste liste arrivano già
+// pronte da getPartyForCampaign (sync fatta dal giocatore stesso, mai modificabili da qui). Non
+// mostra nulla se il personaggio non ha ancora nulla in nessuna delle tre liste, per non aggiungere
+// un blocco vuoto ad ogni card del Party.
+function PartyBuildDetails({
+  talenti,
+  infusioniConosciute,
+  scelteClasse,
+}: {
+  talenti: KnownFeat[];
+  infusioniConosciute: KnownFeat[];
+  scelteClasse: KnownFeat[];
+}) {
+  const gruppi = [
+    { label: "Talenti", voci: talenti },
+    { label: "Infusioni", voci: infusioniConosciute },
+    { label: "Scelte di classe", voci: scelteClasse },
+  ].filter((g) => g.voci.length > 0);
+
+  if (gruppi.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-1">
+      {gruppi.map((g) => (
+        <p key={g.label} className="text-xs text-muted">
+          <span className="font-semibold text-foreground">{g.label}:</span>{" "}
+          {g.voci.map((v) => v.nome).join(", ")}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function CampaignDetailView({
   campaignId,
   userId,
@@ -441,6 +477,8 @@ function CampaignDetailView({
 
       <RollTablesSection campaignId={campaignId} isDm={isDm} />
 
+      <HomebrewSection campaignId={campaignId} isDm={isDm} />
+
       <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
       <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
         <div className="flex items-center justify-between">
@@ -572,6 +610,11 @@ function CampaignDetailView({
                     )}
                   </div>
                   <PartySpellSlots classi={pc.classi} slotUsati={pc.slotUsati} slotPattoUsati={pc.slotPattoUsati} />
+                  <PartyBuildDetails
+                    talenti={pc.talenti}
+                    infusioniConosciute={pc.infusioniConosciute}
+                    scelteClasse={pc.scelteClasse}
+                  />
                   <div className="mt-2 pt-2 border-t border-edge/60 flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-xs text-muted">
                       {pc.esperienza} XP

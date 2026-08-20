@@ -33,6 +33,9 @@ export async function syncCharacterToCampaign(campaignId: string, character: Cha
     slotUsati: character.slotUsati,
     slotPattoUsati: character.slotPattoUsati,
     esperienza: character.esperienza,
+    talenti: character.talenti,
+    infusioniConosciute: character.infusioniConosciute,
+    scelteClasse: character.scelteClasse,
     note: character.note,
     updatedAt: new Date(),
   };
@@ -67,6 +70,9 @@ export async function getPartyForCampaign(campaignId: string) {
       slotPattoUsati: campaignCharacters.slotPattoUsati,
       esperienza: campaignCharacters.esperienza,
       xpInSospeso: campaignCharacters.xpInSospeso,
+      talenti: campaignCharacters.talenti,
+      infusioniConosciute: campaignCharacters.infusioniConosciute,
+      scelteClasse: campaignCharacters.scelteClasse,
       updatedAt: campaignCharacters.updatedAt,
     })
     .from(campaignCharacters)

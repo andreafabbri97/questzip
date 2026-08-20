@@ -8,6 +8,7 @@ import {
   campaignCharacters,
   campaignEncounters,
   encounterCombatants,
+  type CombatantCondition,
 } from "@/lib/db/schema";
 
 async function requireDmForEncounter(encounterId: string, userId: string) {
@@ -169,7 +170,7 @@ export async function updateCombatant(
     hpAttuali: number;
     hpMax: number;
     nome: string;
-    condizioni: string[];
+    condizioni: CombatantCondition[];
     tiriMorteSuccessi: number;
     tiriMorteFallimenti: number;
     azioniLeggendarieMax: number;

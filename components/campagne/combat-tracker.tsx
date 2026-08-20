@@ -13,6 +13,7 @@ import {
   startEncounter,
   updateCombatant,
 } from "@/app/actions/encounters";
+import { getHomebrewForCampaign } from "@/app/actions/homebrew";
 import {
   CONDIZIONI_5E,
   multiclassCasterLevel,
@@ -64,12 +65,73 @@ function HpValue({
 
 type Combatant = NonNullable<Awaited<ReturnType<typeof getActiveEncounter>>>["combatants"][number];
 
+// Durata opzionale in round: scadeAlRound è un round ASSOLUTO calcolato una volta sola qui
+// (round corrente + round dichiarati), non serve altro codice per farlo scalare — a ogni
+// render lo si confronta di nuovo col round corrente dell'incontro (vedi combat-tracker più
+// sotto). Il campo testo resta libero (non un <select> chiuso su CONDIZIONI_5E): richiesto per
+// coprire anche effetti a tempo che non sono condizioni ufficiali, es. "Bless per 10 round" —
+// CONDIZIONI_5E resta come suggerimento via datalist, non come unica scelta possibile.
+function AddConditionForm({
+  existing,
+  onAdd,
+  onCancel,
+}: {
+  existing: string[];
+  onAdd: (nome: string, durataRound: number) => void;
+  onCancel: () => void;
+}) {
+  const [nome, setNome] = useState("");
+  const [durata, setDurata] = useState(0);
+
+  const confirm = () => {
+    const trimmed = nome.trim();
+    if (!trimmed || existing.includes(trimmed)) return onCancel();
+    onAdd(trimmed, durata);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        autoFocus
+        list="condizioni-5e-datalist"
+        value={nome}
+        onChange={(event) => setNome(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") confirm();
+          if (event.key === "Escape") onCancel();
+        }}
+        placeholder="Nome (es. Bless)"
+        className="w-28 rounded-full border border-edge bg-surface px-2 py-0.5 text-[10px] text-foreground"
+      />
+      <IntField
+        min={0}
+        value={durata}
+        onChange={setDurata}
+        aria-label="Durata in round (0 = indeterminata)"
+        className="w-12 rounded-full border border-edge bg-surface px-1.5 py-0.5 text-[10px] text-foreground text-center"
+        placeholder="round"
+      />
+      <button
+        onClick={confirm}
+        className="text-[10px] font-bold text-accent-strong hover:underline"
+      >
+        ✓
+      </button>
+      <button onClick={onCancel} className="text-[10px] text-muted hover:text-foreground">
+        ×
+      </button>
+    </div>
+  );
+}
+
 function CombatantConditions({
   combatant,
+  round,
   isDm,
   onChange,
 }: {
   combatant: Combatant;
+  round: number;
   isDm: boolean;
   onChange: () => void;
 }) {
@@ -78,55 +140,53 @@ function CombatantConditions({
 
   if (condizioni.length === 0 && !isDm) return null;
 
-  const remove = async (condizione: string) => {
-    await updateCombatant(combatant.id, { condizioni: condizioni.filter((c) => c !== condizione) });
+  const remove = async (nome: string) => {
+    await updateCombatant(combatant.id, { condizioni: condizioni.filter((c) => c.nome !== nome) });
     onChange();
   };
 
-  const add = async (condizione: string) => {
+  const add = async (nome: string, durataRound: number) => {
     setAdding(false);
-    if (!condizione || condizioni.includes(condizione)) return;
-    await updateCombatant(combatant.id, { condizioni: [...condizioni, condizione] });
+    const scadeAlRound = durataRound > 0 ? round + durataRound : null;
+    await updateCombatant(combatant.id, { condizioni: [...condizioni, { nome, scadeAlRound }] });
     onChange();
   };
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {condizioni.map((condizione) => (
-        <span
-          key={condizione}
-          className="flex items-center gap-1 rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-[10px] font-bold text-danger"
-        >
-          {condizione}
-          {isDm && (
-            <button
-              onClick={() => remove(condizione)}
-              aria-label={`Rimuovi condizione ${condizione}`}
-              className="hover:text-foreground"
-            >
-              ×
-            </button>
-          )}
-        </span>
-      ))}
+      {condizioni.map((condizione) => {
+        const remaining = condizione.scadeAlRound === null ? null : condizione.scadeAlRound - round;
+        const expired = remaining !== null && remaining <= 0;
+        return (
+          <span
+            key={condizione.nome}
+            className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+              expired
+                ? "border-danger bg-danger/25 text-danger animate-pulse"
+                : "border-danger/40 bg-danger/10 text-danger"
+            }`}
+          >
+            {condizione.nome}
+            {remaining !== null && <span className="font-normal">· {expired ? "scaduta" : `${remaining} round`}</span>}
+            {isDm && (
+              <button
+                onClick={() => remove(condizione.nome)}
+                aria-label={`Rimuovi condizione ${condizione.nome}`}
+                className="hover:text-foreground"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        );
+      })}
       {isDm &&
         (adding ? (
-          <select
-            autoFocus
-            defaultValue=""
-            onChange={(event) => add(event.target.value)}
-            onBlur={() => setAdding(false)}
-            className="rounded-full border border-edge bg-surface px-2 py-0.5 text-[10px] text-foreground"
-          >
-            <option value="" disabled>
-              Scegli…
-            </option>
-            {CONDIZIONI_5E.filter((c) => !condizioni.includes(c)).map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <AddConditionForm
+            existing={condizioni.map((c) => c.nome)}
+            onAdd={add}
+            onCancel={() => setAdding(false)}
+          />
         ) : (
           <button
             onClick={() => setAdding(true)}
@@ -404,6 +464,13 @@ export function EncounterTracker({
         )}
       </div>
 
+      {combatants.length > 0 && (
+        <datalist id="condizioni-5e-datalist">
+          {CONDIZIONI_5E.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+      )}
       {combatants.length === 0 ? (
         <p className="text-sm text-muted">Nessun combattente ancora.</p>
       ) : (
@@ -486,7 +553,7 @@ export function EncounterTracker({
                 )}
               </div>
 
-              <CombatantConditions combatant={c} isDm={isDm} onChange={refresh} />
+              <CombatantConditions combatant={c} round={encounter.round} isDm={isDm} onChange={refresh} />
 
               {!c.isPg && c.azioniLeggendarieMax > 0 && (
                 <CombatantLegendaryActions combatant={c} isDm={isDm} onChange={refresh} />
@@ -514,6 +581,52 @@ export function EncounterTracker({
       )}
       {error && <p className="text-xs text-danger">{error}</p>}
     </section>
+  );
+}
+
+// Stesso ruolo di MonsterQuickAdd (generators.tsx) ma pescando dal Compendio homebrew della
+// campagna invece che dal mirror 5etools — un mostro inventato dal master deve poter finire in
+// combattimento con la stessa rapidità di uno ufficiale. Mostra anche le voci non ancora
+// rivelate ai giocatori: il master deve poterle usare in combattimento PRIMA di rivelarle (es.
+// un'imboscata a sorpresa), le due cose sono scelte indipendenti.
+function HomebrewMonsterQuickAdd({
+  campaignId,
+  onPick,
+}: {
+  campaignId: string;
+  onPick: (name: string, hp: number, xp: number) => void;
+}) {
+  const [monsters, setMonsters] = useState<Awaited<ReturnType<typeof getHomebrewForCampaign>> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    getHomebrewForCampaign(campaignId).then(setMonsters);
+  }, [campaignId]);
+
+  const list = (monsters ?? []).filter((m) => m.tipo === "mostro");
+  if (list.length === 0) return null;
+
+  return (
+    <select
+      defaultValue=""
+      onChange={(event) => {
+        const monster = list.find((m) => m.id === event.target.value);
+        if (!monster) return;
+        onPick(monster.nome, monster.hpMax ?? 10, monster.xp ?? 0);
+        event.target.value = "";
+      }}
+      className="rounded-md border border-edge bg-surface-raised px-2 py-1.5 text-xs text-foreground max-w-52"
+    >
+      <option value="" disabled>
+        Homebrew della campagna…
+      </option>
+      {list.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.nome} ({m.hpMax ?? "?"} PF)
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -559,6 +672,15 @@ function EncounterDmControls({
         >
           + Aggiungi il party
         </button>
+        <HomebrewMonsterQuickAdd
+          campaignId={campaignId}
+          onPick={(name, hp, monsterXp) => {
+            setNome(name);
+            setHpMax(hp);
+            setAzioniLeggendarieMax(0);
+            setXp(monsterXp);
+          }}
+        />
         <MonsterQuickAdd
           onPick={(name, hp, legendaryActions, monsterXp) => {
             setNome(name);

@@ -15,7 +15,7 @@ import {
   date,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
-import type { Ability, Character, ClassEntry } from "@/lib/dnd";
+import type { Ability, Character, ClassEntry, KnownFeat } from "@/lib/dnd";
 import type { CellType, DungeonRoom, MonsterToken } from "@/lib/dungeon";
 import type { RegionalMarker, TerrainType } from "@/lib/regional-map";
 
@@ -173,6 +173,41 @@ export const campaignRegionalMaps = pgTable("campaign_regional_map", {
   height: integer("height").notNull(),
   cells: jsonb("cells").$type<TerrainType[][]>().notNull(),
   markers: jsonb("markers").$type<RegionalMarker[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const campaignHomebrewTipoEnum = pgEnum("campaign_homebrew_tipo", [
+  "mostro",
+  "oggetto",
+  "incantesimo",
+]);
+
+// Compendio "in proprio" per una singola campagna: un mostro/oggetto/incantesimo inventato dal
+// master che il Compendio ufficiale (mirror 5etools + testo italiano) non ha e non avrà mai,
+// perché semplicemente non esiste nei manuali — richiesto dall'utente. Stesso schema
+// visibile/rivelato di Handout sopra (parte nascosto: un mostro non ancora incontrato o un
+// oggetto non ancora trovato sarebbe uno spoiler se visibile da subito) — ma a differenza di
+// NPC/Trame/Preparazione qui sotto, che restano SEMPRE master-only, un'entry rivelata è pensata
+// per essere consultata dai giocatori come una voce vera del Compendio, non solo letta ad alta
+// voce dal master (vedi getHomebrewForCampaign in app/actions/homebrew.ts).
+// Solo "mostro" ha PF/CA/XP strutturati — serve ad aggiungerlo rapidamente al tracker di
+// combattimento (vedi HomebrewMonsterQuickAdd in combat-tracker.tsx); oggetti/incantesimi
+// restano puro testo libero, non hanno bisogno di alcun campo meccanico per essere utili al tavolo.
+export const campaignHomebrew = pgTable("campaign_homebrew", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tipo: campaignHomebrewTipoEnum("tipo").notNull(),
+  nome: text("nome").notNull(),
+  descrizione: text("descrizione").notNull().default(""),
+  hpMax: integer("hp_max"),
+  classeArmatura: integer("classe_armatura"),
+  xp: integer("xp"),
+  visibile: boolean("visibile").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
@@ -370,6 +405,14 @@ export const campaignCharacters = pgTable(
     // locale (claimXp) e la riga torna a 0.
     xpInSospeso: integer("xp_in_sospeso").notNull().default(0),
     xpAutoLevel: boolean("xp_auto_level").notNull().default(true),
+    // Prima mancavano del tutto: il master vedeva solo caratteristiche/PF/CA/slot di un
+    // personaggio in Party, non la build completa (talenti presi, infusioni dell'Artefice, scelte
+    // di classe come suppliche occulte/stile di combattimento) — segnalato dall'utente. Stesso
+    // formato KnownFeat[] della scheda locale, sola lettura lato campagna (nessuna azione le
+    // modifica da qui, solo syncCharacterToCampaign le porta).
+    talenti: jsonb("talenti").$type<KnownFeat[]>().notNull().default([]),
+    infusioniConosciute: jsonb("infusioni_conosciute").$type<KnownFeat[]>().notNull().default([]),
+    scelteClasse: jsonb("scelte_classe").$type<KnownFeat[]>().notNull().default([]),
     note: text("note").notNull().default(""),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
@@ -412,6 +455,16 @@ export const campaignEncounters = pgTable("campaign_encounter", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
+// scadeAlRound è il numero di round ASSOLUTO (campaign_encounter.round) al quale la condizione
+// finisce, non una durata relativa: calcolato una volta sola al momento dell'aggiunta (round
+// corrente + durata in round dichiarata), da lì basta confrontarlo col round corrente per sapere
+// quanto manca, senza dover scalare nulla ad ogni "Prossimo turno". null = a tempo indeterminato
+// (comportamento di prima, es. una condizione che dura finché qualcuno non la rimuove a mano).
+export interface CombatantCondition {
+  nome: string;
+  scadeAlRound: number | null;
+}
+
 export const encounterCombatants = pgTable("encounter_combatant", {
   id: uuid("id").primaryKey().defaultRandom(),
   encounterId: uuid("encounter_id")
@@ -426,7 +479,7 @@ export const encounterCombatants = pgTable("encounter_combatant", {
   hpMax: integer("hp_max").notNull(),
   hpAttuali: integer("hp_attuali").notNull(),
   isPg: boolean("is_pg").notNull().default(false),
-  condizioni: jsonb("condizioni").$type<string[]>().notNull().default([]),
+  condizioni: jsonb("condizioni").$type<CombatantCondition[]>().notNull().default([]),
   tiriMorteSuccessi: integer("tiri_morte_successi").notNull().default(0),
   tiriMorteFallimenti: integer("tiri_morte_fallimenti").notNull().default(0),
   azioniLeggendarieMax: integer("azioni_leggendarie_max").notNull().default(0),
