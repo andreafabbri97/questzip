@@ -131,6 +131,9 @@ export default async function GuidaPage() {
           nel party, aggiornabile a mano ogni volta che vuoi risincronizzarlo (non un collegamento
           live — se cambi PF a metà sessione sulla tua scheda, il master lo vede quando gestisce i PF
           dal tracker di iniziativa, non perché la tua scheda si aggiorna da sola su schermo suo).
+          Porta con sé caratteristiche/PF/CA/slot incantesimo, ma anche talenti presi, Infusioni
+          dell&apos;Artefice e Scelte di classe (es. suppliche occulte di un Warlock) — così il
+          master vede la build completa, non solo i numeri principali.
         </p>
         <SottoTitolo>Cosa tiene traccia la scheda</SottoTitolo>
         <p>
@@ -172,7 +175,8 @@ export default async function GuidaPage() {
             <><strong>Rubrica NPC</strong> <em>(solo master)</em> — chi popola il mondo: nome, aspetto/personalità/segreti, dove si trova, se è vivo/morto/scomparso. Consultabile al volo durante la sessione invece di doverselo ricordare a memoria.</>,
             <><strong>Trame e missioni</strong> <em>(solo master)</em> — fili narrativi aperti (missione principale, secondarie, agganci) con uno stato (attiva/completata/fallita/in pausa), separati dalle note di sessione così non si perdono tra un diario e l&apos;altro.</>,
             <><strong>Preparazione prossima sessione</strong> <em>(solo master)</em> — l&apos;unica sezione della campagna rivolta al FUTURO invece che al passato: una checklist libera per quello che vuoi preparare prima di giocare di nuovo.</>,
-            <><strong>Party</strong> — le schede dei personaggi collegati dai giocatori, in sola lettura per gli altri.</>,
+            <><strong>Party</strong> — le schede dei personaggi collegati dai giocatori (caratteristiche/PF/CA, talenti, Infusioni, Scelte di classe), in sola lettura per gli altri.</>,
+            <><strong>Compendio homebrew</strong> <em>(creazione riservata al master)</em> — mostri/oggetti/incantesimi inventati per la tua campagna, che il Compendio ufficiale non ha. Nascosti finché il master non li rivela; una volta rivelati sono visibili a tutto il party, consultabili come una voce vera del Compendio (diverso da Rubrica NPC/Trame/Preparazione qui sopra, che restano sempre e solo per il master). I mostri homebrew si possono anche aggiungere al tracker di combattimento, come quelli ufficiali.</>,
             <><strong>Mappa regionale</strong> — un editor di mappe di ambientazione (terreno dipinto a mano + marcatori con etichetta/icona/note), pensata come riferimento statico che il master prepara con calma: nessun token, nessuna fog of war, non cambia mentre i giocatori guardano.</>,
             <><strong>Dungeon</strong> — mappe di gioco vere e proprie, vedi la sezione sotto.</>,
             <><strong>Jukebox</strong> — condividi un URL YouTube o audio diretto: ognuno preme &quot;play&quot; sul proprio dispositivo (i browser bloccano l&apos;autoplay, quindi non parte da solo per tutti).</>,
@@ -225,6 +229,13 @@ export default async function GuidaPage() {
             "A fine scontro, il master vede la somma XP dei mostri sconfitti già calcolata (divisibile per il party, modificabile a mano) e può scegliere \"sali di livello automaticamente se possibile\".",
           ]}
         />
+        <p>
+          Ogni combattente può avere delle <strong>condizioni</strong> (bottone &quot;+
+          Condizione&quot; sulla sua riga) — con una durata opzionale in round (es. &quot;Bless
+          per 10 round&quot;, il nome è libero: non solo le condizioni ufficiali D&amp;D). Il
+          conto alla rovescia scende da solo a ogni &quot;Prossimo turno&quot;, e si evidenzia
+          quando scade — resta comunque una scelta tua rimuoverla davvero, non sparisce da sola.
+        </p>
 
         <SottoTitolo>Dopo il combattimento: XP e salita di livello</SottoTitolo>
         <p>
@@ -379,6 +390,15 @@ export default async function GuidaPage() {
           per richieste di amicizia, inviti campagna e nuovi messaggi in chat — sono per dispositivo,
           quindi vanno attivate su ciascun telefono/browser dove vuoi riceverle.
         </p>
+        <SottoTitolo>Uso offline (wifi assente o instabile)</SottoTitolo>
+        <p>
+          Dopo che le hai aperte almeno una volta online, la scheda Personaggio e i Dadi restano
+          usabili anche senza rete — comodo se al tavolo il wifi va e viene, dato che i loro dati
+          vivono già sul dispositivo. Le funzioni di campagna (chat, party, combattimento) restano
+          invece online-only, dato che sono dati condivisi in tempo reale con il resto del gruppo:
+          se manca la rete un banner in alto te lo segnala subito, e aprire una pagina di campagna
+          offline mostra un avviso invece di un errore grezzo del browser.
+        </p>
       </Sezione>
 
       {/* ---------------------------------------------------------------- Assistenza IA */}
@@ -472,9 +492,12 @@ export default async function GuidaPage() {
             ma non potrai più aggiornarlo.
           </Faq>
           <Faq domanda="Posso usare QuestZip offline?">
-            No: sia le Campagne sia il Compendio hanno bisogno di connessione (dati condivisi su
-            database e mirror del Compendio interrogato in tempo reale). I Personaggi hanno una
-            copia locale, ma aprire l&apos;app la prima volta richiede comunque connessione.
+            In parte. La scheda Personaggio e i Dadi restano usabili anche senza rete (i dati
+            vivono già sul dispositivo), purché tu li abbia già aperti almeno una volta online —
+            un banner in alto ti avvisa quando sei offline. Campagne e Compendio hanno invece
+            sempre bisogno di connessione (dati condivisi su database e mirror del Compendio
+            interrogato in tempo reale): se provi ad aprirli offline vedi un avviso &quot;sei
+            offline&quot; invece di un errore grezzo del browser.
           </Faq>
           <Faq domanda="Come faccio a diventare master di una campagna?">
             Chi crea una campagna ne è automaticamente il master. Un master può anche assegnare il
@@ -532,6 +555,13 @@ export default async function GuidaPage() {
             con modifiche pendenti — se hai chiuso direttamente la scheda del browser (non un
             pulsante &quot;indietro&quot; dentro l&apos;app), il browser stesso avvisa prima di
             chiudere, ma solo se non l&apos;hai ignorato/disattivato.
+          </Faq>
+          <Faq domanda="Cosa succede se il wifi cade a metà sessione?">
+            La scheda Personaggio e i Dadi continuano a funzionare (i dati sono già sul
+            dispositivo, non serve la rete). Le funzioni di campagna (chat, party, combattimento)
+            si fermano finché la rete non torna — un banner in alto avvisa &quot;sei
+            offline&quot;, così è chiaro cosa sta succedendo invece di sembrare un bug. Non serve
+            fare nulla: appena la connessione torna, riprende tutto normalmente.
           </Faq>
           <Faq domanda="Non trovo un'opzione/pagina che mi aspetterei">
             Alcune funzioni sono deliberatamente fuori scope per restare un progetto gestibile per un
