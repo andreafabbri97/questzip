@@ -438,6 +438,11 @@ export function applyLongRest(character: Character): Character {
   return {
     ...character,
     hpAttuali: character.hpMax,
+    // RAW: i PF temporanei scadono e il riposo lungo toglie UN livello di esaurimento. Entrambi
+    // mancavano, e il contatore Affaticamento sta proprio accanto al bottone "Riposo lungo" —
+    // l'utente credeva che il riposo avesse già fatto tutto e restava con un livello di troppo.
+    hpTemporanei: 0,
+    affaticamento: Math.max(0, character.affaticamento - 1),
     dadiVitaUsati: Math.max(0, character.dadiVitaUsati - dadiVitaRecuperati),
     slotUsati: character.slotUsati.map(() => 0),
     slotPattoUsati: 0,
@@ -518,6 +523,25 @@ const CLASS_NAME_IT_TO_EN: Record<string, string> = {
 export function canonicalClassName(nome: string): string {
   const trimmed = nome.trim();
   return CLASS_NAME_IT_TO_EN[trimmed.toLowerCase()] ?? trimmed;
+}
+
+/** Progressione standard degli Aumenti di Caratteristica, valida per quasi tutte le classi. */
+const ASI_LEVELS = [4, 8, 12, 16, 19];
+
+/** Due classi ne ottengono di EXTRA rispetto alla progressione standard (PHB): il Guerriero al 6°
+ * e al 14°, il Ladro al 10°. Con la sola tabella generica il wizard di level-up saltava del tutto
+ * il riquadro "ottieni un Aumento di Caratteristica" a quei livelli, e il giocatore si ritrovava
+ * con un aumento (o un talento) mai assegnato. */
+const ASI_LEVELS_EXTRA: Record<string, number[]> = {
+  fighter: [6, 14],
+  rogue: [10],
+};
+
+/** Se a QUEL livello di QUELLA classe spetta un Aumento di Caratteristica (o un talento). */
+export function isAsiLevelFor(className: string, level: number): boolean {
+  if (ASI_LEVELS.includes(level)) return true;
+  const extra = ASI_LEVELS_EXTRA[canonicalClassName(className).toLowerCase()];
+  return extra?.includes(level) ?? false;
 }
 
 /** Caratteristica da incantatore per classe (chiave inglese minuscola, stessa convenzione di

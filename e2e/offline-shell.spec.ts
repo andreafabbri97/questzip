@@ -28,7 +28,22 @@ test.describe("Robustezza offline (service worker)", () => {
       timeout: 15000,
     });
     await page.reload();
-    await page.waitForTimeout(1500);
+    // Attesa DETERMINISTICA invece di un timeout fisso: si aspetta che la cache del service worker
+    // contenga davvero ogni script della pagina corrente. Con una pausa a tempo il test passava da
+    // solo ma falliva dentro la suite completa (macchina più carica, caching non ancora finito) —
+    // e il numero di chunk cresce ad ogni modifica ai componenti di Personaggi, quindi qualunque
+    // costante scelta oggi sarebbe comunque scaduta domani.
+    await page.waitForFunction(
+      async () => {
+        const cache = await caches.open("questzip-shell-v1");
+        const inCache = new Set((await cache.keys()).map((r) => new URL(r.url).pathname));
+        const serve = [...document.querySelectorAll("script[src]")]
+          .map((el) => el.getAttribute("src"))
+          .filter((src): src is string => !!src && src.startsWith("/_next/static/"));
+        return serve.length > 0 && serve.every((src) => inCache.has(src));
+      },
+      { timeout: 20000 },
+    );
 
     await context.setOffline(true);
     try {
@@ -41,8 +56,13 @@ test.describe("Robustezza offline (service worker)", () => {
         timeout: 5000,
       });
 
-      await page.goto("/campagne", { waitUntil: "domcontentloaded" });
-      await expect(page.getByText("Sei offline")).toBeVisible({ timeout: 10000 });
+      // expect.poll invece di un locator: offline il router di Next.js continua a ritentare il
+      // payload della rotta, quindi la pagina ri-naviga più volte di seguito e un locator legato
+      // al DOM viene interrotto a metà controllo. Qui si rilegge il testo ad ogni tentativo.
+      await page.goto("/campagne", { waitUntil: "domcontentloaded" }).catch(() => {});
+      await expect
+        .poll(() => page.evaluate(() => document.body.innerText).catch(() => ""), { timeout: 15000 })
+        .toContain("Sei offline");
     } finally {
       await context.setOffline(false);
     }

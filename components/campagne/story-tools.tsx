@@ -151,6 +151,7 @@ function NewNpcForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
   const [descrizione, setDescrizione] = useState("");
   const [posizione, setPosizione] = useState("");
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [aiAvailable, setAiAvailable] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -161,12 +162,17 @@ function NewNpcForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
   const create = async () => {
     if (!nome.trim()) return;
     setCreating(true);
+    setError(null);
     try {
       await createNpc(campaignId, nome, descrizione, posizione);
       setNome("");
       setDescrizione("");
       setPosizione("");
       onCreated();
+    } catch (err) {
+      // Senza catch il bottone smetteva solo di girare: il master credeva di aver salvato un NPC
+      // che sul server non esisteva (rete assente, sessione scaduta, requireDm che rifiuta).
+      setError((err as Error).message);
     } finally {
       setCreating(false);
     }
@@ -222,6 +228,7 @@ function NewNpcForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
       >
         {creating ? "Creo…" : "Crea"}
       </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -366,6 +373,17 @@ function NpcDetail({
     }
   };
 
+  // "Annulla" deve riportare i campi ai valori salvati, non solo chiudere il form: i campi sono
+  // stato locale, e changeStatoNow qui sotto rispedisce SEMPRE tutti i campi insieme allo stato —
+  // senza questo ripristino, annullare una modifica e poi cliccare una pillola di stato salvava
+  // in silenzio proprio il testo che si era appena scartato.
+  const annulla = () => {
+    setNome(npc.nome);
+    setDescrizione(npc.descrizione);
+    setPosizione(npc.posizione);
+    setEditing(false);
+  };
+
   // Cambiare stato è un'azione comune abbastanza da meritare un salvataggio immediato, senza
   // dover entrare in modalità modifica solo per quello (es. l'NPC muore durante il combattimento).
   const changeStatoNow = async (next: typeof stato) => {
@@ -402,7 +420,7 @@ function NpcDetail({
           >
             {saving ? "…" : "Salva"}
           </button>
-          <button onClick={() => setEditing(false)} className="text-xs text-muted hover:underline">
+          <button onClick={annulla} className="text-xs text-muted hover:underline">
             Annulla
           </button>
         </div>
@@ -560,6 +578,7 @@ function NewQuestForm({ campaignId, onCreated }: { campaignId: string; onCreated
   const [titolo, setTitolo] = useState("");
   const [descrizione, setDescrizione] = useState("");
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [aiAvailable, setAiAvailable] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -570,11 +589,14 @@ function NewQuestForm({ campaignId, onCreated }: { campaignId: string; onCreated
   const create = async () => {
     if (!titolo.trim()) return;
     setCreating(true);
+    setError(null);
     try {
       await createQuest(campaignId, titolo, descrizione);
       setTitolo("");
       setDescrizione("");
       onCreated();
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setCreating(false);
     }
@@ -624,6 +646,7 @@ function NewQuestForm({ campaignId, onCreated }: { campaignId: string; onCreated
       >
         {creating ? "Creo…" : "Crea"}
       </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -654,6 +677,14 @@ function QuestDetail({
     }
   };
 
+  // Stesso ripristino di NpcDetail: senza, annullare una modifica e poi cambiare stato salvava
+  // comunque il testo appena scartato (changeStatoNow rispedisce sempre tutti i campi).
+  const annulla = () => {
+    setTitolo(quest.titolo);
+    setDescrizione(quest.descrizione);
+    setEditing(false);
+  };
+
   const changeStatoNow = async (next: typeof stato) => {
     setStato(next);
     await updateQuest(quest.id, { titolo, descrizione, stato: next });
@@ -682,7 +713,7 @@ function QuestDetail({
           >
             {saving ? "…" : "Salva"}
           </button>
-          <button onClick={() => setEditing(false)} className="text-xs text-muted hover:underline">
+          <button onClick={annulla} className="text-xs text-muted hover:underline">
             Annulla
           </button>
         </div>
@@ -810,6 +841,10 @@ export function SessionPrepSection({ campaignId, isDm }: { campaignId: string; i
               </span>
               <button
                 onClick={async () => {
+                  // La "✕" è a pochi pixel dalla checkbox "fatto" e l'eliminazione è definitiva:
+                  // le altre quattro sezioni gemelle (NPC, Trame, Handout, Tabelle) confermano
+                  // tutte, questa era l'unica scoperta.
+                  if (!window.confirm(`Eliminare "${item.testo}"?`)) return;
                   await deletePrepItem(item.id);
                   refresh();
                 }}

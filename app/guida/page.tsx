@@ -313,8 +313,8 @@ export default async function GuidaPage() {
       {/* ---------------------------------------------------------------- Dadi */}
       <Sezione id="dadi" titolo="🎲 Dadi">
         <p>
-          Il tiro dadi si apre in un modal sopra qualunque pagina (icona 🎲 nella barra di
-          navigazione): non serve uscire da dove sei per tirare un dado al volo.
+          Il tiro dadi si apre in un modal sopra qualunque pagina (voce &quot;Dadi&quot; nella barra di
+          navigazione — su telefono con l&apos;icona 🎲): non serve uscire da dove sei per tirare un dado al volo.
         </p>
         <ListaPuntata
           voci={[
@@ -327,7 +327,7 @@ export default async function GuidaPage() {
             </>,
             "I dadi 3D fisici veri (se il tuo dispositivo supporta WebGL) rotolano davvero con fisica reale — anche più tipi di dado insieme, nello stesso lancio fisico; se non disponibili, un tumble animato mostra comunque il risultato con lo stesso effetto \"suspense\".",
             "La cronologia dei tiri è sincronizzata sul tuo account: la ritrovi identica su ogni dispositivo dove fai login, non solo su quello con cui hai tirato. Tiene gli ultimi 30 tiri.",
-            "Puoi eliminare un singolo tiro dalla cronologia (✕) o tutta la cronologia in un colpo (chiede conferma, non è reversibile).",
+            "Puoi eliminare un singolo tiro già archiviato in cronologia (✕ accanto al risultato) o tutta la cronologia in un colpo (chiede conferma, non è reversibile).",
           ]}
         />
       </Sezione>

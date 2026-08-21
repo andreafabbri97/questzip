@@ -38,15 +38,30 @@ const ALIGNMENT_NAMES: Record<string, string> = {
   A: "Qualsiasi allineamento",
 };
 
-const TIME_UNIT_NAMES: Record<string, string> = {
-  action: "azione",
-  "bonus": "azione bonus",
-  reaction: "reazione",
-  minute: "minuto",
-  minutes: "minuti",
-  hour: "ora",
-  hours: "ore",
+// I dati 5etools esprimono sempre l'unità al SINGOLARE con la quantità in un campo a parte
+// ("number"/"amount"), quindi le vecchie chiavi plurali (minutes/hours) non venivano mai
+// raggiunte: si leggeva "10 minuto", "8 ora", e le unità mai mappate ("day", "round") restavano
+// in inglese. La forma giusta va quindi scelta in base alla quantità, non cercata come chiave.
+const TIME_UNITS: Record<string, { uno: string; molti: string }> = {
+  action: { uno: "azione", molti: "azioni" },
+  bonus: { uno: "azione bonus", molti: "azioni bonus" },
+  reaction: { uno: "reazione", molti: "reazioni" },
+  round: { uno: "round", molti: "round" },
+  turn: { uno: "turno", molti: "turni" },
+  minute: { uno: "minuto", molti: "minuti" },
+  hour: { uno: "ora", molti: "ore" },
+  day: { uno: "giorno", molti: "giorni" },
+  week: { uno: "settimana", molti: "settimane" },
+  month: { uno: "mese", molti: "mesi" },
+  year: { uno: "anno", molti: "anni" },
 };
+
+function formatTimeUnit(amount: number | undefined, unit: string): string {
+  const names = TIME_UNITS[unit];
+  const quantita = amount ?? 1;
+  const testo = names ? (quantita === 1 ? names.uno : names.molti) : unit;
+  return `${quantita} ${testo}`;
+}
 
 export function formatSchool(code: string): string {
   return SCHOOL_NAMES[code] ?? code;
@@ -68,9 +83,7 @@ export function formatChallengeRating(cr: RawCreature["cr"]): string {
 
 export function formatTime(time: { number: number; unit: string }[] | undefined): string {
   if (!time || time.length === 0) return "—";
-  return time
-    .map(({ number, unit }) => `${number} ${TIME_UNIT_NAMES[unit] ?? unit}`)
-    .join(" o ");
+  return time.map(({ number, unit }) => formatTimeUnit(number, unit)).join(" o ");
 }
 
 const RANGE_SHAPE_NAMES: Record<string, string> = {
@@ -131,8 +144,7 @@ export function formatDuration(
       if (entry.type === "permanent") return "Permanente";
       if (entry.type === "special") return "Speciale";
       if (entry.duration) {
-        const unit = TIME_UNIT_NAMES[entry.duration.type] ?? entry.duration.type;
-        const base = `${entry.duration.amount ?? ""} ${unit}`;
+        const base = formatTimeUnit(entry.duration.amount, entry.duration.type);
         return entry.concentration ? `${base} (concentrazione)` : base;
       }
       return entry.type;
@@ -193,9 +205,48 @@ export function formatSpeed(speed: RawCreature["speed"], lang: "en" | "it" = "en
   return parts.join(", ") || "—";
 }
 
+// Tipo di creatura e rarità restavano gli unici valori in inglese in mezzo a dati tutti tradotti
+// ("Grande dragon, Caotico Malvagio", "💍 very rare"): sono due elenchi chiusi e piccoli, quindi
+// un dizionario è sufficiente — nessuna chiamata di traduzione.
+const CREATURE_TYPE_NAMES: Record<string, string> = {
+  aberration: "aberrazione",
+  beast: "bestia",
+  celestial: "celestiale",
+  construct: "costrutto",
+  dragon: "drago",
+  elemental: "elementale",
+  fey: "folletto",
+  fiend: "immondo",
+  giant: "gigante",
+  humanoid: "umanoide",
+  monstrosity: "mostruosità",
+  ooze: "melma",
+  plant: "pianta",
+  undead: "non morto",
+  swarm: "sciame",
+};
+
+const RARITY_NAMES: Record<string, string> = {
+  common: "comune",
+  uncommon: "non comune",
+  rare: "raro",
+  "very rare": "molto raro",
+  legendary: "leggendario",
+  artifact: "artefatto",
+  varies: "variabile",
+  unknown: "sconosciuta",
+  "unknown (magic)": "sconosciuta (magico)",
+};
+
+export function formatRarity(rarity: string | undefined): string {
+  if (!rarity) return "";
+  return RARITY_NAMES[rarity.toLowerCase()] ?? rarity;
+}
+
 export function formatCreatureType(type: RawCreature["type"]): string {
   if (!type) return "—";
-  return typeof type === "string" ? type : type.type;
+  const raw = typeof type === "string" ? type : type.type;
+  return CREATURE_TYPE_NAMES[raw?.toLowerCase() ?? ""] ?? raw;
 }
 
 const ABILITY_ABBR: Record<string, string> = {

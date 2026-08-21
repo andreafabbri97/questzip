@@ -118,7 +118,10 @@ export default function PublicProfilePage() {
             </button>
             <button
               disabled={busy}
-              onClick={() => act(() => removeFriend(profile.id))}
+              onClick={() => {
+                if (!window.confirm(`Rimuovere ${profile.name ?? "questo utente"} dagli amici?`)) return;
+                act(() => removeFriend(profile.id));
+              }}
               className="text-xs text-muted hover:text-danger disabled:opacity-50"
             >
               Rimuovi amico

@@ -328,6 +328,7 @@ export function CharacterSheet({
                 max={6}
                 value={character.affaticamento}
                 onChange={(value) => set("affaticamento", value)}
+                aria-label="Livello di affaticamento (0-6)"
                 className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground text-center"
               />
             </div>
@@ -338,6 +339,7 @@ export function CharacterSheet({
                 max={6}
                 value={character.livelloFollia}
                 onChange={(value) => set("livelloFollia", value)}
+                aria-label="Livello di follia (0-6)"
                 className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-sm text-foreground text-center"
               />
             </div>

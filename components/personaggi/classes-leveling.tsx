@@ -7,6 +7,7 @@ import {
   ABILITY_LABELS,
   abilityModifier,
   canonicalClassName,
+  isAsiLevelFor,
   feetToMeters,
   formatModifier,
   levelForXp,
@@ -767,7 +768,6 @@ export function XpTracker({
   );
 }
 
-const ASI_LEVELS = [4, 8, 12, 16, 19];
 
 export function LevelUpWizard({
   character,
@@ -794,7 +794,7 @@ export function LevelUpWizard({
 
   const targetClass = character.classi[classIndex];
   const newLevel = targetClass ? targetClass.livello + 1 : 1;
-  const isAsiLevel = ASI_LEVELS.includes(newLevel);
+  const isAsiLevel = isAsiLevelFor(targetClass?.nome ?? "", newLevel);
   const conModifier = abilityModifier(character.caratteristiche.costituzione);
   const averageHp = hitDieFaces ? Math.max(1, Math.floor(hitDieFaces / 2) + 1 + conModifier) : null;
   const displayedHpGain = hpGain ?? averageHp ?? 0;

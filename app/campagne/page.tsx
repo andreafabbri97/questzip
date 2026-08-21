@@ -525,24 +525,48 @@ function CampaignDetailView({
               <div className="flex items-center gap-2 shrink-0">
                 {isDm && member.userId !== userId ? (
                   <>
+                    {/* Entrambe le azioni possono essere RIFIUTATE dal server (è vietato togliere o
+                        retrocedere l'ultimo master, vedi app/actions/campaigns.ts): senza catch la
+                        promise veniva rigettata in silenzio e la tendina restava sul ruolo nuovo
+                        mentre sul server era ancora quello vecchio — la pagina mostrava uno stato
+                        falso senza dire perché. Il refresh() nel finally rimette comunque la UI
+                        in pari con il server, anche quando l'azione è fallita. */}
                     <select
                       value={member.role}
                       onChange={async (event) => {
-                        await setMemberRole(campaignId, member.userId, event.target.value as "dm" | "player");
-                        refresh();
+                        setError(null);
+                        try {
+                          await setMemberRole(campaignId, member.userId, event.target.value as "dm" | "player");
+                        } catch (err) {
+                          setError((err as Error).message);
+                        } finally {
+                          refresh();
+                        }
                       }}
                       className="rounded-md border border-edge bg-surface px-2 py-1 text-xs text-foreground"
+                      aria-label={`Ruolo di ${member.name ?? member.email}`}
                     >
                       <option value="player">Giocatore</option>
                       <option value="dm">Master</option>
                     </select>
                     <button
                       onClick={async () => {
-                        await removeMember(campaignId, member.userId);
-                        refresh();
+                        // Espellere qualcuno da una campagna è distruttivo quanto le altre azioni
+                        // della pagina che la conferma ce l'hanno già (elimina campagna, abbandona,
+                        // elimina nota) — e qui il bersaglio è una "×" minuscola accanto a una
+                        // tendina, facilissima da centrare per sbaglio.
+                        if (!window.confirm(`Rimuovere ${member.name ?? member.email} dalla campagna?`)) return;
+                        setError(null);
+                        try {
+                          await removeMember(campaignId, member.userId);
+                        } catch (err) {
+                          setError((err as Error).message);
+                        } finally {
+                          refresh();
+                        }
                       }}
                       className="text-muted hover:text-danger text-sm"
-                      aria-label={`Rimuovi ${member.name}`}
+                      aria-label={`Rimuovi ${member.name ?? member.email}`}
                     >
                       ×
                     </button>
@@ -566,7 +590,11 @@ function CampaignDetailView({
 
       <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 md:mt-0">
         <h2 className="text-sm uppercase tracking-widest text-muted">Party</h2>
-        {!party || party.length === 0 ? (
+        {/* party === null significa "fetch ancora in volo", non "vuoto": prima all'apertura della
+            campagna si leggeva per un istante che il party era vuoto anche quando non lo era. */}
+        {party === null ? (
+          <p className="text-sm text-muted">Caricamento…</p>
+        ) : party.length === 0 ? (
           <p className="text-sm text-muted">
             Nessun personaggio ancora — portane uno qui da Personaggi.
           </p>

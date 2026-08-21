@@ -5,6 +5,7 @@ import { IntField } from "@/components/int-field";
 import { addCombatant } from "@/app/actions/encounters";
 import { loadCreatures, loadItems, type RawCreature, type RawItem } from "@/lib/fivetools/data";
 import { bestItalianName, useItalianSearchIndex } from "@/lib/fivetools/compendio-detail";
+import { formatRarity } from "@/lib/fivetools/format";
 import { translateText } from "@/lib/fivetools/translate";
 import { generateName, NAME_RACES, type NameRace } from "@/lib/names";
 import {
@@ -192,7 +193,7 @@ export function TreasureGenerator({ defaultCr }: { defaultCr: number }) {
                 {result.magicItems.map((item, index) => (
                   <li key={index} className="text-foreground">
                     <span className="font-bold">{item.name}</span>{" "}
-                    <span className="text-xs text-muted capitalize">({item.rarity})</span>
+                    <span className="text-xs text-muted capitalize">({formatRarity(item.rarity)})</span>
                   </li>
                 ))}
               </ul>

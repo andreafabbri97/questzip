@@ -44,6 +44,7 @@ import {
   formatProficiencyList,
   formatRaceSpeed,
   formatRange,
+  formatRarity,
   formatSchool,
   formatSize,
   formatSpeed,
@@ -991,7 +992,7 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
             ("None"): prima non capitava mai di arrivare qui con un oggetto mundano (ItemDetail
             era raggiungibile solo per oggetti magici), ora che "Verifica"/mention in chat/
             assistente IA coprono anche armi e attrezzatura comune serve filtrarlo esplicitamente. */}
-        {[typeName, item.rarity !== "none" ? item.rarity : null, attunement].filter(Boolean).join(" · ")}
+        {[typeName, item.rarity !== "none" ? formatRarity(item.rarity) : null, attunement].filter(Boolean).join(" · ")}
       </p>
       {hasStats && (
         <div className="grid grid-cols-2 @sm:grid-cols-4 gap-3">

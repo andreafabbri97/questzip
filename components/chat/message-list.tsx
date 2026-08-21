@@ -222,7 +222,16 @@ export function MessageList({
                       bolla "failed" ha invece Riprova/Rimuovi, puramente locali (il messaggio
                       non è mai arrivato al server, niente da cancellare lì). */}
                   {!message.status && canDelete(message) && (
-                    <button onClick={() => onDelete(message.id)} className="hover:text-danger">
+                    <button
+                      onClick={() => {
+                        // Bottoncino da 10px accanto a "Rispondi", facile da sbagliare su mobile —
+                        // e per il master cancella il messaggio DI UN ALTRO per tutto il gruppo,
+                        // senza modo di recuperarlo.
+                        if (!window.confirm("Eliminare questo messaggio per tutti?")) return;
+                        onDelete(message.id);
+                      }}
+                      className="hover:text-danger"
+                    >
                       Elimina
                     </button>
                   )}

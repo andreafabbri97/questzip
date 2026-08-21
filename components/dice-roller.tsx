@@ -552,7 +552,10 @@ export function DiceRoller({
         )}
       </section>
 
-      {history.length > 0 && (
+      {/* > 1 e non > 0: il tiro più recente è già mostrato nel riquadro grande qui sopra e la lista
+          sotto lo salta (slice(1)) — con un solo tiro in cronologia si vedeva il titolo
+          "Cronologia" con sotto il vuoto. */}
+      {history.length > 1 && (
         <section className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-sm uppercase tracking-widest text-muted">Cronologia</h2>

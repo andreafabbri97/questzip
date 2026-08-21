@@ -70,7 +70,12 @@ export const DAMAGE_TYPES = [
 /** Le 14 condizioni standard 5e (stesso elenco usato per il tracker di combattimento in
  * Campagne, vedi components/campagne/combat-tracker.tsx): qui serve per le condizioni attive
  * sulla scheda Personaggio anche fuori da un combattimento (es. una maledizione fra una sessione
- * e l'altra). */
+ * e l'altra).
+ *
+ * NON contiene l'Indebolimento/Esaurimento: non è una condizione a spunta ma una scala 0-6, già
+ * tracciata a parte dal campo "affaticamento" della scheda — averlo anche qui era un doppione che
+ * rubava il posto a "Privo di sensi", di gran lunga la condizione più frequente (0 PF, Sonno,
+ * Blocca Persone) e che invece mancava del tutto. */
 export const CONDIZIONI_5E = [
   "Affascinato",
   "Afferrato",
@@ -78,10 +83,10 @@ export const CONDIZIONI_5E = [
   "Assordato",
   "Avvelenato",
   "Incapacitato",
-  "Indebolito",
   "Invisibile",
   "Paralizzato",
   "Pietrificato",
+  "Privo di sensi",
   "Prono",
   "Spaventato",
   "Stordito",

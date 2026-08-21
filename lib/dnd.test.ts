@@ -9,6 +9,7 @@ import {
   carryingCapacityKg,
   characterSchema,
   knownSpellSchema,
+  isAsiLevelFor,
   levelForXp,
   limitedFeatureSchema,
   multiclassCasterLevel,
@@ -235,6 +236,19 @@ describe("applyLongRest", () => {
     expect(applyLongRest(character).hpAttuali).toBe(30);
   });
 
+  // RAW: i PF temporanei scadono con un riposo lungo e l'esaurimento scende di UN livello.
+  // Mancavano entrambi, e il contatore Affaticamento sta proprio accanto al bottone del riposo.
+  it("azzera i PF temporanei e toglie un livello di affaticamento", () => {
+    const character = makeCharacter({ hpTemporanei: 7, affaticamento: 3 });
+    const dopo = applyLongRest(character);
+    expect(dopo.hpTemporanei).toBe(0);
+    expect(dopo.affaticamento).toBe(2);
+  });
+
+  it("non porta l'affaticamento sotto zero", () => {
+    expect(applyLongRest(makeCharacter({ affaticamento: 0 })).affaticamento).toBe(0);
+  });
+
   it("recupera metà dei dadi vita totali arrotondato per eccesso, senza andare sotto 0", () => {
     // livello totale 4 -> ceil(4/2) = 2 dadi vita recuperati
     const character = makeCharacter({ classi: [{ nome: "Guerriero", livello: 4 }], dadiVitaUsati: 3 });
@@ -358,5 +372,35 @@ describe("schema: nuovi campi con default retrocompatibili", () => {
       "Anello di Protezione",
     ]);
     expect(character.oggettiMagici.every((o) => o.armonizzato)).toBe(true);
+  });
+});
+
+// Il wizard di level-up usava la sola progressione generica [4,8,12,16,19]: per Guerriero e Ladro
+// saltava il riquadro "ottieni un Aumento di Caratteristica" ai loro livelli extra, e il giocatore
+// si ritrovava con un aumento (o un talento) mai assegnato.
+describe("isAsiLevelFor", () => {
+  it("riconosce la progressione standard per una classe qualunque", () => {
+    for (const livello of [4, 8, 12, 16, 19]) {
+      expect(isAsiLevelFor("Mago", livello)).toBe(true);
+    }
+  });
+
+  it("non segnala livelli che non danno alcun aumento", () => {
+    for (const livello of [1, 2, 3, 5, 6, 7, 9, 10, 11, 20]) {
+      expect(isAsiLevelFor("Mago", livello)).toBe(false);
+    }
+  });
+
+  it("aggiunge il 6° e il 14° al Guerriero, il 10° al Ladro", () => {
+    expect(isAsiLevelFor("Guerriero", 6)).toBe(true);
+    expect(isAsiLevelFor("Guerriero", 14)).toBe(true);
+    expect(isAsiLevelFor("Guerriero", 10)).toBe(false);
+    expect(isAsiLevelFor("Ladro", 10)).toBe(true);
+    expect(isAsiLevelFor("Ladro", 6)).toBe(false);
+  });
+
+  it("funziona anche col nome inglese della classe", () => {
+    expect(isAsiLevelFor("Fighter", 6)).toBe(true);
+    expect(isAsiLevelFor("rogue", 10)).toBe(true);
   });
 });

@@ -171,6 +171,10 @@ export function InventorySection({
         </div>
       </div>
 
+      {character.inventario.length === 0 && (
+        <p className="text-sm text-muted">Lo zaino è vuoto — aggiungi un oggetto qui sopra.</p>
+      )}
+
       {character.inventario.length > 0 && (
         <div className="space-y-2">
           {character.inventario.map((item) => (

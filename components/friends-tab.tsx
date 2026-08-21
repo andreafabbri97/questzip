@@ -84,6 +84,12 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
           placeholder="Nome o email…"
           className="input-focus w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
         />
+        {/* Senza questo, una ricerca senza risultati era indistinguibile da "sto ancora cercando":
+            non compariva nulla. La soglia di 2 caratteri è la stessa dell'effetto di ricerca. */}
+        {query.trim().length >= 2 && results.length === 0 && (
+          <p className="text-sm text-muted">Nessun utente trovato.</p>
+        )}
+
         {results.length > 0 && (
           <ul className="space-y-1.5">
             {results.map((u) => (
@@ -103,7 +109,7 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
                 ) : outgoingIds.has(u.id) ? (
                   <span className="text-xs text-muted shrink-0">Richiesta inviata</span>
                 ) : incomingIds.has(u.id) ? (
-                  <span className="text-xs text-muted shrink-0">Ti ha scritto</span>
+                  <span className="text-xs text-muted shrink-0">Ti ha inviato una richiesta</span>
                 ) : (
                   <button
                     onClick={() => act(() => sendFriendRequest(u.id))}
@@ -208,7 +214,13 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
                     💬 Chatta
                   </button>
                   <button
-                    onClick={() => act(() => removeFriend(f.id))}
+                    onClick={() => {
+                      // A 3px da "Chatta", e togliendo l'amicizia sparisce anche la conversazione
+                      // diretta dalla lista di /chat: merita una conferma come le altre azioni
+                      // distruttive dell'app.
+                      if (!window.confirm(`Rimuovere ${f.name ?? "questo utente"} dagli amici?`)) return;
+                      act(() => removeFriend(f.id));
+                    }}
                     className="text-xs text-muted hover:text-danger"
                   >
                     Rimuovi

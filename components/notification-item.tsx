@@ -55,6 +55,7 @@ export function NotificationItem({
   onDelete: () => void;
 }) {
   const [responding, setResponding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const icon = NOTIFICATION_ICONS[notification.tipo]?.(notification.datiJson) ?? "🔔";
   const label = NOTIFICATION_LABELS[notification.tipo]?.(notification.datiJson) ?? notification.tipo;
   const dateLabel = formatRelativeTime(notification.createdAt);
@@ -81,10 +82,16 @@ export function NotificationItem({
   if (inviteId || requestId) {
     const respond = async (accept: boolean) => {
       setResponding(true);
+      setError(null);
       try {
         if (inviteId) await respondToCampaignFriendInvite(inviteId, accept);
         else await respondToFriendRequest(requestId, accept);
         onDelete();
+      } catch (err) {
+        // Casi reali: invito revocato dal master, oppure richiesta già accettata/rifiutata da un
+        // altro dispositivo. Senza catch il click su "Accetta" non produceva NULLA - nessun
+        // messaggio, notifica ferma lì - e sembrava che il bottone fosse rotto.
+        setError((err as Error).message);
       } finally {
         setResponding(false);
       }
@@ -98,7 +105,7 @@ export function NotificationItem({
         </span>
         <div className="min-w-0 flex-1">
           {href ? (
-            <Link href={href} className="block hover:underline">
+            <Link href={href} onClick={onRead} className="block hover:underline">
               {label}
             </Link>
           ) : (
@@ -121,6 +128,7 @@ export function NotificationItem({
               Rifiuta
             </button>
           </div>
+          {error && <p className="text-[10px] text-danger mt-1 font-normal">{error}</p>}
         </div>
         {deleteButton}
       </div>

@@ -222,7 +222,9 @@ function CombatantDeathSaves({
         key={i}
         disabled={!isDm}
         onClick={() => toggle(key, i)}
-        aria-label={`${key} ${i + 1}`}
+        // Il nome del campo in camelCase ("tiriMorteSuccessi 1") finiva letto così com'era da uno
+        // screen reader, unico aria-label non in italiano di tutta l'area.
+        aria-label={`${key === "tiriMorteSuccessi" ? "Successo" : "Fallimento"} ${i + 1} contro la morte di ${combatant.nome}`}
         className={`size-3.5 rounded-full border-2 transition-colors ${
           i < value ? color : "border-edge bg-transparent"
         }`}

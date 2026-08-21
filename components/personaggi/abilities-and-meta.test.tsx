@@ -166,11 +166,15 @@ describe("SpellSlotsSection", () => {
 });
 
 describe("RestSection", () => {
-  it("mostra solo 'Riposo lungo' per un personaggio non Warlock", () => {
+  // Questo test asseriva il contrario ("riposo breve solo per i Warlock"): era il comportamento
+  // di allora, ma nascondeva un difetto reale — il recupero "riposo breve" è selezionabile su
+  // qualunque privilegio a usi limitati di qualunque classe (Punti Ki, Recuperare Energie,
+  // Canalizzare Divinità), e senza il bottone quei personaggi non potevano applicarlo mai.
+  it("mostra entrambi i riposi anche per un personaggio non Warlock", () => {
     const character = baseCharacter();
     render(<RestSection character={character} onChange={() => {}} />);
     expect(screen.getByRole("button", { name: /Riposo lungo/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Riposo breve/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Riposo breve/ })).toBeInTheDocument();
   });
 
   it("riposo lungo: riepiloga le modifiche e, confermato, applica applyLongRest", async () => {

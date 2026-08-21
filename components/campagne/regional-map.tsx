@@ -360,6 +360,10 @@ function RegionalMapViewer({
             {isDm && (
               <button
                 onClick={async () => {
+                  // Con il marcatore spariscono anche le sue note: era l'unica eliminazione
+                  // dell'area senza conferma (la mappa stessa qui sopra, il punto d'interesse e
+                  // il token mostro del dungeon la chiedono tutti).
+                  if (!window.confirm(`Eliminare il marcatore "${selectedMarker.label}" e le sue note?`)) return;
                   await deleteRegionalMarker(map.id, selectedMarker.id);
                   setSelectedMarkerId(null);
                   onChanged();

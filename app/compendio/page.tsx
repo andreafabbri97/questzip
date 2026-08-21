@@ -37,6 +37,7 @@ import {
   formatChallengeRating,
   formatCreatureType,
   formatHitDie,
+  formatRarity,
   formatSchool,
   formatSize,
 } from "@/lib/fivetools/format";
@@ -750,7 +751,7 @@ function EntrySubtitle({ kind, entry }: { kind: CompendiumKind; entry: Entry }) 
     // rarity "none" è il valore reale per gli oggetti mundani (non magici, vedi tab "Oggetti
     // comuni") — mostrarlo testualmente sarebbe "None"; il tipo (Arma da mischia, Attrezzatura...)
     // è un'informazione più utile in quel caso, stessa etichetta della scheda di dettaglio.
-    const label = item.rarity && item.rarity !== "none" ? item.rarity : formatItemTypeName(item);
+    const label = item.rarity && item.rarity !== "none" ? formatRarity(item.rarity) : formatItemTypeName(item);
     return <span className="text-xs text-muted capitalize">{label}</span>;
   }
   if (kind === "razze") {

@@ -277,6 +277,17 @@ export function RestSection({
       if (character.hpAttuali < character.hpMax) {
         lines.push(`Punti ferita ripristinati al massimo (${character.hpMax}).`);
       }
+      // Dichiarati esplicitamente: sono due effetti RAW che il riposo lungo applica davvero (vedi
+      // applyLongRest) ma che il riepilogo non nominava — l'utente li avrebbe visti cambiare senza
+      // averli mai visti annunciare.
+      if (character.hpTemporanei > 0) {
+        lines.push(`Punti ferita temporanei scaduti (erano ${character.hpTemporanei}).`);
+      }
+      if (character.affaticamento > 0) {
+        lines.push(
+          `Affaticamento ridotto di 1 livello (da ${character.affaticamento} a ${character.affaticamento - 1}).`,
+        );
+      }
       const dadiRecuperati = Math.min(character.dadiVitaUsati, Math.ceil(totale / 2));
       if (dadiRecuperati > 0) {
         lines.push(
@@ -325,14 +336,18 @@ export function RestSection({
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {wlLevel > 0 && (
-        <button
-          onClick={() => setPending("breve")}
-          className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-xs font-bold text-accent-strong hover:border-accent transition-colors"
-        >
-          😴 Riposo breve
-        </button>
-      )}
+      {/* Prima il riposo breve compariva SOLO per i Warlock (gli unici a recuperare slot così), ma
+          il recupero "riposo breve" è selezionabile su qualunque privilegio a usi limitati di
+          qualunque classe (Punti Ki del Monaco, Recuperare Energie del Guerriero, Canalizzare
+          Divinità del Chierico...): senza il bottone quei personaggi potevano impostare il
+          recupero ma non applicarlo mai. Ora è sempre disponibile — il riepilogo di conferma
+          spiega comunque caso per caso cosa cambierà davvero. */}
+      <button
+        onClick={() => setPending("breve")}
+        className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-xs font-bold text-accent-strong hover:border-accent transition-colors"
+      >
+        😴 Riposo breve
+      </button>
       <button
         onClick={() => setPending("lungo")}
         className="rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-xs font-bold text-accent-strong hover:border-accent transition-colors"
