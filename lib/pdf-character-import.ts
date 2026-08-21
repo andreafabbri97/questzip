@@ -120,7 +120,7 @@ function parseClasses(classNames: string, classLevels: string): ClassEntry[] {
   return names.map((nome, i) => ({ nome, livello: clamp(levels[i] ?? 1, 1, 20) }));
 }
 
-const SKILL_CODE_TO_NAME: Record<string, string> = {
+export const SKILL_CODE_TO_NAME: Record<string, string> = {
   ACRO: "Acrobazia",
   ANIM: "Addestrare Animali",
   ARC: "Arcano",
@@ -141,7 +141,7 @@ const SKILL_CODE_TO_NAME: Record<string, string> = {
   HIST: "Storia",
 };
 
-const ABILITY_SAVE_FIELD: Record<string, Ability> = {
+export const ABILITY_SAVE_FIELD: Record<string, Ability> = {
   STRprof: "forza",
   DEXprof: "destrezza",
   CONprof: "costituzione",
@@ -154,7 +154,7 @@ const ABILITY_SAVE_FIELD: Record<string, Ability> = {
 // Il bonus d'attacco testuale NON viene riportato: QuestZip lo ricalcola sempre da vivo da
 // caratteristica+competenza+bonus estra, riportarlo come testo fisso rischierebbe solo di restare
 // disallineato alla prima modifica del personaggio.
-const WEAPON_FIELDS = [1, 2, 3, 4, 5, 6].map((n) => ({
+export const WEAPON_FIELDS = [1, 2, 3, 4, 5, 6].map((n) => ({
   name: n === 1 ? "Wpn Name" : `Wpn Name ${n}`,
   dmg: `Wpn${n} Damage`,
 }));
@@ -167,7 +167,7 @@ function parseWeaponDamage(raw: string): { dado: string; tipo: string } {
   return { dado, tipo: rest.replace(/\s+/g, " ").trim() };
 }
 
-const LIMITED_FEAT_FIELDS = [1, 2, 3, 4, 5, 6].map((n) => ({
+export const LIMITED_FEAT_FIELDS = [1, 2, 3, 4, 5, 6].map((n) => ({
   nome: `Limited Feat ${n}`,
   tot: `FeatTot ${n}`,
   left: `FeatLeft ${n}`,
@@ -183,7 +183,7 @@ const LIMITED_FEAT_FIELDS = [1, 2, 3, 4, 5, 6].map((n) => ({
 // riga 3 del 4° livello" è la posizione sulla pagina, non il nome. La tabella è quindi un dato
 // fisso del template (uguale per ogni scheda compilata da questo stesso PDF), non qualcosa che si
 // possa dedurre a runtime nel browser.
-const SPELL_FIELD_MAP: Record<string, { level: number; row: number; role: "name" | "prepared" }> =
+export const SPELL_FIELD_MAP: Record<string, { level: number; row: number; role: "name" | "prepared" }> =
   {
     "0 1": { level: 0, row: 0, role: "name" },
     "0 2": { level: 0, row: 1, role: "name" },

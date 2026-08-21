@@ -159,6 +159,17 @@ export default async function GuidaPage() {
           Se il PDF non è questo template (o è una foto), puoi provare a farlo leggere
           dall&apos;assistente IA — vedi <a href="#assistenza-ia" className="text-accent-strong hover:underline">Assistenza IA</a> più sotto.
         </p>
+        <SottoTitolo>Stampare la scheda (esporta PDF)</SottoTitolo>
+        <p>
+          Il bottone <strong>&quot;📄 PDF&quot;</strong> in cima alla scheda scarica una versione
+          stampabile in A4: pagina 1 con tutto quello che serve in combattimento (caratteristiche,
+          tiri salvezza, abilità, PF, armi con bonus d&apos;attacco e danno già calcolati), pagina 2
+          con equipaggiamento, talenti, infusioni, scelte di classe e personalità, pagina 3 con gli
+          incantesimi — quest&apos;ultima solo se il personaggio ne ha, così un guerriero puro non
+          si stampa un foglio vuoto. Ci sono righe libere per scrivere a penna quello che cambia
+          durante la sessione. Usa i valori che vedi a schermo in quel momento, anche se non li hai
+          ancora salvati.
+        </p>
       </Sezione>
 
       {/* ---------------------------------------------------------------- Campagne */}

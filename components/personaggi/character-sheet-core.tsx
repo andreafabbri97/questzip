@@ -58,6 +58,46 @@ import {
 
 type CloudStatus = "syncing" | "synced" | "error";
 
+/** Scarica la scheda come PDF stampabile. Il generatore (lib/pdf-character-export.ts) tira dentro
+ * pdf-lib, ~300KB di JS: importato dinamicamente al primo click invece che in cima al file, così
+ * non pesa sul caricamento della pagina Personaggi per chi non stampa mai nulla. Esporta la BOZZA
+ * corrente, non l'ultima versione salvata: quello che vedi a schermo è quello che finisce nel PDF. */
+function ExportPdfButton({ character }: { character: Character }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+
+  const scarica = async () => {
+    setBusy(true);
+    setError(false);
+    try {
+      const { exportCharacterToPdf, pdfFileName } = await import("@/lib/pdf-character-export");
+      const bytes = await exportCharacterToPdf(character);
+      const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = pdfFileName(character);
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={scarica}
+      disabled={busy}
+      title="Scarica la scheda come PDF stampabile (usa i valori attuali, anche non salvati)"
+      className="card-elevated-hover rounded-lg border border-edge px-3 py-1.5 text-xs font-bold text-muted transition-colors hover:border-accent hover:text-foreground disabled:opacity-50"
+    >
+      {busy ? "Genero…" : error ? "Errore, riprova" : "📄 PDF"}
+    </button>
+  );
+}
+
 export function CharacterSheet({
   character: persistedCharacter,
   onSave,
@@ -191,6 +231,7 @@ export function CharacterSheet({
         </button>
         <div className="flex items-center gap-2 min-w-0">
           <CloudStatusBadge status={cloudStatus} />
+          <ExportPdfButton character={character} />
           <button
             onClick={handleSave}
             disabled={!dirty}
