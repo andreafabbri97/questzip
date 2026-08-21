@@ -32,6 +32,11 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof getFriendsAndRequests>> | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Awaited<ReturnType<typeof searchUsers>>>([]);
+  // La query a cui i risultati attuali corrispondono davvero, aggiornata INSIEME a essi. Da qui si
+  // ricava "sto ancora cercando" senza un altro stato e senza setState sincrono nell'effetto
+  // (vietato dalle regole del progetto): il debounce di 250ms fa parte dell'attesa, e senza
+  // contarlo "nessun utente trovato" comparirebbe fra un tasto e l'altro mentre si digita.
+  const [resultsQuery, setResultsQuery] = useState("");
   const [error, setError] = useState("");
 
   const refresh = () => {
@@ -46,11 +51,20 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
       if (cancelled) return;
       if (q.length < 2) {
         setResults([]);
+        setResultsQuery(q);
         return;
       }
-      searchUsers(q).then((r) => {
-        if (!cancelled) setResults(r);
-      });
+      searchUsers(q)
+        .then((r) => {
+          if (cancelled) return;
+          setResults(r);
+          setResultsQuery(q);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setResults([]);
+          setResultsQuery(q);
+        });
     }, 250);
     return () => {
       cancelled = true;
@@ -85,8 +99,10 @@ export function FriendsTab({ onChat }: { onChat: (friendId: string) => void }) {
           className="input-focus w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-foreground"
         />
         {/* Senza questo, una ricerca senza risultati era indistinguibile da "sto ancora cercando":
-            non compariva nulla. La soglia di 2 caratteri è la stessa dell'effetto di ricerca. */}
-        {query.trim().length >= 2 && results.length === 0 && (
+            non compariva nulla. Legato a "searching" e non alla sola lunghezza della query,
+            altrimenti il messaggio comparirebbe durante il debounce e il viaggio verso il server —
+            cioè proprio mentre stiamo ancora cercando, l'inverso di quello che deve dire. */}
+        {query.trim().length >= 2 && resultsQuery === query.trim() && results.length === 0 && (
           <p className="text-sm text-muted">Nessun utente trovato.</p>
         )}
 

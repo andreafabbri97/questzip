@@ -552,13 +552,19 @@ export function DiceRoller({
         )}
       </section>
 
-      {/* > 1 e non > 0: il tiro più recente è già mostrato nel riquadro grande qui sopra e la lista
-          sotto lo salta (slice(1)) — con un solo tiro in cronologia si vedeva il titolo
-          "Cronologia" con sotto il vuoto. */}
-      {history.length > 1 && (
+      {/* Il tiro più recente è già mostrato nel riquadro grande qui sopra, e la lista sotto lo salta
+          (slice(1)): con un solo tiro salvato la lista è vuota, quindi il TITOLO va nascosto (prima
+          si vedeva "Cronologia" con sotto il nulla). "Elimina cronologia" resta però legato a
+          history.length > 0, altrimenti un unico tiro salvato non sarebbe più cancellabile in alcun
+          modo — non ha la ✕ perché la ✕ vive solo nelle righe della lista. */}
+      {history.length > 0 && (
         <section className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm uppercase tracking-widest text-muted">Cronologia</h2>
+            {history.length > 1 ? (
+              <h2 className="text-sm uppercase tracking-widest text-muted">Cronologia</h2>
+            ) : (
+              <span />
+            )}
             <button
               onClick={() => setConfirmingClear(true)}
               className="text-xs font-bold text-muted hover:text-danger transition-colors"

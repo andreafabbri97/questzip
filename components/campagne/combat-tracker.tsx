@@ -14,6 +14,7 @@ import {
   updateCombatant,
 } from "@/app/actions/encounters";
 import { getHomebrewForCampaign } from "@/app/actions/homebrew";
+import type { CombatantCondition } from "@/lib/db/schema";
 import {
   CONDIZIONI_5E,
   multiclassCasterLevel,
@@ -124,6 +125,16 @@ function AddConditionForm({
   );
 }
 
+// Le condizioni sono passate da string[] a {nome, scadeAlRound}[] con un semplice cambio di tipo
+// sul jsonb: TypeScript non valida a runtime, quindi una scheda rimasta aperta da prima del deploy
+// (JS vecchio in memoria) può ancora scrivere il formato stringa. Senza questa normalizzazione
+// quelle voci si renderebbero con il nome vuoto e "· NaN round", per giunta irremovibili.
+function normalizzaCondizioni(grezze: Combatant["condizioni"]): CombatantCondition[] {
+  return (grezze as unknown[]).map((c) =>
+    typeof c === "string" ? { nome: c, scadeAlRound: null } : (c as CombatantCondition),
+  );
+}
+
 function CombatantConditions({
   combatant,
   round,
@@ -136,7 +147,7 @@ function CombatantConditions({
   onChange: () => void;
 }) {
   const [adding, setAdding] = useState(false);
-  const condizioni = combatant.condizioni;
+  const condizioni = normalizzaCondizioni(combatant.condizioni);
 
   if (condizioni.length === 0 && !isDm) return null;
 

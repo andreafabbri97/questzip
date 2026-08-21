@@ -341,12 +341,21 @@ function CampaignDetailView({
   // Stato a parte da "error" sopra: quello sostituisce l'intera pagina (fallita l'apertura della
   // campagna), questo è solo un avviso testuale accanto al bottone del riassunto.
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  // Stessa ragione di summaryError: cambiare ruolo o rimuovere un membro può essere RIFIUTATO dal
+  // server ("non puoi togliere l'ultimo master"), ma è un rifiuto locale a quell'azione — scriverlo
+  // in "error" sostituirebbe l'intera schermata della campagna con una riga rossa, senza nemmeno un
+  // modo di tornare indietro (refresh() non azzera "error").
+  const [memberError, setMemberError] = useState<string | null>(null);
 
   const refresh = () => {
     getCampaign(campaignId)
       .then(setDetail)
       .catch((err) => setError(err.message));
-    getPartyForCampaign(campaignId).then(setParty);
+    // Il .catch NON è opzionale ora che party === null significa "sto caricando": senza, un fetch
+    // fallito lascerebbe "Caricamento…" per sempre invece di mostrare la lista vuota.
+    getPartyForCampaign(campaignId)
+      .then(setParty)
+      .catch(() => setParty([]));
   };
 
   useEffect(refresh, [campaignId]);
@@ -504,6 +513,7 @@ function CampaignDetailView({
           </div>
         )}
         {isDm && <InviteFriendPicker campaignId={campaignId} />}
+        {memberError && <p className="text-xs text-danger">{memberError}</p>}
         <ul className="space-y-2">
           {detail.members.map((member) => (
             <li
@@ -534,11 +544,11 @@ function CampaignDetailView({
                     <select
                       value={member.role}
                       onChange={async (event) => {
-                        setError(null);
+                        setMemberError(null);
                         try {
                           await setMemberRole(campaignId, member.userId, event.target.value as "dm" | "player");
                         } catch (err) {
-                          setError((err as Error).message);
+                          setMemberError((err as Error).message);
                         } finally {
                           refresh();
                         }
@@ -556,11 +566,11 @@ function CampaignDetailView({
                         // elimina nota) — e qui il bersaglio è una "×" minuscola accanto a una
                         // tendina, facilissima da centrare per sbaglio.
                         if (!window.confirm(`Rimuovere ${member.name ?? member.email} dalla campagna?`)) return;
-                        setError(null);
+                        setMemberError(null);
                         try {
                           await removeMember(campaignId, member.userId);
                         } catch (err) {
-                          setError((err as Error).message);
+                          setMemberError((err as Error).message);
                         } finally {
                           refresh();
                         }

@@ -171,6 +171,18 @@ function dot(ctx: Ctx, x: number, y: number, mode: "vuoto" | "pieno" | "doppio")
   }
 }
 
+/** Avvisa quando un elenco è stato tagliato per ragioni di spazio. Una scheda STAMPATA che omette
+ * in silenzio la settima arma è peggio di una che lo dichiara: chi la usa al tavolo non ha modo di
+ * accorgersene confrontandola con lo schermo. */
+function notaTroncamento(ctx: Ctx, totale: number, mostrati: number, x: number, y: number): number {
+  if (totale <= mostrati) return y;
+  text(ctx, `… e altri ${totale - mostrati} (non stampati per spazio: vedi l'app)`, x, y, {
+    size: 6.5,
+    color: MUTED,
+  });
+  return y - 10;
+}
+
 /** Righe vuote da compilare a penna: la scheda stampata deve restare utilizzabile al tavolo. */
 function blankLines(ctx: Ctx, x: number, y: number, w: number, count: number, step = 12): number {
   let cursor = y;
@@ -350,7 +362,8 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   text(ctx, "ATTACCO", MARGIN + 250, by, { size: 6.5, bold: true, color: MUTED });
   text(ctx, "DANNO", MARGIN + 310, by, { size: 6.5, bold: true, color: MUTED });
   by -= 11;
-  for (const arma of character.armi.slice(0, 6)) {
+  const armiMostrate = character.armi.slice(0, 6);
+  for (const arma of armiMostrate) {
     const atk = weaponAttackBonus(arma.caratteristica, character.caratteristiche, arma.competente, livello, arma.bonusExtra);
     const dmgMod = weaponAbilityModifier(arma.caratteristica, character.caratteristiche);
     text(ctx, arma.nome, MARGIN + 4, by, { size: 8, maxWidth: 240 });
@@ -361,17 +374,20 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
     });
     by -= 11;
   }
+  by = notaTroncamento(ctx, character.armi.length, armiMostrate.length, MARGIN + 4, by);
   if (character.armi.length === 0) by = blankLines(ctx, MARGIN + 4, by - 2, CONTENT_W - 8, 3);
 
   by -= 8;
   const featY = sectionHeader(ctx, "Privilegi a usi limitati", MARGIN, by, halfW);
   let fy = featY;
-  for (const p of character.privilegiLimitati.slice(0, 8)) {
+  const privilegiMostrati = character.privilegiLimitati.slice(0, 8);
+  for (const p of privilegiMostrati) {
     text(ctx, p.nome, MARGIN + 4, fy, { size: 8, maxWidth: halfW - 110 });
     text(ctx, `${Math.max(0, p.usiMax - p.usiUsati)}/${p.usiMax}`, MARGIN + halfW - 96, fy, { size: 8, bold: true });
     text(ctx, RECUPERO_LABELS[p.recupero], MARGIN + halfW - 66, fy, { size: 6.5, color: MUTED });
     fy -= 11;
   }
+  fy = notaTroncamento(ctx, character.privilegiLimitati.length, privilegiMostrati.length, MARGIN + 4, fy);
   // Righe libere fino in fondo anche qui, non solo negli appunti: su una scheda STAMPATA i
   // privilegi si aggiungono salendo di livello, e lo spazio in fondo alla colonna resterebbe
   // comunque bianco.
@@ -410,6 +426,7 @@ function drawGearPage(ctx: Ctx, character: Character, totPagine: number) {
   }
   // Sempre qualche riga libera dopo l'ultimo oggetto: su una scheda stampata il bottino si
   // aggiunge a penna durante la sessione, un elenco che finisce di netto non lascia spazio.
+  ly = notaTroncamento(ctx, character.inventario.length, mostrati.length, MARGIN + 4, ly);
   ly = blankLines(ctx, MARGIN + 4, ly - 2, halfW - 8, Math.max(4, 10 - mostrati.length), 11);
   ly -= 4;
   const capacita = character.pesoMassimo > 0 ? character.pesoMassimo : carryingCapacityKg(character.caratteristiche.forza);
@@ -424,11 +441,13 @@ function drawGearPage(ctx: Ctx, character: Character, totPagine: number) {
   ly -= 18;
 
   ly = sectionHeader(ctx, "Oggetti magici", MARGIN, ly, halfW);
-  for (const item of character.oggettiMagici.slice(0, 12)) {
+  const magiciMostrati = character.oggettiMagici.slice(0, 12);
+  for (const item of magiciMostrati) {
     text(ctx, item.nome, MARGIN + 12, ly, { size: 8, maxWidth: halfW - 20 });
     dot(ctx, MARGIN + 6, ly + 3, item.armonizzato ? "pieno" : "vuoto");
     ly -= 11;
   }
+  ly = notaTroncamento(ctx, character.oggettiMagici.length, magiciMostrati.length, MARGIN + 4, ly);
   if (character.oggettiMagici.length === 0) ly = blankLines(ctx, MARGIN + 4, ly - 2, halfW - 8, 3);
   ly -= 4;
   text(ctx, "(pallino pieno = armonizzato)", MARGIN + 4, ly, { size: 6.5, color: MUTED });
@@ -593,13 +612,38 @@ function drawSpellsPage(ctx: Ctx, character: Character, totPagine: number) {
   let accumulato = 0;
   let col = 0;
 
+  // Quando anche la seconda colonna finisce lo spazio si SMETTE di disegnare e si tiene il conto:
+  // prima il ciclo esterno proseguiva comunque, piazzando intestazioni e incantesimi sotto il
+  // margine inferiore, cioè fuori dalla pagina stampata e invisibili.
+  let nonStampati = 0;
+
   for (const blocco of blocchi) {
     if (col === 0 && accumulato > 0 && accumulato + blocco.altezza / 2 > meta) col = 1;
     accumulato += blocco.altezza;
+
+    // Serve spazio almeno per l'intestazione più una riga, altrimenti il titolo resterebbe
+    // orfano in fondo alla colonna.
+    if (colY[col] - 32 < MARGIN + 16) {
+      if (col === 0) col = 1;
+      if (colY[col] - 32 < MARGIN + 16) {
+        nonStampati += blocco.spells.length;
+        continue;
+      }
+    }
+
     colY[col] = sectionHeader(ctx, blocco.titolo, colX[col], colY[col], halfW);
+    let esauriti = false;
     for (const spell of blocco.spells) {
+      if (esauriti) {
+        nonStampati++;
+        continue;
+      }
       if (colY[col] < MARGIN + 26) {
-        if (col === 1) break;
+        if (col === 1) {
+          esauriti = true;
+          nonStampati++;
+          continue;
+        }
         col = 1;
         colY[col] = sectionHeader(ctx, `${blocco.titolo} (segue)`, colX[col], colY[col], halfW);
       }
@@ -623,7 +667,11 @@ function drawSpellsPage(ctx: Ctx, character: Character, totPagine: number) {
     }
   }
 
-  text(ctx, "(pallino pieno = preparato)", MARGIN + 4, MARGIN + 2, { size: 6.5, color: MUTED });
+  const legenda =
+    nonStampati > 0
+      ? `(pallino pieno = preparato) - ${nonStampati} incantesimi non stampati per spazio: vedi l'app`
+      : "(pallino pieno = preparato)";
+  text(ctx, legenda, MARGIN + 4, MARGIN + 2, { size: 6.5, color: MUTED });
 
   pageFooter(ctx, 3, totPagine);
 }

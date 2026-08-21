@@ -15,6 +15,17 @@ const CACHE_NAME = "questzip-shell-v1";
 // shell e il JS già in cache di una qualunque di queste pagine per usarli offline.
 const OFFLINE_SAFE_PATHS = ["/", "/personaggi", "/guida", "/offline"];
 
+// Ogni rotta è protetta dal middleware (proxy.ts): a sessione assente o scaduta la richiesta
+// viene REDIRETTA alla pagina di accesso, che risponde 200 — quindi il solo response.ok
+// metterebbe in cache la schermata di login sotto "/", "/personaggi", "/guida" e "/offline".
+// Peggio: /offline non viene mai visitato online, quindi resterebbe avvelenato per sempre, e una
+// risposta "redirected" passata a respondWith() per una navigazione fa lanciare un TypeError —
+// il fallback offline si romperebbe esattamente quando serve. Si mette in cache solo una risposta
+// arrivata davvero da quell'indirizzo.
+function isCacheableResponse(response) {
+  return response.ok && !response.redirected && response.type === "basic";
+}
+
 function isCacheable(url) {
   if (url.origin !== self.location.origin) return false;
   if (url.pathname.startsWith("/_next/static/")) return true;
@@ -33,7 +44,7 @@ self.addEventListener("install", (event) => {
         OFFLINE_SAFE_PATHS.map(async (path) => {
           try {
             const response = await fetch(path);
-            if (response.ok) await cache.put(path, response);
+            if (isCacheableResponse(response)) await cache.put(path, response);
           } catch {
             // Niente rete proprio all'installazione (raro: il file sw.js stesso è appena
             // arrivato via rete) — quel percorso resta scoperto finché non verrà visitato una
@@ -68,8 +79,13 @@ self.addEventListener("activate", (event) => {
 // prima che l'evento "load" del browser si considerasse concluso).
 const NAVIGATION_TIMEOUT_MS = 4000;
 
+// Sentinella (non un errore): il timeout scaduto NON significa "sei offline", significa solo
+// "la rete ci sta mettendo troppo". Va distinto da un fallimento vero, perché la reazione è
+// diversa — vedi il gestore fetch più sotto.
+const TIMED_OUT = Symbol("timeout");
+
 function timeout(ms) {
-  return new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms));
+  return new Promise((resolve) => setTimeout(() => resolve(TIMED_OUT), ms));
 }
 
 // Ogni NAVIGAZIONE viene comunque intercettata, anche verso pagine non cacheable (/campagne,
@@ -88,15 +104,32 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
-      try {
-        const response = isNavigation
-          ? await Promise.race([fetch(request), timeout(NAVIGATION_TIMEOUT_MS)])
-          : await fetch(request);
-        if (response.ok && cacheable) {
+      // Una sola richiesta di rete, riutilizzabile: se il timeout scatta ma non abbiamo nulla in
+      // cache da offrire, si continua ad aspettare PROPRIO questa invece di rifarne un'altra.
+      const network = fetch(request);
+      network.catch(() => {}); // evita un "unhandled rejection" quando non la attendiamo subito
+
+      const salvaInCache = async (response) => {
+        if (cacheable && isCacheableResponse(response)) {
           const cache = await caches.open(CACHE_NAME);
-          cache.put(request, response.clone());
+          await cache.put(request, response.clone());
         }
         return response;
+      };
+
+      try {
+        const esito = isNavigation
+          ? await Promise.race([network, timeout(NAVIGATION_TIMEOUT_MS)])
+          : await network;
+
+        if (esito !== TIMED_OUT) return salvaInCache(esito);
+
+        // Rete lenta, non assente: la cache è un buon compromesso SOLO se contiene davvero questa
+        // pagina. Per una pagina non cacheable (/campagne, /chat) mostrare "sei offline" a chi è
+        // online sarebbe una bugia — meglio aspettare la risposta vera, per quanto lenta.
+        const cached = cacheable ? await caches.match(request) : null;
+        if (cached) return cached;
+        return salvaInCache(await network);
       } catch {
         if (cacheable) {
           const cached = await caches.match(request);

@@ -32,7 +32,11 @@ export function HomebrewSection({ campaignId, isDm }: { campaignId: string; isDm
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const refresh = () => {
-    getHomebrewForCampaign(campaignId).then(setEntries);
+    // Il .catch non è opzionale: entries === null fa restituire null all'intera sezione, quindi un
+    // caricamento fallito la farebbe sparire dalla pagina senza spiegazione invece di mostrarla vuota.
+    getHomebrewForCampaign(campaignId)
+      .then(setEntries)
+      .catch(() => setEntries([]));
   };
   useEffect(refresh, [campaignId]);
 
@@ -180,15 +184,21 @@ function NewHomebrewForm({ campaignId, onCreated }: { campaignId: string; onCrea
   const [classeArmatura, setClasseArmatura] = useState(10);
   const [xp, setXp] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const create = async () => {
     if (!nome.trim()) return;
     setCreating(true);
+    setError(null);
     try {
       await createHomebrewEntry(campaignId, tipo, nome, descrizione, { hpMax, classeArmatura, xp });
       setNome("");
       setDescrizione("");
       onCreated();
+    } catch (err) {
+      // Stessa classe di silenzio già corretta per i form NPC/Trame: senza, il bottone smette solo
+      // di girare e il master crede di aver salvato una voce che sul server non esiste.
+      setError((err as Error).message);
     } finally {
       setCreating(false);
     }
@@ -241,6 +251,7 @@ function NewHomebrewForm({ campaignId, onCreated }: { campaignId: string; onCrea
       >
         {creating ? "Creo…" : "Crea"}
       </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -263,16 +274,32 @@ function HomebrewDetail({
   const [classeArmatura, setClasseArmatura] = useState(entry.classeArmatura ?? 10);
   const [xp, setXp] = useState(entry.xp ?? 0);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
     setSaving(true);
+    setError(null);
     try {
       await updateHomebrewEntry(entry.id, { nome, descrizione, hpMax, classeArmatura, xp });
       setEditing(false);
       onChanged();
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setSaving(false);
     }
+  };
+
+  // "Annulla" ripristina i campi ai valori salvati, non chiude soltanto: stesso motivo di
+  // NpcDetail/QuestDetail, dove lasciare la bozza nello stato locale poteva farla risalire a galla.
+  const annulla = () => {
+    setNome(entry.nome);
+    setDescrizione(entry.descrizione);
+    setHpMax(entry.hpMax ?? 10);
+    setClasseArmatura(entry.classeArmatura ?? 10);
+    setXp(entry.xp ?? 0);
+    setError(null);
+    setEditing(false);
   };
 
   if (editing) {
@@ -307,7 +334,7 @@ function HomebrewDetail({
           >
             {saving ? "…" : "Salva"}
           </button>
-          <button onClick={() => setEditing(false)} className="text-xs text-muted hover:underline">
+          <button onClick={annulla} className="text-xs text-muted hover:underline">
             Annulla
           </button>
         </div>
@@ -334,8 +361,14 @@ function HomebrewDetail({
           <div className="flex items-center gap-2 text-xs shrink-0">
             <button
               onClick={async () => {
-                await toggleHomebrewVisible(entry.id);
-                onChanged();
+                setError(null);
+                try {
+                  await toggleHomebrewVisible(entry.id);
+                } catch (err) {
+                  setError((err as Error).message);
+                } finally {
+                  onChanged();
+                }
               }}
               className={entry.visibile ? "text-accent-strong hover:underline" : "text-muted hover:text-foreground"}
             >
@@ -347,8 +380,13 @@ function HomebrewDetail({
             <button
               onClick={async () => {
                 if (!window.confirm(`Eliminare "${entry.nome}"?`)) return;
-                await deleteHomebrewEntry(entry.id);
-                onDeleted();
+                setError(null);
+                try {
+                  await deleteHomebrewEntry(entry.id);
+                  onDeleted();
+                } catch (err) {
+                  setError((err as Error).message);
+                }
               }}
               className="text-danger hover:underline"
             >
@@ -357,6 +395,7 @@ function HomebrewDetail({
           </div>
         )}
       </div>
+      {error && <p className="text-xs text-danger">{error}</p>}
       {entry.descrizione && <TestoStrutturato testo={entry.descrizione} />}
     </div>
   );

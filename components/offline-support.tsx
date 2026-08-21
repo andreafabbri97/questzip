@@ -51,7 +51,14 @@ export function OfflineSupport() {
   if (online) return null;
 
   return (
-    <div className="sticky top-0 z-40 bg-danger/90 px-4 py-1.5 text-center text-xs font-bold text-background">
+    // NON sticky: la barra di navigazione è già `sticky top-0` (components/nav.tsx), e due elementi
+    // appiccicati entrambi in cima si sovrappongono appena si scorre — il banner finiva sopra
+    // l'header coprendolo. role="status" perché la comparsa dev'essere annunciata anche da un
+    // lettore di schermo, non solo vista.
+    <div
+      role="status"
+      className="bg-danger/90 px-4 py-1.5 text-center text-xs font-bold text-background"
+    >
       📡 Sei offline — scheda personaggio e dadi restano usabili, le funzioni di campagna no.
     </div>
   );
