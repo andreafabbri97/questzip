@@ -3,7 +3,6 @@ import {
   ABILITIES,
   ABILITY_LABELS,
   RECUPERO_LABELS,
-  XP_PER_LEVEL,
   abilityModifier,
   carryingCapacityKg,
   formatModifier,
@@ -19,8 +18,9 @@ import {
   spellSlotsForCasterLevel,
   totalLevel,
   warlockLevel,
+  xpForNextLevel,
   weaponAttackBonus,
-  weaponAbilityModifier,
+  weaponDamageModifier,
   type Character,
 } from "@/lib/dnd";
 import { SKILLS } from "@/lib/dnd-tables";
@@ -298,7 +298,11 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
           character.abilitaCompetenti.includes("Percezione") || character.abilitaEsperte.includes("Percezione"),
           character.abilitaEsperte.includes("Percezione"),
           livello,
-        ) + character.percezionePassivaBonus,
+        ) +
+          character.percezionePassivaBonus +
+          // Anche il bonus per-abilità su Percezione, altrimenti la stessa pagina stampava
+          // "Percezione +6" nella tabella Abilità e una passiva da 15 invece di 16.
+          (character.abilitaBonus["Percezione"] ?? 0),
       ),
     ],
   ];
@@ -365,7 +369,7 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   const armiMostrate = character.armi.slice(0, 6);
   for (const arma of armiMostrate) {
     const atk = weaponAttackBonus(arma.caratteristica, character.caratteristiche, arma.competente, livello, arma.bonusExtra);
-    const dmgMod = weaponAbilityModifier(arma.caratteristica, character.caratteristiche);
+    const dmgMod = weaponDamageModifier(arma.caratteristica, character.caratteristiche, arma.bonusExtra);
     text(ctx, arma.nome, MARGIN + 4, by, { size: 8, maxWidth: 240 });
     text(ctx, formatModifier(atk), MARGIN + 250, by, { size: 8, bold: true });
     text(ctx, `${arma.dadoDanno}${dmgMod !== 0 ? formatModifier(dmgMod) : ""} ${arma.tipoDanno}`.trim(), MARGIN + 310, by, {
@@ -684,7 +688,9 @@ export async function exportCharacterToPdf(character: Character): Promise<Uint8A
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   const livello = totalLevel(character.classi);
-  const prossimoLivello = XP_PER_LEVEL[Math.min(19, livello)] ?? null;
+  // xpForNextLevel ritorna già null al 20°: con Math.min(19, ...) si finiva per stampare la soglia
+  // del livello GIÀ raggiunto ("355000 XP (prossimo livello: 355000)").
+  const prossimoLivello = xpForNextLevel(livello);
   pdf.setTitle(safe(`${character.nome} - scheda QuestZip`));
   pdf.setCreator("QuestZip");
   // XP non trova posto fra i riquadri della pagina 1 (spazio) ma resta un dato della scheda:

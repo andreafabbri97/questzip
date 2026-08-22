@@ -9,6 +9,7 @@ import {
   carryingCapacityKg,
   characterSchema,
   knownSpellSchema,
+  hitDiceRecoveredOnLongRest,
   isAsiLevelFor,
   levelForXp,
   limitedFeatureSchema,
@@ -402,5 +403,54 @@ describe("isAsiLevelFor", () => {
   it("funziona anche col nome inglese della classe", () => {
     expect(isAsiLevelFor("Fighter", 6)).toBe(true);
     expect(isAsiLevelFor("rogue", 10)).toBe(true);
+  });
+});
+
+// Il monoclasse usa la TABELLA DELLA SUA CLASSE (metà arrotondata per eccesso), il multiclasse la
+// regola del multiclasse (metà per difetto). Applicare la seconda anche al primo, com'era prima,
+// toglieva slot a ogni livello dispari e nascondeva del tutto i gradi appena sbloccati a 9/13/17.
+describe("multiclassCasterLevel — mezzi incantatori", () => {
+  it("paladino/ranger MONOCLASSE: metà arrotondata per eccesso", () => {
+    expect(multiclassCasterLevel([{ nome: "Paladino", livello: 5 }])).toBe(3);
+    expect(multiclassCasterLevel([{ nome: "Ranger", livello: 9 }])).toBe(5);
+    expect(multiclassCasterLevel([{ nome: "Paladino", livello: 13 }])).toBe(7);
+    expect(multiclassCasterLevel([{ nome: "Paladino", livello: 17 }])).toBe(9);
+    expect(multiclassCasterLevel([{ nome: "Paladino", livello: 20 }])).toBe(10);
+  });
+
+  it("paladino/ranger di 1° livello non lanciano ancora incantesimi", () => {
+    expect(multiclassCasterLevel([{ nome: "Paladino", livello: 1 }])).toBe(0);
+    expect(multiclassCasterLevel([{ nome: "Ranger", livello: 1 }])).toBe(0);
+    expect(multiclassCasterLevel([{ nome: "Paladino", livello: 2 }])).toBe(1);
+  });
+
+  it("in MULTICLASSE resta la regola del multiclasse: metà per difetto", () => {
+    expect(multiclassCasterLevel([
+      { nome: "Paladino", livello: 5 },
+      { nome: "Mago", livello: 1 },
+    ])).toBe(3); // floor(5/2)=2 + 1
+    expect(multiclassCasterLevel([
+      { nome: "Ranger", livello: 3 },
+      { nome: "Ladro", livello: 3 },
+    ])).toBe(1); // floor(3/2)=1, il Ladro non è incantatore
+  });
+
+  it("il paladino di 5° ottiene davvero 4 slot di 1° e 2 di 2°", () => {
+    const slot = spellSlotsForCasterLevel(multiclassCasterLevel([{ nome: "Paladino", livello: 5 }]));
+    expect(slot[0]).toBe(4);
+    expect(slot[1]).toBe(2);
+  });
+});
+
+describe("hitDiceRecoveredOnLongRest", () => {
+  it("metà del totale arrotondata per DIFETTO", () => {
+    expect(hitDiceRecoveredOnLongRest(5)).toBe(2);
+    expect(hitDiceRecoveredOnLongRest(7)).toBe(3);
+    expect(hitDiceRecoveredOnLongRest(20)).toBe(10);
+  });
+
+  it("mai meno di 1, anche a livello 1", () => {
+    expect(hitDiceRecoveredOnLongRest(1)).toBe(1);
+    expect(hitDiceRecoveredOnLongRest(0)).toBe(1);
   });
 });

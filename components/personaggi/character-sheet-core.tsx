@@ -524,7 +524,7 @@ export function CharacterSheet({
       {tab === "incantesimi" && (
         <div className="space-y-6">
           <SpellSlotsSection character={character} onChange={onChange} />
-          <SpellListSection character={character} onChange={onChange} />
+          <SpellListSection character={character} onChange={onChange} onAutofill={setCharacterState} />
           <InfusionsSection character={character} onChange={onChange} />
           <ClassChoicesSection character={character} onChange={onChange} />
         </div>

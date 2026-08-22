@@ -86,6 +86,14 @@ export async function createBlankDungeon(campaignId: string, nome: string, width
   return dungeon;
 }
 
+/** Raggio di visione in celle, oppure undefined per lasciare il fallback al raggio predefinito.
+ * Deliberatamente undefined anche per 0: l'app non modella le sorgenti di luce, quindi "nessuna
+ * scurovisione" non deve voler dire "cieco". */
+function visionRadiusCells(meters: number | null): number | undefined {
+  if (!meters || meters <= 0) return undefined;
+  return metersToCells(meters);
+}
+
 export async function getDungeonsForCampaign(campaignId: string) {
   const userId = await requireUserId();
   await requireMember(campaignId, userId);
@@ -144,7 +152,11 @@ export async function getDungeon(dungeonId: string) {
     playerPositions.map((p) => ({
       x: p.x,
       y: p.y,
-      radius: dungeon.realisticMode ? metersToCells(p.visioneRadiusMeters ?? 0) : undefined,
+      // undefined (non 0!) quando manca un raggio reale: computeVisibleCells usa "?? fallback",
+      // e 0 NON è nullish — un giocatore senza personaggio sincronizzato, o senza scurovisione,
+      // finiva con raggio 0, cioè mappa completamente nera e nessun mostro visibile nemmeno sotto
+      // il proprio token. Il commento qui sopra dichiarava già questo comportamento, il codice no.
+      radius: dungeon.realisticMode ? visionRadiusCells(p.visioneRadiusMeters) : undefined,
     })),
   );
 
@@ -185,7 +197,7 @@ export async function updateRoomNotes(
   await requireDm(dungeon.campaignId, userId);
 
   const rooms = dungeon.rooms.map((room) =>
-    room.id === roomId ? { ...room, encounter: values.encounter, reward: values.reward } : room,
+    room.id === roomId ? { ...room, encounter: values.encounter.slice(0, 10000), reward: values.reward.slice(0, 10000) } : room,
   );
   await db.update(campaignDungeons).set({ rooms }).where(eq(campaignDungeons.id, dungeonId));
   await broadcastDungeonChanged(dungeonId);

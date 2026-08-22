@@ -305,19 +305,26 @@ export function EntriesBlock({
   language: Language;
 }) {
   const blocks = useMemo(() => flattenEntries(entries), [entries]);
-  const [translated, setTranslated] = useState<string[] | null>(null);
+  // La traduzione è memorizzata INSIEME al testo da cui proviene: il componente viene riusato
+  // quando si passa da una voce all'altra del Compendio (nessuna key su EntryDetail), e senza
+  // questo confronto si vedeva la descrizione della voce PRECEDENTE sotto il nome di quella nuova
+  // per tutta la durata della traduzione — che è una vera chiamata di rete per ogni paragrafo.
+  const chiave = useMemo(() => blocks.join(" "), [blocks]);
+  const [translated, setTranslated] = useState<{ chiave: string; testi: string[] } | null>(null);
 
   useEffect(() => {
     if (language !== "it" || blocks.length === 0) return;
     let cancelled = false;
     translateBatch(blocks, "en", "it").then((result) => {
       if (cancelled) return;
-      setTranslated(result.map((text, index) => text ?? blocks[index]));
+      setTranslated({ chiave, testi: result.map((text, index) => text ?? blocks[index]) });
     });
     return () => {
       cancelled = true;
     };
-  }, [blocks, language]);
+  }, [blocks, chiave, language]);
+
+  const testiTradotti = translated && translated.chiave === chiave ? translated.testi : null;
 
   if (!entries || entries.length === 0) return null;
 
@@ -325,7 +332,7 @@ export function EntriesBlock({
     return <RenderEntries entries={entries} />;
   }
 
-  if (!translated) {
+  if (!testiTradotti) {
     return (
       <div className="space-y-2">
         <p className="text-sm text-muted">Traduzione in corso…</p>
@@ -337,7 +344,7 @@ export function EntriesBlock({
   // riconosce da sé un nome di tratto corto (es. "Età") come sottotitolo quando è un blocco a sé,
   // così anche il fallback "traduzione dal vivo" (voci non ancora raggiunte dalla cache IA) mostra
   // sottotitoli invece di un elenco di paragrafi piatti senza distinzione nome/corpo.
-  return <TestoStrutturato testo={translated.join("\n\n")} />;
+  return <TestoStrutturato testo={testiTradotti.join("\n\n")} />;
 }
 
 /** Come EntriesBlock, ma usa il testo tradotto dall'IA (cache compendio_traduzione_ia) quando

@@ -105,7 +105,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         const existing = next.get(roomKey);
         next.set(roomKey, {
           roomKey,
-          unreadCount: (existing?.unreadCount ?? 0) + 1,
+          // Mai contare come "non letto" un messaggio scritto da me: arriva sulla mia stessa
+          // stanza personale, quindi senza questo controllo inviare una DM accendeva per un
+          // istante il pallino dei non letti (e il badge 💬 in header) sul proprio messaggio.
+          unreadCount: (existing?.unreadCount ?? 0) + (incoming.authorId === userId ? 0 : 1),
           lastMessage: {
             testo: incoming.testo ?? "",
             authorId: incoming.authorId ?? "",

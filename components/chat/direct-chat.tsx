@@ -108,9 +108,14 @@ export function DirectChat({
   // Rete di sicurezza indipendente dal realtime: se si torna su questa scheda dopo un po',
   // riallinea la cronologia — unita col locale per non far sparire un invio ancora in corso.
   useEffect(() => {
+    // "annullato" non è pedanteria: la cleanup toglie il listener ma NON annulla una richiesta
+    // già partita, che altrimenti scriverebbe la cronologia della conversazione precedente dentro
+    // quella appena aperta.
+    let annullato = false;
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       getDirectMessages(otherUserId).then((rows) => {
+        if (annullato) return;
         setMessages((prev) => {
           const serverIds = new Set(rows.map((r) => r.id));
           const pendingLocal = (prev ?? []).filter((m) => m.status && !serverIds.has(m.id));
@@ -119,16 +124,28 @@ export function DirectChat({
       });
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    return () => {
+      annullato = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [otherUserId]);
 
   useEffect(() => {
     // La stanza personale riceve TUTTE le DM dell'utente (con qualunque amico), non solo quelle
     // della conversazione aperta qui — va filtrato per mittente/destinatario di QUESTA thread.
     const unsubscribeNew = subscribe("dm-message", (payload) => {
-      const message = (payload as { message?: ChatMessageData }).message;
+      // userIdLow/userIdHigh viaggiano nel payload realtime (li usa già realtime-provider) ma non
+      // fanno parte di ChatMessageData, che descrive solo ciò che serve a disegnare la bolla.
+      const message = (payload as {
+        message?: ChatMessageData & { userIdLow?: string; userIdHigh?: string };
+      }).message;
       if (!message) return;
-      if (message.authorId !== otherUserId && message.authorId !== userId) return;
+      // Filtrare per AUTORE non basta: la stanza personale riceve anche le DM che invio io a
+      // chiunque altro (il broadcast va pure a user-<mittente>), e quelle hanno authorId === userId
+      // — quindi passavano il filtro e finivano dentro la conversazione sbagliata. La coppia
+      // (userIdLow, userIdHigh) identifica univocamente la thread.
+      const [basso, alto] = [userId, otherUserId].sort();
+      if (message.userIdLow !== basso || message.userIdHigh !== alto) return;
       upsertMessage(message);
       // La thread è aperta proprio ora: segnala subito come letto invece di lasciare il pallino
       // acceso finché non la si riapre.

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireUserId } from "@/lib/campaign-auth";
+
 import {
   loadBackgrounds,
   loadClassData,
@@ -159,6 +161,9 @@ export async function askRulesAssistant(
   question: string,
   history: RulesAssistantExchange[] = [],
 ): Promise<string | null> {
+  // Come per le bozze IA: senza questo controllo la quota Gemini del progetto è spendibile da
+  // chiunque, dato che /campagne è raggiungibile senza login.
+  await requireUserId();
   const trimmed = question.trim().slice(0, 500);
   if (!trimmed) return null;
 

@@ -159,8 +159,13 @@ function MessagesTab({
   }
   if (forceOpenDmUserId && (!selected || selected.kind !== "dm" || selected.id !== forceOpenDmUserId)) {
     setSelected({ kind: "dm", id: forceOpenDmUserId });
-    onConsumeForceOpen();
   }
+  // onConsumeForceOpen aggiorna lo stato del GENITORE: chiamarlo durante il render di questo
+  // componente fa loggare a React "Cannot update a component while rendering a different
+  // component". setSelected qui sopra è invece stato proprio, che React ammette in fase di render.
+  useEffect(() => {
+    if (forceOpenDmUserId) onConsumeForceOpen();
+  }, [forceOpenDmUserId, onConsumeForceOpen]);
 
   // Tiene l'URL sincronizzato con la thread aperta — non solo per il deep link in ingresso, ma
   // anche per la SOPPRESSIONE delle notifiche push: il service worker (public/sw.js) decide se

@@ -229,6 +229,15 @@ export function EncounterGenerator({
   // parte precompilata dal party sincronizzato, ma modificabile: utile per pianificare un
   // incontro con un party diverso da quello attuale (assenti, PNG aggiunti, ecc.)
   const [levels, setLevels] = useState<number[]>(partyLevels);
+  // Il party cambia sotto i piedi (un PG sale di livello, il master assegna XP e la pagina si
+  // rinfresca): senza risincronizzare, il "Budget XP" restava calcolato sui livelli di quando la
+  // sezione è stata montata, e il bottone di reset compare solo se cambia il NUMERO di PG —
+  // quindi con lo stesso numero di giocatori non c'era alcun modo di riallinearlo.
+  const [partyCaricato, setPartyCaricato] = useState(partyLevels.join(","));
+  if (partyCaricato !== partyLevels.join(",")) {
+    setPartyCaricato(partyLevels.join(","));
+    setLevels(partyLevels);
+  }
 
   const updateLevel = (index: number, value: number) =>
     setLevels((prev) => prev.map((l, i) => (i === index ? Math.min(20, Math.max(1, value)) : l)));
@@ -249,7 +258,9 @@ export function EncounterGenerator({
 
     const countOptions = [1, 1, 2, 2, 3, 4];
     const count = countOptions[Math.floor(Math.random() * countOptions.length)];
-    const perMonsterTarget = budget / (count * encounterMultiplier(count));
+    // levels.length = numero di PG: il DMG fa salire/scendere il moltiplicatore di uno
+    // scaglione sotto i 3 o dai 6 giocatori in su.
+    const perMonsterTarget = budget / (count * encounterMultiplier(count, levels.length));
 
     let candidates = withXp.filter(
       (entry) => entry.xp >= perMonsterTarget * 0.4 && entry.xp <= perMonsterTarget * 1.6,
@@ -263,7 +274,7 @@ export function EncounterGenerator({
     setSuggestion({
       creature: pick.creature,
       count,
-      totalXp: adjustedEncounterXp(pick.xp, count),
+      totalXp: adjustedEncounterXp(pick.xp, count, levels.length),
       xpPerMonster: pick.xp,
     });
   };

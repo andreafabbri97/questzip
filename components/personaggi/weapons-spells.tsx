@@ -12,7 +12,7 @@ import {
   spellAttackBonus,
   totalLevel,
   warlockLevel,
-  weaponAbilityModifier,
+  weaponDamageModifier,
   weaponAttackBonus,
   type Character,
   type KnownFeat,
@@ -111,7 +111,11 @@ export function WeaponsSection({
             level,
             weapon.bonusExtra,
           );
-          const dmgMod = weaponAbilityModifier(weapon.caratteristica, character.caratteristiche);
+          const dmgMod = weaponDamageModifier(
+            weapon.caratteristica,
+            character.caratteristiche,
+            weapon.bonusExtra,
+          );
           return (
             <div key={weapon.id} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
               <div className="flex items-center gap-2">
@@ -173,7 +177,7 @@ export function WeaponsSection({
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-widest text-muted">Bonus extra</span>
+                  <span className="text-[10px] uppercase tracking-widest text-muted">Bonus arma (att. e danni)</span>
                   <IntField
                     value={weapon.bonusExtra}
                     onChange={(value) => updateWeapon(weapon.id, { bonusExtra: value })}
@@ -235,10 +239,17 @@ export function WeaponsSection({
 export function SpellListSection({
   character,
   onChange,
+  onAutofill,
 }: {
   character: Character;
   onChange: (character: Character) => void;
+  /** Come onChange ma per aggiornamenti che l'utente NON ha chiesto (la precompilazione automatica
+   * del dado danno qui sotto): passando da onChange, la scheda risultava "modificata" per il solo
+   * fatto di aver aperto la scheda Incantesimi, e uscendo compariva il modal "Modifiche non
+   * salvate" senza aver toccato niente. Se non fornita ricade su onChange. */
+  onAutofill?: (character: Character) => void;
 }) {
+  const applicaAutofill = onAutofill ?? onChange;
   const casterLevel = multiclassCasterLevel(character.classi);
   const wlLevel = warlockLevel(character.classi);
 
@@ -285,7 +296,7 @@ export function SpellListSection({
       }
       if (cancelled || updates.size === 0) return;
       const current = characterRef.current;
-      onChange({
+      applicaAutofill({
         ...current,
         incantesimi: current.incantesimi.map((s) =>
           updates.has(s.id) && !s.dadoDanno.trim() ? { ...s, dadoDanno: updates.get(s.id)! } : s,

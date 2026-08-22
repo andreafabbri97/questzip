@@ -2,7 +2,7 @@ import { useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { newCharacter, spellAttackBonus, weaponAbilityModifier, weaponAttackBonus, type Character } from "@/lib/dnd";
+import { newCharacter, spellAttackBonus, weaponDamageModifier, weaponAttackBonus, type Character } from "@/lib/dnd";
 import { ClassChoicesSection, SpellListSection, WeaponsSection } from "./weapons-spells";
 import type { DiceRollerPreset } from "@/components/dice-roller-modal";
 import { loadSpells } from "@/lib/fivetools/data";
@@ -158,7 +158,7 @@ describe("WeaponsSection", () => {
     );
   });
 
-  it("🎲 Danno usa il dado danno dell'arma e il mod. di caratteristica (non il bonus di competenza)", async () => {
+  it("🎲 Danno usa dado + mod. caratteristica + bonus arma (mai il bonus di competenza)", async () => {
     const user = userEvent.setup();
     const character = baseCharacter({
       armi: [
@@ -178,7 +178,10 @@ describe("WeaponsSection", () => {
 
     await user.click(screen.getByRole("button", { name: "Tira danno con Spada lunga" }));
 
-    const expectedMod = weaponAbilityModifier("forza", character.caratteristiche);
+    // weaponDamageModifier e non weaponDamageModifier: il bonus fisso dell'arma (campo "Bonus
+    // arma") vale per il tiro per colpire E per i danni — un'arma +1 in 5e dà +1 a entrambi, e
+    // prima veniva sommato solo all'attacco.
+    const expectedMod = weaponDamageModifier("forza", character.caratteristiche, 1);
     expect(screen.getByTestId("dice-label")).toHaveTextContent("Spada lunga — Danno");
     expect(screen.getByTestId("dice-modifier")).toHaveTextContent(String(expectedMod));
     expect(screen.getByTestId("dice-groups")).toHaveTextContent(

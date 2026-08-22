@@ -1,6 +1,13 @@
 "use server";
 
 import { askGemini } from "@/lib/gemini";
+import { requireUserId } from "@/lib/campaign-auth";
+
+// Ogni bozza richiede un utente autenticato. Non è una formalità: /campagne è deliberatamente
+// raggiungibile SENZA login (auth.ts la lascia aperta perché mostra lei stessa il "Accedi con
+// Google"), e generateCampaignDraft è invocata proprio da quella pagina — senza questo controllo
+// chiunque, senza account, poteva bruciare la quota Gemini gratuita del progetto, lasciando il
+// gruppo senza assistente per il resto della giornata.
 
 /** Bozza di testo per un handout di campagna (lettera, cartello, iscrizione, volantino...) — MAI
  * salvata da sola: finisce nel campo testo del form di creazione, il master la rivede/modifica
@@ -8,6 +15,7 @@ import { askGemini } from "@/lib/gemini";
  * Ritorna null se l'IA non è disponibile o se qualcosa va storto — è un comodo extra opzionale,
  * scrivere un handout a mano resta sempre possibile. */
 export async function generateHandoutDraft(titolo: string, hint: string): Promise<string | null> {
+  await requireUserId();
   const trimmedTitle = titolo.trim();
   if (!trimmedTitle) return null;
 
@@ -21,6 +29,7 @@ export async function generateHandoutDraft(titolo: string, hint: string): Promis
 /** Bozza di descrizione per un NPC (rubrica del master) — stesso principio di
  * generateHandoutDraft: mai salvata da sola, il master la rivede prima di confermare. */
 export async function generateNpcDraft(nome: string, hint: string): Promise<string | null> {
+  await requireUserId();
   const trimmedName = nome.trim();
   if (!trimmedName) return null;
 
@@ -36,6 +45,7 @@ export async function generateNpcDraft(nome: string, hint: string): Promise<stri
  * rivede/modifica prima di premere "Crea". A differenza degli altri generatori qui sopra non c'è
  * ancora nessun dato di campagna nel Compendio da ancorare: il prompt lavora solo dal nome. */
 export async function generateCampaignDraft(nome: string, hint: string): Promise<string | null> {
+  await requireUserId();
   const trimmedName = nome.trim();
   if (!trimmedName) return null;
 
@@ -49,6 +59,7 @@ export async function generateCampaignDraft(nome: string, hint: string): Promise
 /** Bozza di descrizione/aggancio per una trama (tracciatore quest del master) — stesso principio
  * di generateHandoutDraft: mai salvata da sola, il master la rivede prima di confermare. */
 export async function generateQuestDraft(titolo: string, hint: string): Promise<string | null> {
+  await requireUserId();
   const trimmedTitle = titolo.trim();
   if (!trimmedTitle) return null;
 

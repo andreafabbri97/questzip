@@ -86,7 +86,11 @@ export interface AoeTemplate {
   angle: number;
 }
 
-const CONE_HALF_ANGLE = Math.PI / 6; // 60° totali, apertura standard dei coni in 5e
+// RAW un cono è largo quanto è lungo alla sua estremità (PHB): la larghezza a distanza d
+// è pari a d, quindi il semi-angolo è atan(0,5) ≈ 26,57° (53,13° totali), non i 30° di
+// PI/6. Con l'apertura più larga il template marcava come colpite creature ai bordi che
+// RAW restano fuori — su un cono da 4,5 m tipicamente una o due caselle per lato.
+const CONE_HALF_ANGLE = Math.atan(0.5);
 const LINE_HALF_WIDTH = 0.5; // una linea è larga 1 cella (5 piedi)
 
 /** true se il centro della cella (x,y) ricade dentro il template — usato per capire chi viene

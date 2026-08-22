@@ -167,18 +167,21 @@ export function useTranslatedText(
   source: "en" | "it" = "en",
   target: "en" | "it" = "it",
 ): string | null {
-  const [translated, setTranslated] = useState<string | null>(null);
+  // Risultato memorizzato insieme al testo di partenza: l'hook è riusato quando cambia la voce
+  // mostrata (stessa istanza di componente), e restituire la traduzione PRECEDENTE mentre arriva
+  // quella nuova faceva comparire il nome italiano della voce vecchia accanto a quella nuova.
+  const [translated, setTranslated] = useState<{ per: string; valore: string | null } | null>(null);
 
   useEffect(() => {
     if (!text) return;
     let cancelled = false;
     translateText(text, source, target).then((result) => {
-      if (!cancelled) setTranslated(result);
+      if (!cancelled) setTranslated({ per: text, valore: result });
     });
     return () => {
       cancelled = true;
     };
   }, [text, source, target]);
 
-  return translated;
+  return translated && translated.per === text ? translated.valore : null;
 }

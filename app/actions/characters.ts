@@ -144,27 +144,38 @@ export async function grantXpToParty(
   await requireDm(campaignId, dmId);
   if (perPlayerAmount <= 0 || userIds.length === 0) return;
 
+  // Il driver Neon HTTP non supporta le transazioni: un UPDATE parziale è GIÀ scritto quando
+  // un'eccezione risale. Prima si aggiornava e poi si lanciava l'errore sul parziale — il master
+  // vedeva "XP assegnata solo a 3 su 4", ripremeva il bottone (che resta abilitato) e i 3
+  // giocatori validi incassavano il doppio. Ora si guarda PRIMA chi può davvero ricevere: se non
+  // può nessuno si lancia senza aver scritto nulla (riprovare è sicuro), altrimenti si scrive per
+  // quelli e il parziale viene RESTITUITO come avviso, non come errore.
+  const presenti = await db
+    .select({ userId: campaignCharacters.userId })
+    .from(campaignCharacters)
+    .where(
+      and(
+        eq(campaignCharacters.campaignId, campaignId),
+        inArray(campaignCharacters.userId, userIds),
+      ),
+    );
+  if (presenti.length === 0) {
+    throw new Error("Nessuno dei giocatori selezionati ha un personaggio sincronizzato in questa campagna.");
+  }
+
   const updated = await db
     .update(campaignCharacters)
     .set({ xpInSospeso: sql`${campaignCharacters.xpInSospeso} + ${perPlayerAmount}`, xpAutoLevel: autoLevelUp })
     .where(
       and(
         eq(campaignCharacters.campaignId, campaignId),
-        inArray(campaignCharacters.userId, userIds),
+        inArray(
+          campaignCharacters.userId,
+          presenti.map((r) => r.userId),
+        ),
       ),
     )
     .returning({ userId: campaignCharacters.userId });
-
-  // Come per grantXp: se qualcuno dei partecipanti non ha (più) un personaggio sincronizzato
-  // (es. si è rimosso dalla campagna tra la fine del combattimento e l'assegnazione XP), l'UPDATE
-  // lo salta silenziosamente — segnalalo invece di far credere che sia andato tutto a buon fine.
-  if (updated.length < userIds.length) {
-    throw new Error(
-      updated.length === 0
-        ? "Nessuno dei giocatori selezionati ha un personaggio sincronizzato in questa campagna."
-        : `XP assegnata solo a ${updated.length} su ${userIds.length} giocatori: qualcuno non ha (più) un personaggio sincronizzato.`,
-    );
-  }
 
   const [campaign] = await db.select({ nome: campaigns.nome }).from(campaigns).where(eq(campaigns.id, campaignId));
   await Promise.all(
@@ -176,6 +187,8 @@ export async function grantXpToParty(
       }),
     ),
   );
+
+  return { assegnati: updated.length, richiesti: userIds.length };
 }
 
 export async function claimXp(campaignId: string) {

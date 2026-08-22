@@ -195,7 +195,7 @@ describe("RestSection", () => {
 
     expect(screen.getByText("Punti ferita ripristinati al massimo (30).")).toBeInTheDocument();
     expect(
-      screen.getByText("3 dado/i vita recuperato/i (metà del totale, arrotondato per eccesso)."),
+      screen.getByText("2 dado/i vita recuperato/i (metà del totale, arrotondato per difetto, minimo 1)."),
     ).toBeInTheDocument();
     expect(screen.getByText("Tiri salvezza contro la morte azzerati.")).toBeInTheDocument();
     expect(screen.getByText("Privilegi a usi limitati ripristinati: Rabbia.")).toBeInTheDocument();

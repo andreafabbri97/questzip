@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const askGeminiMock = vi.fn();
+vi.mock("@/lib/campaign-auth", () => ({
+  // Le azioni IA ora richiedono un utente autenticato (la pagina /campagne è raggiungibile senza
+  // login, quindi senza questo controllo la quota Gemini era spendibile da chiunque): qui basta
+  // che non lanci, il comportamento sotto test è il prompt, non l'autenticazione.
+  requireUserId: async () => "utente-di-prova",
+}));
 vi.mock("@/lib/gemini", () => ({
   askGemini: (...args: unknown[]) => askGeminiMock(...args),
 }));

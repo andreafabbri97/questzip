@@ -118,9 +118,14 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
   // cambio app sul telefono), riallinea la cronologia — unisce col locale invece di sostituirlo
   // di netto, per non far sparire un eventuale messaggio ancora in fase di invio.
   useEffect(() => {
+    // "annullato" non è pedanteria: la cleanup toglie il listener ma NON annulla una richiesta
+    // già partita, che altrimenti scriverebbe la cronologia della conversazione precedente dentro
+    // quella appena aperta.
+    let annullato = false;
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       getCampaignChatMessages(campaignId).then((rows) => {
+        if (annullato) return;
         setMessages((prev) => {
           const serverIds = new Set(rows.map((r) => r.id));
           const pendingLocal = (prev ?? []).filter((m) => m.status && !serverIds.has(m.id));
@@ -129,7 +134,10 @@ export function CampaignChat({ campaignId }: { campaignId: string }) {
       });
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    return () => {
+      annullato = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [campaignId]);
 
   // Stessa stanza "campaign-<id>" già usata da combattimento/jukebox quando la pagina Campagne è

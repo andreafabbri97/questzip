@@ -347,7 +347,11 @@ export function carryingCapacityKg(forza: number): number {
 // dato di scurovisione del Compendio (RawRace.darkvision) arriva in piedi, qui serve in metri
 // per essere coerente con "Velocità (m)" già presente in scheda.
 export function feetToMeters(feet: number): number {
-  return Math.round(feet * 0.3);
+  // Arrotondato al mezzo metro, non al metro intero: 25 piedi sono 7,5 m (non 8) e 15 piedi 4,5 m
+  // (non 5). Oggi è chiamata solo su scurovisione 60/120 piedi, dove l'errore non si vedeva, ma
+  // le velocità razziali di nani/halfling/gnomi sono proprio 25 piedi. La gemella in
+  // lib/fivetools/format.ts conservava già il decimale.
+  return Math.round(feet * 0.3 * 2) / 2;
 }
 
 export function newCharacter(): Character {
@@ -432,9 +436,18 @@ export function newCharacter(): Character {
  * lungo copre anche tutto ciò che un riposo breve recupererebbe, ed essendo notturno normalmente
  * arriva fino all'alba. Funzione pura: chi la chiama decide se/come chiedere conferma.
  */
+/** Dadi Vita recuperati con un riposo lungo. RAW (PHB): "un numero di Dadi Vita pari a metà del
+ * totale, MINIMO uno" — metà arrotondata per DIFETTO (5e arrotonda sempre per difetto salvo
+ * indicazione contraria), non per eccesso. Funzione condivisa apposta: la stessa formula viveva
+ * copiata in tre punti (qui, il mini-bottone dei Dadi Vita e il riepilogo di conferma del riposo)
+ * ed è così che i tre numeri finiscono per divergere. */
+export function hitDiceRecoveredOnLongRest(totalLevel: number): number {
+  return Math.max(1, Math.floor(totalLevel / 2));
+}
+
 export function applyLongRest(character: Character): Character {
   const totale = totalLevel(character.classi);
-  const dadiVitaRecuperati = Math.ceil(totale / 2);
+  const dadiVitaRecuperati = hitDiceRecoveredOnLongRest(totale);
   return {
     ...character,
     hpAttuali: character.hpMax,
@@ -600,6 +613,20 @@ export function weaponAbilityModifier(
   return abilityModifier(caratteristiche[caratteristica]);
 }
 
+/** Modificatore ai DANNI di un'arma: modificatore di caratteristica + il bonus fisso dell'arma.
+ * Il bonus fisso (campo "bonusExtra") nasce per le armi magiche — e un'arma +1 in 5e dà +1 sia al
+ * tiro per colpire SIA ai danni: prima veniva sommato solo all'attacco, quindi una spada +1
+ * mostrava "attacco +6 / danno 1d8+3" invece di 1d8+4, e si tiravano danni più bassi del dovuto a
+ * ogni colpo. Funzione condivisa fra scheda a schermo e PDF stampato, che prima calcolavano il
+ * danno ciascuno per conto proprio. */
+export function weaponDamageModifier(
+  caratteristica: WeaponAbility,
+  caratteristiche: AbilityScores,
+  bonusExtra: number,
+): number {
+  return weaponAbilityModifier(caratteristica, caratteristiche) + bonusExtra;
+}
+
 export function weaponAttackBonus(
   caratteristica: WeaponAbility,
   caratteristiche: AbilityScores,
@@ -673,14 +700,30 @@ export const DIFFICULTY_LABELS: Record<EncounterDifficulty, string> = {
   mortale: "Mortale",
 };
 
-/** Moltiplicatore incontro in base al numero di mostri (regole standard). */
-export function encounterMultiplier(monsterCount: number): number {
-  if (monsterCount <= 1) return 1;
-  if (monsterCount === 2) return 1.5;
-  if (monsterCount <= 6) return 2;
-  if (monsterCount <= 10) return 2.5;
-  if (monsterCount <= 14) return 3;
-  return 4;
+// Scala ufficiale dei moltiplicatori: il numero di PG fa salire o scendere di UNO scaglione
+// lungo questa scala, non moltiplica il valore.
+const MOLTIPLICATORI = [0.5, 1, 1.5, 2, 2.5, 3, 4];
+
+function scaglionePerNumeroMostri(monsterCount: number): number {
+  if (monsterCount <= 1) return 1; // -> 1
+  if (monsterCount === 2) return 2; // -> 1.5
+  if (monsterCount <= 6) return 3; // -> 2
+  if (monsterCount <= 10) return 4; // -> 2.5
+  if (monsterCount <= 14) return 5; // -> 3
+  return 6; // -> 4
+}
+
+/** Moltiplicatore incontro per numero di mostri, aggiustato per la dimensione del party (DMG):
+ * con MENO di 3 personaggi si sale di uno scaglione, con 6 o più si scende di uno. Senza questo
+ * aggiustamento un gruppo di 6-7 giocatori vede gli incontri come più duri di quanto siano (e il
+ * generatore li sotto-popola), mentre in due sono più pericolosi di quanto l'app dichiari. */
+export function encounterMultiplier(monsterCount: number, partySize?: number): number {
+  let indice = scaglionePerNumeroMostri(monsterCount);
+  if (partySize !== undefined && partySize > 0) {
+    if (partySize < 3) indice += 1;
+    else if (partySize >= 6) indice -= 1;
+  }
+  return MOLTIPLICATORI[Math.min(MOLTIPLICATORI.length - 1, Math.max(0, indice))];
 }
 
 /** Budget XP totale del party per una data difficoltà (somma delle soglie individuali). */
@@ -692,8 +735,8 @@ export function xpBudget(partyLevels: number[], difficulty: EncounterDifficulty)
 }
 
 /** XP "aggiustato" (con moltiplicatore) di un gruppo di mostri dello stesso CR. */
-export function adjustedEncounterXp(crXp: number, monsterCount: number): number {
-  return crXp * monsterCount * encounterMultiplier(monsterCount);
+export function adjustedEncounterXp(crXp: number, monsterCount: number, partySize?: number): number {
+  return crXp * monsterCount * encounterMultiplier(monsterCount, partySize);
 }
 
 // --- Slot incantesimi (regole standard PHB) ---
@@ -701,16 +744,29 @@ export function adjustedEncounterXp(crXp: number, monsterCount: number): number 
 const FULL_CASTERS = new Set(["bard", "cleric", "druid", "sorcerer", "wizard"]);
 const HALF_CASTERS = new Set(["paladin", "ranger"]);
 
-/** Livello incantatore effettivo in multiclasse: full=intero, mezzo=metà arrotondato per
- * difetto, artefice=metà arrotondato per eccesso. Lo Stregone (Warlock) NON entra qui: usa
- * il Patto Magico, un pool di slot separato. */
+/** Livello incantatore effettivo: full=intero, mezzo=metà, artefice=metà arrotondata per eccesso.
+ * Il Warlock NON entra qui: usa il Patto Magico, un pool di slot separato.
+ *
+ * ATTENZIONE alla differenza fra monoclasse e multiclasse per i MEZZI incantatori: la regola del
+ * multiclasse dice "metà dei livelli da paladino/ranger, arrotondata per DIFETTO", ma un
+ * paladino/ranger che NON è multiclasse usa la tabella della propria classe, che equivale a
+ * metà arrotondata per ECCESSO. Applicare la regola del multiclasse anche al monoclasse (com'era
+ * prima) toglie slot a ogni livello dispari: un Paladino 5 aveva 3 slot di 1° invece di 4 di 1° +
+ * 2 di 2°, e ai livelli 9/13/17 non gli compariva proprio il grado di incantesimo appena
+ * sbloccato. Il livello 1 resta 0: paladini e ranger iniziano a lanciare al 2°. */
 export function multiclassCasterLevel(classi: { nome: string; livello: number }[]): number {
+  const soloUnaClasse = classi.length === 1;
   let total = 0;
   for (const { nome, livello } of classi) {
     const key = canonicalClassName(nome).toLowerCase();
     if (FULL_CASTERS.has(key)) total += livello;
-    else if (HALF_CASTERS.has(key)) total += Math.floor(livello / 2);
-    else if (key === "artificer") total += Math.ceil(livello / 2);
+    else if (HALF_CASTERS.has(key)) {
+      total += soloUnaClasse
+        ? livello < 2
+          ? 0
+          : Math.ceil(livello / 2)
+        : Math.floor(livello / 2);
+    } else if (key === "artificer") total += Math.ceil(livello / 2);
   }
   return total;
 }
@@ -768,14 +824,14 @@ export function rollIndividualCoins(tier: TreasureTier): CoinResult {
     return { ...empty, mp: rollDice(1, 6) };
   }
   if (tier === "5-10") {
-    if (roll <= 30) return { ...empty, mr: rollDice(4, 6) * 10, ma: rollDice(1, 6) * 10 };
-    if (roll <= 60) return { ...empty, ma: rollDice(1, 6) * 10, mo: rollDice(1, 6) * 10 };
-    if (roll <= 70) return { ...empty, me: rollDice(1, 6) * 10, mo: rollDice(1, 6) * 10 };
-    if (roll <= 95) return { ...empty, mo: rollDice(2, 6) * 10 };
-    return { ...empty, mo: rollDice(2, 6) * 10, mp: rollDice(1, 6) * 10 };
+    if (roll <= 30) return { ...empty, mr: rollDice(4, 6) * 100, me: rollDice(1, 6) * 10 };
+    if (roll <= 60) return { ...empty, ma: rollDice(6, 6) * 10, mo: rollDice(2, 6) * 10 };
+    if (roll <= 70) return { ...empty, me: rollDice(3, 6) * 10, mo: rollDice(2, 6) * 10 };
+    if (roll <= 95) return { ...empty, mo: rollDice(4, 6) * 10 };
+    return { ...empty, mo: rollDice(2, 6) * 10, mp: rollDice(3, 6) };
   }
   if (tier === "11-16") {
-    if (roll <= 20) return { ...empty, ma: rollDice(2, 6) * 100, mo: rollDice(1, 6) * 100 };
+    if (roll <= 20) return { ...empty, ma: rollDice(4, 6) * 100, mo: rollDice(1, 6) * 100 };
     if (roll <= 35) return { ...empty, me: rollDice(1, 6) * 100, mo: rollDice(1, 6) * 100 };
     if (roll <= 75) return { ...empty, mo: rollDice(2, 6) * 100 };
     return { ...empty, mo: rollDice(2, 6) * 100, mp: rollDice(1, 6) * 100 };
@@ -785,40 +841,29 @@ export function rollIndividualCoins(tier: TreasureTier): CoinResult {
   return { ...empty, mo: rollDice(1, 6) * 1000, mp: rollDice(2, 6) * 100 };
 }
 
-/** Monete per un tesoro d'incontro (party intero), tabella "Treasure Hoard: Challenge X". */
+/** Monete di un tesoro d'incontro (party intero), riga "Coins" delle tabelle "Treasure Hoard"
+ * del DMG. Gli importi sono FISSI per fascia: nel manuale il tiro di d100 serve a determinare
+ * gemme/oggetti d'arte/oggetti magici, NON le monete — qui invece si tirava un d100 anche per
+ * queste, su una tabella che non esiste, con risultati fino a 3-4 volte troppo generosi per i
+ * party di basso livello e circa un terzo del dovuto per quelli di livello alto. */
 export function rollHoardCoins(tier: TreasureTier): CoinResult {
-  const roll = Math.floor(Math.random() * 100) + 1;
   const empty: CoinResult = { mr: 0, ma: 0, me: 0, mo: 0, mp: 0 };
   if (tier === "0-4") {
-    if (roll <= 6) return { ...empty, mr: rollDice(6, 6) * 100 };
-    if (roll <= 16) return { ...empty, mr: rollDice(3, 6) * 100, ma: rollDice(2, 6) * 100 };
-    if (roll <= 29) return { ...empty, ma: rollDice(2, 6) * 100, mo: rollDice(2, 6) * 10 };
-    if (roll <= 52) return { ...empty, ma: rollDice(3, 6) * 100, mo: rollDice(2, 6) * 100 };
-    if (roll <= 74) return { ...empty, mo: rollDice(2, 6) * 100 };
-    if (roll <= 95) return { ...empty, mo: rollDice(2, 6) * 100, mp: rollDice(1, 6) * 10 };
-    return { ...empty, mo: rollDice(2, 6) * 100, mp: rollDice(2, 6) * 10 };
+    return { ...empty, mr: rollDice(6, 6) * 100, ma: rollDice(3, 6) * 100, mo: rollDice(2, 6) * 10 };
   }
   if (tier === "5-10") {
-    if (roll <= 6) return { ...empty, mr: rollDice(2, 6) * 100, mo: rollDice(2, 6) * 100 };
-    if (roll <= 16) return { ...empty, ma: rollDice(2, 6) * 100, mo: rollDice(2, 6) * 100 };
-    if (roll <= 29) return { ...empty, ma: rollDice(5, 6) * 100, mo: rollDice(3, 6) * 100 };
-    if (roll <= 52) return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(1, 6) * 10 };
-    if (roll <= 74) return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(2, 6) * 10 };
-    if (roll <= 95) return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(3, 6) * 10 };
-    return { ...empty, mo: rollDice(4, 6) * 100, mp: rollDice(4, 6) * 10 };
+    return {
+      ...empty,
+      mr: rollDice(2, 6) * 100,
+      ma: rollDice(2, 6) * 1000,
+      mo: rollDice(6, 6) * 100,
+      mp: rollDice(3, 6) * 10,
+    };
   }
   if (tier === "11-16") {
-    if (roll <= 5) return { ...empty, ma: rollDice(4, 6) * 1000 };
-    if (roll <= 14) return { ...empty, ma: rollDice(1, 6) * 1000, mo: rollDice(1, 6) * 1000 };
-    if (roll <= 27) return { ...empty, mo: rollDice(2, 6) * 1000 };
-    if (roll <= 53) return { ...empty, mo: rollDice(2, 6) * 1000, mp: rollDice(1, 6) * 100 };
-    if (roll <= 78) return { ...empty, mo: rollDice(4, 6) * 1000, mp: rollDice(1, 6) * 100 };
-    return { ...empty, mo: rollDice(4, 6) * 1000, mp: rollDice(2, 6) * 100 };
+    return { ...empty, mo: rollDice(4, 6) * 1000, mp: rollDice(5, 6) * 100 };
   }
-  if (roll <= 7) return { ...empty, mo: rollDice(2, 6) * 1000, mp: rollDice(1, 6) * 1000 };
-  if (roll <= 29) return { ...empty, mo: rollDice(8, 6) * 1000, mp: rollDice(1, 6) * 1000 };
-  if (roll <= 68) return { ...empty, mo: rollDice(6, 6) * 1000, mp: rollDice(2, 6) * 1000 };
-  return { ...empty, mo: rollDice(6, 6) * 1000, mp: rollDice(3, 6) * 1000 };
+  return { ...empty, mo: rollDice(12, 6) * 1000, mp: rollDice(8, 6) * 1000 };
 }
 
 /** Valori tipici (in mo) di gemme/oggetti d'arte per fascia di GS, tabella DMG semplificata:

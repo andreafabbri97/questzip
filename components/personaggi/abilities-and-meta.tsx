@@ -19,6 +19,7 @@ import {
   calculateMulticlassHitPoints,
   canonicalClassName,
   formatModifier,
+  hitDiceRecoveredOnLongRest,
   multiclassCasterLevel,
   pactMagicForLevel,
   pointBuyCost,
@@ -238,8 +239,10 @@ export function HitDiceTracker({
         </span>
         <button
           onClick={() =>
-            // Riposo lungo: recupera metà del totale (arrotondato per eccesso), regola RAW.
-            onChange({ ...character, dadiVitaUsati: Math.max(0, usati - Math.ceil(totale / 2)) })
+            onChange({
+              ...character,
+              dadiVitaUsati: Math.max(0, usati - hitDiceRecoveredOnLongRest(totale)),
+            })
           }
           disabled={usati <= 0}
           className="rounded-full border border-edge px-2 text-[10px] font-bold text-accent-strong disabled:opacity-30"
@@ -288,10 +291,10 @@ export function RestSection({
           `Affaticamento ridotto di 1 livello (da ${character.affaticamento} a ${character.affaticamento - 1}).`,
         );
       }
-      const dadiRecuperati = Math.min(character.dadiVitaUsati, Math.ceil(totale / 2));
+      const dadiRecuperati = Math.min(character.dadiVitaUsati, hitDiceRecoveredOnLongRest(totale));
       if (dadiRecuperati > 0) {
         lines.push(
-          `${dadiRecuperati} dado/i vita recuperato/i (metà del totale, arrotondato per eccesso).`,
+          `${dadiRecuperati} dado/i vita recuperato/i (metà del totale, arrotondato per difetto, minimo 1).`,
         );
       }
       const slotUsatiTotali = character.slotUsati.reduce((sum, v) => sum + v, 0);

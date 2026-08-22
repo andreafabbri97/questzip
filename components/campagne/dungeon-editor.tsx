@@ -59,7 +59,15 @@ export function DungeonSection({ campaignId, isDm }: { campaignId: string; isDm:
 
   const openDungeon = (id: string) => {
     setActiveId(id);
-    getDungeon(id).then(setActive);
+    // Si scrive "active" solo se nel frattempo non è stato aperto un ALTRO dungeon: su rete lenta
+    // due click ravvicinati potevano far arrivare per ultima la risposta del primo, lasciando in
+    // evidenza il bottone B ma disegnando la mappa A, in modo persistente.
+    getDungeon(id).then((d) => {
+      setActiveId((corrente) => {
+        if (corrente === id) setActive(d);
+        return corrente;
+      });
+    });
   };
 
   const refreshActive = () => {
@@ -1349,7 +1357,12 @@ function DungeonMap({
         (tokens ?? []).map((t) => ({
           x: t.x,
           y: t.y,
-          radius: realisticMode ? metersToCells(t.visioneRadius ?? 0) : undefined,
+          // Stesso motivo del gemello lato server (app/actions/dungeons.ts): 0 non è nullish,
+          // quindi passarlo significherebbe raggio zero, non "usa il predefinito".
+          radius:
+            realisticMode && t.visioneRadius && t.visioneRadius > 0
+              ? metersToCells(t.visioneRadius)
+              : undefined,
         })),
       )
     : new Set<string>();

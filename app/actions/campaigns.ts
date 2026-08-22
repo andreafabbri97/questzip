@@ -109,11 +109,20 @@ export async function redeemInvite(code: string) {
       and(eq(campaignMembers.campaignId, invite.campaignId), eq(campaignMembers.userId, userId)),
     );
   if (!existing) {
-    await db.insert(campaignMembers).values({
-      campaignId: invite.campaignId,
-      userId,
-      role: "player",
-    });
+    // La chiave primaria è (campaignId, userId): fra il SELECT qui sopra e questo INSERT può
+    // infilarsi un secondo tentativo (link aperto e pagina ricaricata subito, o "Accetta" premuto
+    // da telefono e desktop insieme) e la violazione di chiave risalirebbe come errore server
+    // grezzo invece di far semplicemente entrare in campagna. Stesso try/catch già usato da
+    // sendFriendRequest e inviteFriendToCampaign per la stessa ragione.
+    try {
+      await db.insert(campaignMembers).values({
+        campaignId: invite.campaignId,
+        userId,
+        role: "player",
+      });
+    } catch {
+      // Già membro: è esattamente il risultato voluto, non un errore da mostrare.
+    }
   }
   return invite.campaignId;
 }
@@ -306,6 +315,20 @@ export async function leaveCampaign(campaignId: string) {
   if (campaign?.ownerId === userId) {
     throw new Error("Il creatore non può abbandonare la campagna, solo eliminarla.");
   }
+  // Stessa protezione di setMemberRole/removeMember, che qui mancava: il proprietario può
+  // promuovere un amico a master e farsi retrocedere a giocatore (permesso: i master sono ancora
+  // due), a quel punto l'amico "abbandona" e la campagna resta con ZERO master per sempre —
+  // nessuno può più invitare, gestire membri o aprire combattimenti, senza alcun modo di
+  // recuperare se non a mano sul database.
+  const [mio] = await db
+    .select({ role: campaignMembers.role })
+    .from(campaignMembers)
+    .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
+  if (mio?.role === "dm" && (await countDms(campaignId)) <= 1) {
+    throw new Error(
+      "Sei l'ultimo master: nomina un altro master prima di abbandonare la campagna.",
+    );
+  }
   await db
     .delete(campaignMembers)
     .where(and(eq(campaignMembers.campaignId, campaignId), eq(campaignMembers.userId, userId)));
@@ -321,7 +344,16 @@ export async function deleteCampaign(campaignId: string) {
 export async function addSessionNote(campaignId: string, titolo: string, testo: string) {
   const userId = await requireUserId();
   await requireMember(campaignId, userId);
-  await db.insert(campaignSessionNotes).values({ campaignId, authorId: userId, titolo, testo });
+  // Limiti come in tutte le creazioni gemelle (handout, trame, NPC, preparazione): è l'unica
+  // scrittura aperta a QUALUNQUE membro, non solo al master, e la nota viene riletta per intero
+  // ad ogni apertura della campagna da tutto il gruppo — un incollaggio enorme rallenterebbe la
+  // pagina a tutti, senza nessun modo di accorciarla dalla UI (esiste solo l'eliminazione).
+  await db.insert(campaignSessionNotes).values({
+    campaignId,
+    authorId: userId,
+    titolo: (titolo.trim() || "Senza titolo").slice(0, 100),
+    testo: testo.slice(0, 10000),
+  });
 }
 
 // Jukebox condiviso: un solo brano "in riproduzione" per campagna (niente coda). Il master

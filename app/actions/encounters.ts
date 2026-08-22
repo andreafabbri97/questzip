@@ -189,7 +189,25 @@ export async function updateCombatant(
   // in più per gli aggiornamenti frequenti che non lo toccano (HP, condizioni, tiri morte...).
   const oldOrder =
     values.iniziativa !== undefined ? await getSortedCombatantIds(combatant.encounterId) : null;
-  await db.update(encounterCombatants).set(values).where(eq(encounterCombatants.id, combatantId));
+  // Oggetto costruito campo per campo, MAI lo spread di "values": Drizzle scrive ogni colonna
+  // reale presente nell'oggetto, non solo quelle dichiarate nel tipo — una richiesta confezionata
+  // a mano con encounterId/characterUserId sposterebbe il combattente in un'altra campagna o lo
+  // riattribuirebbe a un altro giocatore (che poi incasserebbe gli XP di fine scontro). Tutte le
+  // update gemelle (updateNpc, updateQuest, updateHandout...) fanno già così.
+  const set: Partial<typeof encounterCombatants.$inferInsert> = {};
+  if (values.iniziativa !== undefined) set.iniziativa = values.iniziativa;
+  if (values.hpAttuali !== undefined) set.hpAttuali = values.hpAttuali;
+  if (values.hpMax !== undefined) set.hpMax = values.hpMax;
+  if (values.nome !== undefined) set.nome = values.nome.slice(0, 100);
+  if (values.condizioni !== undefined) set.condizioni = values.condizioni;
+  if (values.tiriMorteSuccessi !== undefined) set.tiriMorteSuccessi = values.tiriMorteSuccessi;
+  if (values.tiriMorteFallimenti !== undefined) set.tiriMorteFallimenti = values.tiriMorteFallimenti;
+  if (values.azioniLeggendarieMax !== undefined) set.azioniLeggendarieMax = values.azioniLeggendarieMax;
+  if (values.azioniLeggendarieUsate !== undefined) set.azioniLeggendarieUsate = values.azioniLeggendarieUsate;
+  if (values.concentrazione !== undefined) {
+    set.concentrazione = values.concentrazione === null ? null : values.concentrazione.slice(0, 100);
+  }
+  await db.update(encounterCombatants).set(set).where(eq(encounterCombatants.id, combatantId));
   if (oldOrder) await realignCurrentTurn(combatant.encounterId, encounter.currentTurn, oldOrder);
   await broadcastEncounterChanged(encounter.campaignId);
 }

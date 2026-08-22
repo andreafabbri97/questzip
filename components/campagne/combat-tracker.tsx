@@ -320,6 +320,15 @@ function CombatantConcentration({
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(combatant.concentrazione ?? "");
+  // Il componente non viene rimontato quando il combattente si aggiorna (la key <li> è l'id, che
+  // non cambia): senza risincronizzare, un secondo master che aveva la pagina già aperta apriva
+  // il campo VUOTO e al blur CANCELLAVA la concentrazione impostata dall'altro. Schema "reset a
+  // render" già usato altrove nel progetto (VisionField, HitPointCalculator).
+  const [valoreCaricato, setValoreCaricato] = useState(combatant.concentrazione ?? "");
+  if (!editing && valoreCaricato !== (combatant.concentrazione ?? "")) {
+    setValoreCaricato(combatant.concentrazione ?? "");
+    setValue(combatant.concentrazione ?? "");
+  }
 
   const save = async () => {
     setEditing(false);
@@ -811,8 +820,16 @@ function XpDistributor({
     setGranting(true);
     setError("");
     try {
-      await grantXpToParty(campaignId, perPlayer, autoLevelUp, participantUserIds);
+      const esito = await grantXpToParty(campaignId, perPlayer, autoLevelUp, participantUserIds);
       setGranted(true);
+      // Parziale = AVVISO, non errore: l'XP a chi poteva riceverla è già stata assegnata, quindi
+      // ripremere il bottone la raddoppierebbe. Prima arrivava come eccezione e invitava proprio
+      // a riprovare.
+      if (esito && esito.assegnati < esito.richiesti) {
+        setError(
+          `XP assegnata a ${esito.assegnati} su ${esito.richiesti} giocatori: gli altri non hanno (più) un personaggio sincronizzato. Non ripremere: chi doveva riceverla l'ha già.`,
+        );
+      }
       onGranted();
     } catch (err) {
       setError((err as Error).message);

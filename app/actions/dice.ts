@@ -30,7 +30,10 @@ export async function saveDiceRoll(data: {
   const userId = await requireUserId();
   const [row] = await db
     .insert(diceRolls)
-    .values({ userId, ...data })
+    // userId DOPO lo spread: "data" arriva dal client e i tipi TypeScript non esistono a runtime,
+    // quindi una chiave userId iniettata lì dentro scriverebbe il tiro nella cronologia di un altro
+    // account. L'ordine qui è una garanzia, non uno stile.
+    .values({ ...data, userId })
     .returning();
 
   // Pota quello che eccede il tetto invece di lasciarlo accumulare — stessa politica di prima.
