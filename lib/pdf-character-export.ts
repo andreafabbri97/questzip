@@ -703,7 +703,9 @@ export async function exportCharacterToPdf(character: Character): Promise<Uint8A
 
   // La pagina incantesimi si salta del tutto per chi non è incantatore (un guerriero puro non
   // deve stamparsi un foglio vuoto) — ma basta un solo incantesimo o slot per includerla, così
-  // resta coperto anche il caso Cavaliere Mistico/Furfante Arcano.
+  // resta coperto anche il caso Cavaliere Mistico/Mistificatore Arcano (i due "terzi
+  // incantatori": nomi ufficiali del Manuale del Giocatore 2014 — nel 2024 Eldritch Knight
+  // diventa "Cavaliere Occulto").
   const haIncantesimi =
     character.incantesimi.length > 0 ||
     multiclassCasterLevel(character.classi) > 0 ||

@@ -145,6 +145,15 @@ export const campaignDungeons = pgTable("campaign_dungeon", {
   fogOfWar: boolean("fog_of_war").notNull().default(false),
   revealedRooms: jsonb("revealed_rooms").$type<number[]>().notNull().default([]),
   monsterTokens: jsonb("monster_tokens").$type<MonsterToken[]>().notNull().default([]),
+  // Contatore di versione per il confronto-e-scambio: OGNI scrittura lo incrementa e aggiorna solo
+  // se il valore letto è ancora quello attuale. Serve perché i campi jsonb qui sotto (rooms,
+  // revealedRooms, monsterTokens, markers) si modificano leggendo l'array intero, cambiandolo in
+  // JS e riscrivendolo: senza questo controllo due dispositivi che scrivono insieme (il master su
+  // laptop e telefono, o due master) si sovrascrivevano a vicenda in silenzio — la modifica di uno
+  // spariva senza alcun errore. Il driver Neon HTTP non offre transazioni, ma un singolo UPDATE
+  // con WHERE sulla versione è comunque atomico.
+  version: integer("version").notNull().default(0),
+
   // "Movimento e visione realistici": quando attivo, la luce dinamica usa il raggio di visione
   // REALE di ciascun personaggio (da campaignCharacters.visioneRadius) invece di un valore fisso
   // uguale per tutti, e il trascinamento del token durante il proprio turno di combattimento
@@ -173,6 +182,8 @@ export const campaignRegionalMaps = pgTable("campaign_regional_map", {
   height: integer("height").notNull(),
   cells: jsonb("cells").$type<TerrainType[][]>().notNull(),
   markers: jsonb("markers").$type<RegionalMarker[]>().notNull().default([]),
+  // Stesso ruolo del gemello su campaign_dungeon: vedi il commento lì.
+  version: integer("version").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 

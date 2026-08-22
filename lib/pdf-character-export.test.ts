@@ -31,7 +31,7 @@ describe("exportCharacterToPdf", () => {
   });
 
   it("include la pagina incantesimi anche se la magia arriva solo dagli incantesimi conosciuti", async () => {
-    // Cavaliere Mistico/Furfante Arcano: la classe non risulta incantatrice dalle tabelle, ma il
+    // Cavaliere Mistico/Mistificatore Arcano: la classe non risulta incantatrice dalle tabelle, ma il
     // personaggio ha comunque incantesimi in scheda — senza questo caso resterebbero fuori dal PDF.
     const cavaliere = build({
       classi: [{ nome: "Guerriero", livello: 5 }],
