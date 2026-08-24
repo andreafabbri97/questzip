@@ -9,6 +9,13 @@ import {
 import { AiUsageHint } from "@/components/ai-usage-hint";
 import { isAiAvailable } from "@/app/actions/ai";
 import { importCharacterFromPdfWithAi } from "@/app/actions/character-pdf-ai";
+import { pesoTotale, riduciImmagine } from "@/lib/image-downscale";
+
+// Tetto di sicurezza per l'invio all'IA. Il limite vero è doppio: le Server Action di Next.js
+// accettano di default 1 MB di corpo (alzato in next.config.ts) e Vercel si ferma comunque
+// intorno ai 4,5 MB per richiesta. Meglio dirlo prima con un messaggio chiaro che lasciar
+// fallire il trasporto con un errore incomprensibile — che è esattamente com'era prima.
+const MAX_INVIO_BYTE = 3.5 * 1024 * 1024;
 import { useLocalCollection } from "@/lib/storage";
 import { characterSchema, newCharacter, totalLevel, type Character } from "@/lib/dnd";
 import { importCharacterFromPdf } from "@/lib/pdf-character-import";
@@ -33,7 +40,7 @@ function ExportImport({
   // File non riconosciuto dal parser locale, in attesa di conferma esplicita dell'utente prima
   // di provare a leggerlo con l'IA (il file viene inviato a Google per l'analisi — non un
   // passaggio automatico/silenzioso, sono i dati personali del personaggio di qualcuno).
-  const [pendingAiImport, setPendingAiImport] = useState<{ bytes: ArrayBuffer; mimeType: string } | null>(
+  const [pendingAiImport, setPendingAiImport] = useState<{ bytes: ArrayBuffer; mimeType: string }[] | null>(
     null,
   );
   const [aiImporting, setAiImporting] = useState(false);
@@ -75,33 +82,47 @@ function ExportImport({
   // gratuito, e più preciso dell'IA per QUESTO template specifico, quindi resta il tentativo
   // predefinito anche ora che esiste un fallback IA per tutto il resto.
   const importPdfFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    // Più file insieme: una scheda fotografata sta quasi sempre su 2-3 pagine, e prima se ne
+    // poteva scegliere una sola — le altre non c'era proprio modo di caricarle.
+    const files = [...(event.target.files ?? [])];
     event.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
     setError(null);
     setPendingAiImport(null);
     setImportingPdf(true);
     try {
-      const bytes = await file.arrayBuffer();
-      if (file.type === "application/pdf") {
+      // Un solo PDF: si tenta prima il parser locale del nostro template, che è istantaneo,
+      // gratuito e più preciso dell'IA — e legge davvero le schede del gruppo.
+      if (files.length === 1 && files[0].type === "application/pdf") {
         try {
-          const character = await importCharacterFromPdf(bytes);
+          const character = await importCharacterFromPdf(await files[0].arrayBuffer());
           onImport([character]);
           return;
         } catch (err) {
-          // Non è il nostro template — se l'IA è disponibile si passa alla conferma esplicita
-          // sotto, altrimenti resta il solo errore di sempre.
           if (!aiAvailable) {
             setError(err instanceof Error ? err.message : "Impossibile leggere questo PDF.");
             return;
           }
         }
       }
-      if (aiAvailable) {
-        setPendingAiImport({ bytes, mimeType: file.type || "application/pdf" });
-      } else {
+
+      if (!aiAvailable) {
         setError("QuestZip non riconosce questo file come una scheda compatibile.");
+        return;
       }
+
+      // Le foto vengono rimpicciolite QUI, prima di partire: a piena risoluzione superano il
+      // limite di corpo delle Server Action e l'import falliva sempre, senza che l'IA venisse
+      // nemmeno interpellata.
+      const allegati = await Promise.all(files.map(riduciImmagine));
+      const peso = pesoTotale(allegati);
+      if (peso > MAX_INVIO_BYTE) {
+        setError(
+          `I file sono troppo pesanti (${(peso / 1024 / 1024).toFixed(1)} MB in tutto, massimo ${MAX_INVIO_BYTE / 1024 / 1024}). Caricane meno alla volta, oppure usa il PDF invece delle foto.`,
+        );
+        return;
+      }
+      setPendingAiImport(allegati);
     } finally {
       setImportingPdf(false);
     }
@@ -113,7 +134,7 @@ function ExportImport({
     if (!pendingAiImport) return;
     setError(null);
     setAiImporting(true);
-    importCharacterFromPdfWithAi(pendingAiImport.bytes, pendingAiImport.mimeType)
+    importCharacterFromPdfWithAi(pendingAiImport)
       .then((character) => {
         onImport([character]);
         setPendingAiImport(null);
@@ -143,12 +164,13 @@ function ExportImport({
           importingPdf ? "opacity-60" : "hover:text-foreground hover:border-accent/50 cursor-pointer"
         }`}
       >
-        {importingPdf ? "Importazione…" : "📄 Importa da PDF"}
+        {importingPdf ? "Importazione…" : aiAvailable ? "📄 Importa da PDF/foto" : "📄 Importa da PDF"}
         <input
           type="file"
           // Il tipo immagine ha senso solo se l'IA è disponibile: il parser locale legge solo
           // PDF compilabili, una foto passa per forza dal fallback IA.
           accept={aiAvailable ? "application/pdf,image/*" : "application/pdf"}
+          multiple={aiAvailable}
           onChange={importPdfFile}
           disabled={importingPdf}
           className="hidden"
@@ -158,8 +180,11 @@ function ExportImport({
       {pendingAiImport && (
         <div className="w-full rounded-lg border border-edge bg-surface-raised p-3 text-xs text-muted space-y-2">
           <p>
-            Questo file non sembra il nostro template PDF conosciuto. Vuoi provare a leggerlo con
-            l&apos;assistente IA? Il contenuto verrà inviato a Google per l&apos;analisi.
+            {pendingAiImport.length > 1
+              ? `${pendingAiImport.length} pagine da leggere come un'unica scheda.`
+              : "Questo file non sembra il nostro template PDF conosciuto."}{" "}
+            Vuoi provare a leggerlo con l&apos;assistente IA? Il contenuto verrà inviato a Google
+            per l&apos;analisi.
           </p>
           <div className="flex gap-2">
             <button

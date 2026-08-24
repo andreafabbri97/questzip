@@ -125,9 +125,17 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
           </button>
         </div>
 
-        {/* justify-end: come in message-list.tsx, ancora i messaggi in fondo vicino al composer
-            quando sono pochi invece di lasciarli appesi in alto con un vuoto enorme sotto. */}
-        <div className="flex-1 overflow-y-auto flex flex-col justify-end gap-4 p-4">
+        {/* "justify-end" NON va messo sul contenitore che scorre: quando il contenuto supera
+            l'altezza, la parte in eccesso finisce SOPRA il bordo superiore e diventa
+            irraggiungibile — non esiste scroll negativo. Su telefono, dove lo spazio è poco, una
+            risposta lunga risultava quindi tagliata e impossibile da leggere per intero
+            (segnalato dall'utente). L'ancoraggio in basso quando i messaggi sono pochi si ottiene
+            invece con un wrapper interno "min-h-full + justify-end": se il contenuto è corto resta
+            attaccato al composer, se è lungo il wrapper cresce e si scorre normalmente.
+            min-h-0 serve perché un figlio flex possa davvero andare in overflow (stesso motivo per
+            cui c'è in message-list.tsx). */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <div className="flex min-h-full flex-col justify-end gap-4">
           {history.length === 0 && (
             <p className="py-6 text-center text-sm text-muted">
               Fai una domanda sulle regole di D&amp;D 5e — es. &quot;Quanto danno fa Palla di Fuoco al
@@ -169,7 +177,8 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
               </div>
             </div>
           ))}
-          <div ref={bottomRef} />
+            <div ref={bottomRef} />
+          </div>
         </div>
 
         <div className="border-t border-edge p-3 space-y-1.5 shrink-0">

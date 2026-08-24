@@ -68,17 +68,28 @@ export interface AskGeminiInput {
   /** Un file allegato (es. un PDF) da far leggere al modello insieme al prompt — Gemini accetta
    * PDF direttamente come contenuto multimodale, non serve rasterizzare le pagine a mano. */
   attachment?: { bytes: ArrayBuffer; mimeType: string };
+  /** Più allegati insieme (es. le pagine fotografate di una stessa scheda), tutti nella stessa
+   * richiesta così il modello li legge come un unico documento. Ignorato se "attachment" è
+   * valorizzato: i due campi non si combinano, si sceglie l'uno o l'altro. */
+  attachments?: { bytes: ArrayBuffer; mimeType: string }[];
 }
 
 /** Chiede a Gemini una risposta testuale libera. Ritorna null se l'IA non è configurata o se
  * qualunque cosa va storta — mai un'eccezione. */
-export async function askGemini({ prompt, attachment }: AskGeminiInput): Promise<string | null> {
+export async function askGemini({ prompt, attachment, attachments }: AskGeminiInput): Promise<string | null> {
   const ai = getClient();
   if (!ai) return null;
 
-  const parts = attachment
-    ? [createPartFromBase64(Buffer.from(attachment.bytes).toString("base64"), attachment.mimeType), prompt]
-    : prompt;
+  const allegati = attachment ? [attachment] : (attachments ?? []);
+  const parts =
+    allegati.length > 0
+      ? [
+          ...allegati.map((a) =>
+            createPartFromBase64(Buffer.from(a.bytes).toString("base64"), a.mimeType),
+          ),
+          prompt,
+        ]
+      : prompt;
   const contents: Content[] = [createUserContent(parts)];
 
   // GEMINI_MODEL forza UN solo modello specifico (es. un piano a pagamento pensato apposta per

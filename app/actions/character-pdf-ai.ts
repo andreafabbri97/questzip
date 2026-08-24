@@ -176,12 +176,21 @@ function mapAiResultToCharacter(parsed: unknown): Character {
  * personaggio vuoto/corrotto — mai fidarsi ciecamente dell'output di un modello: il risultato
  * passa comunque per characterSchema.parse() come ultima rete di sicurezza. */
 export async function importCharacterFromPdfWithAi(
-  bytes: ArrayBuffer,
-  mimeType: string,
+  allegati: { bytes: ArrayBuffer; mimeType: string }[],
 ): Promise<Character> {
   await requireUserId();
+  if (allegati.length === 0) throw new Error("Nessun file da leggere.");
 
-  const raw = await askGemini({ prompt: PROMPT, attachment: { bytes, mimeType } });
+  // Più pagine = più foto della STESSA scheda: va detto al modello, altrimenti tende a trattarle
+  // come personaggi diversi e restituisce solo il primo.
+  const prompt =
+    allegati.length > 1
+      ? `${PROMPT}
+
+ATTENZIONE: gli allegati sono ${allegati.length} pagine/foto di UNA SOLA scheda dello STESSO personaggio. Uniscile e restituisci un unico oggetto JSON che le riassuma tutte, non uno per pagina.`
+      : PROMPT;
+
+  const raw = await askGemini({ prompt, attachments: allegati });
   if (!raw) {
     throw new Error("L'assistente IA non è disponibile in questo momento. Riprova più tardi.");
   }
