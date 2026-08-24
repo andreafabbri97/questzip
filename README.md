@@ -215,4 +215,14 @@ Traduzione IA del resto del Compendio (richiede `GEMINI_API_KEY`, vedi roadmap):
 
 ## Deploy
 
-Su [Vercel](https://vercel.com): importa il repo GitHub e deploya, zero configurazione.
+Su [Vercel](https://vercel.com): importa il repo GitHub e deploya, zero configurazione. Ogni `git push` su `main` fa ripartire il deploy da solo.
+
+> ⚠️ **Il Worker realtime NON si aggiorna col push.** Vercel distribuisce solo l'app Next.js: il
+> Worker Cloudflare (`party/campaign-room.ts`) vive su un altro account e va ridistribuito **a
+> mano** con `npx wrangler deploy` ogni volta che quel file cambia. È un errore silenzioso e
+> difficile da notare: l'app continua a funzionare, ma il Worker vecchio SCARTA i tipi di messaggio
+> che non conosce ancora — è già successo che chat vocale e template d'area risultassero
+> semplicemente "non funzionanti" in produzione per settimane, mentre in locale andavano.
+> Per controllare quando è stato distribuito l'ultima volta:
+> `npx wrangler deployments list --name questzip-party`, e confrontalo con
+> `git log -1 --date=iso -- party/`.
