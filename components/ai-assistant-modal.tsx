@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { askRulesAssistant } from "@/app/actions/ai-assistant";
 import { AiUsageHint } from "@/components/ai-usage-hint";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
-import { useVisualViewportHeight } from "@/lib/use-visual-viewport-height";
+import { useVisualViewport } from "@/lib/use-visual-viewport";
 
 interface Exchange {
   id: string;
@@ -32,30 +32,80 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<Exchange[]>([]);
   const [asking, setAsking] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useBodyScrollLock(open);
   // vh/dvh non si aggiornano in modo affidabile all'apertura della tastiera in alcuni browser
   // in-app (Instagram/Facebook, motore Android WebView) — segnalato con screenshot: il modal
-  // restava dimensionato per lo schermo intero, con un vuoto enorme sopra l'input. Quando
-  // l'API è disponibile, l'altezza reale visibile (tastiera esclusa) sovrascrive la classe CSS.
-  const visualViewportHeight = useVisualViewportHeight();
+  // restava dimensionato per lo schermo intero, con un vuoto enorme sopra l'input. Nemmeno
+  // "fixed inset-0" basta, perché si riferisce al viewport di LAYOUT, che con la tastiera aperta
+  // resta alto quanto tutto lo schermo: l'overlay finiva dietro la tastiera. Quando l'API è
+  // disponibile, il riquadro davvero visibile sovrascrive quindi le classi CSS.
+  const viewport = useVisualViewport();
+  // Sotto questa altezza visibile (telefono in orizzontale con la tastiera aperta) ogni riga di
+  // servizio toglie spazio alla conversazione, che è l'unica cosa per cui il modal esiste.
+  const spazioRidotto = viewport != null && viewport.height < 420;
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Trappola del focus: senza, il Tab esce dal modal e va a finire sui link della pagina
+      // sotto, che è coperta dall'overlay — si naviga alla cieca su elementi che non si vedono.
+      if (event.key !== "Tab" || !modalRef.current) return;
+      const focusabili = modalRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), textarea, input, a[href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusabili.length === 0) return;
+      const primo = focusabili[0];
+      const ultimo = focusabili[focusabili.length - 1];
+      const attivo = document.activeElement;
+      if (event.shiftKey && (attivo === primo || !modalRef.current.contains(attivo))) {
+        event.preventDefault();
+        ultimo.focus();
+      } else if (!event.shiftKey && attivo === ultimo) {
+        event.preventDefault();
+        primo.focus();
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  // Alla chiusura il focus torna da dove era partito (l'icona 🤖 in header): senza, finisce sul
+  // <body> e il Tab successivo riparte dall'inizio della pagina.
+  useEffect(() => {
+    if (!open) return;
+    const origine = document.activeElement as HTMLElement | null;
+    return () => origine?.focus?.();
+  }, [open]);
+
+  // Il campo cresce con il testo invece di scorrere dentro una riga sola: su telefono rileggere
+  // una domanda lunga dentro un campo alto 36px è impraticabile. Il tetto è la classe max-h-24.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [question]);
+
   // Scorre in fondo ad ogni nuova domanda E quando arriva la risposta (la "bolla" che sostituisce
   // i tre puntini può cambiare altezza, senza questo secondo trigger l'ultimo scambio potrebbe
-  // restare tagliato a metà se la risposta è più lunga del previsto.
+  // restare tagliato a metà se la risposta è più lunga del previsto). Si scorre il contenitore dei
+  // messaggi DIRETTAMENTE, non con scrollIntoView su un elemento in fondo: quello scorre ogni
+  // antenato scrollabile, overlay compreso, e su telefono faceva scivolare via l'intero modal
+  // invece della sola conversazione. L'altezza del viewport è fra le dipendenze perché aprendo la
+  // tastiera lo spazio si dimezza: senza, l'ultimo messaggio finirebbe fuori dall'area visibile.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [history, asking]);
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+  }, [history, asking, viewport?.height]);
 
   if (!open) return null;
 
@@ -97,23 +147,36 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-16 sm:pt-4 animate-overlay-in"
+      // NIENTE overflow-y-auto qui: un overlay scrollabile è esattamente ciò che permetteva di
+      // "trascinare via" il modal con la tastiera aperta invece di scorrere la conversazione.
+      // L'overlay copre l'area visibile e basta; a scorrere è solo l'elenco dei messaggi.
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-overlay-in"
+      style={
+        // Ancorato al viewport VISIBILE, non a quello di layout: con la tastiera aperta "inset-0"
+        // si estende dietro la tastiera (Android) oppure fuori dallo schermo (iOS, dove il
+        // viewport visibile viene spostato invece che accorciato).
+        viewport
+          ? { top: viewport.offsetTop, height: viewport.height, bottom: "auto" }
+          : undefined
+      }
       onClick={onClose}
     >
       <div
-        className="card-elevated flex h-[min(34rem,82dvh)] w-full max-w-lg flex-col rounded-xl border border-edge bg-surface overflow-hidden animate-modal-in"
-        style={
-          // Sovrascrive la classe h-[...dvh] con l'altezza REALE misurata da visualViewport
-          // (tastiera esclusa) quando l'API è disponibile — 96px è il margine verticale del
-          // wrapper esterno (pt-16 + p-4 su mobile), 34rem resta il tetto massimo desktop.
-          visualViewportHeight != null
-            ? { height: `min(34rem, ${Math.max(320, visualViewportHeight - 96)}px)` }
-            : undefined
-        }
+        // h-full + max-h: il modal non può MAI essere più alto dell'area visibile, quindi non
+        // esiste nulla da scorrere fuori. Prima un pavimento fisso di 320px lo rendeva più alto
+        // dello spazio rimasto non appena si apriva la tastiera.
+        className="card-elevated flex h-full max-h-[34rem] w-full max-w-lg flex-col rounded-xl border border-edge bg-surface overflow-hidden animate-modal-in"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titolo-assistente-ia"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-edge px-4 py-2.5 shrink-0">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted">
+          <span
+            id="titolo-assistente-ia"
+            className="text-xs font-bold uppercase tracking-widest text-muted"
+          >
             🤖 Assistente regole
           </span>
           <button
@@ -134,7 +197,10 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
             attaccato al composer, se è lungo il wrapper cresce e si scorre normalmente.
             min-h-0 serve perché un figlio flex possa davvero andare in overflow (stesso motivo per
             cui c'è in message-list.tsx). */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        {/* overscroll-contain: arrivati in cima o in fondo alla conversazione il gesto NON si
+            propaga all'overlay o alla pagina sotto — senza, su telefono continuare a trascinare
+            "tirava" tutto il modal. */}
+        <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4">
           <div className="flex min-h-full flex-col justify-end gap-4">
           {history.length === 0 && (
             <p className="py-6 text-center text-sm text-muted">
@@ -177,7 +243,6 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
               </div>
             </div>
           ))}
-            <div ref={bottomRef} />
           </div>
         </div>
 
@@ -195,7 +260,8 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
               placeholder="Fai una domanda sulle regole…"
               rows={1}
               autoFocus
-              className="input-focus flex-1 min-h-9 max-h-24 resize-none rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground"
+              ref={textareaRef}
+              className="input-focus flex-1 min-h-9 max-h-24 resize-none overflow-y-auto rounded-lg border border-edge bg-surface-raised px-3 py-2 text-sm text-foreground"
             />
             <button
               onClick={ask}
@@ -206,11 +272,19 @@ export function AiAssistantModal({ open, onClose }: { open: boolean; onClose: ()
               <span className="text-lg leading-none">↑</span>
             </button>
           </div>
-          <p className="text-center text-[10px] text-muted">
-            Risposte generate da un&apos;IA — verifica sempre le regole ufficiali in caso di dubbio.
-            Ricorda gli ultimi {REMEMBERED_EXCHANGES} scambi di questa conversazione, non l&apos;intera cronologia.
-          </p>
-          <AiUsageHint className="text-center" refreshKey={`${history.length}:${asking}`} />
+          {/* Con la tastiera aperta su un telefono in orizzontale restano ~200px in tutto: fra
+              intestazione, campo di scrittura e queste due righe di servizio, alla conversazione
+              non resterebbe nulla. Sotto quella soglia si nascondono — riappaiono appena la
+              tastiera si chiude, quindi l'avvertenza resta comunque leggibile. */}
+          {!spazioRidotto && (
+            <>
+              <p className="text-center text-[10px] text-muted">
+                Risposte generate da un&apos;IA — verifica sempre le regole ufficiali in caso di dubbio.
+                Ricorda gli ultimi {REMEMBERED_EXCHANGES} scambi di questa conversazione, non l&apos;intera cronologia.
+              </p>
+              <AiUsageHint className="text-center" refreshKey={`${history.length}:${asking}`} />
+            </>
+          )}
         </div>
       </div>
     </div>,

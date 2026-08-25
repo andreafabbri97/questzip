@@ -38,13 +38,18 @@ export function DiceModal({ open, onClose }: { open: boolean; onClose: () => voi
   return createPortal(
     <div
       aria-hidden={!open}
-      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-16 sm:pt-4 ${
+      // pt-10 invece di pt-16 su telefono: quei 24px in meno di margine cieco vanno tutti alla
+      // cronologia dei tiri, che è la parte che si vuole vedere di più (richiesta dell'utente).
+      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-10 sm:pt-4 ${
         open ? "animate-overlay-in" : "animate-overlay-out pointer-events-none"
       }`}
       onClick={onClose}
     >
       <div
-        className={`card-elevated w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-edge bg-background overflow-hidden ${
+        // Su telefono il tetto sale a 90dvh: "dvh" e non "vh" perché vh conta anche la barra
+        // degli indirizzi, quindi 85vh poteva già sforare l'area davvero visibile. Su desktop
+        // resta 85vh, dove di spazio ce n'è in abbondanza e un modal gigante starebbe solo largo.
+        className={`card-elevated w-full max-w-lg max-h-[90dvh] sm:max-h-[85vh] flex flex-col rounded-xl border border-edge bg-background overflow-hidden ${
           open ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}
