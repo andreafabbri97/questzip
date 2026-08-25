@@ -203,6 +203,9 @@ interface BestiaryFile {
 }
 interface ItemsFile {
   item: RawItem[];
+  /** Voci "di famiglia" del manuale (Anello di Resistenza, Corno del Valhalla): una voce sola
+   * con una tabella di varianti al suo interno. */
+  itemGroup?: RawItem[];
 }
 interface RacesFile {
   race: RawRace[];
@@ -262,12 +265,63 @@ export function loadCreatures(): Promise<RawCreature[]> {
   return creaturesPromise;
 }
 
+/** Una "variante generica" di 5etools: un oggetto magico che non è legato a un oggetto base
+ * preciso ma si applica a un'intera famiglia ("Dragon Slayer" vale per qualunque spada). Vive in
+ * un file SEPARATO da items.json, con i dati veri annidati sotto `inherits`. */
+interface RawMagicVariant {
+  name: string;
+  type?: string;
+  inherits?: {
+    source?: string;
+    rarity?: string;
+    reqAttune?: boolean | string;
+    entries?: FiveEntry[];
+  };
+}
+
+interface MagicVariantsFile {
+  magicvariant: RawMagicVariant[];
+}
+
+/**
+ * Gli oggetti magici più iconici del gioco — Flame Tongue, Dragon Slayer, Armatura Adamantina,
+ * Arma/Armatura/Scudo +1/+2/+3, Anello di Resistenza — NON sono in items.json: 5etools li tiene
+ * in magicvariants.json perché non sono un oggetto singolo ma una variante applicabile a
+ * un'intera famiglia di oggetti base. Non caricandoli, il Compendio non li conteneva affatto:
+ * cercare "Lingua di Fiamme" non dava alcun risultato, e le ~47 voci italiane ufficiali
+ * corrispondenti restavano scollegate perché la controparte inglese semplicemente non esisteva.
+ */
+function normalizzaVariante(v: RawMagicVariant): RawItem | null {
+  const dati = v.inherits;
+  if (!dati?.source) return null;
+  return {
+    name: v.name,
+    source: dati.source,
+    rarity: dati.rarity,
+    type: v.type,
+    reqAttune: dati.reqAttune,
+    entries: dati.entries,
+  };
+}
+
 let itemsPromise: Promise<RawItem[]> | null = null;
 /** Solo oggetti MAGICI (rarità reale) — usato dal tab "Oggetti magici" del Compendio. */
 export function loadItems(): Promise<RawItem[]> {
   if (!itemsPromise) {
-    itemsPromise = fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) =>
-      (file?.item ?? []).filter((item) => item.rarity && item.rarity !== "none"),
+    itemsPromise = Promise.all([
+      // "item" sono gli oggetti singoli; "itemGroup" le famiglie che nel manuale hanno una voce
+      // sola con una tabella di varianti (Anello di Resistenza, Corno del Valhalla, Corazza di
+      // Scaglie di Drago, Pergamena Magica). Erano assenti dal Compendio quanto le varianti
+      // generiche, pur essendo voci a tutti gli effetti del Manuale del DM.
+      fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) => [
+        ...(file?.item ?? []),
+        ...(file?.itemGroup ?? []),
+      ]),
+      fetchJson<MagicVariantsFile>(`${RAW_BASE}/magicvariants.json`).then(
+        (file) => (file?.magicvariant ?? []).map(normalizzaVariante).filter((v): v is RawItem => !!v),
+      ),
+    ]).then(([items, varianti]) =>
+      [...items, ...varianti].filter((item) => item.rarity && item.rarity !== "none"),
     );
   }
   return itemsPromise;
@@ -288,9 +342,17 @@ let inventoryItemsPromise: Promise<RawItem[]> | null = null;
 export function loadInventoryItems(): Promise<RawItem[]> {
   if (!inventoryItemsPromise) {
     inventoryItemsPromise = Promise.all([
-      fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) => file?.item ?? []),
+      fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) => [
+        ...(file?.item ?? []),
+        ...(file?.itemGroup ?? []),
+      ]),
       fetchJson<BaseItemsFile>(`${RAW_BASE}/items-base.json`).then((file) => file?.baseitem ?? []),
-    ]).then(([items, baseItems]) => [...items, ...baseItems]);
+      // Stesse varianti generiche caricate da loadItems: senza, un personaggio non poteva mettere
+      // in inventario una Lingua di Fiamme o un'arma +1, fra gli oggetti magici più comuni in gioco.
+      fetchJson<MagicVariantsFile>(`${RAW_BASE}/magicvariants.json`).then(
+        (file) => (file?.magicvariant ?? []).map(normalizzaVariante).filter((v): v is RawItem => !!v),
+      ),
+    ]).then(([items, baseItems, varianti]) => [...items, ...baseItems, ...varianti]);
   }
   return inventoryItemsPromise;
 }

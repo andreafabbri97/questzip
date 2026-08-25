@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pulisciTestoOcr, quotaIlleggibile } from "./ocr-cleanup";
+import { pulisciNumeriStatBlock, pulisciTestoOcr, quotaIlleggibile } from "./ocr-cleanup";
 
 describe("pulisciTestoOcr", () => {
   it("ripara l'intestazione ricorrente degli incantesimi", () => {
@@ -105,5 +105,27 @@ describe("refusi OCR trovati nell'audit sui mostri e sugli oggetti", () => {
 
   it("toglie gli underscore residui dell'OCR", () => {
     expect(pulisciTestoOcr("ogni _ giorno all'alba")).toBe("ogni giorno all'alba");
+  });
+});
+
+// I campi numerici degli stat block sono in colonne strettissime nel PDF e l'OCR li spezza in modo
+// sistematico. Non è solo un fastidio di estrazione: quei valori finiscono tali e quali nella
+// scheda del mostro, quindi si leggeva "CA 1 4" al posto di "CA 14".
+describe("pulisciNumeriStatBlock", () => {
+  it("ricompone le cifre spezzate dalla colonna del PDF", () => {
+    expect(pulisciNumeriStatBlock("1 4  (armatura naturale)")).toBe("14 (armatura naturale)");
+    expect(pulisciNumeriStatBlock("304 (32d10 + 1 28)")).toBe("304 (32d10 + 128)");
+  });
+
+  it("ricostruisce la cifra 1 letta come lettera", () => {
+    expect(pulisciNumeriStatBlock("l 5 (armatura naturale)")).toBe("15 (armatura naturale)");
+    expect(pulisciNumeriStatBlock("136 (l 6d8 + 64)")).toBe("136 (16d8 + 64)");
+    expect(pulisciNumeriStatBlock("51 (6dl 0  + 1 8)")).toBe("51 (6d10 + 18)");
+  });
+
+  it("lascia intatto un valore già corretto", () => {
+    expect(pulisciNumeriStatBlock("12")).toBe("12");
+    expect(pulisciNumeriStatBlock("27 (6d8)")).toBe("27 (6d8)");
+    expect(pulisciNumeriStatBlock("9 (2d6 + 2)")).toBe("9 (2d6 + 2)");
   });
 });

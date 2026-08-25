@@ -66,6 +66,33 @@ export function pulisciTestoOcr(testo: string): string {
   return out.replace(/[^\S\n]{2,}/g, " ");
 }
 
+/**
+ * Pulizia mirata ai campi NUMERICI di uno stat block (classe armatura, punti ferita, velocità,
+ * sensi). Nel PDF del Manuale dei Mostri quei valori sono in colonne strette e l'OCR li spezza in
+ * modo sistematico: "14 (armatura naturale)" diventa "1 4  (armatura naturale)" e "51 (6d10 + 18)"
+ * diventa "51 (6dl 0  + 1 8)". Non è un problema solo di estrazione: quei campi finiscono tali e
+ * quali nella scheda del mostro, quindi l'utente legge "CA 1 4".
+ *
+ * Si applica SOLO a questi campi, mai al testo descrittivo: unire due cifre separate da uno spazio
+ * è corretto dentro un valore numerico ma sarebbe sbagliato in una frase ("colpisce 2 o 3 bersagli").
+ */
+export function pulisciNumeriStatBlock(testo: string): string {
+  return (
+    testo
+      // "l"/"I" al posto della cifra 1 quando è attaccata a un dado o a un'altra cifra:
+      // "6dl0", "l 5", "2dl 2". In un campo numerico non esistono parole, quindi non c'è
+      // ambiguità possibile: una lettera lì dentro è sempre una cifra letta male.
+      .replace(/(\d\s*d)\s*[lI](?=[\d\s])/g, (_m, dado: string) => `${dado}1`)
+      .replace(/\b[lI](?=\s?\d)/g, "1")
+      .replace(/(?<=\d\s?)[lI]\b/g, "1")
+      // Cifre spezzate dalla colonna stretta del PDF: "1 4" -> "14", "+ 1 8" -> "+18".
+      .replace(/(\d) +(?=\d)/g, "$1")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim()
+  );
+}
+
+
 /** Quota di caratteri "impossibili" in un testo italiano: sequenze di consonanti senza vocali,
  * simboli fuori posto, maiuscole in mezzo alle parole. Serve a riconoscere le pagine in cui l'OCR
  * ha prodotto rumore puro invece di testo — mostrarle è peggio che non mostrarle. */
