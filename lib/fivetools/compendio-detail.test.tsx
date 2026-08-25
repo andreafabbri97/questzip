@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { TestoStrutturato } from "./compendio-detail";
+import { findUfficiale, TestoStrutturato } from "./compendio-detail";
 
 // compendio-detail.tsx importa staticamente @/app/actions/compendio-ita, che trascina next-auth
 // e rompe la risoluzione moduli sotto Vitest/jsdom — va sempre mockato anche solo per rompere la
@@ -83,5 +83,32 @@ describe("TestoStrutturato", () => {
     const testoOcr = "PASSO DI VIAGGIO — Veloce: 120 m/minuto\nTERRENO DIFFICILE — costa il doppio";
     render(<TestoStrutturato testo={testoOcr} />);
     expect(screen.getByText(/PASSO DI VIAGGIO/)).toBeInTheDocument();
+  });
+});
+
+// Il testo ufficiale italiano è stato estratto dai manuali del 2014 (PHB/MM/DMG), ma il compendio
+// elenca anche l'edizione 2024 (XPHB/XMM/XDMG). Senza l'aggancio fra edizioni sorelle, aprire una
+// voce del 2024 mostrava la traduzione automatica pur avendo il testo del manuale già nel
+// database — segnalato dall'utente come "le traduzioni di XPHB fanno schifo in confronto a PHB".
+describe("findUfficiale: edizioni sorelle 2014/2024", () => {
+  const elenco = [
+    { nome: "Fiotto Acido", nomeInglese: "Acid Splash", fonteInglese: "PHB" },
+    { nome: "Palla di Fuoco", nomeInglese: "Fireball", fonteInglese: "PHB" },
+  ];
+
+  it("aggancia una voce XPHB al testo ufficiale PHB con lo stesso nome inglese", () => {
+    expect(findUfficiale(elenco, null, "Acid Splash", "XPHB")?.nome).toBe("Fiotto Acido");
+  });
+
+  it("preferisce comunque la corrispondenza esatta di fonte", () => {
+    expect(findUfficiale(elenco, null, "Acid Splash", "PHB")?.nome).toBe("Fiotto Acido");
+  });
+
+  it("non aggancia fonti che non sono edizioni della stessa opera", () => {
+    expect(findUfficiale(elenco, null, "Acid Splash", "XGE")).toBeNull();
+  });
+
+  it("non accosta voci con nome inglese diverso", () => {
+    expect(findUfficiale(elenco, null, "Acid Arrow", "XPHB")).toBeNull();
   });
 });

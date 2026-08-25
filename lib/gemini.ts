@@ -63,6 +63,13 @@ async function recordUsage(model: string): Promise<void> {
   }
 }
 
+// Quante volte ritentare lo STESSO modello quando l'errore è passeggero (5xx). Uno solo: se anche
+// il secondo tentativo fallisce conviene cambiare modello, non insistere — l'utente sta aspettando.
+const RITENTATIVI_TRANSITORI = 1;
+const PAUSA_RITENTATIVO_MS = 600;
+
+const attesa = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export interface AskGeminiInput {
   prompt: string;
   /** Un file allegato (es. un PDF) da far leggere al modello insieme al prompt — Gemini accetta
@@ -100,14 +107,32 @@ export async function askGemini({ prompt, attachment, attachments }: AskGeminiIn
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : MODEL_FALLBACK_CHAIN;
 
   for (const model of models) {
-    try {
-      const response = await ai.models.generateContent({ model, contents });
-      const text = response.text?.trim() || null;
-      if (text) await recordUsage(model);
-      return text;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 429) continue;
-      return null;
+    for (let tentativo = 0; tentativo <= RITENTATIVI_TRANSITORI; tentativo++) {
+      try {
+        const response = await ai.models.generateContent({ model, contents });
+        const text = response.text?.trim() || null;
+        if (text) await recordUsage(model);
+        return text;
+      } catch (err) {
+        if (!(err instanceof ApiError)) return null;
+        // Quota esaurita: ritentare sullo stesso modello è inutile, si passa al successivo.
+        if (err.status === 429) break;
+        // 5xx = il modello è momentaneamente sovraccarico (503 è di gran lunga l'errore più
+        // frequente del livello gratuito) o c'è stato un guasto passeggero lato Google. Non è
+        // colpa della richiesta: un secondo tentativo a breve distanza di solito riesce, e prima
+        // di questa aggiunta un singolo 503 azzerava la risposta senza nemmeno provare gli altri
+        // modelli della catena.
+        if (err.status >= 500) {
+          if (tentativo < RITENTATIVI_TRANSITORI) {
+            await attesa(PAUSA_RITENTATIVO_MS * (tentativo + 1));
+            continue;
+          }
+          break; // esauriti i tentativi su questo modello: si prova il prossimo della catena
+        }
+        // Richiesta malformata, chiave invalida, contenuto bloccato: fallirebbe identico su
+        // qualunque modello, quindi si esce subito senza consumare le altre quote.
+        return null;
+      }
     }
   }
   return null;

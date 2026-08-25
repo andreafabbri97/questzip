@@ -108,6 +108,35 @@ describe("askGemini", () => {
     expect(generateContentMock).toHaveBeenCalledTimes(1);
   });
 
+  // 503 "modello sovraccarico" è di gran lunga l'errore più frequente del livello gratuito: non
+  // dipende dalla richiesta, quindi un secondo tentativo di solito riesce. Prima di questa
+  // aggiunta un singolo 503 azzerava la risposta senza nemmeno provare gli altri modelli.
+  it("ritenta lo stesso modello su un errore transitorio 5xx e restituisce la risposta", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    generateContentMock.mockRejectedValueOnce(new FakeApiError(503, "sovraccarico"));
+    generateContentMock.mockResolvedValueOnce({ text: "risposta al secondo tentativo" });
+    const { askGemini } = await importGemini();
+
+    const result = await askGemini({ prompt: "ciao" });
+
+    expect(result).toBe("risposta al secondo tentativo");
+    expect(generateContentMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("dopo un 5xx ripetuto passa al modello successivo invece di arrendersi", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    generateContentMock.mockRejectedValueOnce(new FakeApiError(503));
+    generateContentMock.mockRejectedValueOnce(new FakeApiError(503));
+    generateContentMock.mockResolvedValueOnce({ text: "risposta dal secondo modello" });
+    const { askGemini } = await importGemini();
+
+    const result = await askGemini({ prompt: "ciao" });
+
+    expect(result).toBe("risposta dal secondo modello");
+    // due tentativi sul primo modello, poi il primo tentativo sul successivo della catena
+    expect(generateContentMock).toHaveBeenCalledTimes(3);
+  });
+
   it("ritorna null se anche l'ultimo modello della catena esaurisce la quota", async () => {
     process.env.GEMINI_API_KEY = "test-key";
     generateContentMock.mockRejectedValue(new FakeApiError(429));

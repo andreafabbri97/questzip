@@ -54,6 +54,7 @@ import {
   formatWeaponRange,
 } from "@/lib/fivetools/format";
 import { abilityModifier, formatModifier, proficiencyBonus } from "@/lib/dnd";
+import { eTitoletto, riflussoTestoOcr } from "@/lib/testo-riflusso";
 import {
   getClassiIta,
   getIncantesimiIta,
@@ -229,6 +230,17 @@ function normalizeItaName(name: string): string {
 // abbinato), ricade sul confronto per nome tradotto — meno affidabile, perché il nome ufficiale
 // del manuale a volte differisce dalla resa automatica del nome inglese (es. "Fiotto Acido"
 // ufficiale vs "Spruzzo Acido" prodotto dalla traduzione automatica di "Acid Splash").
+/** Edizione 2014 <-> edizione 2024 della stessa opera. Il testo ufficiale italiano esiste solo per
+ * la prima, quindi le voci della seconda vanno agganciate a quella. */
+const EDIZIONI_SORELLE: Record<string, string> = {
+  XPHB: "PHB",
+  PHB: "XPHB",
+  XMM: "MM",
+  MM: "XMM",
+  XDMG: "DMG",
+  DMG: "XDMG",
+};
+
 export function findUfficiale<T extends { nome: string; nomeInglese: string | null; fonteInglese: string | null }>(
   list: T[],
   translatedName: string | null,
@@ -237,6 +249,19 @@ export function findUfficiale<T extends { nome: string; nomeInglese: string | nu
 ): T | null {
   const byKey = list.find((r) => r.nomeInglese === entryName && r.fonteInglese === entrySource);
   if (byKey) return byKey;
+  // PHB/XPHB, MM/XMM, DMG/XDMG sono la stessa opera in due edizioni (2014 e 2024). I manuali
+  // italiani da cui è stato estratto il testo ufficiale sono quelli del 2014, ma la voce aperta
+  // nel compendio è spesso quella del 2024: senza questo aggancio una voce come "Displacer Beast"
+  // (XMM) ricadeva sulla traduzione automatica pur avendo già il testo del manuale nel database.
+  // Richiede il nome inglese IDENTICO, quindi non accosta mai voci diverse, e la scheda continua a
+  // dichiarare da quale manuale viene il testo mostrato.
+  const sorella = EDIZIONI_SORELLE[entrySource];
+  if (sorella) {
+    const byEdizioneSorella = list.find(
+      (r) => r.nomeInglese === entryName && r.fonteInglese === sorella,
+    );
+    if (byEdizioneSorella) return byEdizioneSorella;
+  }
   if (!translatedName) return null;
   const target = normalizeItaName(translatedName);
   return list.find((r) => normalizeItaName(r.nome) === target) ?? null;
@@ -309,7 +334,7 @@ export function EntriesBlock({
   // quando si passa da una voce all'altra del Compendio (nessuna key su EntryDetail), e senza
   // questo confronto si vedeva la descrizione della voce PRECEDENTE sotto il nome di quella nuova
   // per tutta la durata della traduzione — che è una vera chiamata di rete per ogni paragrafo.
-  const chiave = useMemo(() => blocks.join(" "), [blocks]);
+  const chiave = useMemo(() => blocks.join("\u0000"), [blocks]);
   const [translated, setTranslated] = useState<{ chiave: string; testi: string[] } | null>(null);
 
   useEffect(() => {
@@ -504,12 +529,33 @@ const ITA_SOURCE_NAMES: Record<string, string> = {
 // senza punteggiatura finale diventa un sottotitolo. Contenuto già ben strutturato (o senza righe
 // vuote da riconoscere, come le fonti OCR pagina-per-pagina) ricade nel caso "paragrafo semplice"
 // — nessuna regressione lì, solo un miglioramento quando c'è struttura da cogliere.
+// Nel manuale ogni tratto si apre con il proprio nome in grassetto ("Multiattacco. La creatura
+// effettua due attacchi."). Nel testo estratto dal PDF quel grassetto si perde e il nome resta
+// annegato nella frase: qui viene riconosciuto e ripristinato, ed è ciò che rende un blocco di
+// tratti scorribile a colpo d'occhio invece che da rileggere per intero.
+export function ParagrafoConTitoletto({ testo, className }: { testo: string; className?: string }) {
+  const fine = testo.indexOf(". ");
+  const titoletto = fine > 0 ? testo.slice(0, fine) : null;
+  if (titoletto && eTitoletto(titoletto)) {
+    return (
+      <p className={className}>
+        <span className="font-bold text-accent-strong">{titoletto}.</span>{" "}
+        {testo.slice(fine + 2)}
+      </p>
+    );
+  }
+  return <p className={className}>{testo}</p>;
+}
+
 export function TestoStrutturato({ testo }: { testo: string }) {
   // useMemo: senza, il parsing (split + regex per blocco) rigira da zero a ogni render del
   // genitore, anche quando "testo" non è cambiato — inconsistente con lo stile già in uso nel
   // resto di questo file. Trovato con una code review.
   const blocks = useMemo(
-    () => testo.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean),
+    // riflussoTestoOcr ricuce prima gli a-capo di fine colonna del PDF: senza, le fonti OCR non
+    // hanno righe vuote da riconoscere e finiscono tutte nel ramo "paragrafo semplice", cioè in
+    // un unico blocco con le righe spezzate a metà frase.
+    () => riflussoTestoOcr(testo).split(/\n{2,}/).map((b) => b.trim()).filter(Boolean),
     [testo],
   );
 
@@ -595,9 +641,11 @@ export function TestoStrutturato({ testo }: { testo: string }) {
         }
 
         return (
-          <p key={i} className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-            {block}
-          </p>
+          <ParagrafoConTitoletto
+            key={i}
+            testo={block}
+            className="whitespace-pre-wrap text-sm text-foreground leading-relaxed"
+          />
         );
       })}
     </div>
@@ -852,11 +900,14 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
           return (
             <div key={section.key} className="space-y-2">
               <p className="text-xs uppercase tracking-widest text-muted">{section.label}</p>
-              {text.split("\n\n").map((paragrafo, index) => (
+              {/* Il testo estratto non ha righe vuote fra un tratto e l'altro: senza riflusso
+                  l'intera sezione finiva in una sola card, con gli a-capo del PDF a metà frase. */}
+              {riflussoTestoOcr(text).split("\n\n").map((paragrafo, index) => (
                 <div key={index} className="rounded-lg border border-edge bg-surface-raised p-3">
-                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-                    {paragrafo}
-                  </p>
+                  <ParagrafoConTitoletto
+                    testo={paragrafo}
+                    className="text-sm text-foreground leading-relaxed"
+                  />
                 </div>
               ))}
             </div>

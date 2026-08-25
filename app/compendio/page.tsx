@@ -196,6 +196,8 @@ export default function CompendiumPage() {
         return itemFilter === "magici" ? isMagico : !isMagico;
       })
       .sort((a, b) => {
+        const nomeOrdinamento = (e: Entry) =>
+          (language === "it" ? bestItalianName(italianIndex, e.name, e.source) : null) ?? e.name;
         if (sortMode === "cr" && kind === "mostri") {
           const diff = crToNumber((a as RawCreature).cr) - crToNumber((b as RawCreature).cr);
           if (diff !== 0) return diff;
@@ -216,9 +218,13 @@ export default function CompendiumPage() {
           );
           if (diff !== 0) return diff;
         }
-        return a.name.localeCompare(b.name);
+        // Ordina per il nome MOSTRATO, non per quello inglese: con l'interfaccia in italiano
+        // (impostazione predefinita) l'elenco risultava ordinato secondo una lingua che l'utente
+        // non vede — "Vista del Diavolo" finiva sotto la D di "Devil's Sight". Il confronto usa
+        // la locale italiana, così accenti e maiuscole seguono le regole giuste.
+        return nomeOrdinamento(a).localeCompare(nomeOrdinamento(b), "it", { sensitivity: "base" });
       });
-  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind, itemFilter, italianIndex]);
+  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind, itemFilter, italianIndex, language]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);

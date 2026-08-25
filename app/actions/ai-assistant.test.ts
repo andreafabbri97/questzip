@@ -13,9 +13,19 @@ vi.mock("@/lib/gemini", () => ({
 
 // Nessun candidato del Compendio: isola il test dalla logica di grounding (già esistente, non
 // toccata da questo cambiamento) per verificare solo il nuovo comportamento, la cronologia.
+// Il lookup del testo ufficiale parla col database: qui interessa solo che l'assistente ricada
+// sui dati inglesi quando la voce ufficiale non c'e', quindi si finge sempre "non trovata".
+const haTestoUfficialeMock = vi.fn().mockReturnValue(false);
+const cercaVoceUfficialeMock = vi.fn().mockResolvedValue(null);
+vi.mock("@/lib/compendio-ita-lookup", () => ({
+  haTestoUfficiale: (...a: unknown[]) => haTestoUfficialeMock(...a),
+  cercaVoceUfficiale: (...a: unknown[]) => cercaVoceUfficialeMock(...a),
+}));
+
+const searchMentionCandidatesMock = vi.fn().mockResolvedValue([]);
 vi.mock("@/lib/fivetools/mention-search", () => ({
-  searchMentionCandidates: vi.fn().mockResolvedValue([]),
-  MENTION_KIND_LABELS: {},
+  searchMentionCandidates: (...a: unknown[]) => searchMentionCandidatesMock(...a),
+  MENTION_KIND_LABELS: { incantesimi: "Incantesimo" },
 }));
 
 const { askRulesAssistant } = await import("./ai-assistant");
@@ -63,5 +73,57 @@ describe("askRulesAssistant", () => {
     expect(prompt).not.toContain("Domanda 1");
     expect(prompt).toContain("Domanda 2");
     expect(prompt).toContain("Domanda 4");
+  });
+});
+
+// L'assistente si ancorava ai soli dati inglesi di 5etools: rispondeva quindi con una traduzione
+// improvvisata di termini che nell'app compaiono gia' con la resa ufficiale del manuale. Adesso,
+// quando la voce esiste nei manuali italiani estratti, e' quel testo ad arrivare al modello.
+describe("askRulesAssistant: ancoraggio al testo ufficiale italiano", () => {
+  beforeEach(() => {
+    askGeminiMock.mockClear();
+    haTestoUfficialeMock.mockReturnValue(false);
+    cercaVoceUfficialeMock.mockResolvedValue(null);
+    searchMentionCandidatesMock.mockResolvedValue([]);
+  });
+
+  it("passa al modello il testo del manuale italiano quando la voce c'e'", async () => {
+    searchMentionCandidatesMock.mockResolvedValue([
+      { kind: "incantesimi", name: "Acid Splash", source: "PHB", nameIta: null },
+    ]);
+    haTestoUfficialeMock.mockReturnValue(true);
+    cercaVoceUfficialeMock.mockResolvedValue({
+      nome: "Fiotto Acido",
+      livello: 0,
+      scuola: "Invocazione",
+      tempoDiLancio: "1 azione",
+      gittata: "18 metri",
+      componenti: "V, S",
+      durata: "Istantanea",
+      descrizione: "Il personaggio scaglia una bolla di acido.",
+      fonteInglese: "PHB",
+    });
+    askGeminiMock.mockResolvedValue("Risposta.");
+
+    await askRulesAssistant("Come funziona Acid Splash?");
+
+    const prompt = askGeminiMock.mock.calls[0][0].prompt as string;
+    expect(prompt).toContain("Fiotto Acido");
+    expect(prompt).toContain("testo ufficiale dal manuale italiano");
+    expect(prompt).toContain("Il personaggio scaglia una bolla di acido.");
+  });
+
+  it("ricade sui dati inglesi se la voce non e' nei manuali italiani estratti", async () => {
+    searchMentionCandidatesMock.mockResolvedValue([
+      { kind: "incantesimi", name: "Acid Splash", source: "PHB", nameIta: null },
+    ]);
+    haTestoUfficialeMock.mockReturnValue(true);
+    cercaVoceUfficialeMock.mockResolvedValue(null);
+    askGeminiMock.mockResolvedValue("Risposta.");
+
+    await askRulesAssistant("Come funziona Acid Splash?");
+
+    const prompt = askGeminiMock.mock.calls[0][0].prompt as string;
+    expect(prompt).not.toContain("testo ufficiale dal manuale italiano");
   });
 });

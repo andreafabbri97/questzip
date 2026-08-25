@@ -15,6 +15,7 @@ import {
 import { flattenEntries } from "@/lib/fivetools/entries";
 import { MENTION_KIND_LABELS, searchMentionCandidates, type MentionCandidate } from "@/lib/fivetools/mention-search";
 import { askGemini } from "@/lib/gemini";
+import { cercaVoceUfficiale, haTestoUfficiale } from "@/lib/compendio-ita-lookup";
 
 const WORD_RE = /[\p{L}'’]+/gu;
 // Quante voci del Compendio si allegano al prompt come contesto ricco (statistiche + testo
@@ -63,7 +64,66 @@ function truncate(text: string, max: number): string {
 // ciascuno — spell/mostro/oggetto/razza hanno campi statistici propri, non un blocco di testo
 // unico. flattenEntries (già usata per la traduzione automatica del Compendio) appiattisce il
 // testo descrittivo ricco in blocchi di stringhe semplici, qui uniti e troncati.
+// Testo UFFICIALE italiano (estratto dai manuali veri) della voce citata, quando esiste. Ha la
+// precedenza sui dati inglesi di 5etools: il modello risponde con le stesse parole e gli stessi
+// numeri che l'utente vede nella scheda del Compendio, invece di improvvisare una traduzione dei
+// termini ("Fiotto Acido" è il nome ufficiale, "Spruzzo Acido" quello che verrebbe da sé).
+async function buildContestoUfficiale(candidate: MentionCandidate): Promise<string | null> {
+  if (!haTestoUfficiale(candidate.kind)) return null;
+  const riga = await cercaVoceUfficiale(candidate.kind, candidate.name, candidate.source);
+  if (!riga) return null;
+
+  const label = MENTION_KIND_LABELS[candidate.kind];
+  const campo = (k: string) => {
+    const v = riga[k];
+    return typeof v === "string" && v.trim() ? v.trim() : null;
+  };
+  const nome = campo("nome") ?? candidate.name;
+  const intestazione = `${label} "${nome}" (nome inglese: ${candidate.name}), testo ufficiale dal manuale italiano`;
+
+  switch (candidate.kind) {
+    case "incantesimi": {
+      const dati = [
+        `livello ${riga.livello}`,
+        campo("scuola") && `scuola ${campo("scuola")}`,
+        campo("tempoDiLancio") && `lancio ${campo("tempoDiLancio")}`,
+        campo("gittata") && `gittata ${campo("gittata")}`,
+        campo("componenti") && `componenti ${campo("componenti")}`,
+        campo("durata") && `durata ${campo("durata")}`,
+      ].filter(Boolean).join(", ");
+      return `${intestazione} — ${dati}. ${truncate(campo("descrizione") ?? "", MAX_EXCERPT_CHARS)}`;
+    }
+    case "mostri": {
+      const dati = [
+        campo("taglia"),
+        campo("tipo"),
+        campo("classeArmatura") && `CA ${campo("classeArmatura")}`,
+        campo("puntiFerita") && `PF ${campo("puntiFerita")}`,
+        campo("velocita") && `velocità ${campo("velocita")}`,
+        campo("sfida") && `Grado Sfida ${campo("sfida")}`,
+      ].filter(Boolean).join(", ");
+      const corpo = [campo("tratti"), campo("azioni")].filter(Boolean).join(" ");
+      return `${intestazione} — ${dati}. ${truncate(corpo, MAX_EXCERPT_CHARS)}`;
+    }
+    case "oggetti": {
+      const dati = [campo("categoria"), campo("rarita"), riga.sintonia ? "richiede sintonia" : null]
+        .filter(Boolean).join(", ");
+      return `${intestazione} — ${dati}. ${truncate(campo("descrizione") ?? "", MAX_EXCERPT_CHARS)}`;
+    }
+    case "talenti": {
+      const prereq = campo("prerequisito");
+      return `${intestazione}${prereq ? ` — prerequisito: ${prereq}` : ""}. ${truncate(campo("descrizione") ?? "", MAX_EXCERPT_CHARS)}`;
+    }
+    case "razze":
+      return `${intestazione}. ${truncate(campo("introduzione") ?? "", MAX_EXCERPT_CHARS)}`;
+  }
+}
+
 async function buildEntryContext(candidate: MentionCandidate): Promise<string | null> {
+  // Il manuale italiano vince sui dati inglesi quando la voce c'è: vedi buildContestoUfficiale.
+  const ufficiale = await buildContestoUfficiale(candidate).catch(() => null);
+  if (ufficiale) return ufficiale;
+
   const label = MENTION_KIND_LABELS[candidate.kind];
   const displayName = candidate.nameIta ?? candidate.name;
   const matchesCandidate = (row: { name: string; source: string }) =>
