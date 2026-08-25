@@ -218,10 +218,11 @@ function SubclassFeaturesToggle({
   subclassName: string;
   className: string;
 }) {
-  // Espanso di default (non più chiuso finché non si clicca) — richiesto esplicitamente
-  // dall'utente: le informazioni "come funziona" sono la prima cosa che serve leggere aprendo la
-  // scheda, non qualcosa da scoprire con un click in più.
-  const [showFeatures, setShowFeatures] = useState(true);
+  // CHIUSA di default, a differenza di razza/classe/background qui accanto: l'elenco dei
+  // privilegi di sottoclasse è il più lungo della scheda e si apriva sempre tutto, spingendo in
+  // basso tutto il resto — "scomodo", segnalato dall'utente dopo una sessione di gioco vera. Chi
+  // la vuole leggere la apre con un click; gli altri non se la ritrovano più in mezzo ai piedi.
+  const [showFeatures, setShowFeatures] = useState(false);
   const [subclassSource, setSubclassSource] = useState<string | null>(null);
   const [features, setFeatures] = useState<
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null

@@ -406,7 +406,7 @@ export function EntryDetail({
     kind,
     entry.name,
     entry.source,
-    language === "it" && (kind === "background" || kind === "condizioni"),
+    language === "it" && (kind === "background" || kind === "condizioni" || kind === "scelteClasse"),
   );
   return (
     // "@container": le griglie a più colonne qui sotto si adattano alla larghezza REALE di
@@ -431,7 +431,10 @@ export function EntryDetail({
       {kind === "oggetti" && <ItemDetail item={entry as RawItem} language={language} />}
       {kind === "razze" && <RaceDetail race={entry as RawRace} language={language} />}
       {kind === "talenti" && <FeatDetail feat={entry as RawFeat} language={language} />}
-      {(kind === "background" || kind === "condizioni") && (
+      {kind === "scelteClasse" && (
+        <SceltaClasseInfo feature={entry as unknown as { featureType?: string[]; prerequisite?: unknown[] }} />
+      )}
+      {(kind === "background" || kind === "condizioni" || kind === "scelteClasse") && (
         <EntriesBlockOrIa
           entries={(entry as RawBackground | RawCondition).entries}
           language={language}
@@ -439,6 +442,37 @@ export function EntryDetail({
         />
       )}
       {kind === "classi" && <ClassDetail cls={entry as RawClass} language={language} />}
+    </div>
+  );
+}
+
+// Che TIPO di scelta è: senza, "Vista del Diavolo" e "Difesa" sembrano la stessa cosa, mentre una
+// è una supplica occulta del Warlock e l'altra uno stile di combattimento. I codici sono quelli di
+// 5etools (optionalfeatures.json), qui tradotti nei nomi che compaiono sui manuali italiani.
+const TIPI_SCELTA: Record<string, string> = {
+  EI: "Supplica occulta",
+  PB: "Voto del Patto",
+  "FS:F": "Stile di combattimento (Guerriero)",
+  "FS:P": "Stile di combattimento (Paladino)",
+  "FS:R": "Stile di combattimento (Ranger)",
+  "FS:B": "Stile di combattimento (Bardo)",
+  MM: "Metamagia",
+  AI: "Infusione dell'Artefice",
+};
+
+function SceltaClasseInfo({ feature }: { feature: { featureType?: string[]; prerequisite?: unknown[] } }) {
+  const tipi = (feature.featureType ?? []).map((t) => TIPI_SCELTA[t] ?? t).filter(Boolean);
+  if (tipi.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {[...new Set(tipi)].map((t) => (
+        <span
+          key={t}
+          className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent-strong"
+        >
+          {t}
+        </span>
+      ))}
     </div>
   );
 }
@@ -534,6 +568,29 @@ export function TestoStrutturato({ testo }: { testo: string }) {
             <h4 key={i} className="font-bold text-accent-strong pt-1">
               {lines[0]}
             </h4>
+          );
+        }
+
+        // Voce a definizione: "ATTACCO — Effettua uno o più attacchi…". È il formato di tutte le
+        // Regole principali (azioni in combattimento, condizioni, tipi di movimento), e finiva
+        // resa come paragrafo piatto: il termine si perdeva dentro la frase e per ritrovare
+        // "Schivata" in mezzo a venti paragrafi uguali bisognava rileggerli tutti. Il termine
+        // viene richiesto TUTTO MAIUSCOLO e corto, così una frase normale che contiene un trattino
+        // lungo non viene scambiata per una definizione.
+        const primaRiga = lines[0] ?? "";
+        const sep = primaRiga.indexOf(" \u2014 ");
+        const termine = sep > 1 && sep <= 40 ? primaRiga.slice(0, sep) : null;
+        if (termine && termine === termine.toUpperCase() && /[A-Z]/.test(termine)) {
+          const descrizione = block.slice(block.indexOf(" \u2014 ") + 3).trim();
+          return (
+            <div key={i} className="rounded-lg border border-edge bg-surface-raised px-3 py-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">
+                {termine.trim()}
+              </p>
+              <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+                {descrizione.trim()}
+              </p>
+            </div>
           );
         }
 

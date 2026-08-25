@@ -14,6 +14,11 @@ export const COMPENDIUM_KINDS = [
   "background",
   "condizioni",
   "classi",
+  // Suppliche occulte, Voto del Patto, stili di combattimento, metamagia, infusioni dell'Artefice:
+  // vivono in optionalfeatures.json, non in una delle categorie "classiche" di 5etools. Prima non
+  // erano cercabili da nessuna parte — un giocatore che voleva rileggere "Vista del Diavolo" non
+  // la trovava nel Compendio, pur avendola scritta in scheda (segnalato dall'utente).
+  "scelteClasse",
 ] as const;
 export type CompendiumKind = (typeof COMPENDIUM_KINDS)[number];
 export type EditionFilter = "2014" | "2024" | "entrambe";
@@ -376,6 +381,15 @@ let optionalFeatureLoadersByKey: Map<string, Promise<RawOptionalFeature[]>> | nu
 /** Carica le optional feature per un insieme di tipi (es. ["EI","PB"] per un Warlock) — cache per
  * combinazione esatta di tipi, così due chiamate con la stessa combinazione riusano la stessa
  * promise invece di rifiltrare/rifetchare ad ogni render. */
+/** Tutte le scelte di classe che l'app conosce, in un unico elenco — per la sezione omonima del
+ * Compendio. Stessi tipi già usati dalla scheda personaggio (CLASS_OPTIONAL_FEATURE_TYPES) più le
+ * infusioni dell'Artefice, che in scheda hanno una sezione propria. */
+export const TUTTI_I_TIPI_SCELTE = ["EI", "PB", "FS:F", "FS:P", "FS:R", "FS:B", "MM", "AI"];
+
+export function loadClassChoices(): Promise<RawOptionalFeature[]> {
+  return loadOptionalFeaturesByTypes(TUTTI_I_TIPI_SCELTE);
+}
+
 export function loadOptionalFeaturesByTypes(types: string[]): Promise<RawOptionalFeature[]> {
   optionalFeatureLoadersByKey ??= new Map();
   const key = [...types].sort().join(",");

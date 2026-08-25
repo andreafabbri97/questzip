@@ -17,6 +17,7 @@ vi.mock("@/lib/fivetools/data", () => ({
   loadBackgrounds: vi.fn().mockResolvedValue([]),
   loadConditions: vi.fn().mockResolvedValue([]),
   loadClassData: vi.fn().mockResolvedValue({ classes: [] }),
+  loadClassChoices: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/app/actions/compendio-ita", () => ({

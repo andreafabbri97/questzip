@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadBooks, type BookMeta } from "@/lib/fivetools/books";
 import {
   loadBackgrounds,
+  loadClassChoices,
   loadClassData,
   loadConditions,
   loadCreatures,
@@ -58,6 +59,7 @@ const TABS: { id: string; kind: CompendiumKind; label: string; icon: string; ite
   { id: "background", kind: "background", label: "Background", icon: "📜" },
   { id: "condizioni", kind: "condizioni", label: "Condizioni", icon: "☠️" },
   { id: "classi", kind: "classi", label: "Classi", icon: "⚔️" },
+  { id: "scelte-classe", kind: "scelteClasse", label: "Scelte di classe", icon: "🔮" },
 ];
 
 const EDITIONS: { value: EditionFilter; label: string }[] = [
@@ -99,6 +101,7 @@ const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
   background: loadBackgrounds,
   condizioni: loadConditions,
   classi: () => loadClassData().then((data) => data.classes),
+  scelteClasse: loadClassChoices,
 };
 
 export default function CompendiumPage() {

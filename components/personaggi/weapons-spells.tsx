@@ -26,15 +26,12 @@ import {
   loadInventoryItems,
   loadOptionalFeaturesByTypes,
   loadSpells,
-  type RawOptionalFeature,
   type RawSpell,
 } from "@/lib/fivetools/data";
 import { guessDamageDice } from "@/lib/fivetools/entries";
 import { findCompendioMatch } from "@/lib/fivetools/mention-search";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
-import { LocalInfoButton } from "./local-info-button";
-import type { SimpleEntryData } from "./simple-entry-modal";
 
 export function WeaponsSection({
   character,
@@ -509,14 +506,6 @@ export function InfusionsSection({
   const addInfusione = () =>
     setInfusioni([...character.infusioniConosciute, { id: crypto.randomUUID(), nome: "" }]);
 
-  const loadInfusionCandidates = async (): Promise<SimpleEntryData[]> => {
-    const infusions = await loadInfusions();
-    return infusions.map((infusion: RawOptionalFeature) => ({
-      title: infusion.name,
-      meta: formatInfusionPrerequisite(infusion),
-      entries: infusion.entries,
-    }));
-  };
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -558,7 +547,7 @@ export function InfusionsSection({
                 ×
               </button>
             </div>
-            <LocalInfoButton nome={infusione.nome} loadCandidates={loadInfusionCandidates} />
+            <CompendioInfoButton kind="scelteClasse" nome={infusione.nome} />
           </div>
         ))}
       </div>
@@ -607,10 +596,6 @@ export function ClassChoicesSection({
   const setScelte = (scelteClasse: KnownFeat[]) => onChange({ ...character, scelteClasse });
   const addScelta = () => setScelte([...character.scelteClasse, { id: crypto.randomUUID(), nome: "" }]);
 
-  const loadChoiceCandidates = async (): Promise<SimpleEntryData[]> => {
-    const features = await loadChoices();
-    return features.map((f) => ({ title: f.name, meta: f.source, entries: f.entries }));
-  };
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
@@ -635,8 +620,12 @@ export function ClassChoicesSection({
                     setScelte(character.scelteClasse.map((s) => (s.id === scelta.id ? { ...s, nome } : s)))
                   }
                   loader={loadChoices}
-                  placeholder="Agonizing Blast, Archery…"
+                  placeholder="Vista del Diavolo, Difesa…"
                   inputClassName="w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+                  // Con il kind, Autocomplete pesca i nomi italiani dalla stessa cache del
+                  // Compendio: prima queste voci restavano in inglese secco ("Devil's Sight"),
+                  // perché non appartenevano a nessuna categoria tradotta.
+                  kind="scelteClasse"
                 />
               </div>
               <button
@@ -647,7 +636,7 @@ export function ClassChoicesSection({
                 ×
               </button>
             </div>
-            <LocalInfoButton nome={scelta.nome} loadCandidates={loadChoiceCandidates} />
+            <CompendioInfoButton kind="scelteClasse" nome={scelta.nome} />
           </div>
         ))}
       </div>
@@ -655,15 +644,4 @@ export function ClassChoicesSection({
   );
 }
 
-function formatInfusionPrerequisite(infusion: RawOptionalFeature): string | undefined {
-  const parts: string[] = [];
-  for (const prereq of infusion.prerequisite ?? []) {
-    if (prereq.level) {
-      const className = prereq.level.class?.name ?? "Artefice";
-      parts.push(`Richiede livello ${prereq.level.level} da ${className}`);
-    }
-    if (prereq.item) parts.push(...prereq.item);
-  }
-  return parts.length > 0 ? parts.join(" · ") : undefined;
-}
 

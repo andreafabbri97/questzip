@@ -1,5 +1,6 @@
 import {
   loadBackgrounds,
+  loadClassChoices,
   loadClassData,
   loadConditions,
   loadCreatures,
@@ -41,6 +42,7 @@ export const MENTION_KIND_LABELS: Record<CompendiumKind, string> = {
   background: "Background",
   condizioni: "Condizione",
   classi: "Classe",
+  scelteClasse: "Scelta di classe",
 };
 
 // "oggetti" usa loadInventoryItems (magici + mundani: armi, armature, attrezzatura comune) e non
@@ -58,6 +60,7 @@ export const MENTION_KIND_LOADERS: Record<CompendiumKind, () => Promise<{ name: 
   background: loadBackgrounds,
   condizioni: loadConditions,
   classi: () => loadClassData().then((data) => data.classes),
+  scelteClasse: loadClassChoices,
 };
 
 // Solo le categorie con una tabella italiana ufficiale abbinabile (background/condizioni no,
