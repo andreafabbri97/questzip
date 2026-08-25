@@ -56,8 +56,14 @@ const PAROLE_CORROTTE: Sostituzione[] = [
   [/\s+_+(?=\s)/g, ""],
 ];
 
+// Caratteri di controllo C0 (ESC, BEL, byte nulli...) lasciati dall'OCR al posto di un carattere
+// che non è riuscito a leggere: sono invisibili a schermo ma spezzano le ricerche e i confronti —
+// "DRAGO D'GENTO ADULTO" non veniva trovato nemmeno cercando "DGENTO". A capo e tabulazione
+// restano, perché portano la struttura del testo.
+const CARATTERI_DI_CONTROLLO = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g;
+
 export function pulisciTestoOcr(testo: string): string {
-  let out = testo;
+  let out = testo.replace(CARATTERI_DI_CONTROLLO, "");
   for (const [pattern, sostituto] of PAROLE_CORROTTE) {
     out = typeof sostituto === "string" ? out.replace(pattern, sostituto) : out.replace(pattern, sostituto);
   }
@@ -65,6 +71,14 @@ export function pulisciTestoOcr(testo: string): string {
   // TestoStrutturato usa per distinguere titoli, elenchi e tabelle).
   return out.replace(/[^\S\n]{2,}/g, " ");
 }
+
+/** Sostituisce le lettere che l'OCR ha messo al posto di cifre: l/I valgono 1, O/o valgono 0. */
+const lettereInCifre = (s: string) => s.replace(/[lI]/g, "1").replace(/[Oo]/g, "0");
+
+// Un pezzo è "solo numerico" se, tolte cifre, spazi, segni e le lettere che l'OCR confonde con le
+// cifre, non resta nulla. La "d" è ammessa solo dentro le parentesi, dov'è il separatore dei dadi.
+const SOLO_NUMERICO = /^[\d\s+\-/lIOo]*$/;
+const SOLO_DADI = /^[\d\s+\-/*dlIOo]*$/;
 
 /**
  * Pulizia mirata ai campi NUMERICI di uno stat block (classe armatura, punti ferita, velocità,
@@ -77,14 +91,21 @@ export function pulisciTestoOcr(testo: string): string {
  * è corretto dentro un valore numerico ma sarebbe sbagliato in una frase ("colpisce 2 o 3 bersagli").
  */
 export function pulisciNumeriStatBlock(testo: string): string {
+  // Regole "una lettera accanto a una cifra" non bastano: in "+ l O" nessuna delle due ha una
+  // cifra vicino, perché sono corrotte entrambe, e restavano lì. Si ragiona quindi per PEZZI —
+  // la parte iniziale e ogni gruppo fra parentesi — convertendo le lettere solo quando l'intero
+  // pezzo non contiene nient'altro che numeri: dentro "(10d1 O + l O)" una lettera non può essere
+  // altro che una cifra, mentre "(armatura naturale)" resta intatta perché è testo vero.
+  const conParentesi = testo.replace(/\(([^)]*)\)/g, (intero, dentro: string) =>
+    SOLO_DADI.test(dentro) ? `(${lettereInCifre(dentro)})` : intero,
+  );
+  const taglio = conParentesi.indexOf("(");
+  const testa = taglio >= 0 ? conParentesi.slice(0, taglio) : conParentesi;
+  const coda = taglio >= 0 ? conParentesi.slice(taglio) : "";
+  const testaPulita = SOLO_NUMERICO.test(testa) ? lettereInCifre(testa) : testa;
+
   return (
-    testo
-      // "l"/"I" al posto della cifra 1 quando è attaccata a un dado o a un'altra cifra:
-      // "6dl0", "l 5", "2dl 2". In un campo numerico non esistono parole, quindi non c'è
-      // ambiguità possibile: una lettera lì dentro è sempre una cifra letta male.
-      .replace(/(\d\s*d)\s*[lI](?=[\d\s])/g, (_m, dado: string) => `${dado}1`)
-      .replace(/\b[lI](?=\s?\d)/g, "1")
-      .replace(/(?<=\d\s?)[lI]\b/g, "1")
+    `${testaPulita}${coda}`
       // Cifre spezzate dalla colonna stretta del PDF: "1 4" -> "14", "+ 1 8" -> "+18".
       .replace(/(\d) +(?=\d)/g, "$1")
       .replace(/[ \t]{2,}/g, " ")

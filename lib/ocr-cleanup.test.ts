@@ -129,3 +129,21 @@ describe("pulisciNumeriStatBlock", () => {
     expect(pulisciNumeriStatBlock("9 (2d6 + 2)")).toBe("9 (2d6 + 2)");
   });
 });
+
+// Trovati completando l'abbinamento dei mostri: un ESC dentro "DRAGO D'ARGENTO ADULTO" rendeva la
+// scheda irrintracciabile persino cercando "DGENTO", e nei punti ferita lo zero era letto come "O".
+describe("caratteri di controllo e zeri letti come lettera", () => {
+  it("elimina i caratteri di controllo lasciati dall'OCR", () => {
+    expect(pulisciTestoOcr("DRAGO D\u001bGENTO")).toBe("DRAGO DGENTO");
+    expect(pulisciTestoOcr("testo\u0000con\u0007rumore")).toBe("testoconrumore");
+  });
+
+  it("conserva gli a capo, che portano la struttura del testo", () => {
+    expect(pulisciTestoOcr("prima\nseconda")).toBe("prima\nseconda");
+  });
+
+  it("converte in zero la O dentro un valore numerico", () => {
+    expect(pulisciNumeriStatBlock("65 (10d1 O + l O)")).toBe("65 (10d10 + 10)");
+    expect(pulisciNumeriStatBlock("6 5  (l Odl O + l O)")).toBe("65 (10d10 + 10)");
+  });
+});

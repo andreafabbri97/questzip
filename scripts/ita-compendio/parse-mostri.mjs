@@ -63,6 +63,19 @@ const CHALLENGE_RE = /^Sfida\s+([\d/]+|-)\s*(?:\(\s*([\d.,]+)\s*PE\))?/i;
 const NOME_FIXES = {
   "DRAGO n1 BRONZO Cucc10Lo": "Drago di Bronzo Cucciolo",
   "ORSO P OLARE": "Orso Polare",
+  // Nomi ricomposti da un titolo andato a capo (vedi COPPIE_DA_UNIRE): la giunzione è corretta,
+  // ma le due metà portano con sé i refusi OCR della pagina, che qui vengono ripuliti.
+  "D RAGO DELLA LUNOPIETRA CUCCIOLO": "Drago della Lunopietra Cucciolo",
+  "GIGANTE DEL GELO DELL'.ACQUA MALVAGIA": "Gigante del Gelo dell'Acqua Malvagia",
+  "SPIRITO DANNATO D'ACCIAIO GUERRIERO": "Spirito Dannato d'Acciaio Guerriero",
+  // Stessa scheda spezzata dopo "DELLA", con "LUNOPIETRA" a sua volta diviso a metà dall'OCR.
+  "DRAGO DELLA LUNO PIETRA ANTICO": "Drago della Lunopietra Antico",
+  "DRAGO DELLA LUNO PIETRA ADULTO": "Drago della Lunopietra Adulto",
+  // L'apostrofo di "d'Argento" è illeggibile in questa pagina e l'OCR lo rende ogni volta in modo
+  // diverso, portandosi via anche la A: la scheda diventava così irrintracciabile per nome.
+  "DRAGO DGENTO ADULTO": "Drago d'Argento Adulto",
+  "DRAGO D%GENTO GIOVANE": "Drago d'Argento Giovane",
+  "DRAGO n&RGENTO Cucc10Lo": "Drago d'Argento Cucciolo",
 };
 
 // alcuni libri usano "Lingue"/minuscole invece di "Linguaggi"/maiuscole: alias + case-insensitive
@@ -85,11 +98,16 @@ function isPageNumberNoise(line) {
   return /^[0-9IlOo]{1,5}$/.test(compact) && compact.length <= 5;
 }
 
+// Caratteri di controllo C0 lasciati dall'OCR al posto di un carattere illeggibile: invisibili a
+// schermo ma velenosi, perché spezzano ricerche e confronti. Un ESC finito dentro "DRAGO
+// D'ARGENTO ADULTO" rendeva quella scheda irrintracciabile persino cercando "DGENTO".
+const CARATTERI_DI_CONTROLLO = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g;
+
 function loadLines(bookKey) {
   const raw = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, `${bookKey}.json`), "utf-8"));
   const lines = [];
   for (const page of raw.pages) {
-    for (const line of page.text.split("\n")) {
+    for (const line of page.text.replace(CARATTERI_DI_CONTROLLO, "").split("\n")) {
       const trimmed = line.trim();
       if (!trimmed || isPageNumberNoise(trimmed)) continue;
       lines.push(trimmed);
@@ -114,8 +132,123 @@ function findChallengeAnchors(lines) {
   return anchors;
 }
 
+// Nei manuali impaginati su due colonne strette il nome della scheda va spesso a capo, e nel testo
+// estratto diventa DUE righe ("QUINTESSENZA DI GIGANTE" + "DELLE TEMPESTE", "DUERGAR MAESTRO
+// DELLA" + "MENTE"). Prendendo solo la riga immediatamente sopra il blocco si perdeva la prima
+// metà del nome, e la scheda finiva nel Compendio come "DELLE TEMPESTE": un nome che non esiste,
+// impossibile da abbinare alla controparte inglese e quindi senza testo ufficiale.
+//
+// Il titolo di una scheda è sempre tutto in maiuscolo, quindi è quello il segnale usato per capire
+// se la riga sopra è la continuazione del nome. Serve almeno una coppia di lettere per non
+// scambiare per titolo un numero di pagina isolato (sopra "GEGANT" c'era proprio un "4", che
+// infatti NON va unito).
+// Il solo "è tutto maiuscolo" NON basta a riconoscere una continuazione: in maiuscolo ci sono
+// anche le testatine di pagina ("C A P I T O LO 2 I B E STI A R I O") e i nomi delle schede
+// vicine, e unirli produce nomi peggiori di quelli tronchi ("CENTAURO CHIMERA", "BULLYWUG
+// BULLYWUG"). Serve il segnale grammaticale del nome andato a capo: la spezzatura di un titolo
+// italiano cade quasi sempre su una preposizione, che resta appesa a fine riga precedente
+// ("DUERGAR MAESTRO DELLA" + "MENTE") o apre quella successiva ("QUINTESSENZA DI GIGANTE" +
+// "DELLE TEMPESTE"). Dove nemmeno questo aiuta, il nome corretto va messo a mano in NOME_FIXES:
+// meglio un elenco chiuso e verificato che un'euristica che sbaglia su decine di schede buone.
+const PREPOSIZIONI = [
+  "DI", "DEL", "DELLO", "DELLA", "DEI", "DEGLI", "DELLE",
+  "DA", "DAL", "DALLO", "DALLA", "DAI", "DAGLI", "DALLE",
+  "IN", "NEL", "NELLA", "NEI", "NEGLI", "NELLE", "CON", "SU", "SUL", "SULLA", "PER",
+  // "E" volutamente ESCLUSA: e' troppo comune a fine riga per caso e uniformava schede buone
+  // ("TARRASQ. E" + "TARRASQ,UE" diventava un nome solo).
+];
+const FINISCE_CON_PREPOSIZIONE = new RegExp(`(?:^|\\s)(?:${PREPOSIZIONI.join("|")})\\s*$`);
+// Le forme elise aprono la riga attaccate alla parola ("DELL'OMBRA"), quindi vanno cercate senza
+// lo spazio che segue invece quelle piene.
+const INIZIA_CON_PREPOSIZIONE = new RegExp(
+  `^\\s*(?:(?:${PREPOSIZIONI.join("|")})\\s|(?:DELL|DALL|NELL|SULL|ALL)['’])`,
+);
+
+function eRigaTitolo(riga) {
+  const t = (riga ?? "").trim();
+  if (t.length < 2 || t.length > 48) return false;
+  const lettere = t.replace(/[^A-Za-zÀ-ÿ]/g, "");
+  if (lettere.length < 2) return false;
+  if (lettere !== lettere.toUpperCase()) return false;
+  // testatine di capitolo/bestiario: in maiuscolo ma non fanno parte di alcun nome. Gli spazi
+  // vengono tolti prima del confronto perché l'OCR le estrae spaziate ("C A P I T O LO 2").
+  const compatto = t.replace(/\s+/g, "").toUpperCase();
+  if (/^(CAPITOLO|APPENDICE|INTRODUZIONE|INDICE|BESTIARIO)/.test(compatto)) return false;
+  if (/BESTIARIO/.test(compatto)) return false;
+  return true;
+}
+
+// Le tre schede in cui il titolo va a capo SENZA che la spezzatura cada su una preposizione, e che
+// quindi la regola grammaticale non può riconoscere. Verificate a mano sul testo estratto (per il
+// guerriero lo conferma anche il corpo del testo: "gli spiriti dannati d'acciaio guerrieri
+// infestano..."). Elenco chiuso e coppia completa "riga precedente || riga nome", perché la sola
+// seconda metà è ambigua: di schede che finiscono con "CUCCIOLO" ce n'è una per ogni tipo di drago.
+const COPPIE_DA_UNIRE = new Set([
+  "D RAGO DELLA LUNOPIETRA||CUCCIOLO",
+  "GIGANTE DEL GELO DELL'.ACQUA||MALVAGIA",
+  "SPIRITO DANNATO D'ACCIAIO||GUERRIERO",
+  "SPIRITO DANNATO D'ACCIAIO||COMANDANTE",
+  "GIGANTE DELLE NUVOLE||SORRIDENTE",
+  "GIGANTE DELLE NUVOLE||GIOCATORE DEL DESTINO",
+  "GIGANTE DI PIETRA||CAMMINATORE DI SOGNI",
+  "GIGANTE DEL FUOCO||INVOCATORE",
+  "GIGANTE DEL GELO||MODELLAGHIACCIO",
+  "GIGANTE DELLE COLLINE||VALANGHIVO",
+  "GIGANTE DELLE PIETRE||LINGUARUPESTRE",
+  "GIGANTE DELLE TEMPESTE||CHIAMABURRASCHE",
+  "GIGANTE DELLA MORTE||AMMANTATO",
+  "GIGANTE DELLA MORTE||MIETITORE",
+  "GITHYANKI COMANDANTE||SUPREMO",
+  "PROGENIE STELLARE MAGO||LARVICO",
+  "DRAGONNEL DELLE LANDE||DESOLATE",
+  "DRAGO DELLE PROFONDITÀ||CUCCIOLO",
+  "DRAGO DELLE PROFONDITÀ||GIOVANE",
+]);
+
+const compatta = (s) => s.replace(/[^A-Za-zÀ-ÿ]/g, "").toUpperCase();
+
+/** Lunghezza del prefisso in comune fra due stringhe già compattate. */
+function prefissoComune(a, b) {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i;
+}
+
+/** Vero se `nome` è la seconda metà di un titolo spezzato che comincia in `precedente`. */
+function eContinuazioneDiNome(precedente, nome) {
+  if (!eRigaTitolo(precedente) || !eRigaTitolo(nome)) return false;
+  const prec = precedente.trim();
+  const nom = nome.trim();
+  if (COPPIE_DA_UNIRE.has(`${prec}||${nom}`)) return true;
+
+  // Una sola parola sopra il titolo è quasi sempre l'intestazione della SEZIONE del bestiario
+  // ("DRAGO", "DIAVOLO", "DINOSAURO" aprono un gruppo di schede nel Manuale dei Mostri): unirla
+  // darebbe "DRAGO DRAGO BLU ADULTO". Una continuazione vera porta con sé almeno due parole.
+  if (prec.split(/\s+/).filter(Boolean).length < 2) return false;
+
+  // Molti libri ristampano il nome della scheda anche come testatina, spesso spaziato o storpiato
+  // dall'OCR ("BUG BEAR" sopra "BUGBEAR CAPOTRIBÙ", "DOPP ELCANG ER" sopra "DOPPELGANGER"):
+  // un prefisso in comune lungo tradisce che è la stessa parola, non la prima metà di un nome.
+  if (prefissoComune(compatta(prec), compatta(nom)) >= 5) return false;
+
+  // Segnale grammaticale: la spezzatura di un titolo italiano cade di norma su una preposizione.
+  if (FINISCE_CON_PREPOSIZIONE.test(prec) || INIZIA_CON_PREPOSIZIONE.test(nom)) return true;
+
+  // Oltre a questo NON si tira a indovinare. Provato a unire anche quando la riga sopra non è il
+  // nome di un'altra scheda, ma in maiuscolo ci sono pure le didascalie delle illustrazioni e i
+  // titoli dei riquadri, e venivano fuori nomi come "UN T1PIC.O 0RC.O ORCO" o "APPRN01CE A:
+  // CREATURE VARIE CAPRA GIGANTE". Le spezzature rimaste vanno in COPPIE_DA_UNIRE, verificate una
+  // per una sul testo estratto: un elenco chiuso è preferibile a un'euristica che rovina schede
+  // già corrette.
+  return false;
+}
+
+// Popolato con una prima passata sul libro (vedi parseBook): serve a distinguere "la riga sopra è
+// un altro mostro" da "la riga sopra è la prima metà di questo nome".
+let nomiDiSchedaNoti = new Set();
+
 /** Cerca all'indietro da un'ancora "Sfida" la riga taglia/tipo/allineamento e il nome sopra di essa. */
-function findHeaderStart(lines, challengeLineIndex) {
+function findHeaderStart(lines, challengeLineIndex, { unisci = true } = {}) {
   for (let i = challengeLineIndex - 1; i >= 0 && i > challengeLineIndex - 40; i--) {
     const standard = lines[i].match(SIZE_TYPE_RE);
     const alt = !standard ? lines[i].match(SIZE_TYPE_ALT_RE) : null;
@@ -133,11 +266,24 @@ function findHeaderStart(lines, challengeLineIndex) {
       .some((l) => lineStartsWithLabel(l, "Classe Armatura"));
     if (!hasArmorClassNearby) continue;
 
-    // la riga nome è quella immediatamente sopra (può essere su 1 riga sola)
+    // la riga nome è quella immediatamente sopra, ma il nome può essere andato a capo: in quel
+    // caso anche la riga precedente è tutta in maiuscolo e va unita (vedi eRigaTitolo).
     const nameLineIndex = i - 1;
     if (nameLineIndex < 0) return null;
+    let nameStartIndex = nameLineIndex;
+    if (!unisci) return { nameLineIndex, nameStartIndex, sizeTypeLineIndex: i, tipo: m[1].trim(), taglia: m[2], allineamento: m[4].trim() };
+    // Al massimo due righe di continuazione: oltre non si tratta più di un nome andato a capo ma
+    // di testo che per caso è in maiuscolo, e unirlo peggiorerebbe il nome invece di completarlo.
+    while (
+      nameStartIndex > 0 &&
+      nameLineIndex - nameStartIndex < 2 &&
+      eContinuazioneDiNome(lines[nameStartIndex - 1], lines[nameStartIndex])
+    ) {
+      nameStartIndex--;
+    }
     return {
       nameLineIndex,
+      nameStartIndex,
       sizeTypeLineIndex: i,
       tipo: m[1].trim(),
       taglia: m[2],
@@ -186,6 +332,15 @@ function parseBook(bookKey) {
   const { lines, nome } = loadLines(bookKey);
   const anchors = findChallengeAnchors(lines);
 
+  // Prima passata SENZA unione: raccoglie i nomi che stanno da soli sopra uno stat block, cioe' i
+  // nomi di scheda veri del libro. Serve a eContinuazioneDiNome per non incollare fra loro due
+  // mostri diversi che il PDF ha impaginato uno sotto l'altro ("CENTAURO" sopra "CHIMERA").
+  nomiDiSchedaNoti = new Set();
+  for (const a of anchors) {
+    const h = findHeaderStart(lines, a.lineIndex, { unisci: false });
+    if (h) nomiDiSchedaNoti.add(compatta(lines[h.nameLineIndex].trim()));
+  }
+
   const monsters = [];
   const skipped = [];
 
@@ -197,7 +352,13 @@ function parseBook(bookKey) {
       continue;
     }
 
-    const nomeMostro = lines[header.nameLineIndex];
+    // Le righe da nameStartIndex a nameLineIndex sono le porzioni del nome andato a capo: unite
+    // in un nome solo (di norma è una riga sola, e allora questo equivale al comportamento di prima).
+    const nomeMostro = lines
+      .slice(header.nameStartIndex, header.nameLineIndex + 1)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join(" ");
     // scarta falsi positivi ovvi: la riga "nome" non deve essere a sua volta una riga di campo,
     // né un'intestazione di pagina/capitolo ripetuta ("CAPITOLO 2 I BESTIARIO", a volte con uno
     // spazio indebito prima di "APITOLO" per lo stesso artefatto small-caps visto altrove) che
