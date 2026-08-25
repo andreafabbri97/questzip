@@ -104,12 +104,17 @@ export function CharacterSheet({
   onDelete,
   onBack,
   cloudStatus,
+  mostraElimina = true,
 }: {
   character: Character;
   onSave: (character: Character) => void;
   onDelete: () => void;
   onBack: () => void;
   cloudStatus?: CloudStatus;
+  /** Falso quando la scheda è aperta da dentro una campagna: lì si sta giocando, e un bottone
+   * "Elimina personaggio" a un tocco di distanza dai punti ferita è solo un rischio. Si elimina
+   * dalla pagina Personaggi, dove quell'azione è nel suo contesto. */
+  mostraElimina?: boolean;
 }) {
   // Bozza locale, non ancora scritta in localStorage/account finché non si preme "Salva" —
   // stile documento (Word/Excel): si può modificare liberamente e poi scegliere se tenere o
@@ -245,12 +250,14 @@ export function CharacterSheet({
             💾 Salva
           </button>
         </div>
-        <button
-          onClick={() => setShowDeleteModal(true)}
-          className="card-elevated-hover flex items-center gap-1.5 rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-bold text-danger transition-colors hover:border-danger hover:bg-danger/10 shrink-0"
-        >
-          🗑️ Elimina
-        </button>
+        {mostraElimina && (
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="card-elevated-hover flex items-center gap-1.5 rounded-lg border border-danger/40 px-3 py-1.5 text-xs font-bold text-danger transition-colors hover:border-danger hover:bg-danger/10 shrink-0"
+          >
+            🗑️ Elimina
+          </button>
+        )}
       </div>
 
       {showDeleteModal && (

@@ -15,7 +15,7 @@ import {
   date,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
-import type { Ability, Character, ClassEntry, KnownFeat } from "@/lib/dnd";
+import type { Ability, Character, ClassEntry, KnownFeat, KnownSpell, Weapon } from "@/lib/dnd";
 import type { CellType, DungeonRoom, MonsterToken } from "@/lib/dungeon";
 import type { RegionalMarker, TerrainType } from "@/lib/regional-map";
 
@@ -424,6 +424,23 @@ export const campaignCharacters = pgTable(
     talenti: jsonb("talenti").$type<KnownFeat[]>().notNull().default([]),
     infusioniConosciute: jsonb("infusioni_conosciute").$type<KnownFeat[]>().notNull().default([]),
     scelteClasse: jsonb("scelte_classe").$type<KnownFeat[]>().notNull().default([]),
+    // Il resto della scheda che serve al master DURANTE il gioco, e che prima non arrivava:
+    // senza competenze non si può calcolare né un tiro salvezza né la Percezione passiva (il
+    // numero che il master usa di continuo per decidere chi nota cosa), senza armi e incantesimi
+    // non si sa cosa il personaggio può fare, e senza stato corrente si chiede ad alta voce ogni
+    // volta "sei ancora avvelenato?". È tutta roba della stessa natura di quella già condivisa
+    // (caratteristiche, PF, talenti) e viaggia solo quando è il GIOCATORE a premere "Porta in
+    // campagna": il master non può modificarla da qui, la vede e basta.
+    trsCompetenti: jsonb("trs_competenti").$type<Ability[]>().notNull().default([]),
+    abilitaCompetenti: jsonb("abilita_competenti").$type<string[]>().notNull().default([]),
+    abilitaEsperte: jsonb("abilita_esperte").$type<string[]>().notNull().default([]),
+    armi: jsonb("armi").$type<Weapon[]>().notNull().default([]),
+    incantesimi: jsonb("incantesimi").$type<KnownSpell[]>().notNull().default([]),
+    condizioniAttive: jsonb("condizioni_attive").$type<string[]>().notNull().default([]),
+    ispirazione: boolean("ispirazione").notNull().default(false),
+    affaticamento: integer("affaticamento").notNull().default(0),
+    dadiVitaUsati: integer("dadi_vita_usati").notNull().default(0),
+    scurovisione: boolean("scurovisione").notNull().default(false),
     note: text("note").notNull().default(""),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },

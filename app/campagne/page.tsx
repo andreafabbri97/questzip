@@ -26,6 +26,8 @@ import { summarizeSession } from "@/app/actions/ai-session-summary";
 import { abilityModifier, formatModifier, totalLevel, type Ability, type KnownFeat } from "@/lib/dnd";
 import type { CampaignDetail, CampaignSummary } from "@/components/campagne/types";
 import { EncounterTracker, GrantXpInline, PartySpellSlots } from "@/components/campagne/combat-tracker";
+import { MiaSchedaOverlay } from "@/components/campagne/mia-scheda";
+import { SchedaCondivisa, type VoceParty } from "@/components/campagne/scheda-condivisa";
 import {
   HandoutsSection,
   InviteFriendPicker,
@@ -332,6 +334,10 @@ function CampaignDetailView({
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  // Scheda di un compagno aperta in sola lettura, e la PROPRIA aperta per intero (modificabile):
+  // due cose diverse, perché del personaggio di un altro si vede solo ciò che lui condivide.
+  const [schedaVista, setSchedaVista] = useState<VoceParty | null>(null);
+  const [schedaPropriaAperta, setSchedaPropriaAperta] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
@@ -428,8 +434,27 @@ function CampaignDetailView({
     }
   };
 
+  // La propria scheda copre la campagna a tutto schermo (è un documento intero, non un riquadro):
+  // si torna indietro senza aver perso lo stato della campagna, che resta montata sotto.
+  if (schedaPropriaAperta !== null) {
+    return (
+      <MiaSchedaOverlay
+        nomeInCampagna={schedaPropriaAperta}
+        onChiudi={() => {
+          setSchedaPropriaAperta(null);
+          // Il party si rilegge: se durante il gioco sono cambiati PF o slot, la card del party
+          // deve mostrarli aggiornati appena si torna indietro.
+          getPartyForCampaign(campaignId).then(setParty).catch(() => {});
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto">
+      {schedaVista && (
+        <SchedaCondivisa pc={schedaVista} onChiudi={() => setSchedaVista(null)} />
+      )}
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
           ← Campagne
@@ -628,10 +653,31 @@ function CampaignDetailView({
                         {pc.playerName}
                       </p>
                     </div>
-                    <span className="text-xs text-muted shrink-0">
-                      PF {pc.hpAttuali}/{pc.hpMax} · CA {pc.classeArmatura} · Liv.{" "}
-                      {totalLevel(pc.classi)}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-muted">
+                        PF {pc.hpAttuali}/{pc.hpMax} · CA {pc.classeArmatura} · Liv.{" "}
+                        {totalLevel(pc.classi)}
+                      </span>
+                      {/* Prima, per vedere qualcosa di più del riassunto, si doveva uscire dalla
+                          campagna: il giocatore andava in Personaggi (perdendo di vista
+                          combattimento e mappa) e il master non aveva proprio modo di vedere la
+                          scheda di un compagno. */}
+                      {pc.userId === userId ? (
+                        <button
+                          onClick={() => setSchedaPropriaAperta(pc.nome)}
+                          className="rounded-lg border border-accent-strong px-2.5 py-1 text-xs font-bold text-accent-strong hover:bg-accent/10 transition-colors"
+                        >
+                          ✏️ La mia scheda
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setSchedaVista(pc)}
+                          className="rounded-lg border border-edge px-2.5 py-1 text-xs font-bold text-foreground hover:border-accent transition-colors"
+                        >
+                          📋 Scheda
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-6 gap-1.5 mt-2">
                     {(["forza", "destrezza", "costituzione", "intelligenza", "saggezza", "carisma"] as Ability[]).map(

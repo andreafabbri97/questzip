@@ -37,6 +37,19 @@ export async function syncCharacterToCampaign(campaignId: string, character: Cha
     infusioniConosciute: character.infusioniConosciute,
     scelteClasse: character.scelteClasse,
     note: character.note,
+    // Competenze, armi, incantesimi e stato corrente: senza, il master vedeva del personaggio
+    // solo caratteristiche/PF/CA e non poteva ricavare né un tiro salvezza né la Percezione
+    // passiva, che al tavolo usa di continuo.
+    trsCompetenti: character.trsCompetenti,
+    abilitaCompetenti: character.abilitaCompetenti,
+    abilitaEsperte: character.abilitaEsperte,
+    armi: character.armi,
+    incantesimi: character.incantesimi,
+    condizioniAttive: character.condizioniAttive,
+    ispirazione: character.ispirazione,
+    affaticamento: character.affaticamento,
+    dadiVitaUsati: character.dadiVitaUsati,
+    scurovisione: character.scurovisione,
     updatedAt: new Date(),
   };
 
@@ -73,6 +86,17 @@ export async function getPartyForCampaign(campaignId: string) {
       talenti: campaignCharacters.talenti,
       infusioniConosciute: campaignCharacters.infusioniConosciute,
       scelteClasse: campaignCharacters.scelteClasse,
+      note: campaignCharacters.note,
+      trsCompetenti: campaignCharacters.trsCompetenti,
+      abilitaCompetenti: campaignCharacters.abilitaCompetenti,
+      abilitaEsperte: campaignCharacters.abilitaEsperte,
+      armi: campaignCharacters.armi,
+      incantesimi: campaignCharacters.incantesimi,
+      condizioniAttive: campaignCharacters.condizioniAttive,
+      ispirazione: campaignCharacters.ispirazione,
+      affaticamento: campaignCharacters.affaticamento,
+      dadiVitaUsati: campaignCharacters.dadiVitaUsati,
+      scurovisione: campaignCharacters.scurovisione,
       updatedAt: campaignCharacters.updatedAt,
     })
     .from(campaignCharacters)
