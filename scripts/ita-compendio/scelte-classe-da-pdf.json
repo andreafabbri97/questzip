@@ -1,0 +1,26 @@
+{
+  "_nota": "Trascritti leggendo direttamente le pagine dei manuali italiani: Manuale del Giocatore p.119 (suppliche occulte), Guida di Xanathar p.60 (suppliche), Calderone di Tasha p.42 (opzioni dello stile di combattimento). Tre nomi erano traduzioni approssimative e sono stati corretti con quelli stampati.",
+  "kind": "scelteClasse",
+  "voci": {
+    "Eyes of the Rune Keeper|PHB": {
+      "nome": "Occhi del Custode delle Rune",
+      "testo": "Il warlock è in grado di leggere ogni forma di scrittura."
+    },
+    "Eyes of the Rune Keeper|XPHB": {
+      "nome": "Occhi del Custode delle Rune",
+      "testo": "Il warlock è in grado di leggere ogni forma di scrittura."
+    },
+    "Eldritch Smite|XGE": {
+      "nome": "Punizione Occulta",
+      "testo": "Prerequisito: 5° livello, privilegio Patto della Lama\n\nUna volta per turno, quando il warlock colpisce una creatura con la sua arma del patto, può spendere uno slot incantesimo da warlock per infliggere 1d8 danni da forza extra al bersaglio, più un altro 1d8 per livello dello slot incantesimo, e può buttare a terra prono il bersaglio, qualora quest'ultimo sia di taglia Enorme o inferiore."
+    },
+    "Shroud of Shadow|XGE": {
+      "nome": "Sudario delle Ombre",
+      "testo": "Prerequisito: 15° livello\n\nIl warlock può lanciare invisibilità a volontà, senza spendere uno slot incantesimo."
+    },
+    "Unarmed Fighting|TCE": {
+      "nome": "Combattere Disarmato",
+      "testo": "Quando il guerriero manda a segno un colpo senza armi, infligge danni contundenti pari a 1d6 + il suo modificatore di Forza. Se non sta impugnando né armi né scudo, il d6 del suo tiro per colpire diventa un d8.\n\nAll'inizio di ogni turno, il guerriero può infliggere 1d4 danni contundenti a una creatura afferrata da lui."
+    }
+  }
+}

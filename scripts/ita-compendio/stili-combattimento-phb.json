@@ -1,0 +1,38 @@
+{
+  "_nota": "Trascritti leggendo direttamente la pagina 72 del Manuale del Giocatore italiano (sezione Stile di Combattimento del guerriero). Nomi E descrizioni sono quelli stampati: l'estrazione automatica di quelle pagine non li aveva presi, e i nomi che c'erano prima erano traduzioni approssimative (Archery era diventato 'Tiro con l'Arco', nel manuale è semplicemente 'Tiro').",
+  "kind": "scelteClasse",
+  "voci": {
+    "Archery|PHB": {
+      "nome": "Tiro",
+      "testo": "Il guerriero ottiene un bonus di +2 ai tiri per colpire che effettua con le armi a distanza."
+    },
+    "Archery|XPHB": {
+      "nome": "Tiro",
+      "testo": "Il guerriero ottiene un bonus di +2 ai tiri per colpire che effettua con le armi a distanza."
+    },
+    "Defense|PHB": {
+      "nome": "Difesa",
+      "testo": "Finché indossa un'armatura, il guerriero ottiene un bonus di +1 alla CA."
+    },
+    "Dueling|PHB": {
+      "nome": "Duellare",
+      "testo": "Quando il guerriero impugna un'arma da mischia in una mano e non impugna altre armi, ottiene un bonus di +2 ai tiri per i danni di quell'arma."
+    },
+    "Great Weapon Fighting|PHB": {
+      "nome": "Combattere con Armi Possenti",
+      "testo": "Quando il guerriero ottiene un 1 o un 2 a un tiro per i danni di un attacco che ha effettuato con un'arma da mischia impugnata a due mani, può ripetere il tiro e deve usare il nuovo risultato, anche se ottiene ancora un 1 o un 2. L'arma deve possedere la proprietà a due mani o versatile affinché il guerriero ottenga questo beneficio."
+    },
+    "Protection|PHB": {
+      "nome": "Protezione",
+      "testo": "Quando una creatura che il guerriero sia in grado di vedere attacca un bersaglio diverso dal guerriero e situato entro 1,5 metri da lui, il guerriero può usare la sua reazione per infliggere svantaggio al tiro per colpire della creatura. Il guerriero deve impugnare uno scudo."
+    },
+    "Two-Weapon Fighting|PHB": {
+      "nome": "Combattere con Due Armi",
+      "testo": "Quando il guerriero combatte con due armi, può aggiungere il suo modificatore di caratteristica ai danni del secondo attacco."
+    },
+    "Two-Weapon Fighting|XPHB": {
+      "nome": "Combattere con Due Armi",
+      "testo": "Quando il guerriero combatte con due armi, può aggiungere il suo modificatore di caratteristica ai danni del secondo attacco."
+    }
+  }
+}
