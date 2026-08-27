@@ -6,6 +6,12 @@
 // decidere dove conviene lavorare: è così che si è visto che 306 mostri erano già estratti ma tenuti
 // fuori dal seed, e che i talenti di Tasha/Xanathar/Dragonlance non erano mai stati letti.
 //
+// Il conteggio è per aggancio ESATTO nome+fonte, quindi sottostima: le varianti che in app
+// ricadono sulla scheda madre (Belt of Fire Giant Strength -> Cintura della Forza dei Giganti, vedi
+// findUfficiale in lib/fivetools/compendio-detail.tsx) qui risultano ancora "recuperabili" anche se
+// il testo del manuale lo mostrano già. Vale soprattutto per gli oggetti del Manuale del DM, dove
+// le varianti sono centinaia.
+//
 // Uso: node --env-file=.env.local scripts/ita-compendio/copertura-manuali.mjs
 import { neon } from "@neondatabase/serverless";
 const sql = neon(process.env.DATABASE_URL);
