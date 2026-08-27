@@ -105,6 +105,26 @@ function isSubraceHeading(line) {
   return words.length <= 5 && words.every((w) => /^[A-ZÀ-Þ]/.test(w) || /^\d/.test(w));
 }
 
+// Non basta "riga tutta maiuscola": dentro i tratti ci sono i titoli delle tabelle ("DISCENDENZA
+// DRACONICA") e le intestazioni di sottorazza, e tagliando lì si perdevano metà scheda e tutte le
+// sottorazze. La sezione dei tratti finisce solo dove ricomincia la parte descrittiva, cioè al
+// titolone della RAZZA successiva o all'apertura del capitolo dopo — un elenco chiuso e noto.
+const TITOLI_DI_SEZIONE = new Set([
+  "NANO", "ELFO", "HALFLING", "UMANO", "DRAGONIDE", "GNOMO", "MEZZELFO", "MEZZORCO", "TIEFLING",
+]);
+
+function isTitoloDiSezione(line) {
+  if (line.includes(".")) return false;
+  const lettere = line.replace(/[^A-Za-zÀ-ÿ]/g, "");
+  if (lettere.length < 4 || lettere !== lettere.toUpperCase()) return false;
+  return TITOLI_DI_SEZIONE.has(compact(line)) || compact(line).startsWith("CAPITOLO");
+}
+
+// i numeri di pagina isolati restano appiccicati in coda all'ultimo tratto ("...a scelta. 31 32")
+function isNumeroDiPagina(line) {
+  return /^\d{1,3}$/.test(line.trim());
+}
+
 function loadLines(bookKey) {
   const raw = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, `${bookKey}.json`), "utf-8"));
   const lines = [];
@@ -128,7 +148,13 @@ function parseTraitsBlock(lines, start, end) {
 
   for (let i = start; i < end; i++) {
     const line = lines[i];
-    if (isPageHeaderNoise(line)) continue;
+    if (isPageHeaderNoise(line) || isNumeroDiPagina(line)) continue;
+    // I tratti finiscono ben prima della RAZZA successiva: il confine "TRATTI DEI ..." lascia in
+    // mezzo tutta la parte descrittiva di quella dopo, e finiva incollata all'ultimo tratto (i
+    // Linguaggi del tiefling contenevano l'apertura del capitolo sulle classi, il Talento
+    // dell'umano il racconto d'apertura dei draconidi). Il titolo che riapre la prosa è stampato
+    // tutto in maiuscolo, mentre i titoli di sottorazza hanno solo l'iniziale maiuscola.
+    if (isTitoloDiSezione(line)) break;
 
     const traitMatch = matchTraitLabel(line);
     if (traitMatch) {

@@ -9,6 +9,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { normalizzaGradoSfida } from "../../lib/compendio-ocr.ts";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const EXTRACTED_DIR = path.join(SCRIPT_DIR, "extracted");
@@ -52,7 +53,12 @@ function normalizeModifier(raw) {
 }
 
 // "Sfida -" (senza PE) è usata per PNG/creature senza minaccia in alcuni libri
-const CHALLENGE_RE = /^Sfida\s+([\d/]+|-)\s*(?:\(\s*([\d.,]+)\s*PE\))?/i;
+// Le cifre del grado di sfida possono uscire separate da uno spazio spurio, come già visto per la
+// Classe Armatura ("Classe Armatura 1 9"): "Sfida 1 7 (18.000 PE)" veniva letto come grado 1, e il
+// mostro finiva in Compendio con la sfida sbagliata o veniva scartato per incoerenza (il Nagpa è 17,
+// non 1). Si prende quindi tutto ciò che sta prima dei PE e si tolgono gli spazi interni.
+const CHALLENGE_RE = /^Sfida\s+([\d\s/]+|-)\s*(?:\(\s*([\d.,]+)\s*PE\))?/i;
+
 
 // Due nomi (su 342) con l'artefatto small-caps già noto altrove nella pipeline — trovati con un
 // audit generale dei nomi, verificati a mano contro l'originale inglese: "n1"/"1" sono la stessa
@@ -93,6 +99,35 @@ const OPTIONAL_FIELD_RE = new RegExp(`^(${OPTIONAL_FIELD_LABELS.join("|")})\\s+(
 
 const SECTION_HEADING_RE = /^(AZIONI LEGGENDARIE|AZIONI DA MITO|AZIONI|REAZIONI|TRATTI)$/;
 
+// Lo stat block finisce prima del prossimo mostro: in mezzo c'è la prosa del manuale (la storia dei
+// giganti, i riquadri, a volte un capitolo intero). Senza un confine, tutto quel testo finiva nelle
+// AZIONI dell'ultimo mostro prima della prosa — il Ghoul del Manuale dei Mostri arrivava a 34.000
+// caratteri, la Spia della Guida a Ravenloft a 105.000. Il confine è la prima intestazione in
+// maiuscolo che non sia una sezione dello stat block: dentro un blocco le uniche righe tutte
+// maiuscole sono quelle (i nomi dei tratti sono in grassetto, non in maiuscolo), mentre le sigle
+// delle caratteristiche (FOR, DES, CAR...) si fermano a tre lettere.
+function fineStatBlock(bodyLines) {
+  const indiceAzioni = bodyLines.findIndex((l) => /^AZIONI$/.test(l));
+  for (let i = 0; i < bodyLines.length; i++) {
+    const linea = bodyLines[i];
+    if (SECTION_HEADING_RE.test(linea)) continue;
+    // solo lettere maiuscole, spazi e apostrofi: le righe con cifre o punteggiatura sono avanzi
+    // d'impaginazione ("DRAC!TO" al posto della testatina, ",.OGNI BEHOLDER È CONVINTO 01...") e
+    // ricompaiono in mezzo a un blocco per intero, non alla sua fine
+    if (!/^[A-ZÀ-Ù][A-ZÀ-Ù\s'’-]*$/.test(linea)) continue;
+    if (linea.replace(/[^A-ZÀ-Ù]/g, "").length < 4) continue;
+    // dopo un vero titolo comincia un periodo nuovo; una testatina cade invece in mezzo a una frase
+    const seguente = bodyLines[i + 1];
+    if (seguente && !/^[A-ZÀ-Ù"«]/.test(seguente)) continue;
+    // e non si taglia mai prima delle AZIONI se nel blocco ci sono ancora: significherebbe buttare
+    // via metà scheda per una riga sfuggita all'estrazione
+    if (indiceAzioni > i) continue;
+    return i;
+  }
+  return bodyLines.length;
+}
+
+
 function isPageNumberNoise(line) {
   const compact = line.replace(/\s+/g, "");
   return /^[0-9IlOo]{1,5}$/.test(compact) && compact.length <= 5;
@@ -127,7 +162,7 @@ function findChallengeAnchors(lines) {
   const anchors = [];
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(CHALLENGE_RE);
-    if (m) anchors.push({ lineIndex: i, cr: m[1], pe: m[2] });
+    if (m) anchors.push({ lineIndex: i, cr: m[1] === "-" ? "-" : normalizzaGradoSfida(m[1]), pe: m[2] });
   }
   return anchors;
 }
@@ -407,6 +442,9 @@ function parseBook(bookKey) {
     const nextAnchor = anchors[idx + 1];
     const bodyEnd = nextAnchor ? findHeaderStart(lines, nextAnchor.lineIndex)?.nameLineIndex ?? nextAnchor.lineIndex : lines.length;
     let bodyLines = lines.slice(anchor.lineIndex + 1, bodyEnd);
+    const taglio = fineStatBlock(bodyLines);
+    if (process.env.DBG_TAGLIO && taglio < bodyLines.length) console.error("TAGLIO", nomeMostro, "->", JSON.stringify(bodyLines[taglio]), "resta", taglio, "righe su", bodyLines.length);
+    bodyLines = bodyLines.slice(0, taglio);
 
     // certe pagine hanno un layout a colonna laterale che fa finire una caratteristica (quasi
     // sempre CAR, l'ultima delle sei) fuori ordine, letta DOPO la riga "Sfida" invece che nel

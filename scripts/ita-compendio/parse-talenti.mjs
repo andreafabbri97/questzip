@@ -14,16 +14,20 @@
 // Uso: node parse-talenti.mjs
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import { TITOLO_ELISIONI, TITOLO_STOPWORDS } from "../../lib/compendio-ocr.ts";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const EXTRACTED_DIR = path.join(SCRIPT_DIR, "extracted");
 const PARSED_DIR = path.join(SCRIPT_DIR, "parsed");
 
-const CHAPTER_START_RE = /^TALENTI\s*$/;
-const CHAPTER_END_RE = /^CAPITOLO\s*7/i;
+// I talenti non stanno nello stesso capitolo in tutti i manuali: nel Manuale del Giocatore sono il
+// capitolo "TALENTI", nel Calderone di Tasha stanno dentro "Opzioni di Personalizzazione", nella
+// Guida di Xanathar sono i "TALENTI RAZZIALI" e in Dragonlance i talenti di ambientazione. Inizio e
+// fine della sezione si dichiarano quindi in books.json, libro per libro.
+const INIZIO_PREDEFINITO = /^TALENTI\s*$/;
+const FINE_PREDEFINITA = /^CAPITOLO\s*7/i;
 
-const STOPWORDS = new Set(["di", "del", "della", "dei", "delle", "e", "o", "a", "il", "la", "le", "i", "gli", "lo", "da", "in", "su", "con", "per"]);
 
 function fixDigitLetterConfusion(raw) {
   return raw
@@ -35,7 +39,15 @@ function fixDigitLetterConfusion(raw) {
 function titleCaseItalian(raw) {
   const words = fixDigitLetterConfusion(raw).replace(/\s+/g, " ").trim().toLowerCase().split(" ").filter(Boolean);
   return words
-    .map((w, i) => (i > 0 && STOPWORDS.has(w) ? w : w.replace(/(^|[-'])([a-zà-ÿ])/g, (m, sep, l) => sep + l.toUpperCase())))
+    .map((w, i) => {
+      if (i > 0 && TITOLO_STOPWORDS.has(w)) return w;
+      // articolo eliso davanti a vocale: "Iniziato dell'Alta Stregoneria", "Maestro d'Armi"
+      const elisione = i > 0 && w.match(/^([a-zà-ÿ]+)'(.+)$/);
+      if (elisione && TITOLO_ELISIONI.has(elisione[1])) {
+        return `${elisione[1]}'${elisione[2].replace(/^[a-zà-ÿ]/, (c) => c.toUpperCase())}`;
+      }
+      return w.replace(/(^|[-'])([a-zà-ÿ])/g, (m, sep, l) => sep + l.toUpperCase());
+    })
     .join(" ");
 }
 
@@ -77,13 +89,26 @@ const NAME_FIXES = {
 function isHeadingCandidate(line) {
   const compact = line.replace(/[^A-Za-zÀ-Ý']/g, "");
   if (compact.length < 4 || compact.length > 40) return false;
-  if (compact !== compact.toUpperCase()) return false;
+  // Non si pretende il maiuscolo perfetto: il rendering small-caps lascia qua e là una minuscola
+  // dentro il titolo ("E SPERTO DI DuNGEON" per Esperto di Dungeon), e con il confronto esatto
+  // quei talenti sparivano. Basta che il titolo sia in stragrande maggioranza maiuscolo — la prosa,
+  // che è il contrario, resta comunque esclusa.
+  const maiuscole = compact.replace(/[^A-ZÀ-Ý]/g, "").length;
+  if (maiuscole / compact.length < 0.8) return false;
   if (/^\d+$/.test(line.trim())) return false;
   if (/CAPITOLO|TALENTI|OPZIONIDIPERSONALIZZAZIONE/i.test(compact)) return false;
   return true;
 }
 
 function loadFeatLines(bookKey) {
+  const books = JSON.parse(readFileSync(path.join(SCRIPT_DIR, "books.json"), "utf-8"));
+  const inizio = books[bookKey]?.inizioTalenti;
+  const fine = books[bookKey]?.fineTalenti;
+  const CHAPTER_START_RE = inizio ? new RegExp(`^${inizio}\s*$`) : INIZIO_PREDEFINITO;
+  // il confine si ancora a tutta la riga: la testatina di pagina comincia anch'essa con
+  // "CAPITOLO" ("CAPITOLO 1 I OPZIONI...") e con un ancoraggio solo iniziale la sezione
+  // veniva chiusa alla prima pagina invece che alla fine del capitolo
+  const CHAPTER_END_RE = fine ? new RegExp(`^${fine}\s*$`, "i") : FINE_PREDEFINITA;
   const raw = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, `${bookKey}.json`), "utf-8"));
   const lines = [];
   let inChapter = false;
@@ -140,18 +165,19 @@ function extractFeat(lines, start, end) {
 }
 
 function main() {
-  const lines = loadFeatLines("phb");
+  const bookKey = process.argv[2] ?? "phb";
+  const lines = loadFeatLines(bookKey);
   const headings = findHeadings(lines);
 
   const feats = headings.map((h, idx) => {
     const bodyStart = h.lineIndex + 1;
     const bodyEnd = idx + 1 < headings.length ? headings[idx + 1].lineIndex : lines.length;
     const { prerequisito, descrizione } = extractFeat(lines, bodyStart, bodyEnd);
-    return { nome: h.nome, prerequisito, descrizione, fonte: "phb" };
+    return { nome: h.nome, prerequisito, descrizione, fonte: bookKey };
   });
 
   mkdirSync(PARSED_DIR, { recursive: true });
-  const outPath = path.join(PARSED_DIR, "phb-talenti.json");
+  const outPath = path.join(PARSED_DIR, `${bookKey}-talenti.json`);
   writeFileSync(outPath, JSON.stringify(feats, null, 2), "utf-8");
 
   console.log(`${feats.length} talenti trovati -> ${outPath}`);

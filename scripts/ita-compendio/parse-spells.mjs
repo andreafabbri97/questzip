@@ -14,6 +14,11 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import {
+  correggiSottotitoloIncantesimo,
+  TITOLO_ELISIONI,
+  TITOLO_STOPWORDS,
+} from "../../lib/compendio-ocr.ts";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const EXTRACTED_DIR = path.join(SCRIPT_DIR, "extracted");
@@ -26,7 +31,11 @@ const FIELD_RE = new RegExp(`^(${FIELD_LABELS.join("|")}):\\s*(.*)$`);
 // "1 °  livello" invece di "1° livello", stesso artefatto di estrazione già noto altrove) — senza
 // \s* qui il sottotitolo non veniva riconosciuto e l'incantesimo intero andava perso (trovato con
 // "Vita Falsata"/False Life, mancante dal PHB nonostante presente nel testo grezzo).
-const SUBTITLE_LEVELED_RE = /^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-']*?)\s+di\s+(\d)\s*°\s*livello(\s*\(rituale\))?$/;
+// il cerchietto del grado, in corsivo e a corpo piccolo, esce dall'OCR anche come punto mediano
+// "·" ("Fuorviare"/Mislead) o come apostrofo, dritto o tipografico ("Abiurazione di 1 '  livello
+// (rituale)", cioè "Allarme"/Alarm). Dopo una cifra e prima di "livello" nessuno di quei segni può
+// essere testo vero, quindi valgono tutti come ordinale.
+const SUBTITLE_LEVELED_RE = /^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-']*?)\s+di\s+(\d)\s*[°·'’]\s*livel[lJ1I]o(\s*\(rituale\))?$/;
 const SUBTITLE_CANTRIP_RE = /^Trucchetto\s+di\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-']*)$/;
 
 // le 8 scuole di magia ufficiali (terminologia PHB ITA): usate per scartare i falsi positivi,
@@ -43,7 +52,6 @@ const SCHOOLS = new Set([
   "trasmutazione",
 ]);
 
-const STOPWORDS = new Set(["di", "del", "della", "dei", "delle", "e", "o", "a", "il", "la", "le", "i", "gli", "lo", "da", "in", "su", "con", "per"]);
 
 // nei nomi non compaiono mai cifre vere (quelle sono solo nelle descrizioni, es. "1d6"): in
 // un "token" (sequenza senza spazi) che contiene anche lettere, uno 0/1 è quasi sempre un
@@ -111,22 +119,74 @@ const NAME_FIXES = new Map([
   ["disco fluttuante di thnser", "Disco Fluttuante di Tenser"],
   ["c omunione con la natura", "Comunione con la Natura"],
   ["scrigno segreto d i leomund", "Scrigno Segreto di Leomund"],
-  ["respirare sott'acq.ua", "Respirare Sott'Acqua"],
+  ["respirare sott'acq.ua", "Respirare sott'Acqua"],
   ["evocaa immondo", "Evoca Immondo"],
   ["evoca non mortto", "Evoca Non Morto"],
   ["parola del p otere d olore", "Parola del Potere Dolore"],
   ["purificare crno e bevande", "Purificare Cibo e Bevande"],
+  ["colpo del vento d'acmaio", "Colpo del Vento d'Acciaio"],
+  ["p rigione mentale", "Prigione Mentale"],
+  ["trasformazione di thnser", "Trasformazione di Tenser"],
+  ["orrido avvizzimento di abi-dalzim", "Orrido Avvizzimento di Abi-Dalzim"],
 ]);
 
 function titleCaseItalian(raw) {
   const words = fixDigitLetterConfusion(raw).trim().toLowerCase().split(/\s+/);
   const cased = words
     .map((w, i) => {
-      if (i > 0 && STOPWORDS.has(w)) return w;
+      if (i > 0 && TITOLO_STOPWORDS.has(w)) return w;
+      const elisione = i > 0 && w.match(/^([a-zà-ÿ]+)'(.+)$/);
+      if (elisione && TITOLO_ELISIONI.has(elisione[1])) {
+        return `${elisione[1]}'${elisione[2].replace(/^[a-zà-ÿ]/, (c) => c.toUpperCase())}`;
+      }
       return w.replace(/(^|[-'/])([a-zà-ÿ])/g, (m, sep, letter) => sep + letter.toUpperCase());
     })
     .join(" ");
   return NAME_FIXES.get(cased.toLowerCase()) ?? cased;
+}
+
+// Il nome ricostruito a regola resta un'ipotesi. Quando lo stesso nome compare anche negli ELENCHI
+// per classe del manuale, lì è stampato in tondo con la sua grafia vera: quella è la fonte, e vince
+// sulla regola. Si adotta soltanto se le lettere coincidono (a meno di maiuscole e spazi), quindi
+// una riga con un refuso d'estrazione non può sostituire un nome buono.
+// Gli spazi NON si ignorano nel confronto: gli elenchi sono impaginati stretti e l'estrazione ci
+// infila spazi spuri ("Armatu ra di Agathys", "M u ro di Fuoco"). Ignorandoli, quelle righe
+// combaciavano col nome buono e lo sostituivano con la versione rotta. Qui la riga del manuale può
+// vincere solo se ha le stesse identiche parole, e cambia soltanto le maiuscole.
+function chiaveNome(s) {
+  return s.toLowerCase().replace(/[^a-zà-ÿ'\s]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function indiceGrafieDelManuale(lines) {
+  const indice = new Map();
+  for (const line of lines) {
+    if (line.length > 45) continue;
+    if (!/^[A-ZÀ-Ù][A-Za-zÀ-ÿ\s'\-]+$/.test(line)) continue;
+    // una voce d'elenco è in tondo: se contiene una parola tutta maiuscola è un titolo di scheda
+    // o un'intestazione finita nel mezzo, non la grafia che cerchiamo
+    if (line.split(/\s+/).some((w) => w.length > 1 && w === w.toUpperCase())) continue;
+    const k = chiaveNome(line);
+    if (k.length >= 5 && !indice.has(k)) indice.set(k, line.replace(/\s+/g, " ").trim());
+  }
+  return indice;
+}
+
+// Non tutti gli elenchi seguono la stessa convenzione: il Manuale del Giocatore scrive le voci in
+// stile titolo ("Banchetto degli Eroi"), la Guida di Xanathar in stile frase ("Prigione mentale",
+// "Sciame di palle di neve di Snilloc"). Del manuale interessa solo l'informazione che la regola
+// non può avere — QUALI paroline restano minuscole — non la convenzione dell'elenco: la grafia
+// stampata si adotta soltanto se le uniche parole che perdono la maiuscola sono articoli e
+// preposizioni. Altrimenti nel Compendio finirebbero nomi in due stili diversi a seconda del libro.
+function grafiaAccettabile(regola, manuale) {
+  const a = regola.split(" ");
+  const b = manuale.split(" ");
+  if (a.length !== b.length) return false;
+  return a.every((parola, i) => {
+    if (parola === b[i]) return true;
+    const minuscola = b[i].toLowerCase() === b[i];
+    const elisione = b[i].match(/^([a-zà-ÿ]+)'/);
+    return minuscola ? TITOLO_STOPWORDS.has(b[i]) : Boolean(elisione && TITOLO_ELISIONI.has(elisione[1]));
+  });
 }
 
 function isHeaderNoise(line) {
@@ -139,6 +199,27 @@ function isHeaderNoise(line) {
 function isPageNumberNoise(line) {
   const compact = line.replace(/\s+/g, "");
   return /^[0-9IlOo]{1,5}$/.test(compact) && compact.length <= 5;
+}
+
+// L'ULTIMA scheda del capitolo non ha una scheda successiva che le faccia da confine, e senza
+// questo controllo si prendeva tutto ciò che nel PDF viene dopo: "Zona di Verità" arrivava a
+// 142.000 caratteri, cioè l'intero contenuto del manuale dalle appendici all'indice analitico.
+// L'inizio di una nuova sezione di primo livello chiude il capitolo degli incantesimi. Le
+// testatine di pagina ("CAPITOLO 11 | INCANTESIMI") sono già state tolte da isHeaderNoise, quindi
+// qui resta solo l'apertura vera di un capitolo o di un'appendice.
+// In alcuni manuali il capitolo non si chiude con un'intestazione riconoscibile da sola: nel
+// Calderone di Tasha dopo l'ultima scheda parte il riquadro "INCANTESIMI PERSONALIZZATI", e la
+// prima delle sue due righe viene già scartata come testatina. Per quei casi il confine si dichiara
+// in books.json (campo "fineIncantesimi"): esplicito e verificabile, invece di una regola generica
+// su "riga tutta maiuscola" che accorcerebbe le schede con uno stat block dentro (vedi "Servitore
+// Minuscolo" nella Guida di Xanathar, che contiene le righe FOR/DES/COS e AZIONI).
+function isFineCapitolo(line, marcatoreLibro) {
+  const compact = line.replace(/\s+/g, "").toUpperCase();
+  if (marcatoreLibro && compact === marcatoreLibro.replace(/\s+/g, "").toUpperCase()) return true;
+  // NON si usa "CAPITOLO": la testatina di pagina comincia proprio con quella parola, e quando
+  // l'OCR ne storpia il titolo ("CAPITOLO 11 f N CANTESI M I") isHeaderNoise non la riconosce
+  // più — la scheda in corso veniva troncata a metà (Prestidigitazione perdeva metà elenco).
+  return /^(APPENDICE|INDICEANALITICO|GLOSSARIO)/.test(compact);
 }
 
 function loadLines(bookKey) {
@@ -155,14 +236,45 @@ function loadLines(bookKey) {
   return { lines, nome: raw.nome };
 }
 
+// Il sottotitolo ("Illusione di 5° livello") è la riga più fragile della scheda: è in corsivo, e
+// nel corsivo del manuale l'OCR confonde sistematicamente lettere e cifre di forma simile. Le
+// schede che ne uscivano storpiate venivano scartate in silenzio, e con esse l'incantesimo intero.
+// Due confusioni ricorrenti, entrambe viste nel Manuale del Giocatore:
+//   - la "I" iniziale della scuola letta come "1", "l" o "J" ("1llusione", "Jllusione");
+//   - la cifra del livello letta come lettera ("Illusione di s° livello" per il 5).
+// Si tenta la lettura corretta e la si accetta solo se il risultato è una scuola di magia vera
+// (il chiamante controlla SCHOOLS), così una riga di prosa qualsiasi non può passare di qui.
+
+// La riga va provata prima com'è e poi corretta, non "corretta solo se non matcha": "Jllusione di
+// 5° livello" la forma del sottotitolo ce l'ha già (la J è una lettera come un'altra), quindi
+// passava il pattern e veniva scartata più avanti perché "jllusione" non è una scuola vera — la
+// correzione non veniva mai tentata. È il nome della SCUOLA a dire se la lettura è buona.
+function leggiSottotitolo(grezzo) {
+  for (const candidato of [grezzo, correggiSottotitoloIncantesimo(grezzo)]) {
+    const leveled = candidato.match(SUBTITLE_LEVELED_RE);
+    const cantrip = candidato.match(SUBTITLE_CANTRIP_RE);
+    if (!leveled && !cantrip) continue;
+    const scuola = (leveled?.[1] ?? cantrip?.[1] ?? "").trim().toLowerCase();
+    if (SCHOOLS.has(scuola)) return { leveled, cantrip };
+  }
+  return null;
+}
+
 function findHeadings(lines) {
   const headings = [];
   for (let i = 0; i < lines.length - 1; i++) {
-    const subtitle = lines[i + 1];
-    const leveled = subtitle.match(SUBTITLE_LEVELED_RE);
-    const cantrip = subtitle.match(SUBTITLE_CANTRIP_RE);
-    const scuolaCandidata = (leveled?.[1] ?? cantrip?.[1] ?? "").trim().toLowerCase();
-    if ((!leveled && !cantrip) || !SCHOOLS.has(scuolaCandidata)) continue;
+    // il sottotitolo a volte si spezza a fine colonna, con l'ordinale respinto alla riga dopo
+    // ("Invocazione di 2" + "° livello", frequente nella Guida di Xanathar): senza ricomporlo la
+    // scheda non veniva vista e finiva inglobata nella descrizione dell'incantesimo precedente.
+    // La seconda riga deve essere corta, altrimenti si rischia di incollare una frase di prosa.
+    let letto = leggiSottotitolo(lines[i + 1]);
+    let righeSottotitolo = 1;
+    if (!letto && i + 2 < lines.length && lines[i + 2].length <= 20) {
+      letto = leggiSottotitolo(`${lines[i + 1]} ${lines[i + 2]}`);
+      righeSottotitolo = 2;
+    }
+    if (!letto) continue;
+    const { leveled, cantrip } = letto;
 
     const nameLine = lines[i];
     // scarta falsi positivi: la riga nome non deve essere a sua volta un'etichetta di campo
@@ -172,6 +284,7 @@ function findHeadings(lines) {
 
     headings.push({
       lineIndex: i,
+      righeSottotitolo,
       nome: titleCaseItalian(nameLine),
       livello: leveled ? Number(leveled[2]) : 0,
       scuola: titleCaseItalian(leveled ? leveled[1] : cantrip[1]),
@@ -222,16 +335,28 @@ function extractFields(lines, start, end) {
   return { fields, descrizione, bodyStart };
 }
 
+function nomeStampato(nome, grafie) {
+  const manuale = grafie.get(chiaveNome(nome));
+  return manuale && grafiaAccettabile(nome, manuale) ? manuale : nome;
+}
+
 function parseBook(bookKey) {
   const { lines, nome } = loadLines(bookKey);
   const headings = findHeadings(lines);
+  const books = JSON.parse(readFileSync(path.join(SCRIPT_DIR, "books.json"), "utf-8"));
+  const fineCapitolo = books[bookKey]?.fineIncantesimi;
+  const grafie = indiceGrafieDelManuale(lines);
 
   const spells = headings.map((h, idx) => {
-    const fieldsStart = h.lineIndex + 2;
-    const fieldsEnd = idx + 1 < headings.length ? headings[idx + 1].lineIndex : lines.length;
+    const fieldsStart = h.lineIndex + 1 + h.righeSottotitolo;
+    const prossimaScheda = idx + 1 < headings.length ? headings[idx + 1].lineIndex : lines.length;
+    let fieldsEnd = prossimaScheda;
+    for (let j = fieldsStart; j < prossimaScheda; j++) {
+      if (isFineCapitolo(lines[j], fineCapitolo)) { fieldsEnd = j; break; }
+    }
     const { fields, descrizione } = extractFields(lines, fieldsStart, fieldsEnd);
     return {
-      nome: h.nome,
+      nome: nomeStampato(h.nome, grafie),
       livello: h.livello,
       scuola: h.scuola,
       rituale: h.rituale,

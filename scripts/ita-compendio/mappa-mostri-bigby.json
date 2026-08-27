@@ -1,0 +1,76 @@
+{
+  "_nota": "Abbinamento fra le schede estratte da bigby e le voci inglesi di 5etools. Le righe qui sotto sono state proposte automaticamente perché il nome è identico a meno di maiuscole e accenti e il grado di sfida coincide; le altre vanno aggiunte a mano. Il campo \"it\" serve solo quando il nome estratto è rovinato dall'OCR e va riscritto. Alcune schede avevano come nome la testatina di pagina (\"C A P I TOLO 6 I B E S T I A R I O\"): il nome italiano vero è stato ripreso dall'indice del manuale (Furia di Kostchtchie, Titanoronte, Gigante del fuoco del Fuoco malvagio).",
+  "GARGANTUA": "Gargantua",
+  "COLOSSO RUNICO": "Runic Colossus",
+  "CERATO PO": {
+    "en": "Ceratops",
+    "it": "CERATOPO"
+  },
+  "REGI SAURO": {
+    "en": "Regisaur",
+    "it": "REGISAURO"
+  },
+  "Eco DI DEMOGORGON": {
+    "en": "Echo of Demogorgon",
+    "it": "ECO DI DEMOGORGON"
+  },
+  "ETTIN CEREMORFO": "Ettin Ceremorph",
+  "FAUCE DI YEENOGHU": "Maw of Yeenoghu",
+  "DIVORATORE FENSIR": "Fensir Devourer",
+  "FOMORIAN NOBILE": "Fomorian Noble",
+  "FOMORIAN VERMEIENA DELLE PROFONDITÀ": {
+    "en": "Fomorian Deep Crawler",
+    "it": "FOMORIAN VERME IENA DELLE PROFONDITÀ"
+  },
+  "FOMORIAN WARLOCK DELL'OSCURITÀ": "Fomorian Warlock of the Dark",
+  "MALVAGIO": {
+    "en": "Fire Giant of Evil Fire",
+    "it": "GIGANTE DEL FUOCO DEL FUOCO MALVAGIO"
+  },
+  "GIGANTE DEL FUOCO INVOCATORE": "Fire Giant Forgecaller",
+  "GIGANTE DEL GELO MODELLAGHIACCIO": "Frost Giant Ice Shaper",
+  "GIGANTE DELLE COLLINE VALANGHIVO": "Hill Giant Avalancher",
+  "GIGANTE DELLE NUVOLE GIOCATORE DEL DESTINO": "Cloud Giant Destiny Gambler",
+  "GIGANTE DELLE PIETRE DELLA T'ERRA MALVAGIA": {
+    "en": "Stone Giant of Evil Earth",
+    "it": "GIGANTE DELLE PIETRE DELLA TERRA MALVAGIA"
+  },
+  "GIGANTE DELLE PIETRE LINGUARUPESTRE": "Stone Giant Rockspeaker",
+  "GIGANTE DELLE TEMPESTE CHIAMABURRASCHE": "Storm Giant Tempest Caller",
+  "GIGANTE DELLA MORTE AMMANTATO": "Death Giant Shrouded One",
+  "GIGANTE DELLA MORTE MIETITORE": "Death Giant Reaper",
+  "HULK DEL FANGO": "Mud Hulk",
+  "HULK DEL FULMINE": "Lightning Hulk",
+  "HULK DELLE CENERI": "Cinder Hulk",
+  "HULK DELLE NEBBIE": "Mist Hulk",
+  "HULK DI BRINA": "Rime Hulk",
+  "LEONE MACULATO": "Spotted Lion",
+  "NUVOLA SPETTRALE": "Spectral Cloud",
+  "CULLA DEL RAMPOLLO DELLE COLLINE": "Cradle of the Hill Scion",
+  "RAMPOLLO DI GROLANTOR": "Scion of Grolantor",
+  "CULLA DEL RAMPOLLO DELLE NUVOLE": "Cradle of the Cloud Scion",
+  "RAMPOLLO DI MEMNOR": "Scion of Memnor",
+  "RAMPOLLO DI SKORAEUS": "Scion of Skoraeus",
+  "CULLA DEL RAMPOLLO DELLE TEMPESTE": "Cradle of the Storm Scion",
+  "RAMPOLLO DI STRONMAUS": "Scion of Stronmaus",
+  "CULLA DEL RAMPOLLO DEL GELO": "Cradle of the Frost Scion",
+  "TAGLIAFUOCO": "Firegaunt",
+  "ÌÌTANORONTE": {
+    "en": "Titanothere",
+    "it": "TITANORONTE"
+  },
+  "TROLL IBRIDO": "Troll Mutate",
+  "ZECCA GIGANTE": "Giant Tick",
+  "BUE GIGANTE": "Giant Ox",
+  "GATTO GHIGNANTE": "Grinning Cat",
+  "LINCE GIGANTE": "Giant Lynx",
+  "OCA GIGANTE": "Giant Goose",
+  "C A P I TOLO 6 I B E S T I A R I O": {
+    "en": "Fury of Kostchtchie",
+    "it": "FURIA DI KOSTCHTCHIE"
+  },
+  "C A P I T O LO 6 I B E S T I A R I O": {
+    "en": "Scion of Surtur",
+    "it": "RAMPOLLO DI SURTUR"
+  }
+}

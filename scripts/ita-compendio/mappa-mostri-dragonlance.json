@@ -1,0 +1,21 @@
+{
+  "_nota": "Abbinamento fra le schede estratte da dragonlance e le voci inglesi di 5etools. Le righe qui sotto sono state proposte automaticamente perché il nome è identico a meno di maiuscole e accenti e il grado di sfida coincide; le altre vanno aggiunte a mano. Il campo \"it\" serve solo quando il nome estratto è rovinato dall'OCR e va riscritto.",
+  "ANHKOLOX": "Anhkolox",
+  "CARADOC": "Caradoc",
+  "CAVALIERE SCHELETRICO": "Skeletal Knight",
+  "DRACONICO AURAK": "Aurak Draconian",
+  "DRACONICO BAAZ": "Baaz Draconian",
+  "DRAGO DELLA MORTE MAGGIORE": "Greater Death Dragon",
+  "DRAGO DELLA MORTE MINORE": "Lesser Death Dragon",
+  "DRONE ISTARIANO": "Istarian Drone",
+  "KANSALDI OccHI DI FUOCO": {
+    "en": "Kansaldi Fire-Eyes",
+    "it": "KANSALDI OCCHI DI FUOCO"
+  },
+  "LORD SOTH": "Lord Soth",
+  "SCHERMAGLIATORE KENDER": "Kender Skirmisher",
+  "UFFICIALE DELLYRMATA DEL DRAGO": {
+    "en": "Dragon Army Officer",
+    "it": "UFFICIALE DELL'ARMATA DEL DRAGO"
+  }
+}

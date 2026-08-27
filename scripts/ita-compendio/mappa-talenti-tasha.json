@@ -1,0 +1,25 @@
+{
+  "_nota": "Talenti del Calderone Omnicomprensivo di Tasha. Il parser prende largo perché in quel manuale i talenti stanno dentro un capitolo più grande: qui si sceglie voce per voce. \"Cuoco\" (Chef) non compare perché nel PDF il suo titolo è stampato in tondo e non in maiuscoletto, quindi il parser non lo riconosce come intestazione; il suo testo è stato trascritto a mano in talenti-mancanti.json.",
+  "Abilita Impeccabile": {
+    "en": "Skill Expert",
+    "it": "Abilità Impeccabile"
+  },
+  "Adepto di Metamagia": "Metamagic Adept",
+  "Adepto Occulto": "Eldritch Adept",
+  "Bisturi da Battaglia": "Slasher",
+  "Contaminazione Fatata": "Fey Touched",
+  "Contaminazione Ombrosa": "Shadow Touched",
+  "Maestria dei Veleni": "Poisoner",
+  "Martello Vivente": "Crusher",
+  "Pistolero": "Gunner",
+  "Rudimenti da Artefice": "Artificer Initiate",
+  "Rudimenti da Guerriero": "Fighting Initiate",
+  "Stile Penetrante": "Piercer",
+  "Telecinesi": "Telekinetic",
+  "Telepatia": "Telepathic",
+  "Cuoco": {
+    "en": "Chef",
+    "it": "Cuoco",
+    "testo": "Il tempo trascorso padroneggiando le arti culinarie ha dato i suoi frutti, conferendo al personaggio i seguenti benefici:\n\n• Il suo punteggio di Costituzione o Saggezza aumenta di 1, fino a un massimo di 20.\n\n• Ottiene competenza con gli utensili da cuoco, se non la possiede già.\n\n• Come parte di un riposo breve, può cucinare cibo speciale, a patto che abbia a disposizione gli ingredienti e gli utensili da cuoco: può prepararne a sufficienza per un numero di creature pari a 4 + il suo bonus di competenza. Alla fine del riposo breve, ogni creatura che ha mangiato il cibo e spende uno o più Dadi Vita per recuperare punti ferita recupera 1d8 punti ferita extra.\n\n• Con un'ora di lavoro o alla fine di un riposo lungo, può cucinare un numero di delizie pari al suo bonus di competenza. Queste speciali delizie durano 8 ore dopo essere state preparate e qualsiasi creatura che usi un'azione bonus per mangiarne una ottiene punti ferita temporanei pari al bonus di competenza del personaggio che le ha preparate."
+  }
+}

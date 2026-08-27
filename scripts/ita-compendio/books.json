@@ -9,11 +9,14 @@
   },
   "tasha": {
     "nome": "Calderone Omnicomprensivo di Tasha",
-    "file": "1.D&D 5e - Calderone Omnicomprensivo di Tasha.pdf"
+    "file": "1.D&D 5e - Calderone Omnicomprensivo di Tasha.pdf",
+    "fineIncantesimi": "PERSONALIZZATI",
+    "inizioTalenti": "TALENTI"
   },
   "xanathar": {
     "nome": "Guida Omnicomprensiva di Xanathar",
-    "file": "1.Guida Omnicomprensiva di Xanathar_ITA-Delux.pdf"
+    "file": "1.Guida Omnicomprensiva di Xanathar_ITA-Delux.pdf",
+    "inizioTalenti": "TALENTI RAZZIALI"
   },
   "ravenloft": {
     "nome": "Guida di Van Richten a Ravenloft",
@@ -29,7 +32,8 @@
   },
   "dragonlance": {
     "nome": "Dragonlance: L'ombra della Regina dei Draghi",
-    "file": "D&D_5e_Dragonlance_L_ombra_della_Regina_dei_Draghi_HQ_11_2023.pdf"
+    "file": "D&D_5e_Dragonlance_L_ombra_della_Regina_dei_Draghi_HQ_11_2023.pdf",
+    "inizioTalenti": "TALENTI"
   },
   "multiverso": {
     "nome": "Mordenkainen presenta Mostri del Multiverso",
