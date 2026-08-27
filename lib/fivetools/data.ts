@@ -357,6 +357,49 @@ export function loadInventoryItems(): Promise<RawItem[]> {
   return inventoryItemsPromise;
 }
 
+/** `spells/sources.json`: `{ FONTE: { "Nome Incantesimo": { class: [{name, source}] } } }` */
+interface SpellSourcesFile {
+  [fonte: string]: {
+    [nomeIncantesimo: string]: {
+      class?: { name: string; source: string }[];
+      classVariant?: { name: string; source: string }[];
+    };
+  };
+}
+
+let classSpellsPromise: Promise<Map<string, { name: string; source: string }[]>> | null = null;
+/**
+ * Quali incantesimi può scegliere ciascuna classe, indicizzati per "Classe|Fonte".
+ *
+ * Il dato NON sta sulle voci degli incantesimi (non hanno un campo "classes") ma in un file a
+ * parte, `spells/sources.json`, che rovescia la relazione: per ogni incantesimo elenca le classi
+ * che lo hanno in lista. Senza, dalla scheda di una classe non c'era modo di sapere cosa può
+ * lanciare — bisognava uscire e cercarlo altrove, che è esattamente il buco segnalato dall'utente.
+ *
+ * Si usa solo `class`, non `classVariant`: quest'ultimo raccoglie gli incantesimi che arrivano da
+ * privilegi opzionali (le liste ampliate di Tasha's), che non fanno parte della lista base della
+ * classe e mescolarli renderebbe l'elenco fuorviante.
+ */
+export function loadClassSpells(): Promise<Map<string, { name: string; source: string }[]>> {
+  if (!classSpellsPromise) {
+    classSpellsPromise = fetchJson<SpellSourcesFile>(`${RAW_BASE}/spells/sources.json`).then((file) => {
+      const perClasse = new Map<string, { name: string; source: string }[]>();
+      for (const [fonteIncantesimo, incantesimi] of Object.entries(file ?? {})) {
+        for (const [nome, info] of Object.entries(incantesimi)) {
+          for (const cls of info.class ?? []) {
+            const chiave = `${cls.name}|${cls.source}`;
+            const lista = perClasse.get(chiave) ?? [];
+            lista.push({ name: nome, source: fonteIncantesimo });
+            perClasse.set(chiave, lista);
+          }
+        }
+      }
+      return perClasse;
+    });
+  }
+  return classSpellsPromise;
+}
+
 let racesPromise: Promise<RawRace[]> | null = null;
 export function loadRaces(): Promise<RawRace[]> {
   if (!racesPromise) {
@@ -446,7 +489,24 @@ let optionalFeatureLoadersByKey: Map<string, Promise<RawOptionalFeature[]>> | nu
 /** Tutte le scelte di classe che l'app conosce, in un unico elenco — per la sezione omonima del
  * Compendio. Stessi tipi già usati dalla scheda personaggio (CLASS_OPTIONAL_FEATURE_TYPES) più le
  * infusioni dell'Artefice, che in scheda hanno una sezione propria. */
-export const TUTTI_I_TIPI_SCELTE = ["EI", "PB", "FS:F", "FS:P", "FS:R", "FS:B", "MM", "AI"];
+// Mancavano le manovre del Maestro di Battaglia (43 voci!), le discipline elementali del monaco,
+// i colpi arcani e le rune del guerriero: sono scelte a tutti gli effetti, che un giocatore deve
+// poter leggere nel Compendio esattamente come una supplica occulta.
+export const TUTTI_I_TIPI_SCELTE = [
+  "EI", "PB", "FS:F", "FS:P", "FS:R", "FS:B", "MM", "AI", "MV:B", "ED", "AS", "RN",
+];
+
+/** Quali di quelle scelte sblocca ciascuna classe, per mostrarle nella sua scheda. */
+export const SCELTE_PER_CLASSE: Record<string, string[]> = {
+  Warlock: ["EI", "PB"],
+  Fighter: ["FS:F", "MV:B", "AS", "RN"],
+  Paladin: ["FS:P"],
+  Ranger: ["FS:R"],
+  Bard: ["FS:B"],
+  Sorcerer: ["MM"],
+  Monk: ["ED"],
+  Artificer: ["AI"],
+};
 
 export function loadClassChoices(): Promise<RawOptionalFeature[]> {
   return loadOptionalFeaturesByTypes(TUTTI_I_TIPI_SCELTE);

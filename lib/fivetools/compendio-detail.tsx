@@ -9,6 +9,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { BookMeta, Edition } from "@/lib/fivetools/books";
 import {
   loadClassData,
+  loadClassSpells,
+  loadOptionalFeaturesByTypes,
+  loadSpells,
+  SCELTE_PER_CLASSE,
   resolveClassFeatures,
   resolveSubclassFeatures,
   type ClassData,
@@ -18,6 +22,7 @@ import {
   type RawCreature,
   type RawFeat,
   type RawItem,
+  type RawOptionalFeature,
   type RawRace,
   type RawSpell,
   type RawSubclass,
@@ -55,6 +60,8 @@ import {
 } from "@/lib/fivetools/format";
 import { abilityModifier, formatModifier, proficiencyBonus } from "@/lib/dnd";
 import { eTitoletto, riflussoTestoOcr } from "@/lib/testo-riflusso";
+import { MentionModal } from "@/components/chat/mention-modal";
+import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 import {
   getClassiIta,
   getIncantesimiIta,
@@ -483,6 +490,10 @@ const TIPI_SCELTA: Record<string, string> = {
   "FS:B": "Stile di combattimento (Bardo)",
   MM: "Metamagia",
   AI: "Infusione dell'Artefice",
+  "MV:B": "Manovra (Maestro di Battaglia)",
+  ED: "Disciplina elementale (Monaco)",
+  AS: "Colpo arcano (Arciere Arcano)",
+  RN: "Runa (Cavaliere Runico)",
 };
 
 function SceltaClasseInfo({ feature }: { feature: { featureType?: string[]; prerequisite?: unknown[] } }) {
@@ -1400,6 +1411,186 @@ function TabellaProgressione({
   );
 }
 
+const NOMI_LIVELLO_INCANTESIMO = [
+  "Trucchetti", "1° livello", "2° livello", "3° livello", "4° livello",
+  "5° livello", "6° livello", "7° livello", "8° livello", "9° livello",
+];
+
+/**
+ * Quali incantesimi può scegliere questa classe, divisi per livello e cliccabili.
+ *
+ * Era il buco più fastidioso del Compendio: la tabella di progressione dice quanti slot hai a ogni
+ * livello, ma non c'era modo di sapere COSA puoi metterci dentro — per saperlo bisognava uscire e
+ * andare su un sito esterno. Il dato non sta sulle voci degli incantesimi (non hanno un campo
+ * "classi") ma in un file a parte che rovescia la relazione: vedi loadClassSpells.
+ *
+ * Ogni incantesimo apre lo stesso modal di dettaglio delle menzioni "#Nome" in chat, così si legge
+ * senza perdere la scheda della classe.
+ */
+function IncantesimiDiClasse({ cls, language }: { cls: RawClass; language: Language }) {
+  const [perLivello, setPerLivello] = useState<Map<number, RawSpell[]> | null>(null);
+  const [aperto, setAperto] = useState(false);
+  const [mention, setMention] = useState<ParsedMentionToken | null>(null);
+  const indiceIta = useItalianSearchIndex("incantesimi", language === "it");
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([loadClassSpells(), loadSpells()]).then(([perClasse, tutti]) => {
+      if (cancelled) return;
+      const perChiave = new Map(tutti.map((s) => [`${s.name}|${s.source}`, s]));
+      const gruppi = new Map<number, RawSpell[]>();
+      for (const rif of perClasse.get(`${cls.name}|${cls.source}`) ?? []) {
+        const spell = perChiave.get(`${rif.name}|${rif.source}`);
+        if (!spell) continue;
+        const lista = gruppi.get(spell.level) ?? [];
+        lista.push(spell);
+        gruppi.set(spell.level, lista);
+      }
+      setPerLivello(gruppi);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cls.name, cls.source]);
+
+  const totale = perLivello ? [...perLivello.values()].reduce((n, l) => n + l.length, 0) : 0;
+  if (!perLivello || totale === 0) return null;
+
+  const nomeDi = (spell: RawSpell) =>
+    (language === "it" ? bestItalianName(indiceIta, spell.name, spell.source) : null) ?? spell.name;
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={() => setAperto((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2 text-left transition-colors hover:border-accent/50"
+      >
+        <span className="text-xs uppercase tracking-widest text-muted">
+          Incantesimi della classe{" "}
+          <span className="text-accent-strong">({totale})</span>
+        </span>
+        <span className="text-xs text-muted">{aperto ? "▲" : "▼"}</span>
+      </button>
+
+      {aperto && (
+        <div className="space-y-3">
+          {[...perLivello.keys()]
+            .sort((a, b) => a - b)
+            .map((livello) => (
+              <div key={livello} className="space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted">
+                  {NOMI_LIVELLO_INCANTESIMO[livello] ?? `Livello ${livello}`}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {perLivello
+                    .get(livello)!
+                    .slice()
+                    .sort((a, b) => nomeDi(a).localeCompare(nomeDi(b), "it", { sensitivity: "base" }))
+                    .map((spell) => (
+                      <button
+                        key={`${spell.name}|${spell.source}`}
+                        onClick={() =>
+                          setMention({ name: spell.name, kind: "incantesimi", source: spell.source })
+                        }
+                        className="rounded-md border border-edge bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:border-accent hover:text-accent-strong"
+                      >
+                        {nomeDi(spell)}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+      <MentionModal mention={mention} onClose={() => setMention(null)} />
+    </div>
+  );
+}
+
+/**
+ * Le altre cose che la classe sblocca oltre agli incantesimi: suppliche occulte e Voto del Patto
+ * per il warlock, stili di combattimento, metamagia, infusioni, manovre del Maestro di Battaglia,
+ * discipline elementali, colpi arcani, rune. Vivono in optionalfeatures.json e finora si potevano
+ * solo cercare a mano nel Compendio, senza sapere quali appartenessero alla propria classe.
+ */
+function ScelteDiClasse({ cls, language }: { cls: RawClass; language: Language }) {
+  const [perTipo, setPerTipo] = useState<Map<string, RawOptionalFeature[]> | null>(null);
+  const [aperto, setAperto] = useState(false);
+  const [mention, setMention] = useState<ParsedMentionToken | null>(null);
+  const indiceIta = useItalianSearchIndex("scelteClasse", language === "it");
+
+  const tipi = SCELTE_PER_CLASSE[cls.name];
+
+  useEffect(() => {
+    if (!tipi) return;
+    let cancelled = false;
+    loadOptionalFeaturesByTypes(tipi).then((voci) => {
+      if (cancelled) return;
+      const gruppi = new Map<string, RawOptionalFeature[]>();
+      for (const v of voci) {
+        for (const t of v.featureType ?? []) {
+          if (!tipi.includes(t)) continue;
+          const lista = gruppi.get(t) ?? [];
+          lista.push(v);
+          gruppi.set(t, lista);
+        }
+      }
+      setPerTipo(gruppi);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tipi, cls.name]);
+
+  if (!tipi || !perTipo || perTipo.size === 0) return null;
+  const totale = [...perTipo.values()].reduce((n, l) => n + l.length, 0);
+  const nomeDi = (v: RawOptionalFeature) =>
+    (language === "it" ? bestItalianName(indiceIta, v.name, v.source) : null) ?? v.name;
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={() => setAperto((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2 text-left transition-colors hover:border-accent/50"
+      >
+        <span className="text-xs uppercase tracking-widest text-muted">
+          Scelte della classe <span className="text-accent-strong">({totale})</span>
+        </span>
+        <span className="text-xs text-muted">{aperto ? "▲" : "▼"}</span>
+      </button>
+
+      {aperto && (
+        <div className="space-y-3">
+          {[...perTipo.entries()].map(([tipo, voci]) => (
+            <div key={tipo} className="space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted">
+                {TIPI_SCELTA[tipo] ?? tipo}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {voci
+                  .slice()
+                  .sort((a, b) => nomeDi(a).localeCompare(nomeDi(b), "it", { sensitivity: "base" }))
+                  .map((v) => (
+                    <button
+                      key={`${v.name}|${v.source}`}
+                      onClick={() =>
+                        setMention({ name: v.name, kind: "scelteClasse", source: v.source })
+                      }
+                      className="rounded-md border border-edge bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:border-accent hover:text-accent-strong"
+                    >
+                      {nomeDi(v)}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <MentionModal mention={mention} onClose={() => setMention(null)} />
+    </div>
+  );
+}
+
 function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   const [classData, setClassData] = useState<ClassData | null>(null);
   const ia = useTraduzioneIa("classi", cls.name, cls.source, language === "it");
@@ -1521,6 +1712,8 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
               )}
           </div>
         )}
+        <IncantesimiDiClasse cls={cls} language={language} />
+        <ScelteDiClasse cls={cls} language={language} />
         {subclassesBlock}
       </>
     );
@@ -1593,6 +1786,8 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
         </div>
       )}
 
+      <IncantesimiDiClasse cls={cls} language={language} />
+      <ScelteDiClasse cls={cls} language={language} />
       {subclassesBlock}
     </>
   );
