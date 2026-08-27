@@ -1583,6 +1583,12 @@ function IncantesimiDiClasse({ cls, language }: { cls: RawClass; language: Langu
  * discipline elementali, colpi arcani, rune. Vivono in optionalfeatures.json e finora si potevano
  * solo cercare a mano nel Compendio, senza sapere quali appartenessero alla propria classe.
  */
+/** Le sigle dell'edizione 2024 sono quelle del 2014 con la "X" davanti (PHB/XPHB, DMG/XDMG): il
+ * testo ufficiale italiano esiste solo per le prime, quindi a parità di nome vince quella. */
+function edizione2014(source: string | undefined): boolean {
+  return !!source && !/^X/.test(source);
+}
+
 function ScelteDiClasse({ cls, language }: { cls: RawClass; language: Language }) {
   const [perTipo, setPerTipo] = useState<Map<string, RawOptionalFeature[]> | null>(null);
   const [aperto, setAperto] = useState(false);
@@ -1601,6 +1607,16 @@ function ScelteDiClasse({ cls, language }: { cls: RawClass; language: Language }
         for (const t of v.featureType ?? []) {
           if (!tipi.includes(t)) continue;
           const lista = gruppi.get(t) ?? [];
+          // Le opzioni ristampate nell'edizione 2024 hanno lo stesso identico nome di quelle del
+          // 2014 (Careful Spell sta sia in PHB sia in XPHB): senza questo controllo lo stregone
+          // mostrava venti metamagie invece di dieci, ognuna due volte. A parità di nome si tiene
+          // l'edizione 2014, che è quella per cui esiste il testo ufficiale italiano estratto dai
+          // manuali — scelto qui esplicitamente e non affidandosi all'ordine del file di 5etools.
+          const gia = lista.findIndex((g) => g.name === v.name);
+          if (gia >= 0) {
+            if (edizione2014(v.source) && !edizione2014(lista[gia].source)) lista[gia] = v;
+            continue;
+          }
           lista.push(v);
           gruppi.set(t, lista);
         }

@@ -18,7 +18,7 @@ export const TITOLO_STOPWORDS = new Set([
   "in", "nel", "nello", "nella", "nei", "negli", "nelle",
   "su", "sul", "sullo", "sulla", "sui", "sugli", "sulle",
   "con", "col", "per", "tra", "fra",
-  "e", "ed", "o", "od",
+  "e", "ed", "o", "od", "ad",
   "il", "lo", "la", "i", "gli", "le", "un", "uno", "una",
 ]);
 
@@ -85,4 +85,31 @@ export function normalizzaGradoSfida(grezzo: string): string {
   const compatto = grezzo.replace(/\s+/g, "");
   if (GRADI_DI_SFIDA.has(compatto)) return compatto;
   return grezzo.trim().split(/\s+/)[0] ?? "";
+}
+
+/**
+ * Il maiuscoletto dei manuali fa infilare all'estrazione uno spazio DENTRO le parole, sempre dopo
+ * le prime lettere: "I Mbottita" per Imbottita, "G Iaco di Maglia" per Giaco di Maglia, "Armatura
+ * Com Pleta" per Completa, "Martello da G Uerra". Il segnale è che il primo pezzo è cortissimo e il
+ * secondo comincia con una maiuscola in mezzo al nome: nei titoli italiani, dopo titoloItaliano, le
+ * parole di una o due lettere sono già state rese minuscole se erano articoli o preposizioni, quindi
+ * un frammento corto ancora maiuscolo non è una parola vera ma la testa di quella dopo.
+ */
+export function ricomponiParoleSpezzate(nome: string): string {
+  const parole = nome.split(" ");
+  const fuse: string[] = [];
+  for (const parola of parole) {
+    const precedente = fuse[fuse.length - 1];
+    const spezzata =
+      precedente !== undefined &&
+      precedente.length <= 3 &&
+      /^[A-ZÀ-Ù][a-zà-ÿ]*$/.test(precedente) &&
+      /^[A-ZÀ-Ù][a-zà-ÿ]/.test(parola);
+    if (spezzata) {
+      fuse[fuse.length - 1] = precedente + parola.charAt(0).toLowerCase() + parola.slice(1);
+      continue;
+    }
+    fuse.push(parola);
+  }
+  return fuse.join(" ");
 }

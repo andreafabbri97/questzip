@@ -42,6 +42,7 @@ if (!kind || !voci) {
 
 let scritte = 0;
 const nonTrovate = [];
+const nuove = [];
 for (const [chiave, valore] of Object.entries(voci)) {
   if (chiave.startsWith("_")) continue; // righe di nota nel file
   const [name, source] = chiave.split("|");
@@ -55,7 +56,15 @@ for (const [chiave, valore] of Object.entries(voci)) {
     SELECT 1 FROM compendio_traduzione_ia
     WHERE kind = ${kind} AND name = ${name} AND source = ${source}`;
   if (esiste.length === 0) {
-    nonTrovate.push(chiave);
+    // Una voce può non essere in cache affatto: la cache è stata riempita per un sottoinsieme,
+    // e per esempio otto delle dieci Metamagie dello stregone non c'erano — nel Compendio
+    // restavano col nome inglese. Se il testo è quello stampato sul manuale, la riga si crea.
+    nuove.push(chiave);
+    if (applica) {
+      await sql`
+        INSERT INTO compendio_traduzione_ia (kind, name, source, nome_ita, descrizione_ita, updated_at)
+        VALUES (${kind}, ${name}, ${source}, ${nome?.trim() ?? null}, ${testo.trim()}, now())`;
+    }
     continue;
   }
   scritte++;
@@ -74,6 +83,9 @@ for (const [chiave, valore] of Object.entries(voci)) {
 }
 
 console.log(`${applica ? "" : "[PROVA] "}${scritte} descrizioni scritte per "${kind}"`);
+if (nuove.length > 0) {
+  console.log(`${applica ? "create" : "da creare"} ${nuove.length} voci nuove: ${nuove.join(", ")}`);
+}
 if (nonTrovate.length > 0) {
   console.log(`voci non presenti nel Compendio (${nonTrovate.length}): ${nonTrovate.join(", ")}`);
 }

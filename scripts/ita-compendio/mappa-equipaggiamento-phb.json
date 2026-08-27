@@ -1,0 +1,504 @@
+{
+  "_nota": "Equipaggiamento comune del capitolo 5 del Manuale del Giocatore: armi, armature, attrezzatura, munizioni, focus da incantatore, cavalcature e veicoli. Nel Compendio (tab \"Oggetti comuni\") e nell'autocompletamento della scheda queste voci comparivano solo in inglese. \"it\" è il nome pulito da mostrare quando l'estrazione l'ha spezzato (\"Lente D ' i Ngrandimento\"), \"en\" la voce 5etools. L'abbinamento viene verificato sul COSTO prima di scrivere: è un numero identico nelle due edizioni, quindi se non torna la voce viene saltata.",
+  "voci": {
+    "Imbottita": {
+      "en": "Padded Armor"
+    },
+    "Cuoio Borchiato": {
+      "en": "Studded Leather Armor"
+    },
+    "Pelle": {
+      "en": "Leather Armor"
+    },
+    "Giaco di Maglia": {
+      "en": "Chain Shirt"
+    },
+    "Corazza a Scaglie": {
+      "en": "Scale Mail"
+    },
+    "Corazza di Piastre": {
+      "en": "Breastplate"
+    },
+    "Mezza Armatura": {
+      "en": "Half Plate Armor"
+    },
+    "Corazza ad Anelli": {
+      "en": "Ring Mail"
+    },
+    "Cotta di Maglia": {
+      "en": "Chain Mail"
+    },
+    "Corazza a Strisce": {
+      "en": "Splint Armor"
+    },
+    "Armatura Completa": {
+      "en": "Plate Armor"
+    },
+    "Ascia": {
+      "en": "Handaxe"
+    },
+    "Bastone Ferrato": {
+      "en": "Quarterstaff"
+    },
+    "Giavellotto": {
+      "en": "Javelin"
+    },
+    "Martello Leggero": {
+      "en": "Light Hammer"
+    },
+    "Mazza": {
+      "en": "Mace"
+    },
+    "Pugnale": {
+      "en": "Dagger"
+    },
+    "Randello Pesante": {
+      "en": "Greatclub"
+    },
+    "Arco Corto": {
+      "en": "Shortbow"
+    },
+    "Balestra Leggera": {
+      "en": "Light Crossbow"
+    },
+    "Dardo": {
+      "en": "Dart"
+    },
+    "Alabarda": {
+      "en": "Halberd"
+    },
+    "Ascia Bipenne": {
+      "en": "Greataxe"
+    },
+    "Ascia da Battaglia": {
+      "en": "Battleaxe"
+    },
+    "Falcione": {
+      "en": "Glaive"
+    },
+    "Frusta": {
+      "en": "Whip"
+    },
+    "Martello da Guerra": {
+      "en": "Warhammer"
+    },
+    "Morning Star": {
+      "en": "Morningstar"
+    },
+    "Picca": {
+      "en": "Pike"
+    },
+    "Piccone da Guerra": {
+      "en": "War Pick"
+    },
+    "Scimitarra": {
+      "en": "Scimitar"
+    },
+    "Spada Lunga": {
+      "en": "Longsword"
+    },
+    "Spadone": {
+      "en": "Greatsword"
+    },
+    "Stocco": {
+      "en": "Rapier"
+    },
+    "Tridente": {
+      "en": "Trident"
+    },
+    "Arco Lungo": {
+      "en": "Longbow"
+    },
+    "Balestra a Mano": {
+      "en": "Hand Crossbow"
+    },
+    "Balestra Pesante": {
+      "en": "Heavy Crossbow"
+    },
+    "Aghi da Cerbottana (50)": {
+      "en": "Blowgun Needles (50)"
+    },
+    "Frecce (20)": {
+      "en": "Arrows (20)"
+    },
+    "Proiettili da Fionda (20)": {
+      "en": "Sling Bullets (20)"
+    },
+    "Quadrelli da Balestra (20)": {
+      "en": "Crossbow Bolts (20)"
+    },
+    "Forziere": {
+      "en": "Chest"
+    },
+    "Abito, Comune": {
+      "en": "Common Clothes"
+    },
+    "Fuoco dell'Alchi Mista (ampolla)": {
+      "en": "Alchemist's Fire (flask)",
+      "it": "Fuoco dell'Alchimista (ampolla)"
+    },
+    "Abito, Costume": {
+      "en": "Costume Clothes"
+    },
+    "Gavetta": {
+      "en": "Mess Kit"
+    },
+    "Abito, da Viaggiatore": {
+      "en": "Traveler's Clothes"
+    },
+    "Gessetto (1 Pezzo)": {
+      "en": "Chalk (1 piece)",
+      "it": "Gessetto (1 pezzo)"
+    },
+    "Abito, Pregiato": {
+      "en": "Fine Clothes"
+    },
+    "Giaciglio": {
+      "en": "Bedroll"
+    },
+    "Acciarino e Pietra Focaia": {
+      "en": "Tinderbox"
+    },
+    "Lampada": {
+      "en": "Lamp"
+    },
+    "Acqua Santa (ampolla)": {
+      "en": "Holy Water (flask)"
+    },
+    "Ampolla o Boccale": {
+      "en": "Flask"
+    },
+    "Lanterna Schermabile": {
+      "en": "Hooded Lantern"
+    },
+    "Anello con Sigillo": {
+      "en": "Signet Ring"
+    },
+    "Lente D ' i Ngrandimento": {
+      "en": "Magnifying Glass",
+      "it": "Lente d'Ingrandimento"
+    },
+    "Antitossina (fiala)": {
+      "en": "Antitoxin (vial)"
+    },
+    "Libro": {
+      "en": "Book"
+    },
+    "Ariete Portatile": {
+      "en": "Portable Ram"
+    },
+    "Libro degli i Ncantesimi": {
+      "en": "Spellbook",
+      "it": "Libro degli Incantesimi"
+    },
+    "Manette": {
+      "en": "Manacles"
+    },
+    "Attrezzi da Scalatore": {
+      "en": "Climber's Kit"
+    },
+    "Martello": {
+      "en": "Hammer"
+    },
+    "Barile": {
+      "en": "Barrel"
+    },
+    "Martello da Demolizione": {
+      "en": "Sledgehammer"
+    },
+    "Bilancia da Mercante": {
+      "en": "Merchant's Scale"
+    },
+    "Borsa": {
+      "en": "Pouch"
+    },
+    "Borsa del Guaritore": {
+      "en": "Healer's Kit"
+    },
+    "Borsa per Componenti": {
+      "en": "Component Pouch"
+    },
+    "Bottiglia di Vetro": {
+      "en": "Glass Bottle"
+    },
+    "Brocca o Caraffa": {
+      "en": "Jug"
+    },
+    "Olio (ampolla)": {
+      "en": "Oil (flask)"
+    },
+    "Campanella": {
+      "en": "Bell"
+    },
+    "Otre": {
+      "en": "Waterskin"
+    },
+    "Candela": {
+      "en": "Candle"
+    },
+    "Canestro": {
+      "en": "Basket"
+    },
+    "Pennino": {
+      "en": "Ink Pen"
+    },
+    "Canna da Pesca": {
+      "en": "Fishing Tackle"
+    },
+    "Pergamena (un Foglio)": {
+      "en": "Parchment (one sheet)",
+      "it": "Pergamena (un foglio)"
+    },
+    "Cannocchiale": {
+      "en": "Spyglass"
+    },
+    "Piccone da Minatore": {
+      "en": "Miner's Pick"
+    },
+    "Carrucola e Paranco": {
+      "en": "Block and Tackle"
+    },
+    "Piede di Porco": {
+      "en": "Crowbar"
+    },
+    "Carta (un Foglio)": {
+      "en": "Paper (one sheet)",
+      "it": "Carta (un foglio)"
+    },
+    "Pozione di Guarigione": {
+      "en": "Potion of Healing",
+      "fonte": "DMG"
+    },
+    "Catena (3 Metri)": {
+      "en": "Chain (10 feet)",
+      "it": "Catena (3 metri)"
+    },
+    "Profumo (fiala)": {
+      "en": "Perfume (vial)"
+    },
+    "Cera per Sigillo": {
+      "en": "Sealing Wax"
+    },
+    "Rampino": {
+      "en": "Grappling Hook"
+    },
+    "Chiodo da Rocciatore": {
+      "en": "Piton"
+    },
+    "Razioni (1 Giornata)": {
+      "en": "Rations (1 day)",
+      "it": "Razioni (1 giornata)"
+    },
+    "Clessidra": {
+      "en": "Hourglass"
+    },
+    "Sacco": {
+      "en": "Sack"
+    },
+    "Coperta": {
+      "en": "Blanket"
+    },
+    "Corda di Canapa (1 5 Metri)": {
+      "en": "Hempen Rope (50 feet)",
+      "it": "Corda di Canapa (15 metri)"
+    },
+    "Scala a Pioli (3 Metri)": {
+      "en": "Ladder (10-foot)",
+      "it": "Scala a Pioli (3 metri)"
+    },
+    "Secchio": {
+      "en": "Bucket"
+    },
+    "Custodia per Mappe o Pergamene": {
+      "en": "Map or Scroll Case"
+    },
+    "Sfere Metalliche (sacchetto da 1 .000)": {
+      "en": "Ball Bearings (bag of 1,000)",
+      "it": "Sfere Metalliche (sacchetto da 1.000)"
+    },
+    "Custodia per Quadrelli da Balestra": {
+      "en": "Crossbow Bolt Case"
+    },
+    "Faretra": {
+      "en": "Quiver"
+    },
+    "Fiala": {
+      "en": "Vial"
+    },
+    "Fischietto da Richiamo": {
+      "en": "Signal Whistle"
+    },
+    "Specchio Piccolo di Metallo": {
+      "en": "Steel Mirror"
+    },
+    "Spuntoni, Ferro (10)": {
+      "en": "Iron Spikes (10)",
+      "it": "Spuntoni di Ferro (10)"
+    },
+    "Tagliola": {
+      "en": "Hunting Trap"
+    },
+    "Tenda, per Duepersone": {
+      "en": "Two-Person Tent",
+      "it": "Tenda, per Due Persone"
+    },
+    "Triboli (sacchetto da 20)": {
+      "en": "Caltrops (bag of 20)"
+    },
+    "Vanga o Badile": {
+      "en": "Shovel"
+    },
+    "Vaso di Ferro": {
+      "en": "Iron Pot"
+    },
+    "Veleno, Base (fiala)": {
+      "en": "Basic Poison (vial)"
+    },
+    "Veste": {
+      "en": "Robes"
+    },
+    "Zaino": {
+      "en": "Backpack"
+    },
+    "Amuleto": {
+      "en": "Amulet"
+    },
+    "Emblema": {
+      "en": "Emblem"
+    },
+    "Reliquiario": {
+      "en": "Reliquary"
+    },
+    "Bastone": {
+      "en": "Staff"
+    },
+    "Globo": {
+      "en": "Orb"
+    },
+    "Bastone di Legno": {
+      "en": "Wooden Staff"
+    },
+    "Rametto di Vischio": {
+      "en": "Sprig of Mistletoe"
+    },
+    "Totem": {
+      "en": "Totem"
+    },
+    "Cavallo da Guerra": {
+      "en": "Warhorse"
+    },
+    "Elefante": {
+      "en": "Elephant"
+    },
+    "Pony": {
+      "en": "Pony"
+    },
+    "Bisacce": {
+      "en": "Saddlebags"
+    },
+    "Carrozza": {
+      "en": "Carriage"
+    },
+    "Morso e Briglie": {
+      "en": "Bit and bridle"
+    },
+    "Dagaloppo": {
+      "en": "Riding Saddle",
+      "it": "Sella da Galoppo"
+    },
+    "Esotica": {
+      "en": "Exotic Saddle",
+      "it": "Sella Esotica"
+    },
+    "Militare": {
+      "en": "Military Saddle",
+      "it": "Sella Militare"
+    },
+    "Slitta": {
+      "en": "Sled"
+    },
+    "Barcone": {
+      "en": "Keelboat",
+      "fonte": "DMG"
+    },
+    "Galea": {
+      "en": "Galley",
+      "fonte": "DMG"
+    },
+    "Nave a Vela": {
+      "en": "Sailing Ship",
+      "fonte": "DMG"
+    },
+    "Nave Lunga": {
+      "en": "Longship",
+      "fonte": "DMG"
+    },
+    "Cuoio": {
+      "en": "Hide Armor"
+    },
+    "Falcetto": {
+      "en": "Sickle"
+    },
+    "Lancia": {
+      "en": "Spear"
+    },
+    "Randello": {
+      "en": "Club"
+    },
+    "Fionda": {
+      "en": "Sling"
+    },
+    "Lancia da Cavaliere": {
+      "en": "Lance"
+    },
+    "Maglio": {
+      "en": "Maul"
+    },
+    "Mazzafrusto": {
+      "en": "Flail"
+    },
+    "Spada Corta": {
+      "en": "Shortsword"
+    },
+    "Cerbottana": {
+      "en": "Blowgun"
+    },
+    "Inchiostro (boccetta da 30 Grammi)": {
+      "en": "Ink (1-ounce bottle)",
+      "it": "Inchiostro (boccetta da 30 grammi)"
+    },
+    "Lanterna a Lente Sporgente": {
+      "en": "Bullseye Lantern"
+    },
+    "Corda di Seta ( 1 5 Metri)": {
+      "en": "Silk Rope (50 feet)",
+      "it": "Corda di Seta (15 metri)"
+    },
+    "Serratura": {
+      "en": "Lock"
+    },
+    "Bacchetta": {
+      "en": "Wand"
+    },
+    "Cristallo": {
+      "en": "Crystal"
+    },
+    "Torcia": {
+      "en": "Torch"
+    },
+    "Verga": {
+      "en": "Rod"
+    },
+    "Bacchetta in Legno di Tasso": {
+      "en": "Yew Wand"
+    },
+    "O,s Kg di Sale": {
+      "en": "Salt",
+      "it": "0,5 kg di Sale"
+    },
+    "0,s K G di Grano": {
+      "en": "Wheat",
+      "it": "0,5 kg di Grano"
+    }
+  }
+}

@@ -18,6 +18,9 @@ const VOCI = [
   // oggetti letti a mano dalle pagine del Manuale del DM (il PDF ha il font offuscato)
   { tab: "Oggetti magici", inglese: "Wand of Orcus", italiano: "Bacchetta di Orcus" },
   { tab: "Oggetti magici", inglese: "Portable Hole", italiano: "Buco Portatile" },
+  // equipaggiamento comune del capitolo 5: prima non aveva testo italiano per nessuna delle 259 voci
+  { tab: "Oggetti comuni", inglese: "Handaxe", italiano: "Ascia" },
+  { tab: "Oggetti comuni", inglese: "Plate Armor", italiano: "Armatura Completa" },
 ];
 
 for (const voce of VOCI) {

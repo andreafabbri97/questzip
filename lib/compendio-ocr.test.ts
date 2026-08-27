@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   correggiSottotitoloIncantesimo,
   normalizzaGradoSfida,
+  ricomponiParoleSpezzate,
   titoloItaliano,
 } from "./compendio-ocr";
 
@@ -74,5 +75,24 @@ describe("normalizzaGradoSfida", () => {
   it("non inventa un grado che non esiste: tiene solo la prima cifra", () => {
     // "3 5" non è il grado 35: uno dei due numeri appartiene a un'altra colonna
     expect(normalizzaGradoSfida("3 5")).toBe("3");
+  });
+});
+
+describe("ricomponiParoleSpezzate", () => {
+  it("ricuce la parola spezzata dal maiuscoletto", () => {
+    expect(ricomponiParoleSpezzate("I Mbottita")).toBe("Imbottita");
+    expect(ricomponiParoleSpezzate("G Iaco di Maglia")).toBe("Giaco di Maglia");
+    expect(ricomponiParoleSpezzate("Armatura Com Pleta")).toBe("Armatura Completa");
+    expect(ricomponiParoleSpezzate("Martello da G Uerra")).toBe("Martello da Guerra");
+  });
+
+  it("non tocca un nome già intero", () => {
+    expect(ricomponiParoleSpezzate("Ascia da Battaglia")).toBe("Ascia da Battaglia");
+    expect(ricomponiParoleSpezzate("Corazza di Piastre")).toBe("Corazza di Piastre");
+  });
+
+  it("non fonde due parole vere che stanno bene così", () => {
+    // "Kit" è corta ma la parola dopo è minuscola: nessuna fusione
+    expect(ricomponiParoleSpezzate("Kit da Erborista")).toBe("Kit da Erborista");
   });
 });

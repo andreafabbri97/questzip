@@ -1,0 +1,66 @@
+{
+  "_nota": "Metamagie dello stregone, nomi come stampati sul Manuale del Giocatore p.110 e sul Calderone di Tasha p.70. Nel Compendio otto delle dieci comparivano ancora col nome inglese perché non erano mai entrate nella cache delle traduzioni. Le voci sono ripetute per l'edizione 2024 (XPHB), che ristampa le stesse opzioni con lo stesso nome inglese.",
+  "kind": "scelteClasse",
+  "voci": {
+    "Careful Spell|PHB": {
+      "nome": "Incantesimo Preciso"
+    },
+    "Careful Spell|XPHB": {
+      "nome": "Incantesimo Preciso"
+    },
+    "Extended Spell|PHB": {
+      "nome": "Incantesimo Esteso"
+    },
+    "Extended Spell|XPHB": {
+      "nome": "Incantesimo Esteso"
+    },
+    "Heightened Spell|PHB": {
+      "nome": "Incantesimo Intensificato"
+    },
+    "Heightened Spell|XPHB": {
+      "nome": "Incantesimo Intensificato"
+    },
+    "Quickened Spell|PHB": {
+      "nome": "Incantesimo Rapido"
+    },
+    "Quickened Spell|XPHB": {
+      "nome": "Incantesimo Rapido"
+    },
+    "Subtle Spell|PHB": {
+      "nome": "Incantesimo Celato"
+    },
+    "Subtle Spell|XPHB": {
+      "nome": "Incantesimo Celato"
+    },
+    "Twinned Spell|PHB": {
+      "nome": "Incantesimo Raddoppiato"
+    },
+    "Twinned Spell|XPHB": {
+      "nome": "Incantesimo Raddoppiato"
+    },
+    "Distant Spell|PHB": {
+      "nome": "Incantesimo Distante"
+    },
+    "Distant Spell|XPHB": {
+      "nome": "Incantesimo Distante"
+    },
+    "Empowered Spell|PHB": {
+      "nome": "Incantesimo Potenziato"
+    },
+    "Empowered Spell|XPHB": {
+      "nome": "Incantesimo Potenziato"
+    },
+    "Seeking Spell|TCE": {
+      "nome": "Incantesimo Mirato"
+    },
+    "Seeking Spell|XPHB": {
+      "nome": "Incantesimo Mirato"
+    },
+    "Transmuted Spell|TCE": {
+      "nome": "Incantesimo Trasmutato"
+    },
+    "Transmuted Spell|XPHB": {
+      "nome": "Incantesimo Trasmutato"
+    }
+  }
+}

@@ -1,0 +1,719 @@
+{
+  "_nota": "Dove stanno, nei manuali italiani, gli elenchi di opzioni delle classi, e come si chiamano in italiano. Nel Compendio 112 di queste voci comparivano ancora col nome inglese perché non erano mai entrate nella cache delle traduzioni. Per ogni voce: \"estratto\" è l'intestazione così come esce dal PDF (a volte con refusi OCR, ed è la chiave con cui lo script ritrova il testo), \"it\" il nome pulito da mostrare, \"en\" la voce 5etools a cui agganciarla. L'abbinamento è stato fatto leggendo la meccanica di ogni opzione, non traducendo il nome: l'ordine alfabetico italiano non corrisponde a quello inglese. Quattro voci avevano l'intestazione resa dall'OCR in maiuscolo misto (\"SuccHIAVITA\", \"Coro RIPETUTO\") e per questo erano sfuggite alla prima passata: si sono ritrovate cercando la meccanica descritta invece del nome.",
+  "sezioni": [
+    {
+      "titolo": "Manovre del Maestro di Battaglia (Manuale del Giocatore)",
+      "libro": "phb",
+      "da": 74,
+      "a": 76,
+      "fonte": "PHB",
+      "voci": [
+        {
+          "estratto": "Attacco Adescante",
+          "it": "Attacco Adescante",
+          "en": "Goading Attack"
+        },
+        {
+          "estratto": "Attacco con Affondo",
+          "it": "Attacco con Affondo",
+          "en": "Lunging Attack"
+        },
+        {
+          "estratto": "Attacco con Finta",
+          "it": "Attacco con Finta",
+          "en": "Feinting Attack"
+        },
+        {
+          "estratto": "Attacco con Manovra",
+          "it": "Attacco con Manovra",
+          "en": "Maneuvering Attack"
+        },
+        {
+          "estratto": "Attacco con Spazzata",
+          "it": "Attacco con Spazzata",
+          "en": "Sweeping Attack"
+        },
+        {
+          "estratto": "Attacco con Spinta",
+          "it": "Attacco con Spinta",
+          "en": "Pushing Attack"
+        },
+        {
+          "estratto": "Attacco Disarmante",
+          "it": "Attacco Disarmante",
+          "en": "Disarming Attack"
+        },
+        {
+          "estratto": "Attacco Minaccioso",
+          "it": "Attacco Minaccioso",
+          "en": "Menacing Attack"
+        },
+        {
+          "estratto": "Attacco Preciso",
+          "it": "Attacco Preciso",
+          "en": "Precision Attack"
+        },
+        {
+          "estratto": "Attacco Sbilanciante",
+          "it": "Attacco Sbilanciante",
+          "en": "Trip Attack"
+        },
+        {
+          "estratto": "Colpo del Comandante",
+          "it": "Colpo del Comandante",
+          "en": "Commander's Strike"
+        },
+        {
+          "estratto": "Colpo Distraente",
+          "it": "Colpo Distraente",
+          "en": "Distracting Strike"
+        },
+        {
+          "estratto": "Incoraggiamento",
+          "it": "Incoraggiamento",
+          "en": "Rally"
+        },
+        {
+          "estratto": "Parata",
+          "it": "Parata",
+          "en": "Parry"
+        },
+        {
+          "estratto": "Replica",
+          "it": "Replica",
+          "en": "Riposte"
+        },
+        {
+          "estratto": "Scarto Elusivo",
+          "it": "Scarto Elusivo",
+          "en": "Evasive Footwork"
+        }
+      ]
+    },
+    {
+      "titolo": "Manovre aggiunte dal Calderone di Tasha",
+      "libro": "tasha",
+      "da": 42,
+      "a": 43,
+      "fonte": "TCE",
+      "voci": [
+        {
+          "estratto": "COLPO AFFERRANTE",
+          "it": "Colpo Afferrante",
+          "en": "Grappling Strike"
+        },
+        {
+          "estratto": "IMBOSCATA",
+          "it": "Imboscata",
+          "en": "Ambush"
+        },
+        {
+          "estratto": "LANCIO RAPIDO",
+          "it": "Lancio Rapido",
+          "en": "Quick Toss"
+        },
+        {
+          "estratto": "PREPARAZIONE",
+          "it": "Preparazione",
+          "en": "Brace"
+        },
+        {
+          "estratto": "PRESENZA IMPONENTE",
+          "it": "Presenza Imponente",
+          "en": "Commanding Presence"
+        },
+        {
+          "estratto": "SCAMBIO",
+          "it": "Scambio",
+          "en": "Bait and Switch"
+        },
+        {
+          "estratto": "VALUTAZIONE TATTICA",
+          "it": "Valutazione Tattica",
+          "en": "Tactical Assessment"
+        }
+      ]
+    },
+    {
+      "titolo": "Stili di combattimento aggiunti dal Calderone di Tasha",
+      "libro": "tasha",
+      "da": 42,
+      "a": 42,
+      "fonte": "TCE",
+      "voci": [
+        {
+          "estratto": "COMBATTERE ALLA CIECA",
+          "it": "Combattere alla Cieca",
+          "en": "Blind Fighting"
+        },
+        {
+          "estratto": "COMBATTERE CON ARMI DA LANCIO",
+          "it": "Combattere con Armi da Lancio",
+          "en": "Thrown Weapon Fighting"
+        },
+        {
+          "estratto": "INTERCETTAZIONE",
+          "it": "Intercettazione",
+          "en": "Interception"
+        },
+        {
+          "estratto": "TECNICA SUPERIORE",
+          "it": "Tecnica Superiore",
+          "en": "Superior Technique"
+        }
+      ]
+    },
+    {
+      "titolo": "Rune del Cavaliere Runico (Calderone di Tasha)",
+      "libro": "tasha",
+      "da": 43,
+      "a": 44,
+      "fonte": "TCE",
+      "voci": [
+        {
+          "estratto": "Runa delle Nuvole",
+          "it": "Runa delle Nuvole",
+          "en": "Cloud Rune"
+        },
+        {
+          "estratto": "Runa del Fuoco",
+          "it": "Runa del Fuoco",
+          "en": "Fire Rune"
+        },
+        {
+          "estratto": "Runa del Gelo",
+          "it": "Runa del Gelo",
+          "en": "Frost Rune"
+        },
+        {
+          "estratto": "Runa delle Pietre",
+          "it": "Runa delle Pietre",
+          "en": "Stone Rune"
+        },
+        {
+          "estratto": "Runa delle Colline",
+          "it": "Runa delle Colline",
+          "en": "Hill Rune"
+        },
+        {
+          "estratto": "Runa delle Tempeste",
+          "it": "Runa delle Tempeste",
+          "en": "Storm Rune"
+        }
+      ]
+    },
+    {
+      "titolo": "Discipline elementali del Monaco (Manuale del Giocatore)",
+      "libro": "phb",
+      "da": 94,
+      "a": 95,
+      "fonte": "PHB",
+      "voci": [
+        {
+          "estratto": "Cavalcare il Vento",
+          "it": "Cavalcare il Vento",
+          "en": "Ride the Wind"
+        },
+        {
+          "estratto": "Colpo della Cenere Turbinante",
+          "it": "Colpo della Cenere Turbinante",
+          "en": "Sweeping Cinder Strike"
+        },
+        {
+          "estratto": "Difesa della Montagna Eterna",
+          "it": "Difesa della Montagna Eterna",
+          "en": "Eternal Mountain Defense"
+        },
+        {
+          "estratto": "Fiamme della Fenice",
+          "it": "Fiamme della Fenice",
+          "en": "Flames of the Phoenix"
+        },
+        {
+          "estratto": "Fiume della Fiamma Famelica",
+          "it": "Fiume della Fiamma Famelica",
+          "en": "River of Hungry Flame"
+        },
+        {
+          "estratto": "Forma del Fiume Fluente",
+          "it": "Forma del Fiume Fluente",
+          "en": "Shape the Flowing River"
+        },
+        {
+          "estratto": "Frusta d'll.cqua",
+          "it": "Frusta d'Acqua",
+          "en": "Water Whip"
+        },
+        {
+          "estratto": "Gong della Sommità",
+          "it": "Gong della Sommità",
+          "en": "Gong of the Summit"
+        },
+        {
+          "estratto": "Morsa del Vento del Nord",
+          "it": "Morsa del Vento del Nord",
+          "en": "Clench of the North Wind"
+        },
+        {
+          "estratto": "Onda della Terra Tumultuosa",
+          "it": "Onda della Terra Tumultuosa",
+          "en": "Wave of Rolling Earth"
+        },
+        {
+          "estratto": "Postura della Nebbia",
+          "it": "Postura della Nebbia",
+          "en": "Mist Stance"
+        },
+        {
+          "estratto": "Pugno dei Quattro Tuoni",
+          "it": "Pugno dei Quattro Tuoni",
+          "en": "Fist of Four Thunders"
+        },
+        {
+          "estratto": "Pugno dell'll.ria Inviolabile",
+          "it": "Pugno dell'Aria Inviolabile",
+          "en": "Fist of Unbroken Air"
+        },
+        {
+          "estratto": "Sintonia Elementale",
+          "it": "Sintonia Elementale",
+          "en": "Elemental Attunement"
+        },
+        {
+          "estratto": "Sofflo dell'Inverno",
+          "it": "Soffio dell'Inverno",
+          "en": "Breath of Winter"
+        },
+        {
+          "estratto": "Spiriti della Burrasca Impetuosa",
+          "it": "Spiriti della Burrasca Impetuosa",
+          "en": "Rush of the Gale Spirits"
+        },
+        {
+          "estratto": "Zanne del Serpente di Fuoco",
+          "it": "Zanne del Serpente di Fuoco",
+          "en": "Fangs of the Fire Snake"
+        },
+        {
+          "estratto": "Pugno dell'll.ria Inviolabile",
+          "it": "Pugno dell'Aria Inviolabile",
+          "en": "Unbroken Air"
+        }
+      ]
+    },
+    {
+      "titolo": "Suppliche occulte del Warlock (Manuale del Giocatore)",
+      "libro": "phb",
+      "da": 118,
+      "a": 120,
+      "fonte": "PHB",
+      "voci": [
+        {
+          "estratto": "ARMATURA DELLE OMBRE",
+          "it": "Armatura delle Ombre",
+          "en": "Armor of Shadows"
+        },
+        {
+          "estratto": "BALZO ULTRATERRENO",
+          "it": "Balzo Ultraterreno",
+          "en": "Otherworldly Leap"
+        },
+        {
+          "estratto": "CATENE DI CARCERI",
+          "it": "Catene di Carceri",
+          "en": "Chains of Carceri"
+        },
+        {
+          "estratto": "DEFLAGRAZIONE AGONIZZANTE",
+          "it": "Deflagrazione Agonizzante",
+          "en": "Agonizing Blast"
+        },
+        {
+          "estratto": "DEFLAGRAZIONE RESPINGENTE",
+          "it": "Deflagrazione Respingente",
+          "en": "Repelling Blast"
+        },
+        {
+          "estratto": "FARDELLO MENTALE",
+          "it": "Fardello Mentale",
+          "en": "Mire the Mind"
+        },
+        {
+          "estratto": "INFLUENZA SEDUCENTE",
+          "it": "Influenza Seducente",
+          "en": "Beguiling Influence"
+        },
+        {
+          "estratto": "LADRO DEI CINQUE FATI",
+          "it": "Ladro dei Cinque Fati",
+          "en": "Thief of Five Fates"
+        },
+        {
+          "estratto": "LAMA ASSETATA",
+          "it": "Lama Assetata",
+          "en": "Thirsting Blade"
+        },
+        {
+          "estratto": "LANCIA OCCULTA",
+          "it": "Lancia Occulta",
+          "en": "Eldritch Spear"
+        },
+        {
+          "estratto": "LIBRO DEGLI ANTICHI SEGRETI",
+          "it": "Libro degli Antichi Segreti",
+          "en": "Book of Ancient Secrets"
+        },
+        {
+          "estratto": "LINGUE DELLE BESTIE",
+          "it": "Lingue delle Bestie",
+          "en": "Beast Speech"
+        },
+        {
+          "estratto": "MAESTRO DI MILLE FORME",
+          "it": "Maestro di Mille Forme",
+          "en": "Master of Myriad Forms"
+        },
+        {
+          "estratto": "MASCHERA DEI MOLTI VOLTI",
+          "it": "Maschera dei Molti Volti",
+          "en": "Mask of Many Faces"
+        },
+        {
+          "estratto": "PAROLA TEMIBILE",
+          "it": "Parola Temibile",
+          "en": "Dreadful Word"
+        },
+        {
+          "estratto": "PASSO ASCENDENTE",
+          "it": "Passo Ascendente",
+          "en": "Ascendant Step"
+        },
+        {
+          "estratto": "PRESAGIO DI SVENTURA",
+          "it": "Presagio di Sventura",
+          "en": "Sign of Ill Omen"
+        },
+        {
+          "estratto": "SCULTORE DELLA CARNE",
+          "it": "Scultore della Carne",
+          "en": "Sculptor of Flesh"
+        },
+        {
+          "estratto": "SERVITORI DEL CAOS",
+          "it": "Servitori del Caos",
+          "en": "Minions of Chaos"
+        },
+        {
+          "estratto": "SGUARDO DELLE DUE MENTI",
+          "it": "Sguardo delle Due Menti",
+          "en": "Gaze of Two Minds"
+        },
+        {
+          "estratto": "SUSSURRI DALLA TOMBA",
+          "it": "Sussurri dalla Tomba",
+          "en": "Whispers of the Grave"
+        },
+        {
+          "estratto": "SUSSURRI STREGATI",
+          "it": "Sussurri Stregati",
+          "en": "Bewitching Whispers"
+        },
+        {
+          "estratto": "TUTT'UNO CON LE OMBRE",
+          "it": "Tutt'uno con le Ombre",
+          "en": "One with Shadows"
+        },
+        {
+          "estratto": "VIGORE IMMONDO",
+          "it": "Vigore Immondo",
+          "en": "Fiendish Vigor"
+        },
+        {
+          "estratto": "VISIONE DEI REAMI LONTANI",
+          "it": "Visione dei Reami Lontani",
+          "en": "Visions of Distant Realms"
+        },
+        {
+          "estratto": "VISIONI VELATE",
+          "it": "Visioni Velate",
+          "en": "Misty Visions"
+        },
+        {
+          "estratto": "VISTA DEL DIAVOLO",
+          "it": "Vista del Diavolo",
+          "en": "Devil's Sight"
+        },
+        {
+          "estratto": "VISTA DELL'OCCULTO",
+          "it": "Vista dell'Occulto",
+          "en": "Eldritch Sight"
+        },
+        {
+          "estratto": "VISTA STREGATA",
+          "it": "Vista Stregata",
+          "en": "Witch Sight"
+        },
+        {
+          "estratto": "VOCE DEL SIGNORE DELLE CATENE",
+          "it": "Voce del Signore delle Catene",
+          "en": "Voice of the Chain Master"
+        },
+        {
+          "estratto": "SuccHIAVITA",
+          "it": "Succhiavita",
+          "en": "Lifedrinker"
+        }
+      ]
+    },
+    {
+      "titolo": "Infusioni dell'Artefice (Calderone di Tasha)",
+      "libro": "tasha",
+      "da": 20,
+      "a": 23,
+      "fonte": "TCE",
+      "voci": [
+        {
+          "estratto": "ANELLO RICGARIGA INGANTESIMI",
+          "it": "Anello Ricarica Incantesimi",
+          "en": "Spell-Refueling Ring"
+        },
+        {
+          "estratto": "ARMA MIGLIORATA",
+          "it": "Arma Migliorata",
+          "en": "Enhanced Weapon"
+        },
+        {
+          "estratto": "ARMA SPLENDENTE",
+          "it": "Arma Splendente",
+          "en": "Radiant Weapon"
+        },
+        {
+          "estratto": "ARMATURA A PROPULSIONE ARCANA",
+          "it": "Armatura a Propulsione Arcana",
+          "en": "Arcane Propulsion Armor"
+        },
+        {
+          "estratto": "ARMATURA DELLA FORZA MAGICA",
+          "it": "Armatura della Forza Magica",
+          "en": "Armor of Magical Strength"
+        },
+        {
+          "estratto": "ARMATURA RESISTENTE",
+          "it": "Armatura Resistente",
+          "en": "Resistant Armor"
+        },
+        {
+          "estratto": "DIFESA MIGLIORATA",
+          "it": "Difesa Migliorata",
+          "en": "Enhanced Defense"
+        },
+        {
+          "estratto": "ELMO DELLA CONSAPEVOLEZZA",
+          "it": "Elmo della Consapevolezza",
+          "en": "Helm of Awareness"
+        },
+        {
+          "estratto": "MENTE ACUTA",
+          "it": "Mente Acuta",
+          "en": "Mind Sharpener"
+        },
+        {
+          "estratto": "REPLICARE UN OGGETTO MAGICO",
+          "it": "Replicare un Oggetto Magico",
+          "en": "Replicate Magic Item"
+        },
+        {
+          "estratto": "RITORNO DELLARMA",
+          "it": "Ritorno dell'Arma",
+          "en": "Returning Weapon"
+        },
+        {
+          "estratto": "SCUDO DELLA REPULSIONE",
+          "it": "Scudo della Repulsione",
+          "en": "Repulsion Shield"
+        },
+        {
+          "estratto": "SERVO OMUNCOLO",
+          "it": "Servo Omuncolo",
+          "en": "Homunculus Servant"
+        },
+        {
+          "estratto": "STIVALI DEL SENTIERO TORTUOSO",
+          "it": "Stivali del Sentiero Tortuoso",
+          "en": "Boots of the Winding Path"
+        },
+        {
+          "estratto": "Focus ARCANO MIGLIORATO",
+          "it": "Focus Arcano Migliorato",
+          "en": "Enhanced Arcane Focus"
+        },
+        {
+          "estratto": "Coro RIPETUTO",
+          "it": "Colpo Ripetuto",
+          "en": "Repeating Shot"
+        }
+      ]
+    },
+    {
+      "titolo": "Opzioni di Tiro Arcano dell'Arciere Arcano (Guida di Xanathar)",
+      "libro": "xanathar",
+      "da": 28,
+      "a": 30,
+      "fonte": "XGE",
+      "voci": [
+        {
+          "estratto": "Freccia Afferrante",
+          "it": "Freccia Afferrante",
+          "en": "Grasping Arrow"
+        },
+        {
+          "estratto": "Freccia Ammaliante",
+          "it": "Freccia Ammaliante",
+          "en": "Beguiling Arrow"
+        },
+        {
+          "estratto": "Freccia Cercatrice",
+          "it": "Freccia Cercatrice",
+          "en": "Seeking Arrow"
+        },
+        {
+          "estratto": "Freccia d'Ombra",
+          "it": "Freccia d'Ombra",
+          "en": "Shadow Arrow"
+        },
+        {
+          "estratto": "Freccia Esiliante",
+          "it": "Freccia Esiliante",
+          "en": "Banishing Arrow"
+        },
+        {
+          "estratto": "Freccia Esplosiva",
+          "it": "Freccia Esplosiva",
+          "en": "Bursting Arrow"
+        },
+        {
+          "estratto": "Freccia Indebolente",
+          "it": "Freccia Indebolente",
+          "en": "Enfeebling Arrow"
+        },
+        {
+          "estratto": "Freccia Perforante",
+          "it": "Freccia Perforante",
+          "en": "Piercing Arrow"
+        }
+      ]
+    },
+    {
+      "titolo": "Suppliche occulte della Guida di Xanathar",
+      "libro": "xanathar",
+      "da": 59,
+      "a": 61,
+      "fonte": "XGE",
+      "voci": [
+        {
+          "estratto": "DONO DEGLI IMPERITURI",
+          "it": "Dono degli Imperituri",
+          "en": "Gift of the Ever-Living Ones"
+        },
+        {
+          "estratto": "DONO DELLE PROFONDITÀ",
+          "it": "Dono delle Profondità",
+          "en": "Gift of the Depths"
+        },
+        {
+          "estratto": "LANCIA DELLA LETARGIA",
+          "it": "Lancia della Letargia",
+          "en": "Lance of Lethargy"
+        },
+        {
+          "estratto": "SGUARDO FANTASMA",
+          "it": "Sguardo Fantasma",
+          "en": "Ghostly Gaze"
+        },
+        {
+          "estratto": "SORTILEGIO DELLA PAZZIA",
+          "it": "Sortilegio della Pazzia",
+          "en": "Maddening Hex"
+        },
+        {
+          "estratto": "SORTILEGIO IMPLACABILE",
+          "it": "Sortilegio Implacabile",
+          "en": "Relentless Hex"
+        },
+        {
+          "estratto": "STRETTA DI BADAR",
+          "it": "Stretta di Hadar",
+          "en": "Grasp of Hadar"
+        }
+      ]
+    },
+    {
+      "titolo": "Suppliche occulte e dono del patto del Calderone di Tasha",
+      "libro": "tasha",
+      "da": 74,
+      "a": 76,
+      "fonte": "TCE",
+      "voci": [
+        {
+          "estratto": "CASTIGO DEL TALISMANO",
+          "it": "Castigo del Talismano",
+          "en": "Rebuke of the Talisman"
+        },
+        {
+          "estratto": "DONO DEL PROTETTORE",
+          "it": "Dono del Protettore",
+          "en": "Gift of the Protectors"
+        },
+        {
+          "estratto": "INVESTITURA DEL SIGNORE DELLE CATENE",
+          "it": "Investitura del Signore delle Catene",
+          "en": "Investment of the Chain Master"
+        },
+        {
+          "estratto": "SCHIAVITU IMMORTALE",
+          "it": "Schiavitù Immortale",
+          "en": "Undying Servitude"
+        },
+        {
+          "estratto": "LEGAME DEL TALISMANO",
+          "it": "Legame del Talismano",
+          "en": "Bond of the Talisman"
+        },
+        {
+          "estratto": "PROTEZIONE DEL TALISMANO",
+          "it": "Protezione del Talismano",
+          "en": "Ward of the Talisman"
+        },
+        {
+          "estratto": "MENTE OCCULTA",
+          "it": "Mente Occulta",
+          "en": "Eldritch Mind"
+        },
+        {
+          "estratto": "PATTO DEL TALISMANO",
+          "it": "Patto del Talismano",
+          "en": "Pact of the Talisman"
+        },
+        {
+          "estratto": "ScRITTURA LONTANA",
+          "it": "Scrittura Lontana",
+          "en": "Far Scribe"
+        }
+      ]
+    },
+    {
+      "titolo": "Stile di combattimento mancante (Manuale del Giocatore)",
+      "libro": "phb",
+      "da": 72,
+      "a": 73,
+      "fonte": "PHB",
+      "voci": [
+        {
+          "estratto": "Combattere con Armi Possenti",
+          "it": "Combattere con Armi Possenti",
+          "en": "Great Weapon Fighting"
+        }
+      ]
+    }
+  ]
+}
