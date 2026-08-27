@@ -10,6 +10,7 @@
 //   Il file è { "kind": "...", "voci": { "Nome Inglese|FONTE": "testo italiano", ... } }
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { neon } from "@neondatabase/serverless";
 
 const sql = neon(process.env.DATABASE_URL);
@@ -21,6 +22,18 @@ if (!file) {
 }
 
 const dati = JSON.parse(readFileSync(path.resolve(file), "utf-8"));
+// Come sopra: i testi dei manuali vivono sotto parsed/ (gitignored), i file di mappatura tracciati
+// portano solo i nomi. Se manca il testo nella voce, lo si cerca lì per chiave.
+const trascritti = (() => {
+  try {
+    const tutti = JSON.parse(
+      readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "parsed", "testi-trascritti.json"), "utf-8"),
+    );
+    return Object.assign({}, ...Object.values(tutti));
+  } catch {
+    return {};
+  }
+})();
 const { kind, voci } = dati;
 if (!kind || !voci) {
   console.error('il file deve avere la forma { "kind": "...", "voci": { "Nome|FONTE": "testo" } }');
@@ -35,7 +48,7 @@ for (const [chiave, valore] of Object.entries(voci)) {
   // Il valore può essere il solo testo, oppure { nome, testo } quando anche il NOME va corretto:
   // leggendo i manuali si scopre che alcune traduzioni automatiche non erano quelle stampate
   // (Archery è "Tiro" nel Manuale del Giocatore, non "Tiro con l'Arco").
-  const testo = typeof valore === "string" ? valore : valore?.testo;
+  const testo = typeof valore === "string" ? valore : (valore?.testo ?? trascritti[chiave] ?? trascritti[valore?.nome]);
   const nome = typeof valore === "string" ? null : valore?.nome;
   if (!name || !source || !testo?.trim()) continue;
   const esiste = await sql`

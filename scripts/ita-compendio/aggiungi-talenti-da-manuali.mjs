@@ -35,6 +35,16 @@ const perNome = new Map(
 );
 
 const mappa = JSON.parse(readFileSync(path.join(SCRIPT_DIR, `mappa-talenti-${libro}.json`), "utf-8"));
+// I testi trascritti a mano stanno sotto parsed/ (gitignored) e non dentro la mappa: sono paragrafi
+// interi dei manuali, e questo repository è pubblico. La mappa qui tracciata contiene solo
+// l'abbinamento dei nomi, che è lavoro nostro.
+const trascritti = (() => {
+  try {
+    return JSON.parse(readFileSync(path.join(SCRIPT_DIR, "parsed", "testi-trascritti.json"), "utf-8")).talenti ?? {};
+  } catch {
+    return {};
+  }
+})();
 const parsed = JSON.parse(readFileSync(path.join(SCRIPT_DIR, "parsed", `${libro}-talenti.json`), "utf-8"));
 const voci = new Map(parsed.map((t) => [t.nome, t]));
 
@@ -57,7 +67,7 @@ for (const [nomeParsato, valore] of Object.entries(mappa)) {
   // una voce può portarsi dietro il proprio testo: serve per i pochi talenti il cui titolo, nel
   // PDF, è stampato in tondo invece che in maiuscoletto e che quindi il parser non vede come
   // intestazione (il Cuoco del Calderone di Tasha). In quei casi il testo è trascritto a mano.
-  const testoAMano = typeof valore === "object" ? valore.testo : null;
+  const testoAMano = (typeof valore === "object" ? valore.testo : null) ?? trascritti[nomeItaliano] ?? null;
   if (!scheda && !testoAMano) { saltati.push(`${nomeParsato} — non è fra le voci estratte`); continue; }
   if (!perNome.has(nomeInglese)) { saltati.push(`${nomeParsato} — "${nomeInglese}" non è un talento ${FONTI[libro]}`); continue; }
   if (giaInTabella.has(nomeItaliano) || giaAgganciati.has(nomeInglese)) { saltati.push(`${nomeParsato} — già in tabella`); continue; }

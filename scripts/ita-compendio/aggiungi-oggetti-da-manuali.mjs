@@ -4,7 +4,11 @@
 // illeggibili (vedi decode_dm_manual.py e la voce di roadmap, tentativo chiuso senza successo).
 // L'unica fonte OCR già in archivio, extracted/oggetti_magici.json, è un estratto parziale e copre
 // 210 delle circa 360 schede del catalogo "OGGETTI MAGICI A-Z". Le mancanti sono state lette
-// direttamente dalle pagine rese in immagine e trascritte in oggetti-dm-manuale.json.
+// direttamente dalle pagine rese in immagine e trascritte in parsed/oggetti-dm-manuale.json.
+//
+// Il file sta sotto parsed/, che è gitignored: contiene il testo integrale delle schede del
+// manuale, e questo repository è pubblico. Vale la stessa regola dei PDF — il testo dei manuali
+// resta in locale e nel database privato, mai nel codice pubblicato.
 //
 // Prima di scrivere, ogni voce viene verificata contro 5etools: rarità e necessità di sintonia sono
 // dati identici nelle due edizioni, quindi se non tornano l'abbinamento al nome inglese è sbagliato
@@ -52,7 +56,7 @@ for (const v of varianti.magicvariant ?? []) {
   if (nome && !perNome.has(nome)) perNome.set(nome, { ...v.inherits, name: nome, source: v.inherits?.source ?? "DMG" });
 }
 
-const dati = JSON.parse(readFileSync(path.join(SCRIPT_DIR, "oggetti-dm-manuale.json"), "utf-8"));
+const dati = JSON.parse(readFileSync(path.join(SCRIPT_DIR, "parsed", "oggetti-dm-manuale.json"), "utf-8"));
 const esistenti = await sql`SELECT nome, nome_inglese FROM compendio_ita_oggetto`;
 const giaInTabella = new Set(esistenti.map((r) => r.nome));
 const giaAgganciati = new Set(esistenti.filter((r) => r.nome_inglese).map((r) => r.nome_inglese));
