@@ -3,7 +3,11 @@ import { stripTags } from "@/lib/fivetools/tags";
 
 export function formatTableCell(cell: TableCell | undefined): string {
   if (cell === undefined || cell === "") return "—";
-  if (typeof cell === "string" || typeof cell === "number") return String(cell);
+  // stripTags anche qui: nelle tabelle di classe la colonna "livello slot" contiene un tag di
+  // collegamento ({@filter 5th|spells|level=5|class=Warlock}), che senza questa conversione
+  // finiva a schermo tale e quale al posto del semplice "5th".
+  if (typeof cell === "string") return stripTags(cell);
+  if (typeof cell === "number") return String(cell);
   if (cell.type === "bonus") return cell.value !== undefined ? `+${cell.value}` : "—";
   return cell.value !== undefined ? String(cell.value) : "—";
 }

@@ -310,11 +310,19 @@ async function translateDescriptionsBatch(kind, items, fewShot) {
   const examples = fewShot.length > 0
     ? `Esempi di terminologia ufficiale già in uso in questa categoria (per coerenza di stile):\n${fewShot.map(([en, it]) => `- ${en} -> ${it}`).join("\n")}\n\n`
     : "";
-  const list = items.map((it, i) => `${i + 1}. [${it.name}]\n${it.text}`).join("\n\n");
-  const prompt = `Sei un traduttore esperto di Dungeons & Dragons 5ª edizione. Traduci in italiano queste ${items.length} descrizioni di ${KIND_LABELS[kind]}, usando la terminologia ufficiale italiana del gioco (non una traduzione letterale parola per parola).\n\n${examples}Rispondi SOLO con un array JSON di ${items.length} stringhe (il testo tradotto di ciascuna voce), NELLO STESSO ORDINE della lista qui sotto — un elemento per voce, senza aggiungerne o toglierne:\n\n${list}`;
+  // Chiave "nome|fonte", NON la posizione nell'array. Prima si chiedeva un array "nello stesso
+  // ordine" e si abbinava per indice: il controllo sulla lunghezza non accorge di un riordino né
+  // di una voce saltata e una aggiunta, e in quel caso TUTTE le descrizioni successive slittano
+  // di uno — nel Compendio il talento "Adepto Occulto" si è ritrovato addosso il testo di
+  // "Resistente" (segnalato dall'utente). Con una chiave esplicita una voce mancante resta
+  // semplicemente senza traduzione, invece di rubare quella del vicino. La fonte serve nella
+  // chiave perché lo stesso nome esiste in più manuali (es. "Durable" in PHB e XPHB).
+  const list = items.map((it) => `### ${it.name}|${it.source}\n${it.text}`).join("\n\n");
+  const prompt = `Sei un traduttore esperto di Dungeons & Dragons 5ª edizione. Traduci in italiano queste ${items.length} descrizioni di ${KIND_LABELS[kind]}, usando la terminologia ufficiale italiana del gioco (non una traduzione letterale parola per parola).\n\n${examples}Rispondi SOLO con un oggetto JSON: la chiave è l'identificatore ESATTO che precede ogni voce (la riga che comincia con ###, senza i cancelletti), il valore è la traduzione italiana di quella voce. Includi tutte e ${items.length} le voci.\n\n${list}`;
   const raw = await askGemini({ prompt });
   const parsed = parseJsonResponse(raw);
-  return Array.isArray(parsed) && parsed.length === items.length ? parsed : null;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed;
 }
 
 async function ensureQueueRows(kind, entries, dryRun) {
@@ -437,14 +445,24 @@ async function translateDescriptionsForCategory(kind, rawByKey, dryRun) {
       batch = [];
       throw new StopForToday();
     }
-    for (let i = 0; i < batch.length; i++) {
+    let scritte = 0;
+    for (const voce of batch) {
+      // Abbinamento per chiave, mai per posizione: una voce che il modello ha saltato resta
+      // senza traduzione (la riprende il prossimo giro) invece di prendersi quella della voce
+      // successiva e far slittare tutto il resto del batch.
+      const tradotta = translations[`${voce.name}|${voce.source}`];
+      if (typeof tradotta !== "string" || !tradotta.trim()) continue;
+      scritte++;
       if (dryRun) continue;
       await db
         .update(compendioTraduzioniIa)
-        .set({ descrizioneIta: translations[i] ?? "", updatedAt: new Date() })
-        .where(and(eq(compendioTraduzioniIa.kind, kind), eq(compendioTraduzioniIa.name, batch[i].name), eq(compendioTraduzioniIa.source, batch[i].source)));
+        .set({ descrizioneIta: tradotta, updatedAt: new Date() })
+        .where(and(eq(compendioTraduzioniIa.kind, kind), eq(compendioTraduzioniIa.name, voce.name), eq(compendioTraduzioniIa.source, voce.source)));
     }
-    console.log(`  Descrizioni: ${batch.length} tradotte in questo batch.`);
+    const saltate = batch.length - scritte;
+    console.log(
+      `  Descrizioni: ${scritte} tradotte in questo batch${saltate > 0 ? ` (${saltate} non restituite dal modello, riprovate al prossimo giro)` : ""}.`,
+    );
     batch = [];
     batchChars = 0;
     await sleep(CALL_DELAY_MS);

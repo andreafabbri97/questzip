@@ -1234,7 +1234,7 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
         <p className="text-xs font-bold text-accent-strong">
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
-        {ufficiale.prerequisito && <Stat label="Prerequisiti" value={ufficiale.prerequisito} />}
+        <Stat label="Prerequisiti" value={ufficiale.prerequisito || NESSUN_PREREQUISITO} />
         <div className="border-t border-edge pt-3 space-y-2">
           <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
           <TestoStrutturato testo={ufficiale.descrizione} />
@@ -1246,7 +1246,7 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        {prerequisite && <Stat label="Prerequisiti" value={prerequisite} />}
+        <Stat label="Prerequisiti" value={prerequisite || NESSUN_PREREQUISITO} />
         {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
       </div>
       <div className="border-t border-edge pt-3">
@@ -1255,6 +1255,13 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
     </>
   );
 }
+
+// I talenti in 5e NON sono legati a una classe: si prendono al posto di un Aumento dei Punteggi
+// di Caratteristica, e chiunque può prendere quelli senza prerequisiti. Prima, quando prerequisiti
+// non ce n'erano, la riga spariva e basta — e dall'assenza non si capisce se il talento sia aperto
+// a tutti o se il dato manchi (dubbio sollevato dall'utente: "come faccio a capire per quali
+// classi sono?"). Dirlo esplicitamente costa una riga e toglie l'ambiguità.
+const NESSUN_PREREQUISITO = "Nessuno — qualsiasi classe o razza";
 
 const CLASS_ABILITY_NAMES: Record<string, string> = {
   str: "Forza",
@@ -1271,6 +1278,126 @@ function buildTableColumns(cls: RawClass) {
   const getCells = (levelIndex: number) =>
     groups.flatMap((g) => (g.rows ?? g.rowsSpellProgression ?? [])[levelIndex] ?? []);
   return { labels, getCells };
+}
+
+// Le intestazioni delle colonne arrivano in inglese dai dati 5etools: in un compendio italiano
+// stonavano parecchio ("CANTRIPS KNOWN", "1ST", "INFUSIONS KNOWN"). Elenco chiuso delle etichette
+// che compaiono davvero nelle tabelle delle classi; quelle non previste restano com'erano.
+const ETICHETTE_COLONNA: Record<string, string> = {
+  "cantrips known": "Trucchetti",
+  "spells known": "Incantesimi noti",
+  "spell slots": "Slot",
+  "spell slots per spell level": "Slot per livello",
+  "slot level": "Livello slot",
+  "slots": "Slot",
+  "invocations known": "Suppliche",
+  "infusions known": "Infusioni note",
+  "infused items": "Oggetti infusi",
+  "rages": "Ire",
+  "rage damage": "Danno da Ira",
+  "martial arts": "Arti marziali",
+  "ki points": "Punti Ki",
+  "unarmored movement": "Movimento senza armatura",
+  "sneak attack": "Attacco furtivo",
+  "sorcery points": "Punti stregoneria",
+  "bardic inspiration": "Ispirazione bardica",
+  "song of rest": "Canto del riposo",
+  "magical secrets": "Segreti magici",
+  "features": "Privilegi",
+  "proficiency bonus": "Bonus competenza",
+  "psi points": "Punti psionici",
+  "psi limit": "Limite psionico",
+  "talents known": "Talenti noti",
+  "disciplines known": "Discipline note",
+};
+
+/** "1st" -> "1°": gli ordinali inglesi compaiono sia nelle intestazioni delle colonne degli slot
+ * sia nelle celle della colonna "livello slot". */
+function ordinaleItaliano(testo: string): string {
+  const m = testo.trim().match(/^(\d+)(st|nd|rd|th)$/i);
+  return m ? `${m[1]}°` : testo;
+}
+
+function etichettaColonna(label: string, italiano: boolean): string {
+  if (!italiano) return label;
+  const chiave = label.trim().toLowerCase();
+  const ordinale = ordinaleItaliano(chiave);
+  if (ordinale !== chiave) return ordinale;
+  return ETICHETTE_COLONNA[chiave] ?? label;
+}
+
+/**
+ * Tabella di progressione della classe, quella vera del manuale: un livello per riga e TUTTE le
+ * colonne (bonus di competenza, trucchetti, incantesimi noti, slot per grado, suppliche…).
+ *
+ * I numeri vengono sempre dai dati strutturati di 5etools, anche quando il Compendio ha il testo
+ * ufficiale italiano: dal PDF italiano erano stati estratti solo i privilegi e il bonus di
+ * competenza, quindi la "tabella" mostrata era in realtà un elenco «Liv. N — privilegi» che
+ * ripeteva quanto già scritto sotto e non diceva nulla su slot e incantesimi (segnalato
+ * dall'utente su warlock e ladro). I numeri sono gli stessi in ogni lingua, i NOMI no: per quelli
+ * si usa la resa ufficiale italiana quando c'è.
+ */
+function TabellaProgressione({
+  cls,
+  nomiPerLivello,
+  italiano,
+}: {
+  cls: RawClass;
+  nomiPerLivello: (livello: number) => string[];
+  italiano: boolean;
+}) {
+  const columns = buildTableColumns(cls);
+  return (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">Progressione</p>
+      <div className="overflow-x-auto rounded-lg border border-edge">
+        <table className="w-full text-sm @2xl:text-xs">
+          <thead>
+            <tr className="bg-surface-raised">
+              <th className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted">
+                Liv.
+              </th>
+              <th className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">
+                Bonus comp.
+              </th>
+              {columns.labels.map((label, index) => (
+                <th
+                  key={`${label}-${index}`}
+                  className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap"
+                >
+                  {etichettaColonna(label, italiano)}
+                </th>
+              ))}
+              <th className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted">
+                Privilegi
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 20 }, (_, index) => index + 1).map((level) => (
+              <tr key={level} className={level % 2 === 0 ? "bg-surface" : "bg-surface-raised/40"}>
+                <td className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 font-bold text-foreground">{level}</td>
+                <td className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-muted">
+                  {formatModifier(proficiencyBonus(level))}
+                </td>
+                {columns.getCells(level - 1).map((cell, index) => (
+                  <td
+                    key={index}
+                    className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-foreground whitespace-nowrap"
+                  >
+                    {italiano ? ordinaleItaliano(formatTableCell(cell)) : formatTableCell(cell)}
+                  </td>
+                ))}
+                <td className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-foreground">
+                  {nomiPerLivello(level).join(", ") || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
@@ -1363,27 +1490,17 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
         {ufficiale.equipaggiamento && (
           <p className="text-sm text-muted">{ufficiale.equipaggiamento}</p>
         )}
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-widest text-muted">Progressione</p>
-          <p className="text-xs text-muted">
-            Tabella ricostruita dal PDF: alcuni livelli senza nuovi privilegi non sono mostrati.
-          </p>
-          <div className="space-y-1.5">
-            {livelli
-              .filter((l) => l.privilegi.length > 0)
-              .map((l) => (
-                <div
-                  key={l.livello}
-                  className="flex items-start gap-3 rounded-lg border border-edge bg-surface-raised px-3 py-2"
-                >
-                  <span className="text-sm font-bold text-accent-strong shrink-0 w-16">
-                    Liv. {l.livello}
-                  </span>
-                  <span className="text-sm text-foreground">{l.privilegi.join(", ")}</span>
-                </div>
-              ))}
-          </div>
-        </div>
+        {/* I nomi dei privilegi sono quelli ufficiali italiani estratti dal manuale; le colonne
+            numeriche vengono dai dati 5etools, perché dal PDF non erano state estratte affatto. */}
+        <TabellaProgressione
+          cls={cls}
+          italiano
+          nomiPerLivello={(livello) =>
+            livelli.find((l) => l.livello === livello)?.privilegi ??
+            iaFeaturesByLevel?.get(livello)?.map((f) => f.name) ??
+            []
+          }
+        />
         {iaFeaturesByLevel && (
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-widest text-muted">Caratteristiche di classe</p>
@@ -1420,8 +1537,6 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
     list.push(feature.name);
     featuresByLevel.set(feature.level, list);
   }
-  const columns = buildTableColumns(cls);
-
   return (
     <>
       <div className="grid grid-cols-2 @sm:grid-cols-3 @2xl:grid-cols-6 gap-3">
@@ -1439,58 +1554,13 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
       </div>
 
       {classFeatures.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-widest text-muted">Progressione</p>
-          <div className="overflow-x-auto rounded-lg border border-edge">
-            <table className="w-full text-sm @2xl:text-xs">
-              <thead>
-                <tr className="bg-surface-raised">
-                  <th className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted">
-                    Liv.
-                  </th>
-                  <th className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">
-                    Bonus comp.
-                  </th>
-                  {columns.labels.map((label, index) => (
-                    <th
-                      key={`${label}-${index}`}
-                      className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted whitespace-nowrap"
-                    >
-                      {label}
-                    </th>
-                  ))}
-                  <th className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-left text-[10px] uppercase tracking-widest text-muted">
-                    Caratteristiche
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: 20 }, (_, index) => index + 1).map((level) => (
-                  <tr
-                    key={level}
-                    className={level % 2 === 0 ? "bg-surface" : "bg-surface-raised/40"}
-                  >
-                    <td className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 font-bold text-foreground">{level}</td>
-                    <td className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-muted">
-                      {formatModifier(proficiencyBonus(level))}
-                    </td>
-                    {columns.getCells(level - 1).map((cell, index) => (
-                      <td key={index} className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-foreground whitespace-nowrap">
-                        {formatTableCell(cell)}
-                      </td>
-                    ))}
-                    <td className="px-3 py-2 @2xl:px-2 @2xl:py-1.5 text-foreground">
-                      {(iaFeaturesByLevel?.get(level)?.map((f) => f.name) ??
-                        featuresByLevel.get(level) ??
-                        []
-                      ).join(", ") || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <TabellaProgressione
+          cls={cls}
+          italiano={language === "it"}
+          nomiPerLivello={(level) =>
+            iaFeaturesByLevel?.get(level)?.map((f) => f.name) ?? featuresByLevel.get(level) ?? []
+          }
+        />
       )}
 
       {classFeatures.length > 0 && (
