@@ -15,6 +15,9 @@ const VOCI = [
   { tab: "Mostri", inglese: "Aboleth", italiano: "Aboleth" },
   { tab: "Talenti", inglese: "Chef", italiano: "Cuoco" },
   { tab: "Talenti", inglese: "Dungeon Delver", italiano: "Esperto di Dungeon" },
+  // oggetti letti a mano dalle pagine del Manuale del DM (il PDF ha il font offuscato)
+  { tab: "Oggetti magici", inglese: "Wand of Orcus", italiano: "Bacchetta di Orcus" },
+  { tab: "Oggetti magici", inglese: "Portable Hole", italiano: "Buco Portatile" },
 ];
 
 for (const voce of VOCI) {
@@ -44,3 +47,25 @@ for (const voce of VOCI) {
     await expect(page.getByText(/testo ufficiale/i).first()).toBeVisible({ timeout: 15000 });
   });
 }
+
+// Le varianti non hanno una scheda propria nel manuale italiano: il nome resta quello specifico
+// della variante (è giusto che "Belt of Fire Giant Strength" si chiami "Cintura della Forza da
+// Gigante del Fuoco"), ma il TESTO deve venire dalla scheda madre del manuale invece che dalla
+// traduzione automatica.
+test("una variante mostra il testo della scheda madre del manuale", async ({ page }) => {
+  await page.goto("/compendio");
+  await page.waitForFunction(
+    () => !document.body.innerText.includes("Caricamento contenuti in corso"),
+  );
+
+  await page.getByRole("button", { name: "Oggetti magici" }).click();
+  await page.getByPlaceholder("Cerca (in inglese o italiano)…").fill("Belt of Fire Giant Strength");
+  const riga = page.getByText("Belt of Fire Giant Strength", { exact: true }).first();
+  await expect(riga).toBeVisible({ timeout: 15000 });
+  await riga.click();
+
+  await expect(page.getByText(/testo ufficiale/i).first()).toBeVisible({ timeout: 15000 });
+  await expect(
+    page.getByText(/il suo punteggio di Forza cambia in un determinato punteggio conferito dalla cintura/i),
+  ).toBeVisible({ timeout: 15000 });
+});

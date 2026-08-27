@@ -112,3 +112,48 @@ describe("findUfficiale: edizioni sorelle 2014/2024", () => {
     expect(findUfficiale(elenco, null, "Acid Arrow", "XPHB")).toBeNull();
   });
 });
+
+// I manuali italiani danno una scheda sola per famiglia, 5etools la espande per variante: senza il
+// ripiego sulla scheda madre queste voci mostravano la traduzione automatica pur avendo già il testo
+// del Manuale del DM nel database.
+describe("findUfficiale: varianti agganciate alla scheda madre", () => {
+  const oggetti = [
+    { nome: "Cintura della Forza dei Giganti", nomeInglese: "Belt of Giant Strength", fonteInglese: "DMG" },
+    { nome: "Corazza di Scaglie di Drago", nomeInglese: "Dragon Scale Mail", fonteInglese: "DMG" },
+    { nome: "Pozione di Resistenza", nomeInglese: "Potion of Resistance", fonteInglese: "DMG" },
+    { nome: "Pozione di Guarigione", nomeInglese: "Potion of Healing", fonteInglese: "DMG" },
+    { nome: "Pergamena di Protezione", nomeInglese: "Scroll of Protection", fonteInglese: "DMG" },
+    { nome: "Tappeto Volante", nomeInglese: "Carpet of Flying", fonteInglese: "DMG" },
+    { nome: "Arma +1, +2 o +3", nomeInglese: "+1 Weapon", fonteInglese: "DMG" },
+    { nome: "Anello di Protezione", nomeInglese: "Ring of Protection", fonteInglese: "DMG" },
+  ];
+
+  it.each([
+    ["Belt of Fire Giant Strength", "Cintura della Forza dei Giganti"],
+    ["Blue Dragon Scale Mail", "Corazza di Scaglie di Drago"],
+    ["Potion of Fire Resistance", "Pozione di Resistenza"],
+    ["Potion of Supreme Healing", "Pozione di Guarigione"],
+    ["Scroll of Protection from Undead", "Pergamena di Protezione"],
+    ["Carpet of Flying, 6 ft. × 9 ft.", "Tappeto Volante"],
+    ["+3 Weapon", "Arma +1, +2 o +3"],
+  ])("%s trova la scheda madre %s", (variante, atteso) => {
+    expect(findUfficiale(oggetti, null, variante, "DMG", { varianti: true })?.nome).toBe(atteso);
+  });
+
+  it("non tocca gli incantesimi: senza l'opzione il ripiego non parte", () => {
+    // "Cure Wounds" è contenuto in "Mass Cure Wounds", ma sono due incantesimi diversi
+    const incantesimi = [{ nome: "Cura Ferite", nomeInglese: "Cure Wounds", fonteInglese: "PHB" }];
+    expect(findUfficiale(incantesimi, null, "Mass Cure Wounds", "PHB")).toBeNull();
+  });
+
+  it("non accosta due schede diverse che condividono solo qualche parola", () => {
+    // "Ring of Spell Turning" ha in comune "Ring of" con "Ring of Protection", ma non tutte le
+    // parole: la sottosequenza non torna e la voce resta senza testo ufficiale, com'è giusto
+    expect(findUfficiale(oggetti, null, "Ring of Spell Turning", "DMG", { varianti: true })).toBeNull();
+  });
+
+  it("non aggancia nulla a un nome di una sola parola", () => {
+    const corte = [{ nome: "Onda", nomeInglese: "Wave", fonteInglese: "DMG" }];
+    expect(findUfficiale(corte, null, "Wave of Fire", "DMG", { varianti: true })).toBeNull();
+  });
+});

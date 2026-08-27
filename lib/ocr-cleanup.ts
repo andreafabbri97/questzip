@@ -12,6 +12,14 @@
  * diversi ma sempre riconoscibili, perché la parola vicina ("Superiori") non lascia dubbi. */
 type Sostituzione = [RegExp, string] | [RegExp, (match: string, ...gruppi: string[]) => string];
 
+// Le parole che in queste schede seguono uno zero VERO: servono a distinguerlo dalla congiunzione
+// "o" letta come cifra (vedi la regola più sotto). "0 punti ferita", "0 cariche", "0 metri".
+const UNITA_DI_MISURA = new Set([
+  "punti", "punto", "cariche", "carica", "metri", "metro", "danni", "danno",
+  "mo", "ma", "pa", "kg", "ore", "ora", "minuti", "minuto", "giorni", "giorno",
+  "livello", "livelli", "dadi", "dado", "cm", "km", "m", "mt", "round", "turni", "turno",
+]);
+
 const PAROLE_CORROTTE: Sostituzione[] = [
   [/\bLi\w{5}(?=\s+Superiori)/g, "Livelli"],
   // "1'" a inizio parola è sempre l'articolo elidato "l'" — nessuna parola italiana inizia con una
@@ -46,6 +54,23 @@ const PAROLE_CORROTTE: Sostituzione[] = [
   [/\bO(?= m\b)/g, "0"],
   // Sostituto come funzione: "$10" verrebbe letto come gruppo 10, non come gruppo 1 più uno zero.
   [/\b([1-9])O\b/g, (_m: string, cifra: string) => `${cifra}0`],
+  // Il caso opposto, molto più diffuso (98 oggetti magici): la congiunzione "o" letta come cifra
+  // zero — "scegliere liberamente 0 determinare a caso", "di livello pari 0 inferiore al 7°". Uno
+  // zero VERO in queste schede compare solo in due forme, ed è così che si riconosce: preceduto da
+  // "a" ("scende a 0", "pari a 0") oppure seguito da un'unità di misura ("0 punti ferita",
+  // "0 cariche"). In tutti gli altri casi una cifra isolata fra due parole è la congiunzione.
+  [
+    /\b([A-Za-zÀ-ÿ][a-zà-ÿ]*) 0 (?=([a-zà-ÿ]+))/g,
+    (_m: string, prima: string, dopo: string) =>
+      prima === "a" || UNITA_DI_MISURA.has(dopo) ? `${prima} 0 ` : `${prima} o `,
+  ],
+  // Stessa congiunzione, ma dopo una parentesi chiusa o una virgola invece che dopo una parola:
+  // "molto raro (bronzo) 0 leggendario (ferro)", "guarigione (1 carica) 0 resurrezione". Qui non
+  // c'è nemmeno il dubbio dello zero vero, che in queste schede segue sempre una parola.
+  [
+    /(?<=[),]) 0 (?=([a-zà-ÿ]+))/g,
+    (_m: string, dopo: string) => (UNITA_DI_MISURA.has(dopo) ? " 0 " : " o "),
+  ],
   // "da 1 a3 cariche" -> "a 3 cariche": la preposizione si è attaccata al numero seguente.
   [/(?<=\s)a(?=[1-9]\b)/g, "a "],
   // Spazio spurio dentro una parola spezzata a fine riga dal PDF. Elenco chiuso: "no", "re" ecc.

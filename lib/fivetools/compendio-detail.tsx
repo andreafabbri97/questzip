@@ -253,6 +253,10 @@ export function findUfficiale<T extends { nome: string; nomeInglese: string | nu
   translatedName: string | null,
   entryName: string,
   entrySource: string,
+  // Il ripiego sulla scheda madre vale SOLO per gli oggetti magici, dove il manuale accorpa
+  // davvero le varianti in un'unica scheda. Sugli incantesimi sarebbe dannoso: "Cure Wounds" è
+  // contenuto in "Mass Cure Wounds", ma sono due incantesimi diversi con testi diversi.
+  { varianti = false }: { varianti?: boolean } = {},
 ): T | null {
   const byKey = list.find((r) => r.nomeInglese === entryName && r.fonteInglese === entrySource);
   if (byKey) return byKey;
@@ -269,9 +273,75 @@ export function findUfficiale<T extends { nome: string; nomeInglese: string | nu
     );
     if (byEdizioneSorella) return byEdizioneSorella;
   }
-  if (!translatedName) return null;
-  const target = normalizeItaName(translatedName);
-  return list.find((r) => normalizeItaName(r.nome) === target) ?? null;
+  if (translatedName) {
+    const target = normalizeItaName(translatedName);
+    const perNomeItaliano = list.find((r) => normalizeItaName(r.nome) === target);
+    if (perNomeItaliano) return perNomeItaliano;
+  }
+  return varianti ? trovaSchedaMadre(list, entryName) : null;
+}
+
+/**
+ * I manuali italiani danno UNA scheda per famiglia, 5etools la espande in una voce per variante:
+ * "Cintura della Forza dei Giganti" contro Belt of Hill/Stone/Frost/Fire/Cloud/Storm Giant Strength,
+ * "Corazza di Scaglie di Drago" contro le dieci varianti per colore, "Pozione di Resistenza" contro
+ * le dieci per tipo di danno. Senza questo ripiego quelle 70 e passa voci mostravano la traduzione
+ * automatica pur avendo il testo del manuale già nel database, agganciato alla scheda madre.
+ *
+ * Si riconosce la parentela per SOTTOSEQUENZA di parole: il nome della scheda madre deve comparire
+ * per intero, nello stesso ordine, dentro il nome della variante ("Belt of Giant Strength" dentro
+ * "Belt of Fire Giant Strength"). È un vincolo stretto — non accosta mai due schede diverse, perché
+ * dovrebbero condividere tutte le parole — e serve un nome di almeno due parole, altrimenti una
+ * scheda dal nome cortissimo finirebbe per adottare mezzo compendio. Fra più schede madri possibili
+ * vince la più specifica, cioè quella con più parole in comune.
+ */
+function parole(nome: string): string[] {
+  return nome
+    .toLowerCase()
+    .replace(/^\+\d+\s+/, "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function eSottosequenza(madre: string[], variante: string[]): boolean {
+  let i = 0;
+  for (const p of variante) if (p === madre[i]) i++;
+  return i === madre.length;
+}
+
+function trovaSchedaMadre<T extends { nomeInglese: string | null }>(
+  list: T[],
+  entryName: string,
+): T | null {
+  // Le varianti "+1/+2/+3" sono un caso a sé: fra "+3 Weapon" e "+1 Weapon" l'unica differenza è il
+  // bonus, e il manuale le tratta come un'unica scheda ("Arma +1, +2 o +3"). Tolto il bonus i due
+  // nomi coincidono, quindi qui basta un confronto diretto — la sottosequenza sotto non servirebbe,
+  // perché di parole ne resterebbe una sola.
+  const senzaBonus = (n: string) => n.replace(/^\+\d+\s+/, "").toLowerCase();
+  if (/^\+\d+\s/.test(entryName)) {
+    const perBonus = list.find(
+      (r) => r.nomeInglese && /^\+\d+\s/.test(r.nomeInglese) && senzaBonus(r.nomeInglese) === senzaBonus(entryName),
+    );
+    if (perBonus) return perBonus;
+  }
+
+  const variante = parole(entryName);
+  if (variante.length < 2) return null;
+  let migliore: T | null = null;
+  let paroleMigliore = 0;
+  for (const r of list) {
+    if (!r.nomeInglese) continue;
+    const madre = parole(r.nomeInglese);
+    if (madre.length < 2 || madre.length >= variante.length) continue;
+    if (!eSottosequenza(madre, variante)) continue;
+    if (madre.length > paroleMigliore) {
+      migliore = r;
+      paroleMigliore = madre.length;
+    }
+  }
+  return migliore;
 }
 
 /**
@@ -1072,7 +1142,7 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
 
   const ufficiale = useMemo(() => {
     if (language !== "it" || !itaOggetti) return null;
-    return findUfficiale(itaOggetti, translatedName, item.name, item.source);
+    return findUfficiale(itaOggetti, translatedName, item.name, item.source, { varianti: true });
   }, [language, itaOggetti, translatedName, item.name, item.source]);
 
   if (ufficiale) {

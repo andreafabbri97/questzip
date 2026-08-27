@@ -147,3 +147,31 @@ describe("caratteri di controllo e zeri letti come lettera", () => {
     expect(pulisciNumeriStatBlock("6 5  (l Odl O + l O)")).toBe("65 (10d10 + 10)");
   });
 });
+
+// La congiunzione "o" letta come cifra zero: 98 oggetti magici dicevano "scegliere liberamente 0
+// determinare a caso" o "di livello pari 0 inferiore al 7°". Uno zero vero, in queste schede, è
+// sempre preceduto da "a" o seguito da un'unità di misura — ed è così che si distinguono.
+describe("zero letto al posto della congiunzione o", () => {
+  it("ripristina la congiunzione fra due parole", () => {
+    expect(pulisciTestoOcr("scegliere liberamente 0 determinare a caso")).toBe(
+      "scegliere liberamente o determinare a caso",
+    );
+    expect(pulisciTestoOcr("di livello pari 0 inferiore al 7°")).toBe("di livello pari o inferiore al 7°");
+    expect(pulisciTestoOcr("una creatura di taglia Media 0 inferiore")).toBe(
+      "una creatura di taglia Media o inferiore",
+    );
+  });
+
+  it("ripristina la congiunzione anche dopo parentesi o virgola", () => {
+    expect(pulisciTestoOcr("molto raro (bronzo) 0 leggendario (ferro)")).toBe(
+      "molto raro (bronzo) o leggendario (ferro)",
+    );
+    expect(pulisciTestoOcr("guarigione (1 carica) 0 resurrezione")).toBe("guarigione (1 carica) o resurrezione");
+  });
+
+  it("non tocca uno zero vero", () => {
+    expect(pulisciTestoOcr("quando scende a 0 punti ferita")).toBe("quando scende a 0 punti ferita");
+    expect(pulisciTestoOcr("la verga possiede 0 cariche rimaste")).toBe("la verga possiede 0 cariche rimaste");
+    expect(pulisciTestoOcr("velocità pari a 0 metri")).toBe("velocità pari a 0 metri");
+  });
+});
