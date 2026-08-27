@@ -21,6 +21,11 @@ const VOCI = [
   // equipaggiamento comune del capitolo 5: prima non aveva testo italiano per nessuna delle 259 voci
   { tab: "Oggetti comuni", inglese: "Handaxe", italiano: "Ascia" },
   { tab: "Oggetti comuni", inglese: "Plate Armor", italiano: "Armatura Completa" },
+  { tab: "Oggetti comuni", inglese: "Smith's Tools", italiano: "Strumenti da Fabbro" },
+  { tab: "Oggetti comuni", inglese: "Explorer's Pack", italiano: "Dotazione da Esploratore" },
+  // veleni ed esplosivi stanno in altri capitoli del Manuale del DM, non nel catalogo magico
+  { tab: "Oggetti comuni", inglese: "Drow Poison", italiano: "Veleno Drow" },
+  { tab: "Oggetti comuni", inglese: "Bomb", italiano: "Bomba" },
 ];
 
 for (const voce of VOCI) {

@@ -52,6 +52,7 @@ const giaAgganciati = new Set(esistenti.filter((r) => r.nome_inglese).map((r) =>
 
 const daInserire = [];
 const saltate = [];
+const senzaVerifica = [];
 
 for (const [nomeParsato, valore] of Object.entries(mappa.voci)) {
   if (nomeParsato.startsWith("_")) continue;
@@ -60,13 +61,22 @@ for (const [nomeParsato, valore] of Object.entries(mappa.voci)) {
   const inglese = perNome.get(`${valore.en}|${fonteInglese}`);
   const nomeItaliano = valore.it ?? nomeParsato;
 
-  if (!scheda) { saltate.push(`${nomeItaliano} — non è fra le voci estratte`); continue; }
+  // Alcune tabelle del capitolo escono dal PDF con nomi e costi in due blocchi separati (strumenti,
+  // strumenti musicali) o con le due colonne sfasate (le merci): lì l'ancora del costo non può
+  // appaiarli, e il costo sta scritto nella mappa, letto a mano dalla tabella. Sono comunque
+  // verificati contro 5etools esattamente come gli altri.
+  const costoDichiarato = valore.costo ?? null;
   if (!inglese) { saltate.push(`${nomeItaliano} — "${valore.en}" non è una voce ${fonteInglese} di 5etools`); continue; }
   if (giaInTabella.has(nomeItaliano) || giaAgganciati.has(valore.en)) { saltate.push(`${nomeItaliano} — già in tabella`); continue; }
 
-  const costoIta = inRame(scheda.costo);
+  // Una manciata di voci non compare come riga di tabella nell'estrazione (il Ninnolo, l'Abaco, la
+  // Rete, lo Scudo): il nome italiano è quello del manuale ma non c'è un costo estratto con cui
+  // verificare l'abbinamento. Entrano lo stesso — sono nomi senza ambiguità possibile — ma vengono
+  // contate a parte, così non sembrano verificate come le altre.
+  const costoIta = inRame(scheda?.costo ?? costoDichiarato);
+  if (costoIta == null) senzaVerifica.push(nomeItaliano);
   if (costoIta != null && inglese.value != null && costoIta !== inglese.value) {
-    saltate.push(`${nomeItaliano} — costo ${scheda.costo} (${costoIta} mr) ma "${valore.en}" vale ${inglese.value} mr`);
+    saltate.push(`${nomeItaliano} — costo ${scheda?.costo ?? costoDichiarato} (${costoIta} mr) ma "${valore.en}" vale ${inglese.value} mr`);
     continue;
   }
 
@@ -75,7 +85,7 @@ for (const [nomeParsato, valore] of Object.entries(mappa.voci)) {
     en: valore.en,
     fonte: fonteInglese,
     categoria: inglese.type?.split("|")[0] ?? "",
-    descrizione: scheda.descrizione ? pulisciTestoOcr(scheda.descrizione) : "",
+    descrizione: scheda?.descrizione ? pulisciTestoOcr(scheda.descrizione) : "",
   });
 }
 

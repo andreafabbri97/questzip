@@ -1,5 +1,5 @@
 {
-  "_nota": "Equipaggiamento comune del capitolo 5 del Manuale del Giocatore: armi, armature, attrezzatura, munizioni, focus da incantatore, cavalcature e veicoli. Nel Compendio (tab \"Oggetti comuni\") e nell'autocompletamento della scheda queste voci comparivano solo in inglese. \"it\" è il nome pulito da mostrare quando l'estrazione l'ha spezzato (\"Lente D ' i Ngrandimento\"), \"en\" la voce 5etools. L'abbinamento viene verificato sul COSTO prima di scrivere: è un numero identico nelle due edizioni, quindi se non torna la voce viene saltata.",
+  "_nota": "Equipaggiamento comune del capitolo 5 del Manuale del Giocatore: armi, armature, attrezzatura, munizioni, focus da incantatore, cavalcature e veicoli. Nel Compendio (tab \"Oggetti comuni\") e nell'autocompletamento della scheda queste voci comparivano solo in inglese. \"it\" è il nome pulito da mostrare quando l'estrazione l'ha spezzato (\"Lente D ' i Ngrandimento\"), \"en\" la voce 5etools. L'abbinamento viene verificato sul COSTO prima di scrivere: è un numero identico nelle due edizioni, quindi se non torna la voce viene saltata. Le tabelle di strumenti, dotazioni e merci escono dal PDF con nomi e costi in due blocchi separati (o sfasati di una riga), quindi lì l'ancora del costo non può appaiarli: per quelle voci il costo è scritto nella mappa, letto a mano dalla tabella, e viene verificato contro 5etools esattamente come gli altri.",
   "voci": {
     "Imbottita": {
       "en": "Padded Armor"
@@ -492,13 +492,396 @@
     "Bacchetta in Legno di Tasso": {
       "en": "Yew Wand"
     },
-    "O,s Kg di Sale": {
-      "en": "Salt",
-      "it": "0,5 kg di Sale"
+    "Sapone": {
+      "en": "Soap"
     },
-    "0,s K G di Grano": {
+    "Cote per Affilare": {
+      "en": "Whetstone"
+    },
+    "Asino o Mulo": {
+      "en": "Donkey",
+      "it": "Asino"
+    },
+    "Cammello": {
+      "en": "Camel"
+    },
+    "Cavallo da Galoppo": {
+      "en": "Riding Horse"
+    },
+    "Cavallo da Tiro": {
+      "en": "Draft Horse"
+    },
+    "Mastino": {
+      "en": "Mastiff"
+    },
+    "Biga": {
+      "en": "Chariot"
+    },
+    "Carretto": {
+      "en": "Cart"
+    },
+    "Carro": {
+      "en": "Wagon"
+    },
+    "Nutrimento (al Giorno)": {
+      "en": "Feed (per day)",
+      "it": "Nutrimento (al giorno)"
+    },
+    "Dacarico": {
+      "en": "Pack Saddle",
+      "it": "Sella da Carico"
+    },
+    "Stallaggio (al Giorno)": {
+      "en": "Stabling (per day)",
+      "it": "Stallaggio (al giorno)"
+    },
+    "Barca a Remi": {
+      "en": "Rowboat",
+      "fonte": "DMG"
+    },
+    "Nave da Guerra": {
+      "en": "Warship",
+      "fonte": "DMG"
+    },
+    "4 Litri": {
+      "en": "Ale (gallon)",
+      "it": "Birra (4 litri)"
+    },
+    "Carne, 1 Pezzo": {
+      "en": "Chunk of Meat",
+      "it": "Carne (1 pezzo)"
+    },
+    "Formaggio, 1 Pezzo": {
+      "en": "Hunk of Cheese",
+      "it": "Formaggio (1 pezzo)"
+    },
+    "Pane (a Pagnotta)": {
+      "en": "Loaf of Bread",
+      "it": "Pane (a pagnotta)"
+    },
+    "Buono (bottiglia)": {
+      "en": "Fine Wine (bottle)",
+      "it": "Vino Buono (bottiglia)"
+    },
+    "Comune (caraffa)": {
+      "en": "Common Wine (pitcher)",
+      "it": "Vino Comune (caraffa)"
+    },
+    "Arnesi da Falsario": {
+      "en": "Forgery Kit",
+      "costo": "15 mo"
+    },
+    "Arnesi da Scasso": {
+      "en": "Thieves' Tools",
+      "costo": "25 mo"
+    },
+    "Borsa da Erborista": {
+      "en": "Herbalism Kit",
+      "costo": "5 mo"
+    },
+    "Dadi": {
+      "en": "Dice Set",
+      "costo": "1 ma"
+    },
+    "Mazzo di Carte": {
+      "en": "Playing Card Set",
+      "costo": "5 ma"
+    },
+    "Scacchi dei Draghi": {
+      "en": "Dragonchess Set",
+      "costo": "1 mo"
+    },
+    "Tre Draghi al Buio": {
+      "en": "Three-Dragon Ante Set",
+      "costo": "1 mo"
+    },
+    "Sostanze da Avvelenatore": {
+      "en": "Poisoner's Kit",
+      "costo": "50 mo"
+    },
+    "Scorte da Alchimista": {
+      "en": "Alchemist's Supplies",
+      "costo": "50 mo"
+    },
+    "Scorte da Calligrafo": {
+      "en": "Calligrapher's Supplies",
+      "costo": "10 mo"
+    },
+    "Scorte da Birraio": {
+      "en": "Brewer's Supplies",
+      "costo": "20 mo"
+    },
+    "Strumenti da Calzolaio": {
+      "en": "Cobbler's Tools",
+      "costo": "5 mo"
+    },
+    "Strumenti da Cartografo": {
+      "en": "Cartographer's Tools",
+      "costo": "15 mo"
+    },
+    "Strumenti da Conciatore": {
+      "en": "Leatherworker's Tools",
+      "costo": "5 mo"
+    },
+    "Strumenti da Costruttore": {
+      "en": "Mason's Tools",
+      "costo": "10 mo"
+    },
+    "Strumenti da Fabbro": {
+      "en": "Smith's Tools",
+      "costo": "20 mo"
+    },
+    "Strumenti da Falegname": {
+      "en": "Carpenter's Tools",
+      "costo": "8 mo"
+    },
+    "Strumenti da Gioielliere": {
+      "en": "Jeweler's Tools",
+      "costo": "25 mo"
+    },
+    "Strumenti da Intagliatore": {
+      "en": "Woodcarver's Tools",
+      "costo": "1 mo"
+    },
+    "Strumenti da Stagnino": {
+      "en": "Tinker's Tools",
+      "costo": "50 mo"
+    },
+    "Strumenti da Pittore": {
+      "en": "Painter's Supplies",
+      "costo": "10 mo"
+    },
+    "Strumenti da Soffiatore": {
+      "en": "Glassblower's Tools",
+      "costo": "30 mo"
+    },
+    "Strumenti da Tessitore": {
+      "en": "Weaver's Tools",
+      "costo": "1 mo"
+    },
+    "Strumenti da Vasaio": {
+      "en": "Potter's Tools",
+      "costo": "10 mo"
+    },
+    "Utensili da Cuoco": {
+      "en": "Cook's Utensils",
+      "costo": "1 mo"
+    },
+    "Strumenti da Navigatore": {
+      "en": "Navigator's Tools",
+      "costo": "25 mo"
+    },
+    "Ciaramella": {
+      "en": "Shawm",
+      "costo": "2 mo"
+    },
+    "Cornamusa": {
+      "en": "Bagpipes",
+      "costo": "30 mo"
+    },
+    "Corno": {
+      "en": "Horn",
+      "costo": "3 mo"
+    },
+    "Dulcimer": {
+      "en": "Dulcimer",
+      "costo": "25 mo"
+    },
+    "Flauto": {
+      "en": "Flute",
+      "costo": "2 mo"
+    },
+    "Flauto di Pan": {
+      "en": "Pan Flute",
+      "costo": "12 mo"
+    },
+    "Lira": {
+      "en": "Lyre",
+      "costo": "30 mo"
+    },
+    "Liuto": {
+      "en": "Lute",
+      "costo": "35 mo"
+    },
+    "Tamburo": {
+      "en": "Drum",
+      "costo": "6 mo"
+    },
+    "Viola": {
+      "en": "Viol",
+      "costo": "30 mo"
+    },
+    "Trucchi per il Camuffamento": {
+      "en": "Disguise Kit",
+      "costo": "25 mo"
+    },
+    "Dotazione da Avventuriero": {
+      "en": "Dungeoneer's Pack",
+      "costo": "12 mo"
+    },
+    "Dotazione da Diplomatico": {
+      "en": "Diplomat's Pack",
+      "costo": "39 mo"
+    },
+    "Dotazione da Esploratore": {
+      "en": "Explorer's Pack",
+      "costo": "10 mo"
+    },
+    "Dotazione da Intrattenitore": {
+      "en": "Entertainer's Pack",
+      "costo": "40 mo"
+    },
+    "Dotazione da Sacerdote": {
+      "en": "Priest's Pack",
+      "costo": "19 mo"
+    },
+    "Dotazione da Scassinatore": {
+      "en": "Burglar's Pack",
+      "costo": "16 mo"
+    },
+    "Dotazione da Studioso": {
+      "en": "Scholar's Pack",
+      "costo": "40 mo"
+    },
+    "Grano (0,5 kg)": {
       "en": "Wheat",
-      "it": "0,5 kg di Grano"
+      "costo": "1 mr"
+    },
+    "Farina (0,5 kg)": {
+      "en": "Flour",
+      "costo": "2 mr"
+    },
+    "Pollo": {
+      "en": "Chicken",
+      "costo": "2 mr"
+    },
+    "Sale (0,5 kg)": {
+      "en": "Salt",
+      "costo": "5 mr"
+    },
+    "Ferro (0,5 kg)": {
+      "en": "Iron",
+      "costo": "1 ma"
+    },
+    "Telo di Stoffa (90 cm di lato)": {
+      "en": "Canvas (1 sq. yd.)",
+      "costo": "1 ma"
+    },
+    "Rame (0,5 kg)": {
+      "en": "Copper",
+      "costo": "5 ma"
+    },
+    "Telo di Cotone (90 cm di lato)": {
+      "en": "Cotton Cloth (1 sq. yd.)",
+      "costo": "5 ma"
+    },
+    "Zenzero (0,5 kg)": {
+      "en": "Ginger",
+      "costo": "1 mo"
+    },
+    "Capra": {
+      "en": "Goat",
+      "costo": "1 mo"
+    },
+    "Pepe (0,5 kg)": {
+      "en": "Pepper",
+      "costo": "2 mo"
+    },
+    "Cannella (0,5 kg)": {
+      "en": "Cinnamon",
+      "costo": "2 mo"
+    },
+    "Pecora": {
+      "en": "Sheep",
+      "costo": "2 mo"
+    },
+    "Chiodi di Garofano (0,5 kg)": {
+      "en": "Cloves",
+      "costo": "3 mo"
+    },
+    "Maiale": {
+      "en": "Pig",
+      "costo": "3 mo"
+    },
+    "Argento (0,5 kg)": {
+      "en": "Silver",
+      "costo": "5 mo"
+    },
+    "Telo di Lino (90 cm di lato)": {
+      "en": "Linen (1 sq. yd.)",
+      "costo": "5 mo"
+    },
+    "Telo di Seta (90 cm di lato)": {
+      "en": "Silk (1 sq. yd.)",
+      "costo": "10 mo"
+    },
+    "Mucca": {
+      "en": "Cow",
+      "costo": "10 mo"
+    },
+    "Zafferano (0,5 kg)": {
+      "en": "Saffron",
+      "costo": "15 mo"
+    },
+    "Bue": {
+      "en": "Ox",
+      "costo": "15 mo"
+    },
+    "Oro (0,5 kg)": {
+      "en": "Gold",
+      "costo": "50 mo"
+    },
+    "Platino (0,5 kg)": {
+      "en": "Platinum",
+      "costo": "500 mo"
+    },
+    "Abaco": {
+      "en": "Abacus"
+    },
+    "Acido (fiala)": {
+      "en": "Acid (vial)"
+    },
+    "Pertica (3 metri)": {
+      "en": "Pole (10-foot)"
+    },
+    "Ninnolo": {
+      "en": "Trinket"
+    },
+    "Rete": {
+      "en": "Net"
+    },
+    "Scudo": {
+      "en": "Shield"
+    },
+    "Mulo": {
+      "en": "Mule"
+    },
+    "Caraffa": {
+      "en": "Pitcher"
+    },
+    "Moneta di Rame (mr)": {
+      "en": "Copper (cp)"
+    },
+    "Moneta d'Argento (ma)": {
+      "en": "Silver (sp)"
+    },
+    "Moneta di Electrum (me)": {
+      "en": "Electrum (ep)"
+    },
+    "Moneta d'Oro (mo)": {
+      "en": "Gold (gp)"
+    },
+    "Moneta di Platino (mp)": {
+      "en": "Platinum (pp)"
+    },
+    "Boccale (recipiente)": {
+      "en": "Tankard",
+      "it": "Boccale"
+    },
+    "Aeronave": {
+      "en": "Airship",
+      "fonte": "DMG",
+      "costo": "20000 mo"
     }
   }
 }

@@ -27,9 +27,11 @@ const ULTIMA_PAGINA = 160;
 // "O,s Kg" per 0,5 kg): sono le stesse confusioni già note altrove. Accettandole si recuperano una
 // trentina di voci — fra cui il Randello, la Spada Corta e la Lancia — che altrimenti sparivano.
 // contenuto della classe di caratteri, senza parentesi: va inserito dentro [...] dai due pattern
-const CIFRE = String.raw`\dlIOo`;
-const COSTO_RE = new RegExp(String.raw`^([${CIFRE}][${CIFRE}\s.,]*)\s*(mo|ma|mr|me|mp)$`, "i");
-const PESO_RE = new RegExp(String.raw`^([${CIFRE}][${CIFRE}\s.,]*)\s*kg$`, "i");
+// anche la S sta per 5 ("SO mo" sono 50 monete d'oro, "2S mo" venticinque): in queste tabelle
+// una lettera dentro una cifra non è mai testo vero
+const CIFRE = String.raw`\dlIOoSs`;
+const COSTO_RE = new RegExp(String.raw`^([${CIFRE}][${CIFRE}\s.,]*)\s*(m\s*[oarep])$`, "i");
+const PESO_RE = new RegExp(String.raw`^([${CIFRE}][${CIFRE}\s.,]*)\s*k\s*g$`, "i");
 const DANNI_RE = /^[l1I]?\s?d\s?\d+\s+(taglienti|perforanti|contundenti)/i;
 
 // "Nome della Voce. Testo che comincia qui." — è il modo in cui il manuale apre ogni descrizione.
@@ -43,6 +45,7 @@ const numero = (s) =>
     .replace(/\s+/g, "")
     .replace(/[lI]/g, "1")
     .replace(/[Oo]/g, "0")
+    .replace(/[Ss]/g, "5")
     .replace(/\.(?=\d{3}(\D|$))/g, "")
     .replace(",", ".");
 
@@ -77,7 +80,7 @@ function leggiTabelle(righe) {
     if (voci.has(chiave)) continue;
     voci.set(chiave, {
       nome: chiave,
-      costo: `${numero(costo[1])} ${costo[2].toLowerCase()}`,
+      costo: `${numero(costo[1])} ${costo[2].replace(/\s+/g, "").toLowerCase()}`,
       peso: peso ? `${numero(peso.match(PESO_RE)[1])} kg` : null,
       danni: danni ? danni.replace(/\s+/g, " ") : null,
     });
