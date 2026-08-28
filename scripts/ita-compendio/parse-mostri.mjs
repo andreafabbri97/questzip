@@ -144,14 +144,19 @@ const CARATTERI_DI_CONTROLLO = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g;
 function loadLines(bookKey) {
   const raw = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, `${bookKey}.json`), "utf-8"));
   const lines = [];
+  // pagina di ogni riga: serve come ancora per le schede il cui titolo l'estrazione riduce a un
+  // glifo ("•"), dove classe armatura e punti ferita da soli non bastano a distinguerle — quattro
+  // eladrin di stagione diversa hanno gli stessi identici numeri
+  const pagine = [];
   for (const page of raw.pages) {
     for (const line of page.text.replace(CARATTERI_DI_CONTROLLO, "").split("\n")) {
       const trimmed = line.trim();
       if (!trimmed || isPageNumberNoise(trimmed)) continue;
       lines.push(trimmed);
+      pagine.push(page.page);
     }
   }
-  return { lines, nome: raw.nome };
+  return { lines, pagine, nome: raw.nome };
 }
 
 // confronta una riga con un'etichetta nota tollerando lo scambio l/1 e o/0 (es. "C1asse
@@ -304,11 +309,17 @@ const RIGHE_INDIETRO_MASSIME = 90;
  * questo file dopo che i nomi italiani sono stati verificati uno per uno sul manuale.
  */
 function caricaNomiPerImpronta(bookKey) {
-  try {
-    return JSON.parse(readFileSync(path.join(SCRIPT_DIR, `nomi-per-impronta-${bookKey}.json`), "utf-8"));
-  } catch {
-    return {};
-  }
+  const leggi = (nome) => {
+    try {
+      return JSON.parse(readFileSync(path.join(SCRIPT_DIR, nome), "utf-8"));
+    } catch {
+      return {};
+    }
+  };
+  // due file, con due tipi di chiave: quella generata dai numeri (recupera-mostri-per-impronta.mjs,
+  // riscritta a ogni esecuzione) e quella ancorata alla pagina, compilata a mano per le poche
+  // schede dove il grado di sfida non si legge affatto e i soli CA e punti ferita non bastano.
+  return { ...leggi(`nomi-per-impronta-${bookKey}.json`), ...leggi(`nomi-per-pagina-${bookKey}.json`) };
 }
 
 /** Header sintetico per una scheda senza titolo: il nome viene dall'impronta, il resto dal blocco. */
@@ -441,7 +452,7 @@ function risolviNomiDoppi(monsters) {
 }
 
 function parseBook(bookKey) {
-  const { lines, nome } = loadLines(bookKey);
+  const { lines, pagine, nome } = loadLines(bookKey);
   const nomiPerImpronta = caricaNomiPerImpronta(bookKey);
   const anchors = findChallengeAnchors(lines);
 
@@ -511,11 +522,21 @@ function parseBook(bookKey) {
       }
     }
 
-    const ca = fields["Classe Armatura"]?.match(/(\d+)/)?.[1];
-    const pf = fields["Punti Ferita"]?.match(/(\d+)/)?.[1];
+    // Stessa normalizzazione di recupera-mostri-per-impronta.mjs, altrimenti le chiavi non
+    // combaciano: l'estrazione infila spazi dentro i numeri ("Classe Armatura 1 7"), e prendere il
+    // primo gruppo di cifre darebbe 1 invece di 17.
+    const soloCifre = (campo) => campo?.split("(")[0].replace(/[^\d]/g, "") || undefined;
+    const ca = soloCifre(fields["Classe Armatura"]);
+    const pf = soloCifre(fields["Punti Ferita"]);
     const gradoSfida = lines[anchor.lineIndex].match(/^Sfida\s+([\d/]+)/i)?.[1];
+    // Due chiavi. Prima quella ancorata alla PAGINA, compilata a mano scheda per scheda: è la più
+    // specifica, e deve vincere — il chitinide e l'evanescente hanno gli stessi classe armatura,
+    // punti ferita e grado di sfida, quindi la chiave generica li confonde. Poi quella dedotta dai
+    // numeri, che copre tutte le altre.
+    const paginaScheda = pagine[anchor.lineIndex];
     const nomePerImpronta =
-      ca && pf && gradoSfida ? nomiPerImpronta[`${ca}|${pf}|${gradoSfida}`] : undefined;
+      (ca && pf ? nomiPerImpronta[`p${paginaScheda}|${ca}|${pf}`] : undefined) ??
+      (ca && pf && gradoSfida ? nomiPerImpronta[`${ca}|${pf}|${gradoSfida}`] : undefined);
 
     const { abilities, next } = parseAbilities(lines, cursor);
     cursor = next;
@@ -591,6 +612,8 @@ function parseBook(bookKey) {
       // finita lì, mentre l'impronta è verificata sui numeri e il nome italiano corrispondente è
       // stato controllato a mano sull'indice del manuale e sul titolo stampato.
       nome: nomePerImpronta ?? NOME_FIXES[nomeMostro] ?? nomeMostro,
+      // la pagina del manuale da cui viene la scheda: serve a ritrovarla quando qualcosa non torna
+      pagina: paginaScheda,
       // si tiene da parte anche il nome LETTO: se quello dedotto dall'impronta risultasse già
       // usato da un'altra scheda, si torna a questo (vedi risolviNomiDoppi)
       nomeLetto: NOME_FIXES[nomeMostro] ?? nomeMostro,
