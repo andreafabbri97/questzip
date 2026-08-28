@@ -26,6 +26,19 @@ const VOCI = [
   // veleni ed esplosivi stanno in altri capitoli del Manuale del DM, non nel catalogo magico
   { tab: "Oggetti comuni", inglese: "Drow Poison", italiano: "Veleno Drow" },
   { tab: "Oggetti comuni", inglese: "Bomb", italiano: "Bomba" },
+  // razze: il Compendio ne aveva dieci in italiano (le nove del Manuale del Giocatore e il Rinato)
+  // mentre i lignaggi di Mostri del Multiverso, i dragonidi di Fizban e gli altri due di Ravenloft
+  // erano in traduzione automatica, pur avendo i PDF italiani di quei manuali
+  { tab: "Razze", inglese: "Harengon", italiano: "Leporidion" },
+  // Bugbear, Shifter e Hexblood esistono in più manuali (anche in libri che non abbiamo): la
+  // fonte va dichiarata, altrimenti si aprirebbe la scheda di un'edizione senza testo italiano
+  { tab: "Razze", inglese: "Bugbear", italiano: "Urgoblin", fonte: "MPMM" },
+  { tab: "Razze", inglese: "Shifter", italiano: "Morfico", fonte: "MPMM" },
+  { tab: "Razze", inglese: "Deep Gnome", italiano: "Gnomo delle Profondità" },
+  { tab: "Razze", inglese: "Hexblood", italiano: "Sangue Strigo", fonte: "VRGR" },
+  // talenti dei giganti e draconici, gli ultimi due manuali che il parser non leggeva
+  { tab: "Talenti", inglese: "Rune Shaper", italiano: "Forgiarune" },
+  { tab: "Talenti", inglese: "Gift of the Gem Dragon", italiano: "Dono del Drago Gemma" },
 ];
 
 for (const voce of VOCI) {
@@ -41,7 +54,14 @@ for (const voce of VOCI) {
       await page.getByRole("button", { name: voce.tab }).click();
     }
     await page.getByPlaceholder("Cerca (in inglese o italiano)…").fill(voce.inglese);
-    const riga = page.getByText(voce.inglese, { exact: true }).first();
+    // dove la stessa voce esiste in più manuali, si sceglie la riga con il badge della fonte giusta
+    const riga = voce.fonte
+      ? page
+          .getByRole("button")
+          .filter({ hasText: new RegExp(`^${voce.inglese}`) })
+          .filter({ hasText: voce.fonte })
+          .first()
+      : page.getByText(voce.inglese, { exact: true }).first();
     await expect(riga).toBeVisible({ timeout: 15000 });
     await riga.click();
 

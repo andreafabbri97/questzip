@@ -11,9 +11,21 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { ricomponiParoleSpezzate, titoloItaliano } from "../../lib/compendio-ocr.ts";
+
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const EXTRACTED_DIR = path.join(SCRIPT_DIR, "extracted");
 const PARSED_DIR = path.join(SCRIPT_DIR, "parsed");
+
+// Negli altri manuali le razze sono decine e i loro nomi non si sanno in anticipo: l'intestazione
+// stessa li dichiara ("TRATTI DELL'AARAKOCRA", "TRATTI DEL GENASI DELL'ACQUA"). L'apostrofo esce
+// spesso come "1" ("TRATTI DELL1AASIMAR"), e il maiuscoletto stacca l'ultima lettera del nome
+// ("TRATTI DELL'ORC O", "TRATTI DEL MORFIC O") — entrambi già visti altrove nella pipeline.
+// "TRATTI" stesso esce storpiato dove il maiuscoletto stringe la doppia T: nel Tesoro dei Draghi
+// di Fizban si legge "TRA'ITI DEL DRAGONIDE GEMMA" e "TRAITI DEL DRAGONIDE METALLICO".
+const ANCORA_GENERICA = /^TRA[TI'’1]{2,4}\s+(?:DEGLI|DELLE|DELLA|DELLO|DELL['’1I]?|DEL|DEI)\s*(.+)$/i;
+// il nome può finire su due righe: "TRATTI DELLO GNOMO DELLE" + "PROFONDITÀ"
+const PREPOSIZIONE_FINALE = /\s(?:DEGLI|DELLE|DELLA|DELLO|DELL['’1I]?|DEL|DEI|DI)$/i;
 
 const RACE_HEADINGS = [
   { anchor: "TRATTIDEGLIELFI", nome: "Elfo" },
@@ -40,6 +52,8 @@ const TEXT_FIXES = [
   [/Ma6ia/g, "Magia"],
   [/Soliìo/g, "Soffio"],
   [/LinguaUi/g, "Linguaggi"],
+  // la doppia f del maiuscoletto esce in tre modi diversi nel Tesoro dei Draghi di Fizban
+  [/\bSo(?:ffl|Dì|Hì|ffì)o\b/g, "Soffio"],
 ];
 function fixText(text) {
   return TEXT_FIXES.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), text);
@@ -60,6 +74,11 @@ function titleCaseHeading(raw) {
     .join("");
 }
 
+/** "ORC O" -> "ORCO": il maiuscoletto stacca l'ultima lettera del nome. */
+function ricomponiUltimaLettera(nome) {
+  return nome.replace(/\s+([A-ZÀ-Ù])$/, "$1");
+}
+
 function compact(line) {
   return line.replace(/\s+/g, "").toUpperCase();
 }
@@ -69,7 +88,7 @@ function compact(line) {
 // distingue un tratto vero (es. "Incremento dei Punteggi di Caratteristica.") da una normale
 // frase che termina per caso con un punto a metà riga
 const CONNECTORS = new Set(["di", "dei", "del", "della", "degli", "delle", "dell'", "nel", "nell'", "e", "a", "con", "alle", "ai", "al"]);
-function matchTraitLabel(line) {
+function matchTraitLabel(line, iniziaPeriodo) {
   const dotIndex = line.indexOf(". ");
   if (dotIndex === -1 || dotIndex > 55) return null;
   const label = line.slice(0, dotIndex);
@@ -83,14 +102,30 @@ function matchTraitLabel(line) {
   // la prima parola dev'essere un vero contenuto (mai un connettivo: scarta frasi come
   // "di Greyhawk e Forgotten Realms." che per coincidenza passerebbero il resto del controllo)
   if (CONNECTORS.has(words[0]) || !/^[A-ZÀ-Þ]/.test(words[0])) return null;
-  const valid = words.every((w) => CONNECTORS.has(w) || /^[A-ZÀ-Þ]/.test(w));
-  if (!valid) return null;
+  // Un tratto apre sempre un periodo nuovo: la riga prima si chiude con un punto. Senza questo
+  // vincolo bastava che una parola con l'iniziale maiuscola capitasse a inizio riga seguita da un
+  // punto per inventare un tratto — "…dall'influenza della Selva / Fatata. Tuttavia, nella Selva
+  // Fatata scoprirono…" dava all'elfo del mare un tratto "Fatata" con dentro 1.200 caratteri di
+  // storia degli elfi.
+  if (!iniziaPeriodo) return null;
+  if (words.every((w) => CONNECTORS.has(w) || /^[A-ZÀ-Þ]/.test(w))) return { label, rest };
+  // Fuori dal Manuale del Giocatore i nomi dei tratti non sono in stile titolo ma con la sola
+  // iniziale maiuscola ("Tipo di creatura.", "Costituzione robusta.", "Comunicazione con flora e
+  // fauna."), e con il solo controllo qui sopra il Firbolg risultava avere due tratti invece di
+  // sei. Lì il segnale che non è una frase qualsiasi finita per caso con un punto è la POSIZIONE:
+  // un tratto apre sempre un periodo nuovo, cioè la riga prima si chiude con un punto.
   return { label, rest };
 }
 
+// La testatina che si ripete a ogni pagina ha la forma "CAPITOLO 1 I CREAZIONE DEL PERSONAGGIO",
+// con una I al posto della barra verticale; il TITOLO vero del capitolo successivo — che invece
+// chiude la scheda — è scritto con i due punti ("CAPITOLO 3 : CLASSI"). Senza questa distinzione
+// la testatina veniva scambiata per il capitolo dopo e il dragonide cromatico del Tesoro dei
+// Draghi di Fizban perdeva gli ultimi due tratti, stampati sotto di essa.
 function isPageHeaderNoise(line) {
   const compactLine = compact(line);
-  return compactLine.includes("CAPITOLO") && compactLine.includes("RAZZE");
+  if (!compactLine.includes("CAPITOLO")) return false;
+  return compactLine.includes("RAZZE") || (/\sI\s/.test(line) && !line.includes(":"));
 }
 
 // titolo di sottorazza: ogni parola inizia con maiuscola (2-4 parole) SENZA punto — a differenza
@@ -113,11 +148,14 @@ const TITOLI_DI_SEZIONE = new Set([
   "NANO", "ELFO", "HALFLING", "UMANO", "DRAGONIDE", "GNOMO", "MEZZELFO", "MEZZORCO", "TIEFLING",
 ]);
 
-function isTitoloDiSezione(line) {
+function isTitoloDiSezione(line, titoli) {
   if (line.includes(".")) return false;
   const lettere = line.replace(/[^A-Za-zÀ-ÿ]/g, "");
   if (lettere.length < 4 || lettere !== lettere.toUpperCase()) return false;
-  return TITOLI_DI_SEZIONE.has(compact(line)) || compact(line).startsWith("CAPITOLO");
+  // oltre ai nomi delle razze, i titoli che aprono una sezione nuova del libro: sono un elenco
+  // chiuso e verificabile, non un'euristica sul maiuscolo — che taglierebbe anche i riquadri
+  // laterali ("SEMPRE ENTUSIASTI" in mezzo ai tratti dello gnomo)
+  return titoli.has(compact(line)) || /^(CAPITOLO|OPZIONI|APPENDICE|INDICE|GLOSSARIO)/.test(compact(line));
 }
 
 // i numeri di pagina isolati restano appiccicati in coda all'ultimo tratto ("...a scelta. 31 32")
@@ -125,19 +163,32 @@ function isNumeroDiPagina(line) {
   return /^\d{1,3}$/.test(line.trim());
 }
 
+// L'impaginazione lascia qua e là un glifo su una riga tutta sua (il punto elenco decorativo, una
+// virgola staccata): non è testo, ma spezzava il periodo e con esso il riconoscimento del tratto
+// successivo — il githzerai perdeva così la Velocità, e senza velocità la scheda non si può
+// nemmeno verificare contro l'inglese.
+function isSegnoIsolato(line) {
+  return !/[A-Za-zÀ-ÿ0-9]/.test(line);
+}
+
 function loadLines(bookKey) {
   const raw = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, `${bookKey}.json`), "utf-8"));
   const lines = [];
+  // pagina di ogni riga: fuori dal Manuale del Giocatore serve a non far debordare una scheda
+  // oltre le proprie pagine (vedi parseBook)
+  const pagine = [];
   for (const page of raw.pages) {
     for (const line of page.text.split("\n")) {
       const t = line.trim();
-      if (t) lines.push(t);
+      if (!t) continue;
+      lines.push(t);
+      pagine.push(page.page);
     }
   }
-  return lines;
+  return { lines, pagine };
 }
 
-function parseTraitsBlock(lines, start, end) {
+function parseTraitsBlock(lines, start, end, titoli) {
   const traits = [];
   const introLines = [];
   const subraces = [];
@@ -145,18 +196,23 @@ function parseTraitsBlock(lines, start, end) {
   // il testo di un tratto continua sulle righe seguenti finché non inizia il prossimo tratto/
   // sottorazza: la lista "traits"/sottorazza tiene un riferimento all'ultimo tratto aperto
   let openTrait = null;
+  // "la riga prima si chiude con un punto" va calcolato sull'ultima riga di TESTO: una testatina di
+  // pagina o un numero di pagina in mezzo non rompono il periodo — è così che l'elfo del Manuale
+  // del Giocatore perdeva "Sensi Acuti", che nel PDF viene subito dopo "C A P ITOLO 2 I RAZZE".
+  let iniziaPeriodo = true;
 
   for (let i = start; i < end; i++) {
     const line = lines[i];
-    if (isPageHeaderNoise(line) || isNumeroDiPagina(line)) continue;
+    if (isPageHeaderNoise(line) || isNumeroDiPagina(line) || isSegnoIsolato(line)) continue;
     // I tratti finiscono ben prima della RAZZA successiva: il confine "TRATTI DEI ..." lascia in
     // mezzo tutta la parte descrittiva di quella dopo, e finiva incollata all'ultimo tratto (i
     // Linguaggi del tiefling contenevano l'apertura del capitolo sulle classi, il Talento
     // dell'umano il racconto d'apertura dei draconidi). Il titolo che riapre la prosa è stampato
     // tutto in maiuscolo, mentre i titoli di sottorazza hanno solo l'iniziale maiuscola.
-    if (isTitoloDiSezione(line)) break;
+    if (isTitoloDiSezione(line, titoli)) break;
 
-    const traitMatch = matchTraitLabel(line);
+    const traitMatch = matchTraitLabel(line, iniziaPeriodo);
+    iniziaPeriodo = /[.!?:]$/.test(line);
     if (traitMatch) {
       const target = activeSubrace ? activeSubrace.tratti : traits;
       openTrait = { nome: traitMatch.label, testo: traitMatch.rest };
@@ -178,6 +234,16 @@ function parseTraitsBlock(lines, start, end) {
       openTrait = null;
       continue;
     }
+    // Un titolo tutto maiuscolo che non è la razza successiva è un RIQUADRO laterale ("ELFI DI
+    // VARI REAMI" in mezzo ai tratti dell'elfo del mare, per via delle colonne che l'estrazione
+    // mescola): non chiude la scheda, ma chiude il tratto aperto, altrimenti quel tratto si
+    // mangia le due colonne del riquadro — 1.200 caratteri di storia degli elfi dentro "Fatata".
+    const lettere = line.replace(/[^A-Za-zÀ-ÿ]/g, "");
+    if (!line.includes(".") && lettere.length >= 8 && lettere === lettere.toUpperCase()) {
+      openTrait = null;
+      iniziaPeriodo = true;
+      continue;
+    }
     if (openTrait) {
       openTrait.testo += " " + line;
       continue;
@@ -191,23 +257,86 @@ function parseTraitsBlock(lines, start, end) {
   return { introduzione: introLines.join(" "), tratti: traits, sottorazze: subraces };
 }
 
+/**
+ * Prosa fra il titolone della razza e l'intestazione dei suoi tratti — la descrizione vera. Si
+ * risale dall'intestazione fino al titolo, saltando testatine, numeri di pagina e glifi isolati.
+ */
+function prosaPrimaDeiTratti(lines, anchor, titoli) {
+  const raccolte = [];
+  for (let i = anchor.lineIndex - 1; i >= 0 && i > anchor.lineIndex - 60; i--) {
+    const line = lines[i];
+    if (isTitoloDiSezione(line, titoli)) return raccolte.reverse().join(" ").replace(/\s+/g, " ").trim();
+    if (isPageHeaderNoise(line) || isNumeroDiPagina(line) || isSegnoIsolato(line)) continue;
+    // un'altra intestazione di tratti vuol dire che siamo scivolati nella razza precedente
+    if (ANCORA_GENERICA.test(line.replace(/\s+/g, " "))) return "";
+    raccolte.push(line);
+  }
+  return "";
+}
+
 function parseBook(bookKey) {
-  const lines = loadLines(bookKey);
+  const { lines, pagine } = loadLines(bookKey);
   const anchors = [];
   for (let i = 0; i < lines.length; i++) {
     const c = compact(lines[i]);
     const heading = RACE_HEADINGS.find((h) => c === h.anchor);
-    if (heading) anchors.push({ lineIndex: i, nome: heading.nome });
+    if (heading) {
+      anchors.push({ lineIndex: i, nome: heading.nome });
+      continue;
+    }
+    // fuori dal Manuale del Giocatore il nome della razza si legge dall'intestazione stessa
+    if (bookKey === "phb") continue;
+    // l'estrazione lascia ogni tanto un segno tipografico davanti all'intestazione
+    // ("'TRATTI DELL1ELADRIN"): senza toglierlo, l'Eladrin non veniva riconosciuto affatto e i
+    // suoi tratti finivano dentro la scheda del Duergar, che ne risultava con diciassette
+    const riga = lines[i].replace(/\s+/g, " ").replace(/^['’"·•]+/, "").trim();
+    const m = riga.match(ANCORA_GENERICA);
+    // l'indice del libro ha la stessa forma ("Tratti del genasi dell'acqua ....... 16"): un titolo
+    // vero è in maiuscolo e non porta puntini di guida
+    if (!m || riga.includes("..") || riga !== riga.toUpperCase()) continue;
+    let nome = m[1].trim();
+    if (PREPOSIZIONE_FINALE.test(nome)) nome = `${nome} ${lines[i + 1]?.trim() ?? ""}`.trim();
+    // il maiuscoletto stacca lettere anche in mezzo al nome ("DRAGONIDE C ROMATICO")
+    anchors.push({ lineIndex: i, nome: ricomponiParoleSpezzate(titoloItaliano(ricomponiUltimaLettera(nome))) });
   }
+
+  // Il confine di fine scheda è il titolone della razza SUCCESSIVA, stampato tutto in maiuscolo:
+  // senza, l'ultimo tratto si porta dietro tutta la prosa che apre la razza dopo. Nel Manuale del
+  // Giocatore quei titoli sono un elenco noto; altrove sono i nomi che le ancore hanno appena
+  // dichiarato, quindi non c'è nulla da scrivere a mano.
+  // anche la prima parola dei nomi composti: le quattro schede "Genasi dell'..." sono precedute da
+  // un unico titolone "GENASI", e senza di esso l'ultimo tratto del Firbolg si portava dietro
+  // l'apertura di quel capitoletto
+  const titoli = new Set([
+    ...TITOLI_DI_SEZIONE,
+    ...anchors.flatMap((a) => [compact(a.nome), compact(a.nome.split(" ")[0])]),
+  ]);
 
   const fixTrait = (t) => ({ nome: fixText(t.nome), testo: fixText(t.testo) });
 
   const races = anchors.map((anchor, idx) => {
-    const end = idx + 1 < anchors.length ? anchors[idx + 1].lineIndex : Math.min(lines.length, anchor.lineIndex + 400);
-    const { introduzione, tratti, sottorazze } = parseTraitsBlock(lines, anchor.lineIndex + 1, end);
+    // Nel Manuale del Giocatore una razza occupa più pagine e il confine è il titolone della
+    // successiva; negli altri manuali sta invece in una pagina, al massimo due, e l'ultima scheda
+    // del capitolo non ha nessun titolo noto dopo di sé — senza un tetto, il dragonide metallico
+    // del Tesoro dei Draghi si portava dietro cinque privilegi della sottoclasse del monaco.
+    const finePagine =
+      bookKey === "phb"
+        ? lines.length
+        : pagine.findIndex((p, i) => i > anchor.lineIndex && p > pagine[anchor.lineIndex] + 1);
+    const limite = finePagine === -1 ? lines.length : finePagine;
+    const end = Math.min(
+      idx + 1 < anchors.length ? anchors[idx + 1].lineIndex : anchor.lineIndex + 400,
+      limite,
+      lines.length,
+    );
+    const { introduzione, tratti, sottorazze } = parseTraitsBlock(lines, anchor.lineIndex + 1, end, titoli);
     return {
       nome: anchor.nome,
-      introduzione: fixText(introduzione),
+      // Fuori dal Manuale del Giocatore la descrizione della razza è stampata PRIMA
+      // dell'intestazione dei tratti, sotto il titolone: senza andarla a prendere, l'introduzione
+      // della scheda sarebbe la sola riga di servizio ("Un personaggio aarakocra possiede i
+      // seguenti tratti razziali").
+      introduzione: fixText(prosaPrimaDeiTratti(lines, anchor, titoli) || introduzione),
       tratti: tratti.map(fixTrait),
       sottorazze: sottorazze.map((s) => ({
         nome: titleCaseHeading(fixText(s.nome)),
