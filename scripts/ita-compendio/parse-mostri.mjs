@@ -565,6 +565,19 @@ function main() {
   console.log(`${nome}: ${monsters.length} mostri trovati -> ${outPath}`);
   console.log(`voci con dati numerici sospetti (da incrociare con l'inglese): ${suspectCount}`);
   console.log(`ancore "Sfida" scartate per header non trovato: ${skipped.length}`);
+  // --scartate stampa il contesto di ogni ancora persa: senza, "ne mancano 40" resta un numero e
+  // non c'è modo di capire quale scheda sia, né perché il suo nome non venga riconosciuto.
+  if (process.argv.includes("--scartate")) {
+    const { lines: righe } = loadLines(bookKey);
+    for (const s of skipped) {
+      if (s.lineIndex == null) {
+        console.log(`  - ${s.reason}: ${s.nomeMostro}`);
+        continue;
+      }
+      const contesto = righe.slice(Math.max(0, s.lineIndex - 12), s.lineIndex + 1).map((r) => `      ${r}`);
+      console.log(`  - riga ${s.lineIndex} (${s.reason}):\n${contesto.join("\n")}`);
+    }
+  }
   const counts = {};
   for (const m of monsters) counts[m.nome] = (counts[m.nome] || 0) + 1;
   const dups = Object.entries(counts).filter(([, c]) => c > 1);
