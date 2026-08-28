@@ -33,7 +33,7 @@ const FILE_BESTIARIO = {
 
 const CHALLENGE_RE = /^Sfida\s+([\d\s/]+|-)\s*(?:\(\s*([\d.,]+)\s*PE\))?/i;
 const CA_RE = /^Classe\s+Armatura\s+(\d+)/i;
-const PF_RE = /^Punti\s+Ferita\s+(\d+)/i;
+const PF_RE = /^Punti\s+Ferita\s+(\d+)\s*\(([^)]*)\)/i;
 
 // L'OCR scambia le cifre con le lettere che somigliano: "lS" per 15, "2O" per 20, "S" per 5.
 const numero = (grezzo) => {
@@ -146,8 +146,18 @@ const inglesi = await fetch(
 
 const gradoInglese = (cr) => (typeof cr === "object" ? cr?.cr : cr) ?? null;
 
+/**
+ * L'impronta come CHIAVE, per ritrovare la stessa scheda dal parser.
+ *
+ * Classe armatura, punti ferita e grado di sfida bastano a distinguere le schede fra loro e non
+ * dipendono da come l'estrazione ha reso il titolo — che è appunto il pezzo mancante. Del grado si
+ * tengono solo le cifre, perché intorno l'OCR lascia di tutto ("Sfida 9 (S.000 PE}").
+ */
+const impronta = (ca, pf, sfida) => `${ca}|${pf}|${sfida.match(/^Sfida\s+([\d/]+)/i)?.[1] ?? "?"}`;
+
 /** Ogni scheda italiana orfana: il blocco statistiche che sta sopra un'ancora "Sfida". */
 const orfane = [];
+const improntePerLibro = new Map();
 for (let i = 0; i < righe.length; i++) {
   if (!CHALLENGE_RE.test(righe[i])) continue;
   // si risale fino alla riga "Classe Armatura" che apre questo blocco
@@ -157,6 +167,17 @@ for (let i = 0; i < righe.length; i++) {
     if (CA_RE.test(righe[j])) { inizio = j; break; }
   }
   if (inizio === -1) continue;
+
+  // Ogni scheda del libro entra nel conteggio delle impronte, non solo quelle senza nome: la
+  // collisione che conta è con le schede NORMALI (il Basilisco letto correttamente e un'orfana con
+  // gli stessi numeri), non fra orfane. Un'impronta usata da più di una scheda non identifica
+  // nessuno e va lasciata stare.
+  const caTutte = numero(righe[inizio].match(CA_RE)[1]);
+  const pfTutte = numero(righe[inizio + 1]?.match(PF_RE)?.[1] ?? "");
+  if (caTutte != null && pfTutte != null) {
+    const k = impronta(caTutte, pfTutte, righe[i]);
+    improntePerLibro.set(k, (improntePerLibro.get(k) ?? 0) + 1);
+  }
 
   // il nome sta due righe sopra "Classe Armatura" (nome, tipo/allineamento, CA): se lì non c'è
   // una riga di tipo/allineamento la scheda è una di quelle che il parser perde
@@ -174,6 +195,7 @@ for (let i = 0; i < righe.length; i++) {
     tipo,
     ca: numero(righe[inizio].match(CA_RE)[1]),
     pf: numero(righe[inizio + 1]?.match(PF_RE)?.[1] ?? ""),
+    formulaPf: righe[inizio + 1]?.match(PF_RE)?.[2] ?? "",
     sfida: righe[i].replace(/\s+/g, " "),
     caratteristiche: caratteristicheVicine(righe, inizio, i),
   });
@@ -205,16 +227,18 @@ for (const scheda of orfane) {
 }
 
 for (const p of proposte) {
-  const impronta = `CA ${p.ca}, PF ${p.pf}, ${p.sfida}`;
+  const descrizioneImpronta = `CA ${p.ca}, PF ${p.pf}, ${p.sfida}`;
   if (p.en) {
     const candidati = nomiPerPagina.get(p.pagina + OFFSET_PAGINA) ?? [];
     const scelta = scegliNome(candidati, p.en);
-    if (scelta?.sicuro) abbinati.push({ it: scelta.nome, en: p.en });
+    if (scelta?.sicuro) {
+      abbinati.push({ it: scelta.nome, en: p.en, impronta: impronta(p.ca, p.pf, p.sfida) });
+    }
     else daDecidere.push({ en: p.en, pagina: p.pagina + OFFSET_PAGINA, candidati });
     const proposto = scelta
       ? `${scelta.sicuro ? "" : "? "}"${scelta.nome}"${candidati.length > 1 ? ` (fra ${candidati.length})` : ""}`
       : "(non nell'indice)";
-    console.log(`  ✓ p.${p.pagina + OFFSET_PAGINA} ${p.en} (grado ${p.cr}) — italiano: ${proposto} — ${impronta}`);
+    console.log(`  ✓ p.${p.pagina + OFFSET_PAGINA} ${p.en} (grado ${p.cr}) — italiano: ${proposto} — ${descrizioneImpronta}`);
   } else {
     console.log(`  · riga ${p.riga}: ${p.quanti} candidati — ${impronta} — nome letto: ${JSON.stringify(p.nomeGrezzo)}`);
   }
@@ -230,4 +254,31 @@ if (daDecidere.length > 0) {
 // averla guardata, perché è la mappa a decidere che cosa entra nel Compendio.
 const uscita = path.join(SCRIPT_DIR, "parsed", `${libro}-mostri-per-impronta.json`);
 writeFileSync(uscita, JSON.stringify(abbinati, null, 2), "utf-8");
+
+// Se i nomi sono già stati rivisti a mano, si produce anche il file che serve al PARSER: impronta
+// -> nome italiano stampato. È quello che permette a parse-mostri.mjs di dare un nome a una scheda
+// il cui titolo l'estrazione ha perso, invece di buttarla.
+try {
+  const rivisti = JSON.parse(readFileSync(path.join(SCRIPT_DIR, `nomi-mostri-rivisti-${libro}.json`), "utf-8"));
+  // Un'impronta condivisa da più schede non identifica nessuno: quattro creature del manuale
+  // hanno tutte classe armatura 12, 22 punti ferita e grado 1/2. Quelle si lasciano stare — è
+  // meglio perdere un nome che darne uno sbagliato a una scheda.
+  const quante = improntePerLibro;
+
+  const perImpronta = {};
+  const senzaNome = [];
+  const ambigue = [];
+  for (const a of abbinati) {
+    if (quante.get(a.impronta) > 1) ambigue.push(`${a.it} (${a.impronta})`);
+    else if (rivisti[a.en]) perImpronta[a.impronta] = rivisti[a.en];
+    else senzaNome.push(a.en);
+  }
+  if (ambigue.length > 0) console.log(`  impronte ambigue, lasciate stare: ${ambigue.join(", ")}`);
+  const fileParser = path.join(SCRIPT_DIR, `nomi-per-impronta-${libro}.json`);
+  writeFileSync(fileParser, JSON.stringify(perImpronta, null, 2) + "\n", "utf-8");
+  console.log(`${Object.keys(perImpronta).length} impronte con nome rivisto -> ${fileParser}`);
+  if (senzaNome.length > 0) console.log(`  ancora da rivedere: ${senzaNome.join(", ")}`);
+} catch {
+  console.log(`(nessun nomi-mostri-rivisti-${libro}.json: i nomi vanno ancora rivisti a mano)`);
+}
 console.log(`\nproposta scritta in ${uscita}`);

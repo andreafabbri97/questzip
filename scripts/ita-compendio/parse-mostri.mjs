@@ -294,6 +294,38 @@ let nomiDiSchedaNoti = new Set();
 // comunque appena incontra la "Sfida" del mostro PRECEDENTE: oltre quella siamo in un'altra scheda.
 const RIGHE_INDIETRO_MASSIME = 90;
 
+/**
+ * Nome di riserva per le schede il cui TITOLO l'estrazione ha perso o storpiato.
+ *
+ * In un centinaio di stat block del Manuale dei Mostri il blocco delle statistiche è intero ma la
+ * riga del nome no ("DEMONP" per Demone d'Ombra, o proprio assente): senza nome la scheda veniva
+ * buttata. Classe armatura, punti ferita e grado di sfida sono però numeri, e insieme fanno
+ * un'impronta che riconosce una sola creatura — vedi recupera-mostri-per-impronta.mjs, che produce
+ * questo file dopo che i nomi italiani sono stati verificati uno per uno sul manuale.
+ */
+function caricaNomiPerImpronta(bookKey) {
+  try {
+    return JSON.parse(readFileSync(path.join(SCRIPT_DIR, `nomi-per-impronta-${bookKey}.json`), "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+/** Header sintetico per una scheda senza titolo: il nome viene dall'impronta, il resto dal blocco. */
+function headerDaImpronta(lines, challengeLineIndex, nomiPerImpronta) {
+  for (let i = challengeLineIndex - 1; i >= 0 && i > challengeLineIndex - RIGHE_INDIETRO_MASSIME; i--) {
+    if (CHALLENGE_RE.test(lines[i])) return null;
+    if (!lineStartsWithLabel(lines[i], "Classe Armatura")) continue;
+    const ca = lines[i].match(/(\d+)/)?.[1];
+    const pf = lines[i + 1]?.match(/^Punti\s+Ferita\s+(\d+)/i)?.[1];
+    const sfida = lines[challengeLineIndex].match(/^Sfida\s+([\d/]+)/i)?.[1];
+    if (!ca || !pf || !sfida) return null;
+    const nome = nomiPerImpronta[`${ca}|${pf}|${sfida}`];
+    return nome ? { sizeTypeLineIndex: i - 1, nameStartIndex: i - 1, nameLineIndex: i - 1, nomeForzato: nome } : null;
+  }
+  return null;
+}
+
 function findHeaderStart(lines, challengeLineIndex, { unisci = true } = {}) {
   for (let i = challengeLineIndex - 1; i >= 0 && i > challengeLineIndex - RIGHE_INDIETRO_MASSIME; i--) {
     // superata la casella "Sfida" precedente si è usciti dalla scheda: il nome che si troverebbe
@@ -386,6 +418,7 @@ function parseAbilities(lines, start) {
 
 function parseBook(bookKey) {
   const { lines, nome } = loadLines(bookKey);
+  const nomiPerImpronta = caricaNomiPerImpronta(bookKey);
   const anchors = findChallengeAnchors(lines);
 
   // Prima passata SENZA unione: raccoglie i nomi che stanno da soli sopra uno stat block, cioe' i
@@ -402,7 +435,9 @@ function parseBook(bookKey) {
 
   for (let idx = 0; idx < anchors.length; idx++) {
     const anchor = anchors[idx];
-    const header = findHeaderStart(lines, anchor.lineIndex);
+    const header =
+      findHeaderStart(lines, anchor.lineIndex) ??
+      headerDaImpronta(lines, anchor.lineIndex, nomiPerImpronta);
     if (!header) {
       skipped.push({ reason: "header non trovato", lineIndex: anchor.lineIndex });
       if (process.env.DBG_SKIP) {
@@ -423,11 +458,13 @@ function parseBook(bookKey) {
 
     // Le righe da nameStartIndex a nameLineIndex sono le porzioni del nome andato a capo: unite
     // in un nome solo (di norma è una riga sola, e allora questo equivale al comportamento di prima).
-    const nomeMostro = lines
-      .slice(header.nameStartIndex, header.nameLineIndex + 1)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .join(" ");
+    const nomeMostro =
+      header.nomeForzato ??
+      lines
+        .slice(header.nameStartIndex, header.nameLineIndex + 1)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .join(" ");
     // scarta falsi positivi ovvi: la riga "nome" non deve essere a sua volta una riga di campo,
     // né un'intestazione di pagina/capitolo ripetuta ("CAPITOLO 2 I BESTIARIO", a volte con uno
     // spazio indebito prima di "APITOLO" per lo stesso artefatto small-caps visto altrove) che
@@ -449,6 +486,12 @@ function parseBook(bookKey) {
         fields[label] = null;
       }
     }
+
+    const ca = fields["Classe Armatura"]?.match(/(\d+)/)?.[1];
+    const pf = fields["Punti Ferita"]?.match(/(\d+)/)?.[1];
+    const gradoSfida = lines[anchor.lineIndex].match(/^Sfida\s+([\d/]+)/i)?.[1];
+    const nomePerImpronta =
+      ca && pf && gradoSfida ? nomiPerImpronta[`${ca}|${pf}|${gradoSfida}`] : undefined;
 
     const { abilities, next } = parseAbilities(lines, cursor);
     cursor = next;
@@ -519,7 +562,11 @@ function parseBook(bookKey) {
       abilityValues.some((a) => a === null);
 
     monsters.push({
-      nome: NOME_FIXES[nomeMostro] ?? nomeMostro,
+      // Il nome per impronta vince su quello letto: il titolo esce spesso storpiato dal
+      // maiuscoletto ("AzER", "GoBLIN", "0RSOGUFO", "R.AKSHASA") o è addirittura una riga di prosa
+      // finita lì, mentre l'impronta è verificata sui numeri e il nome italiano corrispondente è
+      // stato controllato a mano sull'indice del manuale e sul titolo stampato.
+      nome: nomePerImpronta ?? NOME_FIXES[nomeMostro] ?? nomeMostro,
       tipo: header.tipo,
       taglia: header.taglia,
       allineamento: header.allineamento,
