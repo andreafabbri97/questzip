@@ -432,7 +432,12 @@ function risolviNomiDoppi(monsters) {
       m.nome = m.nomeLetto;
     }
   }
-  return monsters.map(({ nomeLetto: _n, daImpronta: _d, ...resto }) => resto);
+  // i due campi di servizio non devono finire nel file: servivano solo qui
+  for (const m of monsters) {
+    delete m.nomeLetto;
+    delete m.daImpronta;
+  }
+  return monsters;
 }
 
 function parseBook(bookKey) {
