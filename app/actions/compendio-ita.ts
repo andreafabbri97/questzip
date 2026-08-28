@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { eq, ne } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -20,24 +21,41 @@ async function requireAuth() {
   if (!session?.user) throw new Error("Devi accedere per continuare.");
 }
 
+/**
+ * Cache lato server delle tabelle del Compendio.
+ *
+ * Queste tabelle cambiano solo quando le riempiamo noi con gli script di `scripts/ita-compendio`,
+ * cioè una volta ogni tanto — mentre venivano rilette dal database a OGNI apertura di pagina, di
+ * ogni persona: le sole traduzioni dei mostri sono 4.757 righe con la descrizione intera. È così
+ * che il 2026-08-28 il progetto Neon ha superato la quota mensile di trasferimento dati (5,6 GB su
+ * 5) e l'app ha smesso di rispondere per tutti.
+ *
+ * Con la cache il database viene letto una volta per periodo di validità, non una volta per
+ * visita. La verifica della sessione resta FUORI dalla cache: si mette in cache il contenuto del
+ * Compendio, che è uguale per tutti, mai il controllo di chi lo sta chiedendo.
+ */
+const GIORNO = 60 * 60 * 24;
+const conCache = <T,>(chiave: string, query: () => Promise<T>) =>
+  unstable_cache(query, [chiave], { revalidate: GIORNO, tags: ["compendio-ita"] })();
+
 export async function getIncantesimiIta() {
   await requireAuth();
-  return db.select().from(compendioItaIncantesimi);
+  return conCache("incantesimi", () => db.select().from(compendioItaIncantesimi));
 }
 
 export async function getMostriIta() {
   await requireAuth();
-  return db.select().from(compendioItaMostri);
+  return conCache("mostri", () => db.select().from(compendioItaMostri));
 }
 
 export async function getRazzeIta() {
   await requireAuth();
-  return db.select().from(compendioItaRazze);
+  return conCache("razze", () => db.select().from(compendioItaRazze));
 }
 
 export async function getClassiIta() {
   await requireAuth();
-  return db.select().from(compendioItaClassi);
+  return conCache("classi", () => db.select().from(compendioItaClassi));
 }
 
 export async function getRegoleIta() {
@@ -45,22 +63,26 @@ export async function getRegoleIta() {
   // "oggetti_magici" era OCR di 8 pagine di flavor text inglese di qualità troppo bassa per
   // essere utile (screenshot di un lettore, non una scansione vera) — il catalogo oggetti magici
   // vero vive già pulito nel tab Oggetti magici, questa fonte era solo rumore.
-  return db.select().from(compendioItaRegole).where(ne(compendioItaRegole.fonte, "oggetti_magici"));
+  return conCache("regole", () =>
+    db.select().from(compendioItaRegole).where(ne(compendioItaRegole.fonte, "oggetti_magici")),
+  );
 }
 
 export async function getOggettiIta() {
   await requireAuth();
-  return db.select().from(compendioItaOggetti);
+  return conCache("oggetti", () => db.select().from(compendioItaOggetti));
 }
 
 export async function getTalentiIta() {
   await requireAuth();
-  return db.select().from(compendioItaTalenti);
+  return conCache("talenti", () => db.select().from(compendioItaTalenti));
 }
 
 // Cache IA (compendio_traduzione_ia): nomi/descrizioni tradotti dall'IA per le voci che non hanno
 // testo ufficiale — priorità di lettura sempre ufficiale -> IA -> traduzione live, mai il contrario.
 export async function getTraduzioniIa(kind: CompendiumKind) {
   await requireAuth();
-  return db.select().from(compendioTraduzioniIa).where(eq(compendioTraduzioniIa.kind, kind));
+  return conCache(`traduzioni-ia:${kind}`, () =>
+    db.select().from(compendioTraduzioniIa).where(eq(compendioTraduzioniIa.kind, kind)),
+  );
 }
