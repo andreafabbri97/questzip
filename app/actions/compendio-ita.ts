@@ -3,6 +3,7 @@
 import { unstable_cache } from "next/cache";
 import { eq, ne } from "drizzle-orm";
 import { auth } from "@/auth";
+import { TAG_COMPENDIO } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
 import {
   compendioItaClassi,
@@ -30,13 +31,19 @@ async function requireAuth() {
  * che il 2026-08-28 il progetto Neon ha superato la quota mensile di trasferimento dati (5,6 GB su
  * 5) e l'app ha smesso di rispondere per tutti.
  *
- * Con la cache il database viene letto una volta per periodo di validità, non una volta per
- * visita. La verifica della sessione resta FUORI dalla cache: si mette in cache il contenuto del
+ * La validità è INFINITA di proposito: questo contenuto non scade da sé, cambia solo quando
+ * rilanciamo gli script — quindi una rilettura a tempo sarebbe traffico speso per niente. A
+ * riempimento finito si invalida a mano il tag, con `scripts/ita-compendio/invalida-cache.mjs`
+ * (che chiama /api/compendio/invalida). È il rovescio della medaglia da ricordare: se si aggiorna
+ * una tabella e ci si dimentica di invalidare, l'app continua a mostrare la versione precedente
+ * senza che nulla lo segnali — per questo l'invalidazione va agganciata agli script, non alla
+ * memoria di chi li lancia.
+ *
+ * La verifica della sessione resta FUORI dalla cache: si mette in cache il contenuto del
  * Compendio, che è uguale per tutti, mai il controllo di chi lo sta chiedendo.
  */
-const GIORNO = 60 * 60 * 24;
 const conCache = <T,>(chiave: string, query: () => Promise<T>) =>
-  unstable_cache(query, [chiave], { revalidate: GIORNO, tags: ["compendio-ita"] })();
+  unstable_cache(query, [chiave], { revalidate: false, tags: [TAG_COMPENDIO] })();
 
 export async function getIncantesimiIta() {
   await requireAuth();
