@@ -98,9 +98,17 @@ function titoloVicino(inizio) {
  * si verifica su un caso noto (il Glabrezu è a pagina 58 dell'indice e a pagina 57 del PDF).
  */
 const OFFSET_PAGINA = 1;
+// L'indice delle schede sta in fondo al libro, e va dichiarato: cercare "la pagina con più righe
+// nella forma Nome, numero" sembrava più furbo ma pesca l'INDICE GENERALE a inizio volume, che ha
+// la stessa forma e rimanda ai capitoli invece che alle schede. Dichiarato solo per il Manuale dei
+// Mostri: negli altri manuali l'indice o non c'è o i suoi numeri di pagina non corrispondono alle
+// schede — in Mostri del Multiverso dava "Abishai verde" per l'Abishai ROSSO, e un nome sbagliato
+// è peggio di nessun nome.
+const PAGINA_INDICE = { mm: 350 };
+
 const nomiPerPagina = new Map();
 for (const pagina of raw.pages) {
-  if (pagina.page < 350) continue;
+  if (!PAGINA_INDICE[libro] || pagina.page < PAGINA_INDICE[libro]) continue;
   for (const linea of (pagina.text ?? "").split("\n")) {
     const m = linea.trim().match(/^(.{3,44}?),\s*([0-9OoIl]{1,3})$/);
     if (!m) continue;
