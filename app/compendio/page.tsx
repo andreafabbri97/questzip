@@ -367,7 +367,8 @@ export default function CompendiumPage() {
       </div>
       {language === "it" && (
         <p className="text-xs text-muted -mt-2">
-          🇮🇹 Traduzione automatica (qualità non garantita) — il testo originale è in inglese.
+          🇮🇹 Testo italiano dai manuali ufficiali dove disponibile; per il resto una traduzione,
+          con l&apos;originale inglese sempre a fianco.
         </p>
       )}
 

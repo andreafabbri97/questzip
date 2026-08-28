@@ -5,9 +5,16 @@ import { useEffect, useState } from "react";
 import { correggiTerminiDnd } from "@/lib/traduzione-termini";
 
 /**
- * Traduzione automatica via l'endpoint pubblico non ufficiale di Google Translate
- * (nessuna chiave, nessun costo). Qualità non garantita sulla terminologia D&D,
- * ma è l'unica opzione gratuita per tradurre l'intero compendio al volo.
+ * ULTIMA RISORSA per tradurre un nome, quando nel database non c'è nulla.
+ *
+ * L'italiano dell'app viene dai manuali: prima il testo ufficiale estratto dai PDF posseduti, poi
+ * la cache già popolata in `compendio_traduzione_ia` (nome e descrizione per tutte e nove le
+ * categorie del Compendio). Questo endpoint pubblico non ufficiale di Google Translate resta solo
+ * per ciò che non è coperto da nessuna delle due — e non va considerato affidabile: la qualità
+ * sulla terminologia D&D è scarsa (rende "familiar" con "famigliare" invece di "famiglio", vedi
+ * lib/traduzione-termini.ts) e dal 2026-08-28 risponde comunque "429 Too Many Requests", quindi in
+ * pratica non traduce più niente. Quando fallisce, chi chiama tiene l'originale inglese: è un
+ * degrado accettabile proprio perché è l'ultimo anello, non il canale principale.
  */
 const CACHE_KEY = "questzip:translate-cache";
 const CACHE_LIMIT = 1000;

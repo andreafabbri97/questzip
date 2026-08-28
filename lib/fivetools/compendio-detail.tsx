@@ -77,6 +77,7 @@ import {
   type OrigineIncantesimo,
 } from "@/lib/fivetools/incantesimi-classe";
 import { bestItalianName, buildItalianNameIndex, type ItalianNameIndex } from "@/lib/fivetools/italian-names";
+import { correggiTerminiDnd } from "@/lib/traduzione-termini";
 export { bestItalianName } from "@/lib/fivetools/italian-names";
 export type { ItalianNameIndex } from "@/lib/fivetools/italian-names";
 
@@ -166,7 +167,18 @@ export function useTraduzioneIa(
     };
   }, [kind, enabled]);
 
-  return useMemo(() => rows?.find((r) => r.name === name && r.source === source) ?? null, [rows, name, source]);
+  return useMemo(() => {
+    const riga = rows?.find((r) => r.name === name && r.source === source);
+    if (!riga) return null;
+    // Anche questa cache è stata prodotta da un modello, quindi può contenere gli stessi scivoloni
+    // di terminologia D&D della traduzione dal vivo ("famigliare" per "famiglio"): la correzione
+    // vale per entrambe le strade, non solo per quella di riserva.
+    return {
+      ...riga,
+      nomeIta: riga.nomeIta ? correggiTerminiDnd(riga.nomeIta) : riga.nomeIta,
+      descrizioneIta: riga.descrizioneIta ? correggiTerminiDnd(riga.descrizioneIta) : riga.descrizioneIta,
+    };
+  }, [rows, name, source]);
 }
 
 const OFFICIAL_LOADERS: Partial<
