@@ -29,7 +29,7 @@ const applica = process.argv.includes("--applica");
 // abbinamenti inglesi già verificati.
 const riallinea = process.argv.includes("--riallinea");
 
-const FONTI = { multiverso: "MPMM", fizban: "FTD", ravenloft: "VRGR", dragonlance: "DSotDQ", dm_manuale: "DMG" };
+const FONTI = { multiverso: "MPMM", fizban: "FTD", ravenloft: "VRGR", dragonlance: "DSotDQ", dm_manuale: "DMG", tasha: "TCE" };
 if (!FONTI[libro]) {
   console.error(`Uso: aggiungi-razze-da-manuali.mjs <${Object.keys(FONTI).join("|")}> [--applica]`);
   process.exit(1);

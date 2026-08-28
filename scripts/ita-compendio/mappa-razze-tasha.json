@@ -1,0 +1,6 @@
+{
+  "_nota": "Le Origini Personalizzate del Calderone di Tasha (capitolo 1, pagina 8), che 5etools chiama \"Custom Lineage\". Il parser generico non le vede perché non hanno un'intestazione \"TRATTI DEL...\": il testo è trascritto correggendo i refusi dell'estrazione di quelle pagine, dove la doppia elle di \"Il\" esce come \"||\" e la è accentata come \"€\" o \"@\". Taglia Piccola o Media e velocità 9 metri combaciano con i dati inglesi, ed è quella la prova dell'abbinamento.",
+  "Origini Personalizzate": {
+    "en": "Custom Lineage"
+  }
+}
