@@ -31,9 +31,20 @@ export function useLocalCollection<T>(key: string, schema: z.ZodType<T>) {
   }, [key, schema]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const persist = (next: T[]) => {
-    setItems(next);
-    window.localStorage.setItem(key, JSON.stringify(next));
+  /**
+   * Scrive la lista in memoria e su localStorage.
+   *
+   * Accetta anche una funzione, come setState: serve a chi calcola la nuova lista a partire da
+   * quella corrente DOPO un'attesa (la riconciliazione col backup cloud in app/personaggi). Con la
+   * sola forma a valore, quella lista veniva catturata quando l'attesa era cominciata, e un
+   * salvataggio fatto nel frattempo finiva riscritto sopra — cioè perso.
+   */
+  const persist = (next: T[] | ((prev: T[]) => T[])) => {
+    setItems((prev) => {
+      const valore = typeof next === "function" ? (next as (prev: T[]) => T[])(prev) : next;
+      window.localStorage.setItem(key, JSON.stringify(valore));
+      return valore;
+    });
   };
 
   return { items, persist, loaded };

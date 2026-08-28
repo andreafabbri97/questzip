@@ -246,8 +246,12 @@ export function SchedaCondivisa({ pc, onChiudi }: { pc: VoceParty; onChiudi: () 
           <Sezione titolo="Stato">
             <div className="flex flex-wrap gap-1.5 text-xs">
               <Pillola
-                attiva={pc.ispirazione}
-                testo={pc.ispirazione ? "★ Ispirazione" : "Nessuna ispirazione"}
+                attiva={pc.ispirazione > 0}
+                testo={
+                  pc.ispirazione > 0
+                    ? `${"★".repeat(pc.ispirazione)} Ispirazione ${pc.ispirazione}`
+                    : "Nessuna ispirazione"
+                }
               />
               {pc.affaticamento > 0 && (
                 <Pillola attiva testo={`Affaticamento ${pc.affaticamento}`} />

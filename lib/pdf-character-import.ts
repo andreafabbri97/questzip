@@ -572,7 +572,9 @@ export async function importCharacterFromPdf(bytes: ArrayBuffer): Promise<Charac
     occhi: text.get("EYES")?.trim() ?? "",
     carnagione: text.get("SKIN")?.trim() ?? "",
     capelli: text.get("HAIR")?.trim() ?? "",
-    ispirazione: [1, 2, 3, 4].some((n) => check.get(`insp${n}`)),
+    // la scheda ufficiale ha quattro caselle di ispirazione: si contano quelle spuntate, prima
+    // se ne teneva solo il "almeno una"
+    ispirazione: [1, 2, 3, 4].filter((n) => check.get(`insp${n}`)).length,
     affaticamento: clamp(toInt(text.get("Exhaustion"), 0), 0, 6),
     livelloFollia: clamp(toInt(text.get("MadnessLvl"), 0), 0, 6),
     oggettiMagici,

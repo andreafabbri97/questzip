@@ -72,6 +72,10 @@ import {
   getTraduzioniIa,
 } from "@/app/actions/compendio-ita";
 import type { CompendiumKind } from "@/lib/fivetools/data";
+import {
+  incantesimiDelleSottoclassi,
+  type OrigineIncantesimo,
+} from "@/lib/fivetools/incantesimi-classe";
 import { bestItalianName, buildItalianNameIndex, type ItalianNameIndex } from "@/lib/fivetools/italian-names";
 export { bestItalianName } from "@/lib/fivetools/italian-names";
 export type { ItalianNameIndex } from "@/lib/fivetools/italian-names";
@@ -1522,79 +1526,172 @@ const NOMI_LIVELLO_INCANTESIMO = [
  * senza perdere la scheda della classe.
  */
 function IncantesimiDiClasse({ cls, language }: { cls: RawClass; language: Language }) {
-  const [perLivello, setPerLivello] = useState<Map<number, RawSpell[]> | null>(null);
+  const [dati, setDati] = useState<{
+    perLivello: Map<number, { spell: RawSpell; origine: OrigineIncantesimo }[]>;
+    sottoclassi: { nome: string; fonte: string; perLivello: Map<number, RawSpell[]> }[];
+  } | null>(null);
   const [aperto, setAperto] = useState(false);
+  const [apertoSottoclassi, setApertoSottoclassi] = useState(false);
   const [mention, setMention] = useState<ParsedMentionToken | null>(null);
   const indiceIta = useItalianSearchIndex("incantesimi", language === "it");
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadClassSpells(), loadSpells()]).then(([perClasse, tutti]) => {
-      if (cancelled) return;
-      const perChiave = new Map(tutti.map((s) => [`${s.name}|${s.source}`, s]));
-      const gruppi = new Map<number, RawSpell[]>();
-      for (const rif of perClasse.get(`${cls.name}|${cls.source}`) ?? []) {
-        const spell = perChiave.get(`${rif.name}|${rif.source}`);
-        if (!spell) continue;
-        const lista = gruppi.get(spell.level) ?? [];
-        lista.push(spell);
-        gruppi.set(spell.level, lista);
-      }
-      setPerLivello(gruppi);
-    });
+    Promise.all([loadClassSpells(), loadSpells(), loadClassData()]).then(
+      ([perClasse, tutti, classData]) => {
+        if (cancelled) return;
+        const perChiave = new Map(tutti.map((s) => [`${s.name}|${s.source}`, s]));
+        // le sottoclassi nominano l'incantesimo in minuscolo e spesso senza fonte ("shield"),
+        // quindi serve anche un indice per solo nome: a parità di nome vince l'edizione 2014,
+        // l'unica per cui esiste il testo ufficiale italiano
+        const perNome = new Map<string, RawSpell>();
+        for (const s of tutti) {
+          const chiave = s.name.toLowerCase();
+          const attuale = perNome.get(chiave);
+          if (!attuale || (!edizione2014(attuale.source) && edizione2014(s.source))) {
+            perNome.set(chiave, s);
+          }
+        }
+        const risolvi = (rif: { name: string; source?: string }) =>
+          (rif.source ? perChiave.get(`${rif.name}|${rif.source}`) : undefined) ??
+          perNome.get(rif.name.toLowerCase());
+
+        const perLivello = new Map<number, { spell: RawSpell; origine: OrigineIncantesimo }[]>();
+        for (const rif of perClasse.get(`${cls.name}|${cls.source}`) ?? []) {
+          const spell = risolvi(rif);
+          if (!spell) continue;
+          const lista = perLivello.get(spell.level) ?? [];
+          lista.push({ spell, origine: rif.origine });
+          perLivello.set(spell.level, lista);
+        }
+
+        const sottoclassi = incantesimiDelleSottoclassi(
+          classData.subclasses,
+          cls.name,
+          cls.source,
+        ).map((gruppo) => {
+          const perLivelloSub = new Map<number, RawSpell[]>();
+          for (const rif of gruppo.incantesimi) {
+            const spell = risolvi(rif);
+            if (!spell) continue;
+            const lista = perLivelloSub.get(spell.level) ?? [];
+            if (!lista.some((s) => s.name === spell.name)) lista.push(spell);
+            perLivelloSub.set(spell.level, lista);
+          }
+          return { nome: gruppo.sottoclasse, fonte: gruppo.fonte, perLivello: perLivelloSub };
+        });
+
+        setDati({ perLivello, sottoclassi: sottoclassi.filter((s) => s.perLivello.size > 0) });
+      },
+    );
     return () => {
       cancelled = true;
     };
   }, [cls.name, cls.source]);
 
-  const totale = perLivello ? [...perLivello.values()].reduce((n, l) => n + l.length, 0) : 0;
-  if (!perLivello || totale === 0) return null;
+  const totale = dati ? [...dati.perLivello.values()].reduce((n, l) => n + l.length, 0) : 0;
+  const totaleSottoclassi = dati
+    ? dati.sottoclassi.reduce(
+        (n, s) => n + [...s.perLivello.values()].reduce((m, l) => m + l.length, 0),
+        0,
+      )
+    : 0;
+  if (!dati || (totale === 0 && totaleSottoclassi === 0)) return null;
 
   const nomeDi = (spell: RawSpell) =>
     (language === "it" ? bestItalianName(indiceIta, spell.name, spell.source) : null) ?? spell.name;
 
+  const ordinati = <T,>(lista: T[], nome: (v: T) => string) =>
+    lista.slice().sort((a, b) => nome(a).localeCompare(nome(b), "it", { sensitivity: "base" }));
+
+  const chip = (spell: RawSpell, aggiunto?: string) => (
+    <button
+      key={`${spell.name}|${spell.source}`}
+      onClick={() => setMention({ name: spell.name, kind: "incantesimi", source: spell.source })}
+      title={aggiunto ? `Aggiunto alla lista da ${aggiunto}` : undefined}
+      className={`rounded-md border bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:border-accent hover:text-accent-strong ${
+        aggiunto ? "border-dashed border-edge" : "border-edge"
+      }`}
+    >
+      {nomeDi(spell)}
+    </button>
+  );
+
+  const livelliOrdinati = <T,>(mappa: Map<number, T[]>) => [...mappa.keys()].sort((a, b) => a - b);
+
   return (
     <div className="space-y-2">
-      <button
-        onClick={() => setAperto((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2 text-left transition-colors hover:border-accent/50"
-      >
-        <span className="text-xs uppercase tracking-widest text-muted">
-          Incantesimi della classe{" "}
-          <span className="text-accent-strong">({totale})</span>
-        </span>
-        <span className="text-xs text-muted">{aperto ? "▲" : "▼"}</span>
-      </button>
+      {totale > 0 && (
+        <>
+          <button
+            onClick={() => setAperto((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2 text-left transition-colors hover:border-accent/50"
+          >
+            <span className="text-xs uppercase tracking-widest text-muted">
+              Incantesimi della classe <span className="text-accent-strong">({totale})</span>
+            </span>
+            <span className="text-xs text-muted">{aperto ? "▲" : "▼"}</span>
+          </button>
 
-      {aperto && (
-        <div className="space-y-3">
-          {[...perLivello.keys()]
-            .sort((a, b) => a - b)
-            .map((livello) => (
-              <div key={livello} className="space-y-1.5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted">
-                  {NOMI_LIVELLO_INCANTESIMO[livello] ?? `Livello ${livello}`}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {perLivello
-                    .get(livello)!
-                    .slice()
-                    .sort((a, b) => nomeDi(a).localeCompare(nomeDi(b), "it", { sensitivity: "base" }))
-                    .map((spell) => (
-                      <button
-                        key={`${spell.name}|${spell.source}`}
-                        onClick={() =>
-                          setMention({ name: spell.name, kind: "incantesimi", source: spell.source })
-                        }
-                        className="rounded-md border border-edge bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:border-accent hover:text-accent-strong"
-                      >
-                        {nomeDi(spell)}
-                      </button>
-                    ))}
+          {aperto && (
+            <div className="space-y-3">
+              <p className="text-[10px] text-muted">
+                Il bordo tratteggiato segna gli incantesimi che un manuale successivo aggiunge alla
+                lista di questa classe (passa il puntatore per sapere quale).
+              </p>
+              {livelliOrdinati(dati.perLivello).map((livello) => (
+                <div key={livello} className="space-y-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted">
+                    {NOMI_LIVELLO_INCANTESIMO[livello] ?? `Livello ${livello}`}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ordinati(dati.perLivello.get(livello)!, (v) => nomeDi(v.spell)).map((v) =>
+                      chip(v.spell, v.origine.tipo === "variante" ? v.origine.manuale : undefined),
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-        </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Gli incantesimi che arrivano dalla sottoclasse sono un canale a parte: un warlock ha
+          *scudo* solo se ha scelto il patrono Lama Maledetta, e mescolarlo alla lista base
+          direbbe una cosa falsa. Buco segnalato dall'utente, che cercava proprio quello. */}
+      {totaleSottoclassi > 0 && (
+        <>
+          <button
+            onClick={() => setApertoSottoclassi((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-2 text-left transition-colors hover:border-accent/50"
+          >
+            <span className="text-xs uppercase tracking-widest text-muted">
+              Incantesimi dalle sottoclassi{" "}
+              <span className="text-accent-strong">({totaleSottoclassi})</span>
+            </span>
+            <span className="text-xs text-muted">{apertoSottoclassi ? "▲" : "▼"}</span>
+          </button>
+
+          {apertoSottoclassi && (
+            <div className="space-y-3">
+              {dati.sottoclassi.map((sub) => (
+                <div key={`${sub.nome}|${sub.fonte}`} className="space-y-1.5">
+                  <p className="text-[11px] font-bold text-accent-strong">
+                    <DualName text={sub.nome} kind="classi" source={sub.fonte} inline language={language} />
+                  </p>
+                  {livelliOrdinati(sub.perLivello).map((livello) => (
+                    <div key={livello} className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-widest text-muted">
+                        {livello === 0 ? "Trucchetti" : `${livello}°`}
+                      </span>
+                      {ordinati(sub.perLivello.get(livello)!, nomeDi).map((spell) => chip(spell))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
       <MentionModal mention={mention} onClose={() => setMention(null)} />
     </div>

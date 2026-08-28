@@ -244,32 +244,34 @@ export default function CharactersPage() {
     getMyCharacters().then((remote) => {
       if (cancelled) return;
       const remoteMap = new Map(remote.map((r) => [r.id, r]));
-      const localIds = new Set(items.map((c) => c.id));
-      const toPush: Character[] = [];
-      let changed = false;
+      let toPush: Character[] = [];
 
-      let merged = items.map((local) => {
-        const remoteRow = remoteMap.get(local.id);
-        if (!remoteRow) {
-          toPush.push(local);
-          return local;
+      // Il merge parte dalla lista com'è ADESSO, non da com'era quando la richiesta è partita:
+      // getMyCharacters() impiega un momento a rispondere e nel frattempo si può aver già salvato
+      // qualcosa, che così veniva riscritto sopra — cioè perso. Trovato scrivendo il test dei
+      // punti ispirazione, che salva subito dopo l'apertura della pagina.
+      persist((attuali) => {
+        const localIds = new Set(attuali.map((c) => c.id));
+        const daSpingere: Character[] = [];
+        let merged = attuali.map((local) => {
+          const remoteRow = remoteMap.get(local.id);
+          if (!remoteRow) {
+            daSpingere.push(local);
+            return local;
+          }
+          if (local.aggiornatoAl >= remoteRow.aggiornatoAl) {
+            if (local.aggiornatoAl > remoteRow.aggiornatoAl) daSpingere.push(local);
+            return local;
+          }
+          return remoteRow.dataJson;
+        });
+        for (const [id, row] of remoteMap) {
+          if (!localIds.has(id)) merged = [...merged, row.dataJson];
         }
-        if (local.aggiornatoAl >= remoteRow.aggiornatoAl) {
-          if (local.aggiornatoAl > remoteRow.aggiornatoAl) toPush.push(local);
-          return local;
-        }
-        changed = true;
-        return remoteRow.dataJson;
+        toPush = daSpingere;
+        return merged;
       });
 
-      for (const [id, row] of remoteMap) {
-        if (!localIds.has(id)) {
-          merged = [...merged, row.dataJson];
-          changed = true;
-        }
-      }
-
-      if (changed) persist(merged);
       toPush.forEach(pushRemote);
     });
     return () => {

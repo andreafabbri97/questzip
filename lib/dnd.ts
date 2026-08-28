@@ -13,6 +13,9 @@ import {
   XP_THRESHOLDS,
 } from "./dnd-tables";
 
+/** Tetto dei punti ispirazione: quattro, come le caselle della scheda ufficiale in PDF. */
+export const MAX_ISPIRAZIONE = 4;
+
 // Tabelle pure spostate in dnd-tables.ts per dimensione del file — ri-esportate qui così tutti i
 // call site esistenti (`import { SKILLS } from "@/lib/dnd"`) restano validi senza modifiche.
 export {
@@ -220,7 +223,18 @@ const rawCharacterSchema = z.object({
   carnagione: z.string().default(""),
   capelli: z.string().default(""),
   ritrattoUrl: z.string().default(""),
-  ispirazione: z.boolean().default(false),
+  /**
+   * Punti ispirazione, da 0 a 4 (richiesta dell'utente: al suo tavolo se ne accumulano più d'uno,
+   * e la scheda ufficiale in PDF ha infatti quattro caselle).
+   *
+   * Era un sì/no: le schede già salvate — in localStorage, nel backup sull'account e negli scatti
+   * condivisi con la campagna — hanno ancora `true`/`false` lì dentro, quindi si accettano
+   * entrambe le forme e il booleano diventa un punto solo.
+   */
+  ispirazione: z
+    .union([z.boolean(), z.number()])
+    .transform((v) => (typeof v === "boolean" ? (v ? 1 : 0) : Math.max(0, Math.min(MAX_ISPIRAZIONE, Math.trunc(v)))))
+    .default(0),
   // Dadi vita TOTALI derivano dal livello di classe (totalLevel), qui serve solo tenere il conto
   // di quanti sono già stati spesi (si spendono ai riposi brevi, si recuperano — metà del totale,
   // arrotondato per eccesso — a un riposo lungo).
@@ -434,7 +448,7 @@ export function newCharacter(): Character {
     carnagione: "",
     capelli: "",
     ritrattoUrl: "",
-    ispirazione: false,
+    ispirazione: 0,
     dadiVitaUsati: 0,
     affaticamento: 0,
     oggettiMagici: [],

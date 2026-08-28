@@ -105,7 +105,7 @@ export async function seedCampaignWithPartyMember(nome: string): Promise<{
       { id: "e2e-sp1", nome: "Marchio del Cacciatore", livello: 1, preparato: true, dadoDanno: "1d6" },
     ],
     condizioniAttive: ["Avvelenato"],
-    ispirazione: true,
+    ispirazione: 1,
     affaticamento: 1,
     dadiVitaUsati: 2,
     note: "Cerca la sorella scomparsa nel Bosco Ombroso.",

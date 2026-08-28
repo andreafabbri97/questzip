@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import {
+  MAX_ISPIRAZIONE,
   ABILITIES,
   ABILITY_LABELS,
   RECUPERO_LABELS,
@@ -341,7 +342,7 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   // Stato: ispirazione, affaticamento, follia, condizioni — la scheda cartacea di riferimento non
   // ha un posto per le condizioni attive, ma al tavolo sono proprio la cosa che si dimentica.
   ry = sectionHeader(ctx, "Stato", rightX, ry, rightW);
-  text(ctx, `Ispirazione: ${character.ispirazione ? "sì" : "no"}`, rightX + 6, ry, { size: 8 });
+  text(ctx, `Ispirazione: ${character.ispirazione}/${MAX_ISPIRAZIONE}`, rightX + 6, ry, { size: 8 });
   ry -= 11;
   text(ctx, `Affaticamento: ${character.affaticamento}/6`, rightX + 6, ry, { size: 8 });
   ry -= 11;

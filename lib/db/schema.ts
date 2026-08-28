@@ -437,7 +437,9 @@ export const campaignCharacters = pgTable(
     armi: jsonb("armi").$type<Weapon[]>().notNull().default([]),
     incantesimi: jsonb("incantesimi").$type<KnownSpell[]>().notNull().default([]),
     condizioniAttive: jsonb("condizioni_attive").$type<string[]>().notNull().default([]),
-    ispirazione: boolean("ispirazione").notNull().default(false),
+    // punti ispirazione 0-4 (era un sì/no: la colonna è stata convertita conservando il valore,
+    // true -> 1). Vedi MAX_ISPIRAZIONE in lib/dnd.ts.
+    ispirazione: integer("ispirazione").notNull().default(0),
     affaticamento: integer("affaticamento").notNull().default(0),
     dadiVitaUsati: integer("dadi_vita_usati").notNull().default(0),
     scurovisione: boolean("scurovisione").notNull().default(false),

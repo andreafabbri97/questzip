@@ -88,4 +88,34 @@ test.describe("Compendio: incantesimi selezionabili da una classe", () => {
     await expect(page.getByText(/Progressione/).first()).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole("button", { name: /Scelte della classe/ })).toHaveCount(0);
   });
+
+  // Segnalazione dell'utente: "il warlock può avere scudo come incantesimo di primo livello ma non
+  // c'è segnato nel compendio sotto il warlock". Vero — e il buco era doppio: gli incantesimi che
+  // una SOTTOCLASSE concede (scudo arriva dal patrono Lama Maledetta) non erano caricati affatto, e
+  // nemmeno quelli che i manuali successivi AGGIUNGONO alla lista di classe.
+    test("il warlock mostra scudo fra gli incantesimi delle sottoclassi", async ({ page }) => {
+      await apriClasse(page, "Warlock");
+
+      const apri = page.getByRole("button", { name: /Incantesimi dalle sottoclassi/ });
+      await expect(apri).toBeVisible({ timeout: 20000 });
+      await apri.click();
+
+      await expect(page.getByText(/The Hexblade|Lama Maledetta/).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: /^(Scudo|Shield)$/ }).first()).toBeVisible();
+    });
+
+    test("la lista del warlock comprende gli incantesimi aggiunti dai manuali successivi", async ({
+      page,
+    }) => {
+      await apriClasse(page, "Warlock");
+
+      const apri = page.getByRole("button", { name: /Incantesimi della classe/ });
+      await expect(apri).toBeVisible({ timeout: 20000 });
+      await apri.click();
+
+      // "Cause Fear" è uno dei 36 che la Guida di Xanathar aggiunge alla lista del warlock
+      await expect(
+        page.getByRole("button", { name: /^(Provocare Paura|Cause Fear)$/ }).first(),
+      ).toBeVisible();
+    });
 });

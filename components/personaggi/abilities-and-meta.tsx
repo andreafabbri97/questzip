@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { IntField } from "@/components/int-field";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
+  MAX_ISPIRAZIONE,
   ABILITIES,
   ABILITY_CODE_TO_KEY,
   ABILITY_LABELS,
@@ -188,6 +189,14 @@ export function HitPointCalculator({
   );
 }
 
+/**
+ * Punti ispirazione, fino a quattro (richiesta dell'utente: al suo tavolo se ne accumula più
+ * d'uno, e la scheda ufficiale in PDF ha quattro caselle).
+ *
+ * Ogni stella è un pulsante suo: toccare la terza porta il totale a tre, e ritoccare la stella più
+ * alta già accesa lo abbassa di uno — così togliere un punto è un tocco solo, senza dover azzerare
+ * e ricontare.
+ */
 export function InspirationToggle({
   character,
   onChange,
@@ -195,18 +204,34 @@ export function InspirationToggle({
   character: Character;
   onChange: (character: Character) => void;
 }) {
+  const punti = character.ispirazione;
+  const imposta = (valore: number) =>
+    onChange({ ...character, ispirazione: Math.max(0, Math.min(MAX_ISPIRAZIONE, valore)) });
+
   return (
-    <button
-      onClick={() => onChange({ ...character, ispirazione: !character.ispirazione })}
+    <div
       className={`card-elevated-hover flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-bold transition-colors ${
-        character.ispirazione
+        punti > 0
           ? "glow-accent border-accent bg-accent/15 text-accent-strong"
-          : "border-edge bg-surface-raised text-muted hover:text-foreground"
+          : "border-edge bg-surface-raised text-muted"
       }`}
     >
-      <span className="text-lg leading-none">{character.ispirazione ? "⭐" : "☆"}</span>
+      <span className="flex items-center gap-0.5">
+        {Array.from({ length: MAX_ISPIRAZIONE }, (_, i) => i + 1).map((n) => (
+          <button
+            key={n}
+            onClick={() => imposta(punti === n ? n - 1 : n)}
+            aria-label={`${n} punt${n === 1 ? "o" : "i"} ispirazione`}
+            aria-pressed={punti >= n}
+            title={punti === n ? "Togli un punto" : `Porta l'ispirazione a ${n}`}
+            className="px-0.5 text-lg leading-none transition-transform hover:scale-110 active:scale-95"
+          >
+            {punti >= n ? "⭐" : "☆"}
+          </button>
+        ))}
+      </span>
       Ispirazione
-    </button>
+    </div>
   );
 }
 

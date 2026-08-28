@@ -489,3 +489,25 @@ describe("duplicaCharacter", () => {
     expect(copia.oggettiMagici[0].id).not.toBe("abc");
   });
 });
+
+describe("punti ispirazione", () => {
+  const conIspirazione = (valore: unknown) =>
+    characterSchema.parse({ ...newCharacter(), nome: "Prova", ispirazione: valore }).ispirazione;
+
+  it("accetta le schede già salvate, dove era un sì/no", () => {
+    // in localStorage, nel backup sull'account e negli scatti di campagna c'è ancora true/false
+    expect(conIspirazione(true)).toBe(1);
+    expect(conIspirazione(false)).toBe(0);
+  });
+
+  it("tiene il conteggio e non supera le quattro caselle della scheda", () => {
+    expect(conIspirazione(3)).toBe(3);
+    expect(conIspirazione(4)).toBe(4);
+    expect(conIspirazione(9)).toBe(4);
+    expect(conIspirazione(-2)).toBe(0);
+  });
+
+  it("parte da zero su un personaggio nuovo", () => {
+    expect(newCharacter().ispirazione).toBe(0);
+  });
+});

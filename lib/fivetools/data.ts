@@ -1,5 +1,6 @@
 import { RAW_BASE } from "@/lib/fivetools/books";
 import type { FiveEntry } from "@/lib/fivetools/entries";
+import { incantesimiDaSources, type IncantesimoDiClasse } from "@/lib/fivetools/incantesimi-classe";
 
 // Array (non solo il tipo) apposta: serve anche a runtime per validare un CompendiumKind che
 // arriva da fuori TypeScript — es. un token menzione #{Nome|kind|fonte} scritto a mano dentro un
@@ -176,6 +177,11 @@ export interface RawSubclass {
   className: string;
   classSource: string;
   source: string;
+  /** Incantesimi che la sottoclasse concede (liste ampliate dei patroni, domini, giuramenti...):
+   *  la forma dei dati è varia, la legge lib/fivetools/incantesimi-classe.ts. */
+  additionalSpells?: Partial<
+    Record<"expanded" | "prepared" | "known" | "innate", Record<string, unknown>>
+  >[];
 }
 
 export interface RawSubclassFeature {
@@ -362,12 +368,12 @@ interface SpellSourcesFile {
   [fonte: string]: {
     [nomeIncantesimo: string]: {
       class?: { name: string; source: string }[];
-      classVariant?: { name: string; source: string }[];
+      classVariant?: { name: string; source: string; definedInSource?: string }[];
     };
   };
 }
 
-let classSpellsPromise: Promise<Map<string, { name: string; source: string }[]>> | null = null;
+let classSpellsPromise: Promise<Map<string, IncantesimoDiClasse[]>> | null = null;
 /**
  * Quali incantesimi può scegliere ciascuna classe, indicizzati per "Classe|Fonte".
  *
@@ -376,23 +382,26 @@ let classSpellsPromise: Promise<Map<string, { name: string; source: string }[]>>
  * che lo hanno in lista. Senza, dalla scheda di una classe non c'era modo di sapere cosa può
  * lanciare — bisognava uscire e cercarlo altrove, che è esattamente il buco segnalato dall'utente.
  *
- * Si usa solo `class`, non `classVariant`: quest'ultimo raccoglie gli incantesimi che arrivano da
- * privilegi opzionali (le liste ampliate di Tasha's), che non fanno parte della lista base della
- * classe e mescolarli renderebbe l'elenco fuorviante.
+ * Comprende sia la lista base (`class`) sia le liste che i manuali successivi AGGIUNGONO a quella
+ * classe (`classVariant`): la Guida di Xanathar da sola porta trentasei incantesimi in più al
+ * warlock, e chi gioca con quel manuale li ha davvero. L'origine viaggia insieme al nome, così
+ * l'interfaccia può dire da dove arriva ciascuno invece di mescolarli in un elenco indistinto.
  */
-export function loadClassSpells(): Promise<Map<string, { name: string; source: string }[]>> {
+export function loadClassSpells(): Promise<Map<string, IncantesimoDiClasse[]>> {
   if (!classSpellsPromise) {
     classSpellsPromise = fetchJson<SpellSourcesFile>(`${RAW_BASE}/spells/sources.json`).then((file) => {
-      const perClasse = new Map<string, { name: string; source: string }[]>();
-      for (const [fonteIncantesimo, incantesimi] of Object.entries(file ?? {})) {
-        for (const [nome, info] of Object.entries(incantesimi)) {
-          for (const cls of info.class ?? []) {
-            const chiave = `${cls.name}|${cls.source}`;
-            const lista = perClasse.get(chiave) ?? [];
-            lista.push({ name: nome, source: fonteIncantesimo });
-            perClasse.set(chiave, lista);
+      const perClasse = new Map<string, IncantesimoDiClasse[]>();
+      const classi = new Set<string>();
+      for (const incantesimi of Object.values(file ?? {})) {
+        for (const info of Object.values(incantesimi)) {
+          for (const c of [...(info.class ?? []), ...(info.classVariant ?? [])]) {
+            classi.add(`${c.name}|${c.source}`);
           }
         }
+      }
+      for (const chiave of classi) {
+        const [nome, fonte] = chiave.split("|");
+        perClasse.set(chiave, incantesimiDaSources(file ?? {}, nome, fonte));
       }
       return perClasse;
     });
