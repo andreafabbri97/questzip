@@ -20,7 +20,7 @@
   "ABISHAI BIANCO": "White Abishai",
   "ABISHAI NERO": "Black Abishai",
   "ABISHAI VERDE": "Green Abishai",
-  "ADDOLORATO AFFAMATO": "The Hungry",
+  "ADDOLORATO AFFAMATO": "Hungry Sorrowsworn",
   "BAEL": "Bael",
   "ROTHÉ DELLE PROFONDITÀ": "Deep Rothé",
   "BOCCA DI GROLANTOR": "Mouth of Grolantor",
@@ -85,5 +85,16 @@
   "CAPO VEGEPIGMEO": "Vegepygmy Chief",
   "WARLOCK DEL GRANDE ANTICO": "Warlock of the Great Old One",
   "YUAN-TI ANATEMA": "Yuan-ti Anathema",
-  "YUAN-TI PORTAVOCE DEGLI INCUBI": "Yuan-ti Nightmare Speaker"
+  "YUAN-TI PORTAVOCE DEGLI INCUBI": "Yuan-ti Nightmare Speaker",
+  "ARCIERE": "Archer",
+  "BovE FETENTE": {
+    "en": "Stench Kow",
+    "it": "BOVE FETENTE"
+  },
+  "GITHZERAI ILLUMINATO": "Githzerai Enlightened",
+  "KRUTHIK GIOVANE": "Young Kruthik",
+  "MECCANISMO DIFENSORE DI PIETRA": "Clockwork Stone Defender",
+  "MECCANISMO MITRAGLIATORE DI QUERCIA": "Clockwork Oaken Bolter",
+  "RATTO CRANICO": "Swarm of Cranium Rats",
+  "WARLOCK DELL'IMMONDO": "Warlock of the Fiend"
 }

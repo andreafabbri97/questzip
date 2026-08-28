@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { correggiTerminiDnd } from "@/lib/traduzione-termini";
+
 /**
  * Traduzione automatica via l'endpoint pubblico non ufficiale di Google Translate
  * (nessuna chiave, nessun costo). Qualità non garantita sulla terminologia D&D,
@@ -134,7 +136,9 @@ export async function translateText(
 
   const store = loadCache();
   const key = `${source}>${target}:${trimmed}`;
-  if (store[key]) return store[key];
+  // la correzione si applica anche a quel che esce dalla cache: un testo salvato in una sessione
+  // precedente, con "famigliare" al posto di "famiglio", resterebbe altrimenti sbagliato per sempre
+  if (store[key]) return target === "it" ? correggiTerminiDnd(store[key]) : store[key];
 
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(trimmed)}`;
@@ -147,7 +151,11 @@ export async function translateText(
       store[key] = translated;
       persistCache();
     }
-    return translated || null;
+    if (!translated) return null;
+    // Google Translate non conosce la terminologia D&D: "familiar" diventa "famigliare" invece di
+    // "famiglio". Il glossario in testa al file agisce solo sui testi che SONO il termine (i nomi
+    // delle classi); dentro una descrizione lunga serve questa correzione.
+    return target === "it" ? correggiTerminiDnd(translated) : translated;
   } catch {
     return null;
   }

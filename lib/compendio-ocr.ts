@@ -113,3 +113,73 @@ export function ricomponiParoleSpezzate(nome: string): string {
   }
   return fuse.join(" ");
 }
+
+/**
+ * Le citazioni decorative dei manuali (il corsivo calligrafico con la firma del personaggio in
+ * fondo, "— Bigby") sono stampate con un font che l'estrazione non sa leggere: escono come glifi
+ * casuali, `Nuo'lo Cotro, nvo'I) (),'l'l)IJCu=! L(), rtil'I(), vo!C()`. Stanno in mezzo alle schede
+ * e finivano dentro la descrizione del talento o del mostro che le precede.
+ *
+ * Il segnale non è la presenza di simboli — il testo buono ne ha (`8 + il bonus`, `ld6`) — ma
+ * l'assenza di PAROLE: qui quasi nessun gruppo di lettere è una parola italiana plausibile, cioè
+ * lettere con almeno una vocale e senza punteggiatura infilata dentro.
+ */
+export function rigaIllegibile(riga: string): boolean {
+  const testo = riga.trim();
+  // sotto una certa lunghezza non c'è abbastanza materiale per giudicare: una riga corta di testo
+  // buono ("massimo di 20.", "18 metri.") sarebbe indistinguibile da una corta di glifi
+  if (testo.length < 15) return false;
+  const token = testo.split(/\s+/).filter((t) => /[A-Za-zÀ-ÿ]/.test(t));
+  if (token.length === 0) return false;
+  // parentesi e uguale NON valgono come punteggiatura di chiusura: in italiano una parola non
+  // finisce quasi mai per ")" mentre nei glifi della citazione è il carattere più frequente
+  const plausibili = token.filter(
+    (t) => /^[A-Za-zÀ-ÿ]+(['’][A-Za-zÀ-ÿ]+)?[.,;:!?]?$/.test(t) && /[aeiouàèéìòùAEIOU]/.test(t),
+  );
+  return plausibili.length / token.length < 0.5;
+}
+
+/**
+ * Unisce le righe fisiche di una scheda in un testo, tenendo le ETICHETTE come paragrafi a sé.
+ *
+ * Sono etichette le righe che i manuali stampano sopra la descrizione: il prerequisito di una
+ * supplica occulta o di un talento, e l'oggetto richiesto da un'infusione dell'Artefice.
+ *
+ * Sui manuali il prerequisito è una riga in corsivo sopra la descrizione; unendo le righe con uno
+ * spazio, come si fa per il resto della prosa, diventava `Prerequisito: 5° livello Il warlock può
+ * lanciare…` — due frasi appiccicate, con la maiuscola in mezzo e nessun segno che le separi
+ * (segnalato dall'utente leggendo le suppliche occulte).
+ *
+ * Il prerequisito può andare a capo (`Prerequisito: talento Colpo dei giganti (Colpo del` / `gelo)
+ * di 4° livello`), ma la sua continuazione riprende sempre in minuscolo o con un segno — la
+ * parentesi chiusa, o il grado del livello rimasto orfano sulla riga dopo (`Prerequisito: 5` /
+ * `° livello Come reazione…`, la Tomba di Levistus della Guida di Xanathar): la prima riga che
+ * comincia con una lettera maiuscola è già la descrizione.
+ */
+const ETICHETTA_RE = /^(prerequisit[oi]|oggetto)\s*:/i;
+
+export function unisciRigheDiScheda(righe: string[]): string {
+  const paragrafi: string[] = [];
+  let dentroEtichetta = false;
+
+  for (const riga of righe) {
+    if (ETICHETTA_RE.test(riga)) {
+      paragrafi.push(riga);
+      dentroEtichetta = true;
+      continue;
+    }
+    if (dentroEtichetta) {
+      if (/^[a-zà-ÿ)°"'’]/.test(riga)) {
+        paragrafi[paragrafi.length - 1] += ` ${riga}`;
+        continue;
+      }
+      dentroEtichetta = false;
+      paragrafi.push(riga);
+      continue;
+    }
+    if (paragrafi.length === 0) paragrafi.push(riga);
+    else paragrafi[paragrafi.length - 1] += ` ${riga}`;
+  }
+
+  return paragrafi.map((p) => p.replace(/\s+/g, " ").trim()).join("\n\n");
+}

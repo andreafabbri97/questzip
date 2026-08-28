@@ -24,11 +24,14 @@
   },
   "fizban": {
     "nome": "Il Tesoro dei Draghi di Fizban",
-    "file": "D&D 5e - Il Tesoro dei Draghi di Fizban [HQ][05-2023].pdf"
+    "file": "D&D 5e - Il Tesoro dei Draghi di Fizban [HQ][05-2023].pdf",
+    "inizioTalenti": "TALENTI DRACONICI"
   },
   "bigby": {
     "nome": "Bigby presenta La Gloria dei Giganti",
-    "file": "D&D_5e_Bigby_presenta_La_Gloria_dei_Giganti_CHQ_06_2024.pdf"
+    "file": "D&D_5e_Bigby_presenta_La_Gloria_dei_Giganti_CHQ_06_2024.pdf",
+    "inizioTalenti": "D E S C RIZIONI DEI TALENTI",
+    "fineTalenti": "C A P I T O L O\\s+2"
   },
   "dragonlance": {
     "nome": "Dragonlance: L'ombra della Regina dei Draghi",

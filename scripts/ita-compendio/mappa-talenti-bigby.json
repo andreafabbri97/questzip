@@ -1,0 +1,11 @@
+{
+  "_nota": "Talenti dei giganti del Manuale di Bigby (capitolo 1, pagine 17-19 del PDF italiano). Il nome parsato è quello che esce dall'estrazione, storpiato dal maiuscoletto; 'it' è il nome come è stampato sul manuale. Forgiarune è l'unico con il testo trascritto a mano: nell'estrazione la sua seconda metà finisce sotto l'intestazione del talento seguente (vedi parsed/testi-trascritti.json).",
+  "Ardore dei Giganti del Fuoco": { "en": "Ember of the Fire Giant" },
+  "C Olpo dei Giganti": { "en": "Strike of the Giants", "it": "Colpo dei Giganti" },
+  "Entusiasmo dei Giganti delle Pietre": { "en": "Keenness of the Stone Giant" },
+  "Forgiarune": { "en": "Rune Shaper" },
+  "Furia dei Giganti del Gelo": { "en": "Fury of the Frost Giant" },
+  "Scaltrezza dei Giganti delle Nuvole": { "en": "Guile of the Cloud Giant" },
+  "Spirito dei Giganti delle Tempeste": { "en": "Soul of the Storm Giant" },
+  "Vigore dei Giganti delle Colline": { "en": "Vigor of the Hill Giant" }
+}

@@ -33,7 +33,10 @@ const SIZE_TYPE_ALT_RE = new RegExp(
   `^([A-Za-zÀ-ÿ/][A-Za-zÀ-ÿ\\s/'\\-]*?)\\s+di taglia\\s+(${SIZES.join("|")})\\s*(\\([^)]*\\))?,?\\s*(.*)$`,
   "i",
 );
-const ALIGNMENT_HINT_RE = /(legale|caotic|neutral|bene|buon|malvagi|allineamento)/i;
+// "qualsiasi allineamento" esce spesso spezzato dall'OCR ("qualsiasi a/lineamento", "o/lineamento"):
+// tolte le barre resta una L sola, quindi il pattern ne ammette una o due. "qualsiasi" da solo
+// basta come indizio, perché nelle schede compare unicamente in questa posizione.
+const ALIGNMENT_HINT_RE = /(legal|caotic|neutr|bene|buon|malvag|all?ineamento|qualsiasi)/i;
 
 const ABILITY_KEYS = ["FOR", "DES", "COS", "INT", "SAG", "CAR"];
 // il blocco caratteristiche a volte finisce su una riga sola ("FOR 18 (+4) DES 14 (+2) ..."),
@@ -283,21 +286,39 @@ function eContinuazioneDiNome(precedente, nome) {
 let nomiDiSchedaNoti = new Set();
 
 /** Cerca all'indietro da un'ancora "Sfida" la riga taglia/tipo/allineamento e il nome sopra di essa. */
+// Quante righe si può risalire dalla casella "Sfida" per ritrovare la riga taglia/tipo. Quaranta
+// non bastavano: il blocco delle caratteristiche esce dal PDF una cella per riga (dodici righe solo
+// per FOR-CAR), e con tiri salvezza, abilità, resistenze, immunità, sensi e linguaggi che vanno a
+// capo si superano tranquillamente. Erano 67 stat block del Manuale dei Mostri scartati con
+// "header non trovato" — schede intere, non casi limite. Il tetto resta perché la ricerca si ferma
+// comunque appena incontra la "Sfida" del mostro PRECEDENTE: oltre quella siamo in un'altra scheda.
+const RIGHE_INDIETRO_MASSIME = 90;
+
 function findHeaderStart(lines, challengeLineIndex, { unisci = true } = {}) {
-  for (let i = challengeLineIndex - 1; i >= 0 && i > challengeLineIndex - 40; i--) {
+  for (let i = challengeLineIndex - 1; i >= 0 && i > challengeLineIndex - RIGHE_INDIETRO_MASSIME; i--) {
+    // superata la casella "Sfida" precedente si è usciti dalla scheda: il nome che si troverebbe
+    // da qui in su è quello di un altro mostro
+    if (CHALLENGE_RE.test(lines[i])) return null;
     const standard = lines[i].match(SIZE_TYPE_RE);
     const alt = !standard ? lines[i].match(SIZE_TYPE_ALT_RE) : null;
     const m = standard ?? alt;
     if (!m) continue;
     // la variante standard richiede una parola di allineamento plausibile; la variante "di
     // taglia" (senza virgola) è già abbastanza specifica di per sé, l'allineamento è opzionale
-    if (standard && !ALIGNMENT_HINT_RE.test(m[4])) continue;
+    // Il confronto ignora tutto ciò che non è una lettera: l'OCR spezza le parole con barre e
+    // spazi ("Mostruosità Grande, senza a/lineamento" per l'Ankheg), e con il testo grezzo il
+    // controllo falliva facendo scartare la scheda intera.
+    if (standard && !ALIGNMENT_HINT_RE.test(m[4].replace(/[^A-Za-zÀ-ÿ]/g, ""))) continue;
 
     // conferma che sia una vera scheda mostro e non una frase di testo narrativo che per
     // coincidenza combacia col pattern taglia/tipo/allineamento: dev'esserci "Classe Armatura"
     // (con tolleranza OCR) entro le prossime righe
+    // dieci righe e non tre: fra la riga taglia/tipo e la Classe Armatura l'estrazione a volte
+    // infila una testatina, il nome ripetuto o un pezzo della colonna accanto, e con la finestra
+    // stretta la scheda veniva persa. La riga taglia/tipo è già di per sé molto specifica, quindi
+    // allargare qui non apre la porta ai falsi positivi.
     const hasArmorClassNearby = lines
-      .slice(i + 1, i + 4)
+      .slice(i + 1, i + 11)
       .some((l) => lineStartsWithLabel(l, "Classe Armatura"));
     if (!hasArmorClassNearby) continue;
 
@@ -384,6 +405,19 @@ function parseBook(bookKey) {
     const header = findHeaderStart(lines, anchor.lineIndex);
     if (!header) {
       skipped.push({ reason: "header non trovato", lineIndex: anchor.lineIndex });
+      if (process.env.DBG_SKIP) {
+        let diag = "nessuna riga taglia/tipo nella finestra";
+        for (let k = anchor.lineIndex - 1; k > anchor.lineIndex - RIGHE_INDIETRO_MASSIME && k >= 0; k--) {
+          if (CHALLENGE_RE.test(lines[k])) { diag = "fermato dalla Sfida precedente a -" + (anchor.lineIndex - k); break; }
+          const mm2 = lines[k].match(SIZE_TYPE_RE) ?? lines[k].match(SIZE_TYPE_ALT_RE);
+          if (!mm2) continue;
+          const okAll = ALIGNMENT_HINT_RE.test(mm2[4].replace(/[^A-Za-zÀ-ÿ]/g, ""));
+          const okCA = lines.slice(k + 1, k + 4).some((l) => lineStartsWithLabel(l, "Classe Armatura"));
+          diag = `riga "${lines[k].slice(0, 46)}" a -${anchor.lineIndex - k}: allineamento=${okAll} CA=${okCA}`;
+          break;
+        }
+        console.error("SKIP", anchor.lineIndex, diag);
+      }
       continue;
     }
 

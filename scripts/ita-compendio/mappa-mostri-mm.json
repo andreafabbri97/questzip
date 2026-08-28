@@ -1,6 +1,5 @@
 {
   "_nota": "Abbinamento fra le schede estratte dal Manuale dei Mostri italiano e le voci inglesi di 5etools, per le schede che seed.mjs teneva fuori (una caratteristica persa dall'OCR bastava a scartarle). Ogni riga è stata verificata sul grado di sfida, e dove non bastava anche su CA e punti ferita (VERME IENA = Carrion Crawler: CA 13, 51 pf, tentacoli + morso). Il campo \"it\" compare solo dove il nome estratto era rovinato dall'OCR e va riscritto. Il Pteranodonte resta fuori: nelle sue pagine le colonne del PDF sono uscite mescolate e la scheda ha addosso i numeri di un altro mostro (grado di sfida 5 invece di 1/4).",
-
   "ABOLETH": "Aboleth",
   "DEVA": "Deva",
   "SPECTATOR": "Spectator",
@@ -10,33 +9,56 @@
   "BALOR": "Balor",
   "BARLGURA": "Barlgura",
   "QUASIT": "Quasit",
-  "V ROCK": { "en": "Vrock", "it": "VROCK" },
+  "V ROCK": {
+    "en": "Vrock",
+    "it": "VROCK"
+  },
   "DOPPELGANGER": "Doppelganger",
   "FLUMPH": "Flumph",
   "DAO": "Dao",
   "DJINNI": "Djinni",
-  "TARRASQ,UE": { "en": "Tarrasque", "it": "TARRASQUE" },
+  "TARRASQ,UE": {
+    "en": "Tarrasque",
+    "it": "TARRASQUE"
+  },
   "YETI": "Yeti",
-
   "COBOLDO ALATO": "Winged Kobold",
   "CUSPIDE LETALE": "Piercer",
   "DEMONE D'OMBRA": "Shadow Demon",
-  "DEMONP": { "en": "Dretch", "it": "DRETCH" },
+  "DEMONP": {
+    "en": "Dretch",
+    "it": "DRETCH"
+  },
   "DIAVOLO BARBUTO": "Bearded Devil",
   "DIAVOLO DELLE CATENE": "Chain Devil",
   "DIAVOLO SPINATO": "Spined Devil",
   "DRACOLICH BLU ADULTO": "Adult Blue Dracolich",
-  "DRAGO n'OMBRA Rosso G1ovANE": { "en": "Young Red Shadow Dragon", "it": "DRAGO D'OMBRA ROSSO GIOVANE" },
+  "DRAGO n'OMBRA Rosso G1ovANE": {
+    "en": "Young Red Shadow Dragon",
+    "it": "DRAGO D'OMBRA ROSSO GIOVANE"
+  },
   "DRAGO NERO GIOVANE": "Young Black Dragon",
-  "DRAGO Rosso ANT1co": { "en": "Ancient Red Dragon", "it": "DRAGO ROSSO ANTICO" },
-  "DRAGO Rosso ADULTO": { "en": "Adult Red Dragon", "it": "DRAGO ROSSO ADULTO" },
-  "Drago d'Argento Cucciolo": { "en": "Silver Dragon Wyrmling", "it": "DRAGO D'ARGENTO CUCCIOLO" },
+  "DRAGO Rosso ANT1co": {
+    "en": "Ancient Red Dragon",
+    "it": "DRAGO ROSSO ANTICO"
+  },
+  "DRAGO Rosso ADULTO": {
+    "en": "Adult Red Dragon",
+    "it": "DRAGO ROSSO ADULTO"
+  },
+  "Drago d'Argento Cucciolo": {
+    "en": "Silver Dragon Wyrmling",
+    "it": "DRAGO D'ARGENTO CUCCIOLO"
+  },
   "DRAGO DI BRONZO ANTICO": "Ancient Bronze Dragon",
   "DRAGO D'ORO ANTICO": "Ancient Gold Dragon",
   "DROW SACERDOTESSA DI LOLTH": "Drow Priestess of Lolth",
   "EMPIREO": "Empyrean",
   "FAUCE GORGOGLIANTE": "Gibbering Mouther",
-  "GIGANTE DEL Fuoco": { "en": "Fire Giant", "it": "GIGANTE DEL FUOCO" },
+  "GIGANTE DEL Fuoco": {
+    "en": "Fire Giant",
+    "it": "GIGANTE DEL FUOCO"
+  },
   "GIGANTE DELLE COLLINE": "Hill Giant",
   "GIGANTE DELLE PIETRE": "Stone Giant",
   "GITHZERAI MONACO": "Githzerai Monk",
@@ -57,14 +79,49 @@
   "SLAAD BLU": "Blue Slaad",
   "TESCHIO INFUOCATO": "Flameskull",
   "UNICORNO": "Unicorn",
-  "VERMEIENA": { "en": "Carrion Crawler", "it": "VERME IENA" },
+  "VERMEIENA": {
+    "en": "Carrion Crawler",
+    "it": "VERME IENA"
+  },
   "YUAN-TI ABOMINIO": "Yuan-ti Abomination",
   "ZOMBI": "Zombie",
   "LUCERTOLA GIGANTE": "Giant Lizard",
   "LUPO FEROCE": "Dire Wolf",
   "RAGNO LUPO GIGANTE": "Giant Wolf Spider",
   "SQUALO CACCIATORE": "Hunter Shark",
-  "SQ,UALO GIGANTE": { "en": "Giant Shark", "it": "SQUALO GIGANTE" },
+  "SQ,UALO GIGANTE": {
+    "en": "Giant Shark",
+    "it": "SQUALO GIGANTE"
+  },
   "TOPO GIGANTE": "Giant Rat",
-  "DRUIDO": "Druid"
+  "DRUIDO": "Druid",
+  "DRIADE": "Dryad",
+  "FANTASMA": "Ghost",
+  "SPORA GASSOSA": "Gas Spore",
+  "GOLEM DI CARNE": "Flesh Golem",
+  "J": {
+    "en": "Hobgoblin Warlord",
+    "it": "HOBGOBLIN SIGNORE DELLA GUERRA"
+  },
+  "MELMA GRIGIA": "Gray Ooze",
+  "MEPHIT DELLA POLVERE": "Dust Mephit",
+  "MEZZODRAGO Rosso VETERANO": {
+    "en": "Half-Red Dragon Veteran",
+    "it": "MEZZODRAGO ROSSO VETERANO"
+  },
+  "VERME PURPUREO": "Purple Worm",
+  "ALCE": "Elk",
+  "IENA GIGANTE": "Giant Hyena",
+  "LUPO": "Wolf",
+  "MILLEPIEDI GIGANTE": "Giant Centipede",
+  "ORCA ASSASSINA": "Killer Whale",
+  "PANTERA": "Panther",
+  "SERPENTE VELENOSO": "Poisonous Snake",
+  "SERPENTE VELENOSO GIGANTE": "Giant Poisonous Snake",
+  "TASSO GIGANTE": "Giant Badger",
+  "CAVALIERE": "Knight",
+  "COMBATTENTE TRIBALE": "Tribal Warrior",
+  "GLADIATORE": "Gladiator",
+  "GUARDIA": "Guard",
+  "NOBILE": "Noble"
 }

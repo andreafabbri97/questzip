@@ -17,7 +17,7 @@ import { pesoTotale, riduciImmagine } from "@/lib/image-downscale";
 // fallire il trasporto con un errore incomprensibile — che è esattamente com'era prima.
 const MAX_INVIO_BYTE = 3.5 * 1024 * 1024;
 import { useLocalCollection } from "@/lib/storage";
-import { characterSchema, newCharacter, totalLevel, type Character } from "@/lib/dnd";
+import { characterSchema, duplicaCharacter, newCharacter, totalLevel, type Character } from "@/lib/dnd";
 import { importCharacterFromPdf } from "@/lib/pdf-character-import";
 import { CharacterSheet } from "@/components/personaggi/character-sheet-core";
 import { formatClassSummary } from "@/components/personaggi/helpers";
@@ -301,6 +301,17 @@ export default function CharactersPage() {
     setEditingId(character.id);
   };
 
+  // La copia parte dalla scheda SALVATA (items), non dalla bozza aperta: il bottone nella scheda è
+  // disabilitato finché ci sono modifiche non salvate, così quel che si duplica è sempre quello
+  // che si è visto salvare.
+  const duplicate = (id: string) => {
+    const originale = items.find((item) => item.id === id);
+    if (!originale) return;
+    const copia = duplicaCharacter(originale, items.map((item) => item.nome));
+    upsert(copia);
+    setEditingId(copia.id);
+  };
+
   if (!loaded) {
     return <p className="text-muted">Caricamento…</p>;
   }
@@ -312,6 +323,7 @@ export default function CharactersPage() {
         character={editing}
         onSave={upsert}
         onDelete={() => remove(editing.id)}
+        onDuplicate={() => duplicate(editing.id)}
         onBack={() => setEditingId(null)}
         cloudStatus={cloudStatus[editing.id]}
       />

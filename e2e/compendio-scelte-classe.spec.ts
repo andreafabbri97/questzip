@@ -73,3 +73,30 @@ for (const voce of ALTRE) {
     await verificaOpzione(page, voce.nome);
   });
 }
+
+// Due richieste dell'utente sulla scheda di una scelta di classe (2026-08-28):
+// 1. il prerequisito era incollato alla descrizione ("Prerequisito: 5° livello Il warlock può…"),
+//    due frasi appiccicate senza punto né a capo;
+// 2. nell'elenco non si capiva CHE TIPO di scelta fosse una voce (supplica occulta, metamagia…).
+test("il prerequisito sta su una riga sua e l'elenco dice di che tipo di scelta si tratta", async ({
+  page,
+}) => {
+  await page.goto("/compendio");
+  await page.waitForFunction(
+    () => !document.body.innerText.includes("Caricamento contenuti in corso"),
+  );
+
+  await page.getByRole("button", { name: "Scelte di classe" }).click();
+  await page.getByPlaceholder("Cerca (in inglese o italiano)…").fill("Presagio di Sventura");
+
+  const riga = page.getByRole("button", { name: /Presagio di Sventura/ }).first();
+  await expect(riga).toBeVisible({ timeout: 15000 });
+  await expect(riga).toContainText("Supplica occulta");
+
+  await riga.click();
+
+  // il prerequisito è un paragrafo a sé: il testo della descrizione non lo contiene più
+  const prerequisito = page.getByText(/^Prerequisito: 5° livello$/);
+  await expect(prerequisito).toBeVisible();
+  await expect(page.getByText(/livello Il warlock/)).toHaveCount(0);
+});

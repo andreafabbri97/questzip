@@ -102,6 +102,7 @@ export function CharacterSheet({
   character: persistedCharacter,
   onSave,
   onDelete,
+  onDuplicate,
   onBack,
   cloudStatus,
   mostraElimina = true,
@@ -109,6 +110,11 @@ export function CharacterSheet({
   character: Character;
   onSave: (character: Character) => void;
   onDelete: () => void;
+  /**
+   * Crea una copia della scheda SALVATA e ci porta sopra. Assente dove duplicare non ha senso
+   * (la scheda vista dentro una campagna): lì il bottone non compare proprio.
+   */
+  onDuplicate?: () => void;
   onBack: () => void;
   cloudStatus?: CloudStatus;
   /** Falso quando la scheda è aperta da dentro una campagna: lì si sta giocando, e un bottone
@@ -250,6 +256,24 @@ export function CharacterSheet({
             💾 Salva
           </button>
         </div>
+        {onDuplicate && (
+          <button
+            onClick={onDuplicate}
+            disabled={dirty}
+            title={
+              dirty
+                ? "Salva le modifiche prima di duplicare: la copia parte dalla scheda salvata"
+                : "Crea una copia di questo personaggio"
+            }
+            className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors shrink-0 ${
+              dirty
+                ? "border-edge text-muted opacity-60 cursor-default"
+                : "card-elevated-hover border-edge text-foreground hover:border-accent/60 hover:bg-surface-raised"
+            }`}
+          >
+            ⧉ Duplica
+          </button>
+        )}
         {mostraElimina && (
           <button
             onClick={() => setShowDeleteModal(true)}

@@ -26,6 +26,7 @@ import { getRegoleIta } from "@/app/actions/compendio-ita";
 import {
   DualName,
   EntryDetail,
+  etichettaSceltaClasse,
   SourceBadge,
   TestoStrutturato,
   bestItalianName,
@@ -770,6 +771,15 @@ function EntrySubtitle({ kind, entry }: { kind: CompendiumKind; entry: Entry }) 
   if (kind === "classi") {
     const cls = entry as RawClass;
     return <span className="text-xs text-muted">{formatHitDie(cls.hd)}</span>;
+  }
+  if (kind === "scelteClasse") {
+    // Che tipo di scelta è (supplica occulta, metamagia, manovra...): nell'elenco "Vista del
+    // Diavolo" e "Difesa" erano indistinguibili, e per saperlo bisognava aprire ogni scheda.
+    // Qui in forma di testo, non di badge colorato: il badge della fonte accanto resta l'unico
+    // elemento marcato (richiesta esplicita dell'utente).
+    const etichetta = etichettaSceltaClasse((entry as { featureType?: string[] }).featureType);
+    if (!etichetta) return null;
+    return <span className="max-w-[9rem] truncate text-xs text-muted">{etichetta}</span>;
   }
   return null;
 }

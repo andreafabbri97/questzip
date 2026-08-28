@@ -5,6 +5,8 @@ import {
   normalizzaGradoSfida,
   ricomponiParoleSpezzate,
   titoloItaliano,
+  rigaIllegibile,
+  unisciRigheDiScheda,
 } from "./compendio-ocr";
 
 // Ogni caso qui sotto è una scheda che era davvero sparita dal Compendio (o ci era finita con il
@@ -94,5 +96,82 @@ describe("ricomponiParoleSpezzate", () => {
   it("non fonde due parole vere che stanno bene così", () => {
     // "Kit" è corta ma la parola dopo è minuscola: nessuna fusione
     expect(ricomponiParoleSpezzate("Kit da Erborista")).toBe("Kit da Erborista");
+  });
+});
+
+describe("rigaIllegibile", () => {
+  it("riconosce le citazioni decorative in font non leggibile", () => {
+    // la citazione di Bigby in fondo al capitolo dei talenti: finiva in coda al talento
+    // "Vigore dei Giganti delle Colline", che risultava di 2.448 caratteri invece di 1.100
+    expect(rigaIllegibile("Nuo'lo Cotro, nvo'I) (),'l'l)IJCu=! L(), rtil'I(), vo!C(), eh) ho inconCt(),Co")).toBe(true);
+    expect(rigaIllegibile("n)t SoCC)tt(),n)i SoCCo !(), S(),!(), J)l sino= J)i tº(),nCt J)ll) collin).")).toBe(true);
+  });
+
+  it("non scarta prosa vera, nemmeno quella piena di numeri e simboli", () => {
+    expect(rigaIllegibile("La CD del tiro salvezza è pari a 8 + il bonus di competenza")).toBe(false);
+    expect(rigaIllegibile("Colpo delle colline. Il bersaglio subisce ld6 danni extra")).toBe(false);
+    expect(rigaIllegibile("Incremento dei punteggi di caratteristica. Il suo punteggio")).toBe(false);
+  });
+
+  it("lascia stare le righe corte, dove non c'è abbastanza testo per giudicare", () => {
+    expect(rigaIllegibile("·- t?iby")).toBe(false);
+    expect(rigaIllegibile("massimo di 20.")).toBe(false);
+  });
+});
+
+describe("unisciRigheDiScheda", () => {
+  it("stacca il prerequisito dalla descrizione", () => {
+    // Presagio di Sventura, supplica occulta: "Prerequisito: 5° livello Il warlock può lanciare…"
+    expect(
+      unisciRigheDiScheda([
+        "Prerequisito: 5° livello",
+        "Il warlock può lanciare scagliare maledizione una volta",
+        "usando uno slot incantesimo da warlock.",
+      ]),
+    ).toBe(
+      "Prerequisito: 5° livello\n\nIl warlock può lanciare scagliare maledizione una volta usando uno slot incantesimo da warlock.",
+    );
+  });
+
+  it("tiene insieme un prerequisito andato a capo", () => {
+    // sui manuali il prerequisito lungo si spezza, ma riprende sempre in minuscolo o con una ")"
+    expect(
+      unisciRigheDiScheda([
+        "Prerequisito: talento Colpo dei giganti (Colpo del",
+        "gelo) di 4° livello",
+        "Il personaggio ha manifestato la potenza glaciale.",
+      ]),
+    ).toBe(
+      "Prerequisito: talento Colpo dei giganti (Colpo del gelo) di 4° livello\n\nIl personaggio ha manifestato la potenza glaciale.",
+    );
+  });
+
+  it("riattacca il grado del livello rimasto orfano sulla riga dopo", () => {
+    // Tomba di Levistus (Guida di Xanathar): il PDF spezza "5° livello" fra due righe
+    expect(
+      unisciRigheDiScheda([
+        "Prerequisito: 5",
+        "° livello",
+        "Come reazione, quando il warlock subisce danni,",
+      ]),
+    ).toBe("Prerequisito: 5 ° livello\n\nCome reazione, quando il warlock subisce danni,");
+  });
+
+  it("stacca anche l'oggetto richiesto dalle infusioni dell'Artefice", () => {
+    expect(
+      unisciRigheDiScheda([
+        "Prerequisiti: artefice di 10° livello",
+        "Oggetto: un elmo (richiede sintonia)",
+        "Mentre indossa questo elmo, una creatura ha un vantaggio",
+      ]),
+    ).toBe(
+      ["Prerequisiti: artefice di 10° livello", "Oggetto: un elmo (richiede sintonia)", "Mentre indossa questo elmo, una creatura ha un vantaggio"].join("\n\n"),
+    );
+  });
+
+  it("lascia la prosa senza prerequisito in un paragrafo solo", () => {
+    expect(unisciRigheDiScheda(["Il warlock può lanciare", "saltare a volontà."])).toBe(
+      "Il warlock può lanciare saltare a volontà.",
+    );
   });
 });

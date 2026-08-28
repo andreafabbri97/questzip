@@ -21,7 +21,7 @@ const sql = neon(process.env.DATABASE_URL);
 const [libro] = process.argv.slice(2);
 const applica = process.argv.includes("--applica");
 
-const FONTI = { phb: "PHB", tasha: "TCE", xanathar: "XGE", dragonlance: "DSotDQ" };
+const FONTI = { phb: "PHB", tasha: "TCE", xanathar: "XGE", dragonlance: "DSotDQ", bigby: "BGG", fizban: "FTD" };
 if (!FONTI[libro]) {
   console.error(`Uso: aggiungi-talenti-da-manuali.mjs <${Object.keys(FONTI).join("|")}> [--applica]`);
   process.exit(1);

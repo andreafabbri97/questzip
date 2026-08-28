@@ -14,7 +14,7 @@
 // Uso: node parse-talenti.mjs
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { TITOLO_ELISIONI, TITOLO_STOPWORDS } from "../../lib/compendio-ocr.ts";
+import { rigaIllegibile, TITOLO_ELISIONI, TITOLO_STOPWORDS } from "../../lib/compendio-ocr.ts";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -151,7 +151,17 @@ function extractFeat(lines, start, end) {
   }
   const bodyLines = lines.slice(bodyStart, end);
   const paragraphs = [];
+  let scartataPrecedente = false;
   for (const line of bodyLines) {
+    // le citazioni decorative dei manuali escono dal PDF come glifi casuali e stanno fra una
+    // scheda e l'altra: finivano in coda alla descrizione del talento precedente. La citazione è
+    // un blocco, e la riga corta che la chiude è la firma dell'autore ("·- t?iby" per "— Bigby"):
+    // troppo corta perché rigaIllegibile la possa giudicare da sola, ma appiccicata al blocco.
+    if (rigaIllegibile(line) || (scartataPrecedente && line.length < 15)) {
+      scartataPrecedente = true;
+      continue;
+    }
+    scartataPrecedente = false;
     const isBullet = /^•/.test(line);
     const startsNewParagraph = isBullet || paragraphs.length === 0;
     // "- " invece del glifo "•" grezzo: è la convenzione che TestoStrutturato (Compendio)

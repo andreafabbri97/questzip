@@ -611,6 +611,16 @@
       "fonte": "XGE",
       "voci": [
         {
+          "it": "Arma del Patto Migliorata",
+          "en": "Improved Pact Weapon",
+          "estratto": "ARMA DEL PATTO MIGLIORATA"
+        },
+        {
+          "it": "Aspetto della Luna",
+          "en": "Aspect of the Moon",
+          "estratto": "ASPETTO DELLA LUNA"
+        },
+        {
           "estratto": "DONO DEGLI IMPERITURI",
           "it": "Dono degli Imperituri",
           "en": "Gift of the Ever-Living Ones"
@@ -621,9 +631,24 @@
           "en": "Gift of the Depths"
         },
         {
+          "it": "Fuga dell'Ingannatore",
+          "en": "Trickster's Escape",
+          "estratto": "F UGA DELL'INGANNATORE"
+        },
+        {
           "estratto": "LANCIA DELLA LETARGIA",
           "it": "Lancia della Letargia",
           "en": "Lance of Lethargy"
+        },
+        {
+          "it": "Mantello di Mosche",
+          "en": "Cloak of Flies",
+          "estratto": "MANTELLO DI MO SCHE"
+        },
+        {
+          "it": "Punizione Occulta",
+          "en": "Eldritch Smite",
+          "estratto": "PUNIZIONE OccuLTA"
         },
         {
           "estratto": "SGUARDO FANTASMA",
@@ -631,19 +656,29 @@
           "en": "Ghostly Gaze"
         },
         {
-          "estratto": "SORTILEGIO DELLA PAZZIA",
-          "it": "Sortilegio della Pazzia",
-          "en": "Maddening Hex"
-        },
-        {
           "estratto": "SORTILEGIO IMPLACABILE",
           "it": "Sortilegio Implacabile",
           "en": "Relentless Hex"
         },
         {
+          "estratto": "SORTILEGIO DELLA PAZZIA",
+          "it": "Sortilegio della Pazzia",
+          "en": "Maddening Hex"
+        },
+        {
           "estratto": "STRETTA DI BADAR",
           "it": "Stretta di Hadar",
           "en": "Grasp of Hadar"
+        },
+        {
+          "it": "Sudario delle Ombre",
+          "en": "Shroud of Shadow",
+          "estratto": "SUDARIO DELLE OMBRE"
+        },
+        {
+          "it": "Tomba di Levistus",
+          "en": "Tomb of Levistus",
+          "estratto": "TOMBA DI LEVISTUS"
         }
       ]
     },
@@ -670,19 +705,9 @@
           "en": "Investment of the Chain Master"
         },
         {
-          "estratto": "SCHIAVITU IMMORTALE",
-          "it": "Schiavitù Immortale",
-          "en": "Undying Servitude"
-        },
-        {
           "estratto": "LEGAME DEL TALISMANO",
           "it": "Legame del Talismano",
           "en": "Bond of the Talisman"
-        },
-        {
-          "estratto": "PROTEZIONE DEL TALISMANO",
-          "it": "Protezione del Talismano",
-          "en": "Ward of the Talisman"
         },
         {
           "estratto": "MENTE OCCULTA",
@@ -693,6 +718,21 @@
           "estratto": "PATTO DEL TALISMANO",
           "it": "Patto del Talismano",
           "en": "Pact of the Talisman"
+        },
+        {
+          "estratto": "PROTEZIONE DEL TALISMANO",
+          "it": "Protezione del Talismano",
+          "en": "Ward of the Talisman"
+        },
+        {
+          "it": "Protezione del Talismano",
+          "en": "Protection of the Talisman",
+          "estratto": "PROTEZIONE DEL TALISMANO"
+        },
+        {
+          "estratto": "SCHIAVITU IMMORTALE",
+          "it": "Schiavitù Immortale",
+          "en": "Undying Servitude"
         },
         {
           "estratto": "ScRITTURA LONTANA",

@@ -7,6 +7,7 @@ import {
   calculateHitPoints,
   calculateMulticlassHitPoints,
   carryingCapacityKg,
+  duplicaCharacter,
   characterSchema,
   knownSpellSchema,
   hitDiceRecoveredOnLongRest,
@@ -452,5 +453,39 @@ describe("hitDiceRecoveredOnLongRest", () => {
   it("mai meno di 1, anche a livello 1", () => {
     expect(hitDiceRecoveredOnLongRest(1)).toBe(1);
     expect(hitDiceRecoveredOnLongRest(0)).toBe(1);
+  });
+});
+
+describe("duplicaCharacter", () => {
+  const base = { ...newCharacter(), nome: "Pinco Pallino", hpMax: 42, hpAttuali: 30 };
+
+  it("copia la scheda cambiando identità e nome", () => {
+    const copia = duplicaCharacter(base, [base.nome]);
+    expect(copia.nome).toBe("Pinco Pallino - Copia");
+    expect(copia.id).not.toBe(base.id);
+    expect(copia.hpMax).toBe(42);
+    expect(copia.hpAttuali).toBe(30);
+  });
+
+  it("numera le copie successive invece di ripetere lo stesso nome", () => {
+    const nomi = ["Pinco Pallino", "Pinco Pallino - Copia"];
+    expect(duplicaCharacter(base, nomi).nome).toBe("Pinco Pallino - Copia 2");
+    expect(duplicaCharacter(base, [...nomi, "Pinco Pallino - Copia 2"]).nome).toBe(
+      "Pinco Pallino - Copia 3",
+    );
+  });
+
+  it("dà un nome anche alla copia di un personaggio senza nome", () => {
+    expect(duplicaCharacter({ ...base, nome: "" }, []).nome).toBe("Senza nome - Copia");
+  });
+
+  it("rigenera gli id degli oggetti magici, così le due schede non ne condividono nessuno", () => {
+    const conOggetti = {
+      ...base,
+      oggettiMagici: [{ id: "abc", nome: "Spada Vorpal", armonizzato: true }],
+    };
+    const copia = duplicaCharacter(conOggetti, []);
+    expect(copia.oggettiMagici[0].nome).toBe("Spada Vorpal");
+    expect(copia.oggettiMagici[0].id).not.toBe("abc");
   });
 });

@@ -566,6 +566,18 @@ const TIPI_SCELTA: Record<string, string> = {
   RN: "Runa (Cavaliere Runico)",
 };
 
+/**
+ * Etichetta breve del tipo di scelta, per l'ELENCO dei risultati: lì accanto al nome c'è posto per
+ * una riga sola, e "Stile di combattimento (Guerriero) · Stile di combattimento (Paladino) · Stile
+ * di combattimento (Ranger)" — cioè come 5etools marca "Difesa" — non ci starebbe. La classe fra
+ * parentesi si toglie: nell'elenco serve sapere CHE COSA è la voce, la scheda poi dà il dettaglio.
+ */
+export function etichettaSceltaClasse(featureType: string[] | undefined): string | null {
+  const tipi = (featureType ?? []).map((t) => (TIPI_SCELTA[t] ?? t).replace(/\s*\(.*\)$/, ""));
+  const distinti = [...new Set(tipi)];
+  return distinti.length > 0 ? distinti.join(" · ") : null;
+}
+
 function SceltaClasseInfo({ feature }: { feature: { featureType?: string[]; prerequisite?: unknown[] } }) {
   const tipi = (feature.featureType ?? []).map((t) => TIPI_SCELTA[t] ?? t).filter(Boolean);
   if (tipi.length === 0) return null;
@@ -687,6 +699,18 @@ export function TestoStrutturato({ testo }: { testo: string }) {
                 <li key={j}>{l.replace(/^- /, "")}</li>
               ))}
             </ul>
+          );
+        }
+
+        // "Prerequisito: 5° livello", "Oggetto: un elmo (richiede sintonia)": sui manuali sono
+        // righe a sé sopra la descrizione, non titoli di sezione. Senza questo ramo finivano nel
+        // caso "sottotitolo" qui sotto, che le rende come un'intestazione di paragrafo.
+        const etichetta = lines.length === 1 ? lines[0].match(/^(Prerequisit[oi]|Oggetto):\s*(.+)$/) : null;
+        if (etichetta) {
+          return (
+            <p key={i} className="text-sm text-foreground leading-relaxed">
+              <span className="font-bold text-accent-strong">{etichetta[1]}:</span> {etichetta[2]}
+            </p>
           );
         }
 

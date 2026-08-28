@@ -354,6 +354,36 @@ export function feetToMeters(feet: number): number {
   return Math.round(feet * 0.3 * 2) / 2;
 }
 
+/**
+ * Nome della copia di un personaggio: "Pinco Pallino - Copia", e se quella esiste già
+ * "Pinco Pallino - Copia 2", "…3" e così via — duplicare due volte lo stesso eroe non deve
+ * produrre due schede indistinguibili nell'elenco.
+ */
+export function nomeCopia(nome: string, nomiEsistenti: string[]): string {
+  const base = `${nome.trim() || "Senza nome"} - Copia`;
+  const presi = new Set(nomiEsistenti.map((n) => n.trim().toLowerCase()));
+  if (!presi.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n++) {
+    const candidato = `${base} ${n}`;
+    if (!presi.has(candidato.toLowerCase())) return candidato;
+  }
+}
+
+/**
+ * Copia indipendente di un personaggio: stessa scheda, identità nuova. Gli id interni (gli oggetti
+ * magici sintonizzati) vengono rigenerati insieme a quello della scheda, così le due copie non
+ * condividono nessun identificativo.
+ */
+export function duplicaCharacter(originale: Character, nomiEsistenti: string[]): Character {
+  return {
+    ...originale,
+    id: crypto.randomUUID(),
+    nome: nomeCopia(originale.nome, nomiEsistenti),
+    oggettiMagici: originale.oggettiMagici.map((oggetto) => ({ ...oggetto, id: crypto.randomUUID() })),
+    aggiornatoAl: Date.now(),
+  };
+}
+
 export function newCharacter(): Character {
   return {
     id: crypto.randomUUID(),
