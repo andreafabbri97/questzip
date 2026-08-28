@@ -1,0 +1,20 @@
+{
+  "_nota": "Razze mostruose del Manuale del Dungeon Master. Sedici stanno tutte nella tabella 'Privilegi dei PNG' (capitolo 9, pagina 282), l'aasimar ha invece una scheda sua alle pagine 286-287. Il PDF ha il font offuscato: le pagine sono state rese in immagine e trascritte a mano, come per gli oggetti magici. La velocità dichiarata dalla tabella combacia con quella di 5etools per tutte e diciassette (6 m = 20 piedi per l'aarakocra, 3 m = 10 per il marinide), ed è quella la prova dell'abbinamento.",
+  "Aarakocra": { "en": "Aarakocra" },
+  "Aasimar": { "en": "Aasimar" },
+  "Bullywug": { "en": "Bullywug" },
+  "Coboldo": { "en": "Kobold" },
+  "Gnoll": { "en": "Gnoll" },
+  "Gnomo delle profondità": { "en": "Gnome (Deep)" },
+  "Goblin": { "en": "Goblin" },
+  "Grimlock": { "en": "Grimlock" },
+  "Hobgoblin": { "en": "Hobgoblin" },
+  "Kenku": { "en": "Kenku" },
+  "Kuo-toa": { "en": "Kuo-Toa" },
+  "Lucertoloide": { "en": "Lizardfolk" },
+  "Marinide": { "en": "Merfolk" },
+  "Orco": { "en": "Orc" },
+  "Scheletro": { "en": "Skeleton" },
+  "Troglodita": { "en": "Troglodyte" },
+  "Zombi": { "en": "Zombie" }
+}

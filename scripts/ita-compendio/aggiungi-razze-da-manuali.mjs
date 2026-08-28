@@ -29,7 +29,7 @@ const applica = process.argv.includes("--applica");
 // abbinamenti inglesi già verificati.
 const riallinea = process.argv.includes("--riallinea");
 
-const FONTI = { multiverso: "MPMM", fizban: "FTD", ravenloft: "VRGR", dragonlance: "DSotDQ" };
+const FONTI = { multiverso: "MPMM", fizban: "FTD", ravenloft: "VRGR", dragonlance: "DSotDQ", dm_manuale: "DMG" };
 if (!FONTI[libro]) {
   console.error(`Uso: aggiungi-razze-da-manuali.mjs <${Object.keys(FONTI).join("|")}> [--applica]`);
   process.exit(1);
@@ -41,16 +41,23 @@ const TAGLIE = { minuscola: "T", piccola: "S", media: "M", grande: "L", enorme: 
 
 /** Velocità base in piedi, letta dal tratto "Velocità" del manuale ("La velocità base è di 9 metri"). */
 function velocitaInPiedi(tratti) {
-  const tratto = tratti.find((t) => /^velocit/i.test(t.nome));
-  const m = tratto?.testo.match(/(\d+(?:[.,]\d+)?)\s*metri/i);
+  // Di norma la velocità è un tratto suo ("Velocità. La velocità base è di 9 metri"), ma nelle
+  // razze mostruose del Manuale del DM sta dentro l'elenco dei privilegi ("velocità 6 m, volare
+  // 15"): se il tratto dedicato non c'è, si cerca in tutto il testo della scheda.
+  const dedicato = tratti.find((t) => /^velocit/i.test(t.nome));
+  const testo = dedicato?.testo ?? tratti.map((t) => t.testo).join(" ");
+  // la parola "velocità" deve esserci: senza, il primo numero del testo sarebbe la scurovisione
+  // ("scurovisione 18 m"), e l'aarakocra risulterebbe correre a 60 piedi
+  const m = testo.match(/velocit[àa][^.;]*?(\d+(?:[.,]\d+)?)\s*(?:metri|m)/i);
   return m ? Math.round(parseFloat(m[1].replace(",", ".")) * PIEDI_PER_METRO) : null;
 }
 
 /** Codici di taglia citati dal tratto "Taglia" ("È di taglia Piccola o Media" -> ["S","M"]). */
 function taglieDichiarate(tratti) {
+  // stessa ragione della velocità: nella tabella del Manuale del DM la taglia è una voce
+  // dell'elenco dei privilegi ("taglia Piccola"), non un tratto a sé
   const tratto = tratti.find((t) => /^taglia/i.test(t.nome));
-  if (!tratto) return [];
-  const testo = tratto.testo.toLowerCase();
+  const testo = (tratto?.testo ?? tratti.map((t) => t.testo).join(" ")).toLowerCase();
   return Object.entries(TAGLIE)
     .filter(([parola]) => new RegExp(`taglia\\s+(?:\\w+\\s+o\\s+)?${parola}|\\bo\\s+${parola}\\b`).test(testo))
     .map(([, codice]) => codice);
@@ -75,6 +82,7 @@ const pulisci = (testo) => pulisciTestoOcr(togliTestatinePagina(testo));
 
 const daInserire = [];
 const saltate = [];
+const senzaVerifica = [];
 
 for (const [nomeParsato, valore] of Object.entries(mappa)) {
   if (nomeParsato.startsWith("_")) continue;
@@ -91,8 +99,11 @@ for (const [nomeParsato, valore] of Object.entries(mappa)) {
   // sempre la stessa, ed è l'unica che il tratto italiano dichiara in metri
   const velocitaEn = typeof inglese.speed === "number" ? inglese.speed : inglese.speed?.walk;
   const velocitaIt = velocitaInPiedi(scheda.tratti);
-  if (velocitaIt == null) { saltate.push(`${nomeItaliano} — nessuna velocità nel testo estratto`); continue; }
-  if (velocitaEn != null && velocitaIt !== velocitaEn) {
+  // Nella tabella del Manuale del DM la velocità è scritta solo quando NON è quella standard
+  // (l'aarakocra vola, il marinide nuota): dove manca non c'è niente da confrontare, e la razza
+  // entra ugualmente ma viene contata a parte, così non sembra verificata come le altre.
+  if (velocitaIt == null) senzaVerifica.push(nomeItaliano);
+  if (velocitaIt != null && velocitaEn != null && velocitaIt !== velocitaEn) {
     saltate.push(`${nomeItaliano} — velocità ${velocitaIt} piedi ma "${valore.en}" ne ha ${velocitaEn}`);
     continue;
   }
