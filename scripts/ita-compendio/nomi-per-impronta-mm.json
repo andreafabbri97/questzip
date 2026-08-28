@@ -13,11 +13,13 @@
   "22|481|23": "Drago Blu Antico",
   "19|243|16": "Drago d'Argento Adulto",
   "18|168|9": "Drago d'Argento Giovane",
+  "17|45|2": "Drago d'Argento Giovane",
   "19|212|15": "Drago di Bronzo Adulto",
   "17|32|2": "Drago di Bronzo Cucciolo",
   "18|172|13": "Drago d'Ottone Adulto",
   "16|16|1": "Drago d'Ottone Cucciolo",
   "15|13|1/4": "Drow",
+  "22|313|23": "Empireo",
   "13|58|3": "Fatale dell'Acqua",
   "19|22|2": "Fuoco Fatuo",
   "16|85|6": "Galeb Duhr",
@@ -40,6 +42,7 @@
   "17|199|17": "Androsfinge",
   "17|104|12": "Arcanaloth",
   "18|75|5": "Mezzoloth",
+  "8|22|1/4": "Zombi",
   "8|85|2": "Zombi Ogre",
   "12|9|1/8": "Cultista"
 }

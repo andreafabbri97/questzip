@@ -1,0 +1,26 @@
+{
+  "_nota": "Le uniche scelte di classe per cui NON esiste un manuale italiano da cui leggere: vengono da Eberron: Forge of the Artificer, che non possediamo in nessuna lingua. Il testo inglese è quello che l'app già mostra (dati 5etools) ed è stato tradotto a mano, su richiesta esplicita dell'utente, usando la terminologia dei manuali italiani: Rinomanza, tenore di vita (Modesto/Confortevole/Ricco/Aristocratico), grado di sfida, Bastione e struttura speciale, marchio del drago, mo per le monete d'oro. Non è testo ufficiale e finisce infatti nella cache delle traduzioni, non nelle tabelle del testo ufficiale.",
+  "fonte": "EFA",
+  "voci": [
+    {
+      "en": "Favored in House",
+      "it": "Favorito nella Casata",
+      "descrizione": "Il personaggio può chiedere un favore alla propria casata, che può assumere una delle forme seguenti:\n\n- Un membro della casata lancia per lui un incantesimo di 3° livello o inferiore a metà del costo abituale.\n\nPuò chiedere un favore di questo tipo un numero di volte pari al suo punteggio di Rinomanza. Se il punteggio di Rinomanza scende al di sotto del numero totale di favori richiesti, un membro della casata di rango superiore potrebbe esigere un favore da lui, affidandogli un incarico per conto della casata o per affari personali.\n\nInoltre, la casata gli versa uno stipendio che sostiene un tenore di vita Modesto (1 mo al giorno)."
+    },
+    {
+      "en": "Recognized in House",
+      "it": "Riconosciuto nella Casata",
+      "descrizione": "Quando il personaggio chiede un favore alla propria casata (come descritto in Favorito nella Casata), il favore può assumere anche una delle forme seguenti:\n\n- Un membro della casata dotato di marchio del drago lancia per lui, gratuitamente, un incantesimo di 2° livello fra quelli associati al marchio della casata.\n\n- Un membro della casata lancia per lui un incantesimo diverso di 4° livello o inferiore a metà del costo abituale.\n\n- Ogni volta che il personaggio esegue un turno del Bastione, può impartire un ordine alla propria casata come se fosse una struttura speciale del suo Bastione. È la casata a determinare il tipo di struttura speciale a sua disposizione, come indicato nella descrizione di ciascuna casata più avanti in questo capitolo.\n\nInoltre, lo stipendio della casata aumenta fino a sostenere un tenore di vita Confortevole (2 mo al giorno)."
+    },
+    {
+      "en": "Celebrated in House",
+      "it": "Celebrato nella Casata",
+      "descrizione": "Quando il personaggio chiede un favore alla propria casata (come descritto in Favorito nella Casata), il favore può assumere anche una delle forme seguenti:\n\n- Un membro della casata dotato di marchio del drago lancia per lui, gratuitamente, un incantesimo di 3° o 4° livello fra quelli associati al marchio della casata.\n\n- Un membro della casata lancia per lui un incantesimo diverso di 6° livello o inferiore a metà del costo abituale.\n\n- Il personaggio ottiene una guardia del corpo per tutta la durata del suo prossimo incarico per la casata (fino a un massimo di una settimana). La guardia del corpo — una creatura con un grado di sfida non superiore alla metà del suo livello, arrotondata per eccesso — è adeguata alla sua casata.\n\nInoltre, lo stipendio della casata aumenta fino a sostenere un tenore di vita Ricco (4 mo al giorno)."
+    },
+    {
+      "en": "Preeminent in House",
+      "it": "Preminente nella Casata",
+      "descrizione": "Quando il personaggio chiede un favore alla propria casata (come descritto in Favorito nella Casata), il favore può assumere anche una delle forme seguenti:\n\n- Un membro della casata dotato di marchio del drago lancia per lui, gratuitamente, un incantesimo di 5° livello fra quelli associati al marchio della casata.\n\n- Un membro della casata lancia per lui un incantesimo diverso di 8° livello o inferiore a metà del costo abituale.\n\nInoltre, lo stipendio della casata aumenta fino a sostenere un tenore di vita Aristocratico (10 mo al giorno)."
+    }
+  ]
+}

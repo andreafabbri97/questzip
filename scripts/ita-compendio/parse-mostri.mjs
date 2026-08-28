@@ -416,6 +416,25 @@ function parseAbilities(lines, start) {
   return { abilities, next: start + Math.max(1, linesConsumed) };
 }
 
+/**
+ * Nessuna scheda deve rubare il nome a un'altra.
+ *
+ * L'impronta identifica una creatura sola, ma il nome che le si assegna può essere già quello di
+ * una scheda letta correttamente altrove — succedeva al Drago d'Argento Giovane. In quel caso a
+ * cedere è chi ha ricevuto il nome per deduzione, non chi ce l'aveva stampato sopra.
+ */
+function risolviNomiDoppi(monsters) {
+  const quanti = new Map();
+  for (const m of monsters) quanti.set(m.nome, (quanti.get(m.nome) ?? 0) + 1);
+  for (const m of monsters) {
+    if (m.daImpronta && quanti.get(m.nome) > 1 && m.nomeLetto && m.nomeLetto !== m.nome) {
+      quanti.set(m.nome, quanti.get(m.nome) - 1);
+      m.nome = m.nomeLetto;
+    }
+  }
+  return monsters.map(({ nomeLetto: _n, daImpronta: _d, ...resto }) => resto);
+}
+
 function parseBook(bookKey) {
   const { lines, nome } = loadLines(bookKey);
   const nomiPerImpronta = caricaNomiPerImpronta(bookKey);
@@ -567,6 +586,10 @@ function parseBook(bookKey) {
       // finita lì, mentre l'impronta è verificata sui numeri e il nome italiano corrispondente è
       // stato controllato a mano sull'indice del manuale e sul titolo stampato.
       nome: nomePerImpronta ?? NOME_FIXES[nomeMostro] ?? nomeMostro,
+      // si tiene da parte anche il nome LETTO: se quello dedotto dall'impronta risultasse già
+      // usato da un'altra scheda, si torna a questo (vedi risolviNomiDoppi)
+      nomeLetto: NOME_FIXES[nomeMostro] ?? nomeMostro,
+      daImpronta: Boolean(nomePerImpronta),
       tipo: header.tipo,
       taglia: header.taglia,
       allineamento: header.allineamento,
@@ -593,7 +616,7 @@ function parseBook(bookKey) {
     });
   }
 
-  return { nome, monsters, skipped };
+  return { nome, monsters: risolviNomiDoppi(monsters), skipped };
 }
 
 function main() {

@@ -239,10 +239,15 @@ for (const p of proposte) {
   if (p.en) {
     const candidati = nomiPerPagina.get(p.pagina + OFFSET_PAGINA) ?? [];
     const scelta = scegliNome(candidati, p.en);
-    if (scelta?.sicuro) {
-      abbinati.push({ it: scelta.nome, en: p.en, impronta: impronta(p.ca, p.pf, p.sfida) });
-    }
-    else daDecidere.push({ en: p.en, pagina: p.pagina + OFFSET_PAGINA, candidati });
+    // La scheda entra sempre nella proposta: il nome INGLESE è certo (viene dall'impronta), quello
+    // italiano può arrivare dall'indice o — dove l'indice non c'è, come in Mostri del Multiverso —
+    // dal file dei nomi rivisti a mano. Prima si fermava tutto se l'indice non dava candidati.
+    abbinati.push({
+      it: scelta?.sicuro ? scelta.nome : null,
+      en: p.en,
+      impronta: impronta(p.ca, p.pf, p.sfida),
+    });
+    if (!scelta?.sicuro) daDecidere.push({ en: p.en, pagina: p.pagina + OFFSET_PAGINA, candidati });
     const proposto = scelta
       ? `${scelta.sicuro ? "" : "? "}"${scelta.nome}"${candidati.length > 1 ? ` (fra ${candidati.length})` : ""}`
       : "(non nell'indice)";
@@ -277,9 +282,11 @@ try {
   const senzaNome = [];
   const ambigue = [];
   for (const a of abbinati) {
-    if (quante.get(a.impronta) > 1) ambigue.push(`${a.it} (${a.impronta})`);
-    else if (rivisti[a.en]) perImpronta[a.impronta] = rivisti[a.en];
-    else senzaNome.push(a.en);
+    // il nome rivisto a mano vince sempre su quello dedotto dall'indice
+    const nome = rivisti[a.en] ?? a.it;
+    if (!nome) senzaNome.push(a.en);
+    else if (quante.get(a.impronta) > 1) ambigue.push(`${nome} (${a.impronta})`);
+    else perImpronta[a.impronta] = nome;
   }
   if (ambigue.length > 0) console.log(`  impronte ambigue, lasciate stare: ${ambigue.join(", ")}`);
   const fileParser = path.join(SCRIPT_DIR, `nomi-per-impronta-${libro}.json`);
