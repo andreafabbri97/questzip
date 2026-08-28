@@ -436,7 +436,19 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
                 className="flex w-full items-center justify-between gap-2 rounded-lg border border-edge bg-surface-raised px-3 py-1.5 text-left text-sm hover:border-accent/50 transition-colors"
               >
                 <span className="text-foreground truncate">
-                  <DualName text={feature.name} kind="classi" source={feature.source} inline />
+                  {/* Il nome italiano del privilegio è già qui, nella stessa voce da cui si prende
+                      il testo: prima veniva usato solo per il corpo del modal, mentre l'etichetta
+                      passava dalla traduzione automatica dal vivo — che dal 2026-08-28 risponde
+                      "429 Too Many Requests" e quindi lasciava tutto in inglese ("Metamagic",
+                      "Font of Magic"). Con il nome del manuale non serve più chiedere niente a
+                      nessuno. */}
+                  {ia ? (
+                    <>
+                      {ia.name} <span className="text-muted">({feature.name})</span>
+                    </>
+                  ) : (
+                    <DualName text={feature.name} kind="classi" source={feature.source} inline />
+                  )}
                 </span>
                 <span className="text-xs text-muted shrink-0">Liv. {feature.level}</span>
               </button>

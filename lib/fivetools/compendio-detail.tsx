@@ -792,6 +792,10 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
     return findUfficiale(itaSpells, translatedName, spell.name, spell.source);
   }, [language, itaSpells, translatedName, spell.name, spell.source]);
 
+  // il testo ufficiale italiano è quello dei manuali 2014: se la scheda aperta è di un'altra
+  // edizione, il testo si mostra lo stesso (meglio dell'inglese) ma le statistiche no
+  const statsDalManuale = edizione2014(spell.source);
+
   if (ufficiale) {
     return (
       <>
@@ -799,12 +803,30 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
           📖 Testo ufficiale · {ITA_SOURCE_NAMES[ufficiale.fonte] ?? ufficiale.fonte}
         </p>
         <div className="grid grid-cols-2 @sm:grid-cols-3 @2xl:grid-cols-6 gap-3">
-          <Stat label="Scuola" value={ufficiale.scuola} />
-          <Stat label="Livello" value={ufficiale.livello === 0 ? "Trucchetto" : ufficiale.livello} />
-          <Stat label="Tempo di lancio" value={ufficiale.tempoDiLancio} />
-          <Stat label="Gittata" value={ufficiale.gittata} />
-          <Stat label="Componenti" value={ufficiale.componenti} />
-          <Stat label="Durata" value={ufficiale.durata} />
+          {/* Il TESTO viene dal manuale italiano, che esiste solo per l'edizione 2014; le
+              STATISTICHE restano invece quelle della voce aperta, perché nel 2024 alcune sono
+              cambiate — "Wrathful Smite" è passato da Invocazione a Necromanzia e ha perso la
+              concentrazione, e la scheda XPHB mostrava i valori del 2014, cioè una cosa falsa
+              sull'incantesimo che si stava guardando. */}
+          {statsDalManuale ? (
+            <>
+              <Stat label="Scuola" value={ufficiale.scuola} />
+              <Stat label="Livello" value={ufficiale.livello === 0 ? "Trucchetto" : ufficiale.livello} />
+              <Stat label="Tempo di lancio" value={ufficiale.tempoDiLancio} />
+              <Stat label="Gittata" value={ufficiale.gittata} />
+              <Stat label="Componenti" value={ufficiale.componenti} />
+              <Stat label="Durata" value={ufficiale.durata} />
+            </>
+          ) : (
+            <>
+              <Stat label="Scuola" value={formatSchool(spell.school)} />
+              <Stat label="Livello" value={spell.level === 0 ? "Trucchetto" : spell.level} />
+              <Stat label="Tempo di lancio" value={formatTime(spell.time)} />
+              <Stat label="Gittata" value={formatRange(spell.range, language)} />
+              <Stat label="Componenti" value={formatComponents(spell.components)} />
+              <Stat label="Durata" value={formatDuration(spell.duration)} />
+            </>
+          )}
         </div>
         <div className="border-t border-edge pt-3 space-y-2">
           <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
