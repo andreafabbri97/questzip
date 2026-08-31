@@ -1,7 +1,7 @@
 "use server";
 
 import { unstable_cache } from "next/cache";
-import { eq, ne } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { auth } from "@/auth";
 import { TAG_COMPENDIO } from "@/lib/cache-tags";
 import { db } from "@/lib/db";
@@ -87,9 +87,43 @@ export async function getTalentiIta() {
 
 // Cache IA (compendio_traduzione_ia): nomi/descrizioni tradotti dall'IA per le voci che non hanno
 // testo ufficiale — priorità di lettura sempre ufficiale -> IA -> traduzione live, mai il contrario.
-export async function getTraduzioniIa(kind: CompendiumKind) {
+/**
+ * Solo i NOMI, per l'elenco e per la ricerca in italiano.
+ *
+ * La cache delle traduzioni ha anche la descrizione intera di ogni voce, e i mostri sono 4.757:
+ * caricarla tutta per costruire un indice di nomi voleva dire tirare giù qualche megabyte per
+ * mostrare un elenco. Qui si prendono le tre colonne che servono davvero — chi apre una scheda
+ * chiede poi la sua riga con getTraduzioneIa.
+ */
+export async function getNomiIa(kind: CompendiumKind) {
   await requireAuth();
-  return conCache(`traduzioni-ia:${kind}`, () =>
-    db.select().from(compendioTraduzioniIa).where(eq(compendioTraduzioniIa.kind, kind)),
+  return conCache(`nomi-ia:${kind}`, () =>
+    db
+      .select({
+        name: compendioTraduzioniIa.name,
+        source: compendioTraduzioniIa.source,
+        nomeIta: compendioTraduzioniIa.nomeIta,
+      })
+      .from(compendioTraduzioniIa)
+      .where(eq(compendioTraduzioniIa.kind, kind)),
   );
+}
+
+/** La riga di UNA voce, descrizione compresa: serve solo alla scheda che si sta guardando. */
+export async function getTraduzioneIa(kind: CompendiumKind, name: string, source: string) {
+  await requireAuth();
+  const righe = await conCache(`traduzione-ia:${kind}:${source}:${name}`, () =>
+    db
+      .select()
+      .from(compendioTraduzioniIa)
+      .where(
+        and(
+          eq(compendioTraduzioniIa.kind, kind),
+          eq(compendioTraduzioniIa.name, name),
+          eq(compendioTraduzioniIa.source, source),
+        ),
+      )
+      .limit(1),
+  );
+  return righe[0] ?? null;
 }

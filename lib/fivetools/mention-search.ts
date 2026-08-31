@@ -17,7 +17,7 @@ import {
   getOggettiIta,
   getRazzeIta,
   getTalentiIta,
-  getTraduzioniIa,
+  getNomiIa,
 } from "@/app/actions/compendio-ita";
 import { bestItalianName, buildItalianNameIndex } from "@/lib/fivetools/italian-names";
 import { matchScore } from "@/lib/fivetools/search-rank";
@@ -94,7 +94,7 @@ function loadAllMentionCandidates(): Promise<MentionCandidate[]> {
         const [entries, official, ia] = await Promise.all([
           MENTION_KIND_LOADERS[kind](),
           ITA_LOADERS[kind]?.() ?? Promise.resolve([]),
-          getTraduzioniIa(kind),
+          getNomiIa(kind),
         ]);
         const index = buildItalianNameIndex(official, ia);
         return entries.map((e): MentionCandidate => {
@@ -156,7 +156,7 @@ function loadMentionCandidatesForKind(kind: CompendiumKind): Promise<MentionCand
     promise = Promise.all([
       MENTION_KIND_LOADERS[kind](),
       ITA_LOADERS[kind]?.() ?? Promise.resolve([]),
-      getTraduzioniIa(kind),
+      getNomiIa(kind),
     ]).then(([entries, official, ia]) => {
       const index = buildItalianNameIndex(official, ia);
       return entries.map((e): MentionCandidate => {

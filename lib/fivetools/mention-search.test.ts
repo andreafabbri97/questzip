@@ -27,7 +27,7 @@ vi.mock("@/app/actions/compendio-ita", () => ({
   getTalentiIta: vi.fn().mockResolvedValue([]),
   getClassiIta: vi.fn().mockResolvedValue([]),
   getOggettiIta: vi.fn().mockResolvedValue([]),
-  getTraduzioniIa: vi.fn().mockResolvedValue([]),
+  getNomiIa: vi.fn().mockResolvedValue([]),
 }));
 
 async function importMentionSearch() {

@@ -69,7 +69,8 @@ import {
   getOggettiIta,
   getRazzeIta,
   getTalentiIta,
-  getTraduzioniIa,
+  getNomiIa,
+  getTraduzioneIa,
 } from "@/app/actions/compendio-ita";
 import type { CompendiumKind } from "@/lib/fivetools/data";
 import {
@@ -131,17 +132,32 @@ function loadTalentiIta() {
 // Cache IA (compendio_traduzione_ia): stessa idea delle cache ufficiali qui sopra, una promise per
 // kind. Priorità di lettura ovunque nel file: testo ufficiale (tabelle sopra) -> questa cache IA ->
 // traduzione live di useTranslatedText/EntriesBlock, mai il contrario.
-const iaPromises = new Map<CompendiumKind, ReturnType<typeof getTraduzioniIa>>();
-function loadTraduzioniIa(kind: CompendiumKind) {
-  let promise = iaPromises.get(kind);
+//
+// Due letture distinte, e la distinzione conta: l'ELENCO ha bisogno dei soli nomi, la SCHEDA aperta
+// anche della descrizione. Chiedere tutto per l'elenco significava tirare giù la descrizione intera
+// di 4.757 mostri per mostrare una lista di nomi.
+const nomiIaPromises = new Map<CompendiumKind, ReturnType<typeof getNomiIa>>();
+function loadNomiIa(kind: CompendiumKind) {
+  let promise = nomiIaPromises.get(kind);
   if (!promise) {
-    promise = getTraduzioniIa(kind);
-    iaPromises.set(kind, promise);
+    promise = getNomiIa(kind);
+    nomiIaPromises.set(kind, promise);
   }
   return promise;
 }
 
-export type TraduzioneIaRow = Awaited<ReturnType<typeof getTraduzioniIa>>[number];
+const traduzioniPromises = new Map<string, ReturnType<typeof getTraduzioneIa>>();
+function loadTraduzioneIa(kind: CompendiumKind, name: string, source: string) {
+  const chiave = `${kind}|${name}|${source}`;
+  let promise = traduzioniPromises.get(chiave);
+  if (!promise) {
+    promise = getTraduzioneIa(kind, name, source);
+    traduzioniPromises.set(chiave, promise);
+  }
+  return promise;
+}
+
+export type TraduzioneIaRow = NonNullable<Awaited<ReturnType<typeof getTraduzioneIa>>>;
 
 // Nome/descrizione dalla cache IA per una voce di primo livello del Compendio: kind+name+source
 // combaciano esattamente (sono le stesse chiavi inglesi di 5etools), a differenza del match col
@@ -154,22 +170,23 @@ export function useTraduzioneIa(
   source: string,
   enabled: boolean,
 ): TraduzioneIaRow | null {
-  const [rows, setRows] = useState<TraduzioneIaRow[] | null>(null);
+  const [riga, setRiga] = useState<TraduzioneIaRow | null>(null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !name || !source) return;
     let cancelled = false;
-    loadTraduzioniIa(kind).then((data) => {
-      if (!cancelled) setRows(data);
+    // il risultato viaggia insieme alla voce per cui è stato chiesto: cambiando scheda, l'hook
+    // viene riusato e senza questo si vedrebbe per un istante la descrizione di quella precedente
+    loadTraduzioneIa(kind, name, source).then((data) => {
+      if (!cancelled) setRiga(data && data.name === name && data.source === source ? data : null);
     });
     return () => {
       cancelled = true;
     };
-  }, [kind, enabled]);
+  }, [kind, name, source, enabled]);
 
   return useMemo(() => {
-    const riga = rows?.find((r) => r.name === name && r.source === source);
-    if (!riga) return null;
+    if (!riga || riga.name !== name || riga.source !== source) return null;
     // Anche questa cache è stata prodotta da un modello, quindi può contenere gli stessi scivoloni
     // di terminologia D&D della traduzione dal vivo ("famigliare" per "famiglio"): la correzione
     // vale per entrambe le strade, non solo per quella di riserva.
@@ -178,7 +195,7 @@ export function useTraduzioneIa(
       nomeIta: riga.nomeIta ? correggiTerminiDnd(riga.nomeIta) : riga.nomeIta,
       descrizioneIta: riga.descrizioneIta ? correggiTerminiDnd(riga.descrizioneIta) : riga.descrizioneIta,
     };
-  }, [rows, name, source]);
+  }, [riga, name, source]);
 }
 
 const OFFICIAL_LOADERS: Partial<
@@ -222,7 +239,7 @@ export function useItalianSearchIndex(kind: CompendiumKind, enabled: boolean): I
     if (!enabled) return;
     let cancelled = false;
     const officialLoader = OFFICIAL_LOADERS[kind];
-    Promise.all([officialLoader ? officialLoader() : Promise.resolve([]), loadTraduzioniIa(kind)]).then(
+    Promise.all([officialLoader ? officialLoader() : Promise.resolve([]), loadNomiIa(kind)]).then(
       ([official, ia]) => {
         if (cancelled) return;
         setResult(buildItalianNameIndex(official, ia));
