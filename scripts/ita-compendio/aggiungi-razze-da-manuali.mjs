@@ -48,7 +48,7 @@ function velocitaInPiedi(tratti) {
   const testo = dedicato?.testo ?? tratti.map((t) => t.testo).join(" ");
   // la parola "velocità" deve esserci: senza, il primo numero del testo sarebbe la scurovisione
   // ("scurovisione 18 m"), e l'aarakocra risulterebbe correre a 60 piedi
-  const m = testo.match(/velocit[àa][^.;]*?(\d+(?:[.,]\d+)?)\s*(?:metri|m)/i);
+  const m = testo.match(/velocit[àa][^.;]*?(\d+(?:[.,]\d+)?)\s*(?:metri|m)\b/i);
   return m ? Math.round(parseFloat(m[1].replace(",", ".")) * PIEDI_PER_METRO) : null;
 }
 
