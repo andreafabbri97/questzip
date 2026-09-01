@@ -14,11 +14,16 @@ test.describe("Modal dadi: altezza su mobile", () => {
     const modal = page.locator("body > div.fixed.inset-0.z-40 > div").first();
     await expect(modal).toBeVisible();
 
+    // Si misura il TETTO, non l'altezza effettiva: il riquadro si adatta al contenuto, quindi con
+    // pochi tiri in cronologia resta più basso del massimo consentito e una soglia sull'altezza
+    // reale dipenderebbe da quanti tiri sono stati fatti prima.
+    const tetto = await modal.evaluate((el) => parseFloat(getComputedStyle(el).maxHeight));
+    // prima era 85vh = 717px su uno schermo da 844: ora 90dvh, cioè circa 760
+    expect(tetto).toBeGreaterThan(730);
+
     const box = await modal.boundingBox();
     expect(box).not.toBeNull();
-    // Prima il tetto effettivo era 844 * 0.85 = 717px: ora deve essere sensibilmente più alto.
-    expect(box!.height).toBeGreaterThan(730);
-    // ...senza però debordare dallo schermo.
+    // e comunque il riquadro non deborda mai dall'area visibile
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y + box!.height).toBeLessThanOrEqual(845);
   });

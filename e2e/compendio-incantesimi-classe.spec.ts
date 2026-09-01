@@ -44,7 +44,12 @@ test.describe("Compendio: incantesimi selezionabili da una classe", () => {
   test("cliccare un incantesimo ne apre la scheda senza lasciare la classe", async ({ page }) => {
     await apriClasse(page, "Warlock");
     await page.getByRole("button", { name: /Incantesimi della classe/ }).click();
-    await page.getByRole("button", { name: /Deflagrazione Occulta|Eldritch Blast/ }).first().click();
+    // I chip sono ordinati per nome, e i nomi italiani arrivano dal database poco dopo l'elenco:
+    // finché non ci sono, la lista si riordina sotto al cursore e il click cade a vuoto. Si aspetta
+    // quindi il nome italiano, che è anche quello che vede davvero chi usa l'app.
+    const chipIncantesimo = page.getByRole("button", { name: "Deflagrazione Occulta", exact: true });
+    await expect(chipIncantesimo.first()).toBeVisible({ timeout: 20000 });
+    await chipIncantesimo.first().click();
 
     // Il dettaglio dell'incantesimo si apre sopra, e la classe resta sotto: la scheda mostra il
     // livello e la scuola, che nella pagina della classe non c'erano.
@@ -115,7 +120,7 @@ test.describe("Compendio: incantesimi selezionabili da una classe", () => {
 
       // "Cause Fear" è uno dei 36 che la Guida di Xanathar aggiunge alla lista del warlock
       await expect(
-        page.getByRole("button", { name: /^(Provocare Paura|Cause Fear)$/ }).first(),
+        page.getByRole("button", { name: /^(Incuti Paura|Cause Fear)$/ }).first(),
       ).toBeVisible();
     });
 });
