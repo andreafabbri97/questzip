@@ -495,6 +495,38 @@ const REGOLE_WARNINGS: Record<string, string> = {
 // presuppone dati bilingue EN/IT con edizione (dal mirror 5e.tools), mentre "Regole" è
 // contenuto italiano-solo estratto via OCR da scansioni pure — niente switch di lingua, niente
 // filtro edizione, solo un elenco di sezioni con un badge esplicito sulla qualità del testo.
+/**
+ * Tabella del fallimento critico: REGOLA DELLA CASA, non 5e ufficiale — al tavolo si usa ad ogni
+ * sessione e serve averla sottomano, ma resta segnata come tale per non confonderla con le regole
+ * dei manuali che il resto del Compendio riporta alla lettera.
+ */
+const TABELLA_CRITICO: { fisico: string; magico: string }[] = [
+  {
+    fisico: "Concedi vantaggio al nemico",
+    magico: "Concedi vantaggio al nemico",
+  },
+  {
+    fisico: "Ti colpisci da solo; se è un attacco a distanza, colpisci un alleato",
+    magico: "Svantaggio alla prossima prova di concentrazione",
+  },
+  {
+    fisico: "Cadi prono",
+    magico: "I nemici avranno vantaggio al prossimo tiro salvezza inflitto da te",
+  },
+  {
+    fisico: "Perdi la reazione",
+    magico: "Perdi la reazione",
+  },
+  {
+    fisico: "Prendi un attacco dal nemico bersagliato; se non può rispondere, colpisci un alleato",
+    magico: "Svantaggio al prossimo tiro salvezza",
+  },
+  {
+    fisico: "Ti cade l'arma, oppure perdi la prossima azione bonus",
+    magico: "Colpisci un alleato",
+  },
+];
+
 const QUICK_REF_TOPICS: { titolo: string; voci: string[] }[] = [
   {
     titolo: "Azioni, bonus azioni, reazioni",
@@ -566,6 +598,65 @@ const QUICK_REF_TOPICS: { titolo: string; voci: string[] }[] = [
   },
 ];
 
+/**
+ * La tabella del fallimento critico occupa tutta la riga della griglia: sono due colonne di testo
+ * lungo, e stretta a metà larghezza sarebbe illeggibile. Su telefono le due colonne diventano due
+ * righe etichettate dentro la stessa card del numero — una tabella a tre colonne su schermo
+ * stretto costringerebbe a scorrere di lato per leggere un effetto.
+ */
+function TabellaCritico() {
+  return (
+    <div className="sm:col-span-2 card-elevated-hover rounded-lg border border-edge bg-surface-raised p-3">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">
+          Fallimento critico (1 naturale al tiro per colpire)
+        </p>
+        <span className="rounded-full border border-edge px-1.5 py-0.5 text-[10px] font-bold text-muted">
+          regola della casa
+        </span>
+      </div>
+      <p className="text-xs text-muted mb-2">Tira 1d6 e applica l&apos;effetto.</p>
+
+      <table className="hidden sm:table w-full border-collapse text-sm">
+        <thead>
+          <tr className="text-left text-[10px] uppercase tracking-widest text-muted">
+            <th className="w-8 pb-1 font-bold">d6</th>
+            <th className="pb-1 pr-3 font-bold">Fisico</th>
+            <th className="pb-1 font-bold">Magico</th>
+          </tr>
+        </thead>
+        <tbody>
+          {TABELLA_CRITICO.map((riga, index) => (
+            <tr key={index} className="border-t border-edge/60 align-top">
+              <td className="py-1.5 font-bold text-accent-strong">{index + 1}</td>
+              <td className="py-1.5 pr-3 text-foreground leading-snug">{riga.fisico}</td>
+              <td className="py-1.5 text-foreground leading-snug">{riga.magico}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <ul className="sm:hidden space-y-2">
+        {TABELLA_CRITICO.map((riga, index) => (
+          <li key={index} className="rounded-md border border-edge bg-surface p-2">
+            <p className="text-xs font-bold text-accent-strong mb-1">{index + 1}</p>
+            <p className="text-sm text-foreground leading-snug">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Fisico</span>
+              <br />
+              {riga.fisico}
+            </p>
+            <p className="text-sm text-foreground leading-snug mt-1.5">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Magico</span>
+              <br />
+              {riga.magico}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function QuickReference() {
   const [open, setOpen] = useState(false);
   return (
@@ -579,6 +670,7 @@ function QuickReference() {
       </button>
       {open && (
         <div className="grid sm:grid-cols-2 gap-4">
+          <TabellaCritico />
           {QUICK_REF_TOPICS.map((topic) => (
             <div
               key={topic.titolo}
