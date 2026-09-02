@@ -338,6 +338,11 @@ export const campaignNpcs = pgTable("campaign_npc", {
   hpAttuali: integer("hp_attuali"),
   classeArmatura: integer("classe_armatura"),
   caratteristiche: jsonb("caratteristiche").$type<Record<Ability, number>>(),
+  // Scheda intera di un NPC importato da Personaggi. Le colonne qui sopra restano la vista
+  // riassuntiva della rubrica (e sono le uniche compilate per un NPC scritto a mano); questa
+  // conserva anche armi, incantesimi, abilità e privilegi, che al tavolo servono e che prima
+  // andavano cercati sulla scheda originale, in un'altra pagina.
+  scheda: jsonb("scheda").$type<Character>(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 

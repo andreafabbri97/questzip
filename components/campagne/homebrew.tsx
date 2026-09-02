@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MonsterCompendiumPicker } from "./generators";
+import { descrizioneCreatura } from "@/lib/fivetools/creature-testo";
+import { XP_BY_CR } from "@/lib/dnd-tables";
 import { IntField } from "@/components/int-field";
 import {
   createHomebrewEntry,
@@ -176,6 +179,19 @@ function StatFields({
   );
 }
 
+/** PF medi della creatura: 5etools li scrive come numero o come { average, formula }. */
+function hpDaCreatura(creature: Parameters<typeof descrizioneCreatura>[0]): number {
+  if (typeof creature.hp === "number") return creature.hp;
+  return creature.hp?.average ?? 10;
+}
+
+/** CA: puo' essere un numero secco o un oggetto con la provenienza ("armatura naturale"). */
+function caDaCreatura(creature: Parameters<typeof descrizioneCreatura>[0]): number {
+  const primo = creature.ac?.[0];
+  if (primo === undefined) return 10;
+  return typeof primo === "number" ? primo : primo.ac;
+}
+
 function NewHomebrewForm({ campaignId, onCreated }: { campaignId: string; onCreated: () => void }) {
   const [tipo, setTipo] = useState<Tipo>("mostro");
   const [nome, setNome] = useState("");
@@ -221,6 +237,25 @@ function NewHomebrewForm({ campaignId, onCreated }: { campaignId: string; onCrea
           </button>
         ))}
       </div>
+      {tipo === "mostro" && (
+        <>
+          <MonsterCompendiumPicker
+            onPick={(creature) => {
+              // Precompilato, non salvato: il master rivede tutto e poi conferma. È il senso
+              // dell'homebrew — si parte da un mostro vero e lo si cambia (più punti ferita, un
+              // attacco in più) invece di ricopiarlo a mano dal Compendio.
+              setNome(creature.name);
+              setHpMax(hpDaCreatura(creature));
+              setClasseArmatura(caDaCreatura(creature));
+              setXp(XP_BY_CR[typeof creature.cr === "string" ? creature.cr : (creature.cr?.cr ?? "")] ?? 0);
+              setDescrizione(descrizioneCreatura(creature));
+            }}
+          />
+          <p className="text-[11px] text-muted">
+            Oppure scrivi tutto da zero qui sotto.
+          </p>
+        </>
+      )}
       <input
         value={nome}
         onChange={(event) => setNome(event.target.value)}

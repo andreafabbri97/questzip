@@ -58,6 +58,9 @@ export async function importCharacterAsNpc(campaignId: string, character: Charac
       hpAttuali: character.hpAttuali,
       classeArmatura: character.classeArmatura,
       caratteristiche: character.caratteristiche,
+      // La scheda intera accanto al riassunto: armi, incantesimi, abilità e privilegi restano
+      // consultabili dalla campagna, senza tornare in Personaggi a cercarli.
+      scheda: character,
     })
     .returning();
   return npc;

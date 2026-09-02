@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SchedaCondivisa } from "./scheda-condivisa";
 import { AiUsageHint } from "@/components/ai-usage-hint";
 import { isAiAvailable } from "@/app/actions/ai";
 import { generateNpcDraft, generateQuestDraft } from "@/app/actions/ai-content-draft";
@@ -356,6 +357,7 @@ function NpcDetail({
   onDeleted: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [schedaAperta, setSchedaAperta] = useState(false);
   const [nome, setNome] = useState(npc.nome);
   const [descrizione, setDescrizione] = useState(npc.descrizione);
   const [posizione, setPosizione] = useState(npc.posizione);
@@ -430,12 +432,28 @@ function NpcDetail({
 
   return (
     <div className="rounded-lg border border-accent/40 bg-surface-raised p-3 space-y-2">
+      {/* Stesso modal della scheda di un compagno di party: per un NPC importato da Personaggi
+          servono anche armi e incantesimi, non solo il riquadro dei numeri. */}
+      {schedaAperta && npc.scheda && (
+        <SchedaCondivisa
+          pc={{ ...npc.scheda, playerName: "NPC" } as never}
+          onChiudi={() => setSchedaAperta(false)}
+        />
+      )}
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <p className="text-sm font-bold text-foreground">{npc.nome}</p>
           {npc.posizione && <p className="text-xs text-muted">📍 {npc.posizione}</p>}
         </div>
-        <div className="flex items-center gap-2 text-xs shrink-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs shrink-0">
+          {npc.scheda && (
+            <button
+              onClick={() => setSchedaAperta(true)}
+              className="font-bold text-accent-strong hover:underline"
+            >
+              📋 Scheda
+            </button>
+          )}
           <button onClick={() => setEditing(true)} className="text-muted hover:text-foreground">
             Modifica
           </button>

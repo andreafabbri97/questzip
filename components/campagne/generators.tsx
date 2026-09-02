@@ -488,6 +488,62 @@ export function MonsterTokenSearch({
   );
 }
 
+/**
+ * Come MonsterQuickAdd, ma consegna la creatura INTERA invece dei soli numeri per l'iniziativa:
+ * il Compendio homebrew (components/campagne/homebrew.tsx) ne ricava anche la descrizione, cosi'
+ * un mostro si importa gia' scritto e poi si modifica, invece di ricopiarlo a mano.
+ */
+export function MonsterCompendiumPicker({
+  onPick,
+  placeholder = "Importa un mostro dal Compendio…",
+}: {
+  onPick: (creature: RawCreature) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const { creatures, suggestions } = useCreatureSuggestions(query, open);
+
+  return (
+    <div className="relative">
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder={placeholder}
+        aria-label="Importa un mostro dal Compendio"
+        className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
+      />
+      {open && creatures === null && (
+        <div className="absolute z-10 mt-1 w-full rounded-lg border border-edge bg-surface-raised px-3 py-2 text-xs text-muted shadow-lg">
+          Caricamento bestiario…
+        </div>
+      )}
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full max-h-48 overflow-auto rounded-lg border border-edge bg-surface-raised shadow-lg">
+          {suggestions.map((c, index) => (
+            <li key={`${c.source}-${c.name}-${index}`}>
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onPick(c);
+                  setQuery("");
+                  setOpen(false);
+                }}
+                className="w-full text-left px-2 py-1.5 text-xs text-foreground hover:bg-surface transition-colors"
+              >
+                {c.name} <span className="text-muted">({combatantHp(c)} PF)</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function MonsterQuickAdd({
   onPick,
 }: {
