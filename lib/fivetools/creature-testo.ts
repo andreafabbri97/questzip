@@ -1,6 +1,13 @@
 import { abilityModifier, formatModifier } from "@/lib/dnd";
 import type { RawCreature } from "./data";
 import { flattenEntries } from "./entries";
+import { stripTags } from "./tags";
+import {
+  formatAbilita,
+  formatCondizioni,
+  formatListaDanni,
+  formatTiriSalvezza,
+} from "./creature-stats";
 import {
   formatAC,
   formatChallengeRating,
@@ -47,10 +54,46 @@ export function descrizioneCreatura(creature: RawCreature): string {
     .join(" · ");
   blocchi.push(caratteristiche);
 
+  // Le stesse righe dello stat block stampato: senza tiri salvezza e resistenze un mostro
+  // importato nel Compendio homebrew arriverebbe al tavolo monco.
+  const righe: [string, string][] = [
+    ["TIRI SALVEZZA", formatTiriSalvezza(creature.save)],
+    ["ABILITÀ", formatAbilita(creature.skill)],
+    ["VULNERABILITÀ", formatListaDanni(creature.vulnerable, "vulnerable")],
+    ["RESISTENZE", formatListaDanni(creature.resist, "resist")],
+    ["IMMUNITÀ", formatListaDanni(creature.immune, "immune")],
+    ["IMMUNITÀ ALLE CONDIZIONI", formatCondizioni(creature.conditionImmune)],
+  ];
+  for (const [etichetta, valore] of righe) {
+    if (valore) blocchi.push(`${etichetta} — ${valore}`);
+  }
+
   const percezione = creature.passive != null ? `percezione passiva ${creature.passive}` : "";
   const sensi = [...(creature.senses ?? []), percezione].filter(Boolean).join(", ");
   if (sensi) blocchi.push(`SENSI — ${sensi}`);
   if (creature.languages?.length) blocchi.push(`LINGUAGGI — ${creature.languages.join(", ")}`);
+
+  for (const blocco of creature.spellcasting ?? []) {
+    const nome = (voce: string | { entry?: string }) =>
+      stripTags(typeof voce === "string" ? voce : (voce.entry ?? ""));
+    const parti: string[] = [];
+    if (blocco.headerEntries) parti.push(flattenEntries(blocco.headerEntries).join(" "));
+    if (blocco.will?.length) parti.push(`A volontà: ${blocco.will.map(nome).join(", ")}`);
+    for (const [frequenza, voci] of Object.entries(blocco.daily ?? {})) {
+      const volte = frequenza.replace(/e$/, "");
+      const ciascuno = frequenza.endsWith("e") ? " ciascuno" : "";
+      parti.push(`${volte}/giorno${ciascuno}: ${(voci ?? []).map(nome).join(", ")}`);
+    }
+    for (const [livello, dati] of Object.entries(blocco.spells ?? {})) {
+      const titolo = livello === "0" ? "Trucchetti" : `Livello ${livello}`;
+      const slot = dati.slots ? ` (${dati.slots} slot)` : "";
+      parti.push(`${titolo}${slot}: ${(dati.spells ?? []).join(", ")}`);
+    }
+    if (blocco.footerEntries) parti.push(flattenEntries(blocco.footerEntries).join(" "));
+    if (parti.length > 0) {
+      blocchi.push([`${blocco.name ?? "INCANTESIMI"}`.toUpperCase(), ...parti].join("\n"));
+    }
+  }
 
   // Tratti e azioni con la stessa forma "NOME. testo" della scheda stampata: entries annidate
   // (elenchi, sotto-voci) vengono appiattite in righe, come già fa il resto dell'app.

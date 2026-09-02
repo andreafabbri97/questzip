@@ -28,6 +28,13 @@ import {
   type RawSubclass,
 } from "@/lib/fivetools/data";
 import { flattenEntries, RenderEntries, type FiveEntry } from "@/lib/fivetools/entries";
+import {
+  formatAbilita,
+  formatCondizioni,
+  formatListaDanni,
+  formatTiriSalvezza,
+} from "@/lib/fivetools/creature-stats";
+import type { CreatureSpellcasting } from "@/lib/fivetools/data";
 import { translateBatch, useTranslatedText } from "@/lib/fivetools/translate";
 import { stripTags } from "@/lib/fivetools/tags";
 import {
@@ -628,6 +635,75 @@ function SceltaClasseInfo({ feature }: { feature: { featureType?: string[]; prer
   );
 }
 
+/**
+ * Incantesimi di una creatura. Ne esistono due forme: innati (a volontà / tot volte al giorno,
+ * come il Glabrezu) e da incantatore vero (slot per livello, come l'Arcimago). Prima non venivano
+ * mostrati affatto — il campo non era nemmeno nel tipo — e di un demone che lancia "dissolvi
+ * magie" a volontà non restava traccia sulla scheda.
+ */
+function IncantesimiCreatura({ blocco }: { blocco: CreatureSpellcasting }) {
+  const nomeIncantesimo = (voce: string | { entry?: string }) =>
+    typeof voce === "string" ? voce : (voce.entry ?? "");
+
+  const righe: { etichetta: string; voci: (string | { entry?: string })[] }[] = [];
+  if (blocco.will?.length) righe.push({ etichetta: "A volontà", voci: blocco.will });
+  for (const [frequenza, voci] of Object.entries(blocco.daily ?? {}) as [
+    string,
+    (string | { entry?: string })[],
+  ][]) {
+    // "1e" = una volta al giorno CIASCUNO, "1" = una volta al giorno in tutto: la differenza
+    // cambia quante volte il mostro può lanciare, quindi va detta.
+    const volte = frequenza.replace(/e$/, "");
+    righe.push({
+      etichetta: `${volte}/giorno${frequenza.endsWith("e") ? " ciascuno" : ""}`,
+      voci,
+    });
+  }
+  for (const [livello, dati] of Object.entries(blocco.spells ?? {}) as [
+    string,
+    { slots?: number; spells?: string[] },
+  ][]) {
+    const titolo =
+      livello === "0"
+        ? "Trucchetti"
+        : `Livello ${livello}${dati.slots ? ` (${dati.slots} slot)` : ""}`;
+    righe.push({ etichetta: titolo, voci: dati.spells ?? [] });
+  }
+
+  if (righe.length === 0 && !blocco.headerEntries?.length) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-widest text-muted">
+        {blocco.name ?? "Incantesimi"}
+      </p>
+      <div className="rounded-lg border border-edge bg-surface-raised p-3 space-y-2">
+        {blocco.headerEntries && (
+          <div className="text-sm text-foreground leading-relaxed">
+            <RenderEntries entries={blocco.headerEntries} />
+          </div>
+        )}
+        {righe.map((riga) => (
+          <p key={riga.etichetta} className="text-sm text-foreground leading-snug">
+            <span className="font-bold text-accent-strong">{riga.etichetta}:</span>{" "}
+            {riga.voci.map((voce, index) => (
+              <span key={index}>
+                {index > 0 && ", "}
+                <DualName text={stripTags(nomeIncantesimo(voce))} kind="incantesimi" inline />
+              </span>
+            ))}
+          </p>
+        ))}
+        {blocco.footerEntries && (
+          <div className="text-sm text-foreground leading-relaxed">
+            <RenderEntries entries={blocco.footerEntries} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Stat({ label, value }: { label: string; value: string | number | undefined | null }) {
   if (!value && value !== 0) return null;
   return (
@@ -845,6 +921,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
               <Stat label="Gittata" value={ufficiale.gittata} />
               <Stat label="Componenti" value={ufficiale.componenti} />
               <Stat label="Durata" value={ufficiale.durata} />
+              {spell.meta?.ritual && <Stat label="Rituale" value="Sì" />}
             </>
           ) : (
             <>
@@ -854,6 +931,7 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
               <Stat label="Gittata" value={formatRange(spell.range, language)} />
               <Stat label="Componenti" value={formatComponents(spell.components)} />
               <Stat label="Durata" value={formatDuration(spell.duration)} />
+              {spell.meta?.ritual && <Stat label="Rituale" value={language === "it" ? "Sì" : "Yes"} />}
             </>
           )}
         </div>
@@ -1099,9 +1177,31 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
           </div>
         ))}
       </div>
+      {/* Righe che prima mancavano del tutto: senza tiri salvezza, resistenze e immunità una
+          scheda non si può usare al tavolo (segnalato sul Glabrezu, che ha anche incantesimi
+          innati). Ordine e nomi sono quelli dello stat block stampato. */}
+      <Stat label="Tiri salvezza" value={formatTiriSalvezza(creature.save, language)} />
+      <Stat label="Abilità" value={formatAbilita(creature.skill, language)} />
+      <Stat
+        label="Vulnerabilità ai danni"
+        value={formatListaDanni(creature.vulnerable, "vulnerable", language)}
+      />
+      <Stat
+        label="Resistenze ai danni"
+        value={formatListaDanni(creature.resist, "resist", language)}
+      />
+      <Stat label="Immunità ai danni" value={formatListaDanni(creature.immune, "immune", language)} />
+      <Stat
+        label="Immunità alle condizioni"
+        value={formatCondizioni(creature.conditionImmune, language)}
+      />
       <Stat label="Percezione passiva" value={creature.passive} />
       <Stat label="Sensi" value={creature.senses?.join(", ")} />
       <Stat label="Linguaggi" value={creature.languages?.join(", ")} />
+
+      {creature.spellcasting?.map((blocco, index) => (
+        <IncantesimiCreatura key={index} blocco={blocco} />
+      ))}
 
       {language === "it" && iaGroups
         ? IA_CREATURE_GROUP_ORDER.map((label) => {

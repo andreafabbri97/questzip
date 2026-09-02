@@ -50,6 +50,38 @@ export interface RawSpell {
   }[];
   entries: FiveEntry[];
   entriesHigherLevel?: FiveEntry[];
+  // Un incantesimo rituale si può lanciare senza consumare uno slot (10 minuti in più): il
+  // Compendio non lo diceva da nessuna parte, pur riguardando 31 incantesimi del solo Manuale
+  // del Giocatore.
+  meta?: { ritual?: boolean };
+}
+
+/**
+ * Una voce di resistenza/immunità/vulnerabilità: o un tipo di danno secco ("cold"), o un gruppo
+ * con una nota che vale solo per quel gruppo ("bludgeoning, piercing and slashing from nonmagical
+ * attacks"), o un caso speciale scritto a parole.
+ */
+export type DamageGroup =
+  | string
+  | {
+      resist?: string[];
+      immune?: string[];
+      vulnerable?: string[];
+      note?: string;
+      preNote?: string;
+      cond?: boolean;
+      special?: string;
+    };
+
+/** Incantesimi di una creatura: innati (a volontà / al giorno) oppure con slot per livello. */
+export interface CreatureSpellcasting {
+  name?: string;
+  headerEntries?: FiveEntry[];
+  footerEntries?: FiveEntry[];
+  will?: (string | { entry?: string })[];
+  daily?: Record<string, (string | { entry?: string })[]>;
+  spells?: Record<string, { slots?: number; lower?: number; spells?: string[] }>;
+  ability?: string;
 }
 
 export interface RawCreature {
@@ -71,6 +103,16 @@ export interface RawCreature {
   senses?: string[];
   passive?: number;
   languages?: string[];
+  // Righe dello stat block che il Compendio non modellava affatto: senza, una scheda arrivava al
+  // tavolo priva di tiri salvezza, resistenze e incantesimi innati (segnalato sul Glabrezu).
+  save?: Partial<Record<"str" | "dex" | "con" | "int" | "wis" | "cha", string>>;
+  skill?: Record<string, string>;
+  resist?: DamageGroup[];
+  immune?: DamageGroup[];
+  vulnerable?: DamageGroup[];
+  conditionImmune?: (string | { conditionImmune?: string[]; note?: string; cond?: boolean })[];
+  spellcasting?: CreatureSpellcasting[];
+  legendaryHeader?: FiveEntry[];
   trait?: { name: string; entries: FiveEntry[] }[];
   action?: { name: string; entries: FiveEntry[] }[];
   bonus?: { name: string; entries: FiveEntry[] }[];
