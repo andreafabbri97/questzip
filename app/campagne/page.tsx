@@ -318,6 +318,37 @@ function PartyBuildDetails({
   );
 }
 
+/** Salto rapido alle sezioni che servono durante una sessione dal vivo: la pagina campagna e'
+ *  una colonna lunga, e al tavolo si passa di continuo fra le note del master, il combattimento
+ *  e le schede del party. Resta agganciata sotto l'intestazione (h-14 in components/nav.tsx). */
+function BarraSezioni({ isDm }: { isDm: boolean }) {
+  const voci = [
+    { id: "sez-handout", label: "📜 Handout" },
+    { id: "sez-party", label: "👥 Party" },
+    { id: "sez-combattimento", label: "⚔️ Combattimento" },
+    ...(isDm
+      ? [
+          { id: "sez-png", label: "🎭 NPC" },
+          { id: "sez-quest", label: "🎯 Trame" },
+          { id: "sez-prep", label: "✅ Preparazione" },
+        ]
+      : []),
+  ];
+  return (
+    <nav className="sticky top-14 z-10 flex gap-1.5 overflow-x-auto rounded-xl border border-edge bg-background/90 px-2 py-2 backdrop-blur">
+      {voci.map((v) => (
+        <a
+          key={v.id}
+          href={`#${v.id}`}
+          className="shrink-0 rounded-lg border border-edge bg-surface-raised px-2.5 py-1 text-xs font-bold text-foreground hover:text-accent-strong transition-colors"
+        >
+          {v.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function CampaignDetailView({
   campaignId,
   userId,
@@ -503,11 +534,15 @@ function CampaignDetailView({
         )}
       </section>
 
+      <BarraSezioni isDm={isDm} />
+
       <JukeboxPlayer campaignId={campaignId} isDm={isDm} campaign={detail.campaign} onChanged={refresh} />
 
       <VoiceChatPanel campaignId={campaignId} myUserId={userId} members={detail.members} />
 
-      <HandoutsSection campaignId={campaignId} isDm={isDm} />
+      <div id="sez-handout" className="scroll-mt-32">
+        <HandoutsSection campaignId={campaignId} isDm={isDm} />
+      </div>
 
       <RollTablesSection campaignId={campaignId} isDm={isDm} />
 
@@ -623,7 +658,7 @@ function CampaignDetailView({
         </ul>
       </section>
 
-      <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 md:mt-0">
+      <section id="sez-party" className="scroll-mt-32 card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3 mt-6 md:mt-0">
         <h2 className="text-sm uppercase tracking-widest text-muted">Party</h2>
         {/* party === null significa "fetch ancora in volo", non "vuoto": prima all'apertura della
             campagna si leggeva per un istante che il party era vuoto anche quando non lo era. */}
@@ -724,12 +759,14 @@ function CampaignDetailView({
       </section>
       </div>
 
-      <EncounterTracker
-        campaignId={campaignId}
-        isDm={isDm}
-        partyLevels={(party ?? []).map((pc) => totalLevel(pc.classi))}
-        onXpGranted={refresh}
-      />
+      <div id="sez-combattimento" className="scroll-mt-32">
+        <EncounterTracker
+          campaignId={campaignId}
+          isDm={isDm}
+          partyLevels={(party ?? []).map((pc) => totalLevel(pc.classi))}
+          onXpGranted={refresh}
+        />
+      </div>
 
       <DungeonSection campaignId={campaignId} isDm={isDm} />
 
@@ -740,11 +777,17 @@ function CampaignDetailView({
           "mi sembra che vengano gestite bene le sessioni della campagna, ma manca la scrittura
           della storia e la preparazione delle sessioni (momenti off session)". Tutti e tre
           restano invisibili ai giocatori (vedi commento sullo schema in lib/db/schema.ts). */}
-      <NpcSection campaignId={campaignId} isDm={isDm} />
+      <div id="sez-png" className="scroll-mt-32">
+        <NpcSection campaignId={campaignId} isDm={isDm} />
+      </div>
 
-      <QuestSection campaignId={campaignId} isDm={isDm} />
+      <div id="sez-quest" className="scroll-mt-32">
+        <QuestSection campaignId={campaignId} isDm={isDm} />
+      </div>
 
-      <SessionPrepSection campaignId={campaignId} isDm={isDm} />
+      <div id="sez-prep" className="scroll-mt-32">
+        <SessionPrepSection campaignId={campaignId} isDm={isDm} />
+      </div>
 
       <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-4">
         <h2 className="text-sm uppercase tracking-widest text-muted">Diario delle sessioni</h2>
