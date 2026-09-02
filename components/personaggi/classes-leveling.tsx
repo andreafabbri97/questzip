@@ -187,6 +187,13 @@ function ClassSubclassPicker({
 
   if (!subclasses || subclasses.length === 0) return null;
 
+  // Una sottoclasse gia' scritta puo' non combaciare con nessun nome del Compendio: scritta a mano
+  // in italiano ("Assassino" invece di "Assassin"), importata da un PDF, o arrivata da un'altra
+  // scheda. Senza un'opzione che la rappresenti il menu mostrerebbe "— nessuna —" pur avendo un
+  // valore salvato, facendolo sembrare perso — e basterebbe toccare il menu per perderlo davvero.
+  const scritta = value?.trim();
+  const fuoriElenco = scritta && !subclasses.some((s) => s.name === scritta) ? scritta : null;
+
   return (
     <label className="block">
       <span className="text-[10px] uppercase tracking-widest text-muted">{title}</span>
@@ -196,6 +203,7 @@ function ClassSubclassPicker({
         className={inputClassName}
       >
         <option value="">— nessuna —</option>
+        {fuoriElenco && <option value={fuoriElenco}>{fuoriElenco} (fuori dal Compendio)</option>}
         {subclasses.map((s) => {
           const italiano = bestItalianName(italianIndex, s.name, s.source);
           return (
