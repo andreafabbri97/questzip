@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/campaign-auth";
 import { characters } from "@/lib/db/schema";
-import type { Character } from "@/lib/dnd";
+import { parseCharacterRemoto, type Character } from "@/lib/dnd";
 
 // Backup personale su account — NON va confuso con app/actions/characters.ts (quello gestisce lo
 // scatto condiviso con una campagna specifica). Qui c'è la scheda intera, di proprietà del solo
@@ -19,7 +19,7 @@ export async function getMyCharacters() {
   const rows = await db.select().from(characters).where(eq(characters.userId, userId));
   return rows.map((row) => ({
     id: row.id,
-    dataJson: row.dataJson,
+    dataJson: parseCharacterRemoto(row.dataJson),
     aggiornatoAl: row.aggiornatoAl.getTime(),
   }));
 }

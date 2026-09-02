@@ -30,6 +30,7 @@ import {
   weaponAbilityModifier,
   weaponAttackBonus,
   xpForNextLevel,
+  parseCharacterRemoto,
   type Character,
 } from "./dnd";
 
@@ -509,5 +510,29 @@ describe("punti ispirazione", () => {
 
   it("parte da zero su un personaggio nuovo", () => {
     expect(newCharacter().ispirazione).toBe(0);
+  });
+});
+
+describe("parseCharacterRemoto", () => {
+  // Le schede in localStorage passano dallo schema (lib/storage.ts), quelle scaricate dal backup
+  // sull'account no: una riga salvata da una versione precedente dell'app puo' non avere un campo
+  // aggiunto dopo. Senza normalizzazione arrivava cosi' com'era al componente e la scheda
+  // Incantesimi saltava sul primo .trim() di "dadoDanno".
+  it("riempie i campi mancanti di una riga arrivata dal database", () => {
+    const raw = {
+      ...characterSchema.parse({ ...newCharacter(), nome: "Remoto" }),
+      incantesimi: [{ id: "x", nome: "Palla di Fuoco", livello: 3, preparato: true }],
+    };
+    delete (raw as Record<string, unknown>).slotUsati;
+
+    const scheda = parseCharacterRemoto(raw);
+
+    expect(scheda.incantesimi[0].dadoDanno).toBe("");
+    expect(scheda.slotUsati).toHaveLength(9);
+  });
+
+  it("restituisce il dato grezzo se la riga e' irrecuperabile, invece di perdere il backup", () => {
+    const rotta = { nome: "Rotta", classi: "non un array" };
+    expect(parseCharacterRemoto(rotta)).toBe(rotta);
   });
 });

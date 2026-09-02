@@ -310,6 +310,22 @@ export const characterSchema = z.preprocess((raw) => {
 
 export type Character = z.infer<typeof characterSchema>;
 
+/**
+ * Normalizza una scheda che arriva dal DATABASE (il backup sull'account, vedi
+ * app/actions/character-sync.ts). Le copie in localStorage passano gia' dallo schema
+ * (lib/storage.ts), quelle remote no: una riga salvata da una versione precedente dell'app —
+ * o da un altro dispositivo — puo' non avere un campo aggiunto dopo, e la scheda arrivava al
+ * componente com'era, facendo saltare la pagina al primo accesso a quel campo (successo con
+ * "dadoDanno" degli incantesimi, letto con .trim() nella scheda Incantesimi).
+ *
+ * Se la riga e' irrecuperabile si restituisce il dato grezzo invece di perdere la scheda: e'
+ * il comportamento che c'era prima, e un backup malformato resta comunque meglio di niente.
+ */
+export function parseCharacterRemoto(raw: unknown): Character {
+  const parsed = characterSchema.safeParse(raw);
+  return parsed.success ? parsed.data : (raw as Character);
+}
+
 export function totalLevel(classi: ClassEntry[]): number {
   return classi.reduce((sum, entry) => sum + entry.livello, 0);
 }
