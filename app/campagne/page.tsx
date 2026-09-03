@@ -27,6 +27,7 @@ import { abilityModifier, formatModifier, totalLevel, type Ability, type KnownFe
 import type { CampaignDetail, CampaignSummary } from "@/components/campagne/types";
 import { EncounterTracker, GrantXpInline, PartySpellSlots } from "@/components/campagne/combat-tracker";
 import { MiaSchedaOverlay } from "@/components/campagne/mia-scheda";
+import { ModalitaSessione } from "@/components/campagne/modalita-sessione";
 import { SchedaCondivisa, type VoceParty } from "@/components/campagne/scheda-condivisa";
 import {
   HandoutsSection,
@@ -368,6 +369,7 @@ function CampaignDetailView({
   // Scheda di un compagno aperta in sola lettura, e la PROPRIA aperta per intero (modificabile):
   // due cose diverse, perché del personaggio di un altro si vede solo ciò che lui condivide.
   const [schedaVista, setSchedaVista] = useState<VoceParty | null>(null);
+  const [sessioneAperta, setSessioneAperta] = useState(false);
   const [schedaPropriaAperta, setSchedaPropriaAperta] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -486,6 +488,9 @@ function CampaignDetailView({
       {schedaVista && (
         <SchedaCondivisa pc={schedaVista} onChiudi={() => setSchedaVista(null)} />
       )}
+      {sessioneAperta && (
+        <ModalitaSessione campaignId={campaignId} onChiudi={() => setSessioneAperta(false)} />
+      )}
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-sm text-muted hover:text-foreground">
           ← Campagne
@@ -522,12 +527,22 @@ function CampaignDetailView({
           <h2 className="text-2xl font-display font-bold text-accent-strong">
             {detail.campaign.nome}
           </h2>
-          <Link
-            href={`/chat?thread=campaign:${campaignId}`}
-            className="shrink-0 text-xs font-bold text-accent-strong hover:underline"
-          >
-            💬 Apri chat →
-          </Link>
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            {isDm && (
+              <button
+                onClick={() => setSessioneAperta(true)}
+                className="glow-accent rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-background transition-colors hover:bg-accent-strong active:scale-[0.97]"
+              >
+                ▶️ Modalità sessione
+              </button>
+            )}
+            <Link
+              href={`/chat?thread=campaign:${campaignId}`}
+              className="text-xs font-bold text-accent-strong hover:underline"
+            >
+              💬 Apri chat →
+            </Link>
+          </div>
         </div>
         {detail.campaign.descrizione && (
           <p className="text-sm text-muted">{detail.campaign.descrizione}</p>
