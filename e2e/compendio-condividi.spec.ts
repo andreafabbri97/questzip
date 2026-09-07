@@ -59,8 +59,12 @@ test.describe("Compendio: condividere una voce", () => {
     test("la voce condivisa si apre, il resto dell'app no", async ({ page }) => {
       await page.goto("/compendio/condivisa?tab=mostri&v=Glabrezu&f=MM");
 
+      // La scheda è quella vera, non un riassunto: gli stessi riquadri del Compendio.
       await expect(page.getByRole("heading", { name: /Glabrezu/i })).toBeVisible({ timeout: 25000 });
-      await expect(page.getByText(/Mostri · MM/)).toBeVisible();
+      await expect(page.getByText("CA", { exact: true })).toBeVisible();
+      await expect(page.getByText("Grado sfida")).toBeVisible();
+      await expect(page.getByText("Tiri salvezza")).toBeVisible();
+      await expect(page.getByText("A volontà:")).toBeVisible();
 
       // Da qualunque altra parte si vada, il login torna a essere richiesto: la pagina condivisa
       // è una finestra su una scheda, non una porta aperta sull'app.
@@ -75,8 +79,11 @@ test.describe("Compendio: condividere una voce", () => {
     test("mostra il nome italiano, con l'originale inglese sotto", async ({ page }) => {
       await page.goto("/compendio/condivisa?tab=incantesimi&v=Dawn&f=XGE");
 
-      await expect(page.getByRole("heading", { name: "Alba" })).toBeVisible({ timeout: 25000 });
-      await expect(page.getByText("Dawn", { exact: true })).toBeVisible();
+      await expect(page.getByText("Alba").first()).toBeVisible({ timeout: 25000 });
+      await expect(page.getByText("Dawn").first()).toBeVisible();
+      // I riquadri dell'incantesimo, come nel Compendio.
+      await expect(page.getByText("Tempo di lancio")).toBeVisible();
+      await expect(page.getByText("Gittata").first()).toBeVisible();
     });
   });
 });

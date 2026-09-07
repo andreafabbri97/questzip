@@ -17,9 +17,18 @@ import {
 } from "@/lib/db/schema";
 import type { CompendiumKind } from "@/lib/fivetools/data";
 
-async function requireAuth() {
+/**
+ * Chi non ha una sessione non riceve questi elenchi.
+ *
+ * Restituiscono una lista vuota invece di sollevare un errore: la pagina di una voce condivisa
+ * (app/compendio/condivisa) è aperta a chiunque, e chiamate destinate a fallire riempirebbero i
+ * log del server di eccezioni a ogni visita. Il risultato per chi guarda è identico — i testi
+ * tratti dai manuali semplicemente non compaiono — e chi non ha diritto ai dati continua a non
+ * riceverne nessuno.
+ */
+async function autenticato() {
   const session = await auth();
-  if (!session?.user) throw new Error("Devi accedere per continuare.");
+  return Boolean(session?.user);
 }
 
 /**
@@ -46,27 +55,27 @@ const conCache = <T,>(chiave: string, query: () => Promise<T>) =>
   unstable_cache(query, [chiave], { revalidate: false, tags: [TAG_COMPENDIO] })();
 
 export async function getIncantesimiIta() {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   return conCache("incantesimi", () => db.select().from(compendioItaIncantesimi));
 }
 
 export async function getMostriIta() {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   return conCache("mostri", () => db.select().from(compendioItaMostri));
 }
 
 export async function getRazzeIta() {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   return conCache("razze", () => db.select().from(compendioItaRazze));
 }
 
 export async function getClassiIta() {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   return conCache("classi", () => db.select().from(compendioItaClassi));
 }
 
 export async function getRegoleIta() {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   // "oggetti_magici" era OCR di 8 pagine di flavor text inglese di qualità troppo bassa per
   // essere utile (screenshot di un lettore, non una scansione vera) — il catalogo oggetti magici
   // vero vive già pulito nel tab Oggetti magici, questa fonte era solo rumore.
@@ -76,12 +85,12 @@ export async function getRegoleIta() {
 }
 
 export async function getOggettiIta() {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   return conCache("oggetti", () => db.select().from(compendioItaOggetti));
 }
 
 export async function getTalentiIta() {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   return conCache("talenti", () => db.select().from(compendioItaTalenti));
 }
 
@@ -96,7 +105,7 @@ export async function getTalentiIta() {
  * chiede poi la sua riga con getTraduzioneIa.
  */
 export async function getNomiIa(kind: CompendiumKind) {
-  await requireAuth();
+  if (!(await autenticato())) return [];
   return conCache(`nomi-ia:${kind}`, () =>
     db
       .select({
@@ -110,8 +119,17 @@ export async function getNomiIa(kind: CompendiumKind) {
 }
 
 /** La riga di UNA voce, descrizione compresa: serve solo alla scheda che si sta guardando. */
+/**
+ * Unica lettura del Compendio SENZA sessione, perché serve alla pagina di una voce condivisa
+ * (app/compendio/condivisa), che si apre anche a chi non ha un account.
+ *
+ * È aperta con tre limiti che la rendono innocua: restituisce UNA riga indirizzata per chiave
+ * esatta — non esiste modo di farsi dare un elenco, che è ciò che nell'agosto 2026 ha bruciato la
+ * quota di Neon —, contiene testo di manuali e mai il dato di una persona, e passa dalla stessa
+ * cache a validità indeterminata di tutto il resto, quindi anche richiesta all'infinito non
+ * arriva al database più di una volta. Le letture di elenco qui sopra restano protette.
+ */
 export async function getTraduzioneIa(kind: CompendiumKind, name: string, source: string) {
-  await requireAuth();
   const righe = await conCache(`traduzione-ia:${kind}:${source}:${name}`, () =>
     db
       .select()

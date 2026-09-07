@@ -102,37 +102,42 @@ export type Entry =
   | RawClass;
 
 // cache in memoria per la durata della sessione: gli elenchi sono piccoli, non serve rifetcharli
-// ogni volta che si apre un'altra scheda o un altro modal di menzione
+// ogni volta che si apre un'altra scheda o un altro modal di menzione.
+//
+// Ogni lettura degrada in silenzio invece di propagare l'errore: queste tabelle richiedono un
+// account e la pagina di una voce condivisa (app/compendio/condivisa) e' aperta anche a chi non
+// ce l'ha — li' il testo ufficiale semplicemente non compare. Vale anche per gli utenti veri
+// quando il database non risponde: meglio una scheda senza traduzione che una pagina rotta.
 let itaSpellsPromise: ReturnType<typeof getIncantesimiIta> | null = null;
 function loadIncantesimiIta() {
-  if (!itaSpellsPromise) itaSpellsPromise = getIncantesimiIta();
+  if (!itaSpellsPromise) itaSpellsPromise = getIncantesimiIta().catch(() => []);
   return itaSpellsPromise;
 }
 let itaMostriPromise: ReturnType<typeof getMostriIta> | null = null;
 function loadMostriIta() {
-  if (!itaMostriPromise) itaMostriPromise = getMostriIta();
+  if (!itaMostriPromise) itaMostriPromise = getMostriIta().catch(() => []);
   return itaMostriPromise;
 }
 let itaRazzePromise: ReturnType<typeof getRazzeIta> | null = null;
 // Esportata: riusata da components/personaggi/classes-leveling.tsx per i "Privilegi di razza"
 // della scheda del personaggio, stessa fonte ufficiale mostrata nel Compendio.
 export function loadRazzeIta() {
-  if (!itaRazzePromise) itaRazzePromise = getRazzeIta();
+  if (!itaRazzePromise) itaRazzePromise = getRazzeIta().catch(() => []);
   return itaRazzePromise;
 }
 let itaClassiPromise: ReturnType<typeof getClassiIta> | null = null;
 function loadClassiIta() {
-  if (!itaClassiPromise) itaClassiPromise = getClassiIta();
+  if (!itaClassiPromise) itaClassiPromise = getClassiIta().catch(() => []);
   return itaClassiPromise;
 }
 let itaOggettiPromise: ReturnType<typeof getOggettiIta> | null = null;
 function loadOggettiIta() {
-  if (!itaOggettiPromise) itaOggettiPromise = getOggettiIta();
+  if (!itaOggettiPromise) itaOggettiPromise = getOggettiIta().catch(() => []);
   return itaOggettiPromise;
 }
 let itaTalentiPromise: ReturnType<typeof getTalentiIta> | null = null;
 function loadTalentiIta() {
-  if (!itaTalentiPromise) itaTalentiPromise = getTalentiIta();
+  if (!itaTalentiPromise) itaTalentiPromise = getTalentiIta().catch(() => []);
   return itaTalentiPromise;
 }
 
@@ -147,18 +152,21 @@ const nomiIaPromises = new Map<CompendiumKind, ReturnType<typeof getNomiIa>>();
 function loadNomiIa(kind: CompendiumKind) {
   let promise = nomiIaPromises.get(kind);
   if (!promise) {
-    promise = getNomiIa(kind);
+    promise = getNomiIa(kind).catch(() => []);
     nomiIaPromises.set(kind, promise);
   }
   return promise;
 }
 
-const traduzioniPromises = new Map<string, ReturnType<typeof getTraduzioneIa>>();
+const traduzioniPromises = new Map<
+  string,
+  Promise<Awaited<ReturnType<typeof getTraduzioneIa>> | null>
+>();
 function loadTraduzioneIa(kind: CompendiumKind, name: string, source: string) {
   const chiave = `${kind}|${name}|${source}`;
   let promise = traduzioniPromises.get(chiave);
   if (!promise) {
-    promise = getTraduzioneIa(kind, name, source);
+    promise = getTraduzioneIa(kind, name, source).catch(() => null);
     traduzioniPromises.set(chiave, promise);
   }
   return promise;
