@@ -47,6 +47,36 @@ test.describe("Compendio: condividere una voce", () => {
     // chi usa uno screen reader): lo stato si legge dal testo.
     await expect(page.getByRole("button", { name: "Condividi" })).toHaveText(/Link copiato/);
     const negliAppunti = await page.evaluate(() => navigator.clipboard.readText());
-    expect(negliAppunti).toContain("/compendio?tab=mostri&v=Glabrezu&f=MM");
+    // Fuori dall'app si manda il link della pagina pubblica, non quello interno: si deve aprire
+    // anche a chi non ha un account.
+    expect(negliAppunti).toContain("/compendio/condivisa?tab=mostri&v=Glabrezu&f=MM");
+  });
+
+  // Il punto della pagina pubblica: chi riceve il link su WhatsApp non ha per forza un account.
+  test.describe("senza account", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("la voce condivisa si apre, il resto dell'app no", async ({ page }) => {
+      await page.goto("/compendio/condivisa?tab=mostri&v=Glabrezu&f=MM");
+
+      await expect(page.getByRole("heading", { name: /Glabrezu/i })).toBeVisible({ timeout: 25000 });
+      await expect(page.getByText(/Mostri · MM/)).toBeVisible();
+
+      // Da qualunque altra parte si vada, il login torna a essere richiesto: la pagina condivisa
+      // è una finestra su una scheda, non una porta aperta sull'app.
+      await page.goto("/compendio");
+      await expect(page.getByPlaceholder("Cerca (in inglese o italiano)…")).toHaveCount(0);
+
+      await page.goto("/campagne");
+      await expect(page.getByText("E2E", { exact: false })).toHaveCount(0);
+    });
+
+    // Chi riceve il link deve leggere il nome in italiano: "Alba", non "Dawn".
+    test("mostra il nome italiano, con l'originale inglese sotto", async ({ page }) => {
+      await page.goto("/compendio/condivisa?tab=incantesimi&v=Dawn&f=XGE");
+
+      await expect(page.getByRole("heading", { name: "Alba" })).toBeVisible({ timeout: 25000 });
+      await expect(page.getByText("Dawn", { exact: true })).toBeVisible();
+    });
   });
 });

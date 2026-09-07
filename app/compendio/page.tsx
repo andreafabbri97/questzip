@@ -4,15 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { loadBooks, type BookMeta } from "@/lib/fivetools/books";
 import {
-  loadBackgrounds,
-  loadClassChoices,
-  loadClassData,
-  loadConditions,
-  loadCreatures,
-  loadFeats,
-  loadInventoryItems,
-  loadRaces,
-  loadSpells,
   type CompendiumKind,
   type EditionFilter,
   type RawClass,
@@ -37,7 +28,13 @@ import {
   type Language,
 } from "@/lib/fivetools/compendio-detail";
 import { BottoneCondividi } from "@/components/bottone-condividi";
-import { leggiVoceDaUrl, percorsoVoce, testoCondivisione } from "@/lib/compendio-link";
+import { COMPENDIO_LOADERS as LOADERS, COMPENDIO_TABS as TABS } from "@/lib/compendio-categorie";
+import {
+  leggiVoceDaUrl,
+  percorsoVoce,
+  percorsoVoceCondivisa,
+  testoCondivisione,
+} from "@/lib/compendio-link";
 import {
   formatChallengeRating,
   formatCreatureType,
@@ -53,18 +50,6 @@ import {
 // (itemFilter) — niente nuovo CompendiumKind, che avrebbe richiesto duplicare la logica di
 // mention-search/traduzioni/EntryDetail già unificata per "oggetti" in giri precedenti. "id" è la
 // chiave del tab in UI (per sapere qual è "attivo"), "kind" resta quella per i dati.
-const TABS: { id: string; kind: CompendiumKind; label: string; icon: string; itemFilter?: "magici" | "comuni" }[] = [
-  { id: "incantesimi", kind: "incantesimi", label: "Incantesimi", icon: "✨" },
-  { id: "mostri", kind: "mostri", label: "Mostri", icon: "🐉" },
-  { id: "oggetti-magici", kind: "oggetti", label: "Oggetti magici", icon: "💍", itemFilter: "magici" },
-  { id: "oggetti-comuni", kind: "oggetti", label: "Oggetti comuni", icon: "🎒", itemFilter: "comuni" },
-  { id: "razze", kind: "razze", label: "Razze", icon: "🧝" },
-  { id: "talenti", kind: "talenti", label: "Talenti", icon: "🏅" },
-  { id: "background", kind: "background", label: "Background", icon: "📜" },
-  { id: "condizioni", kind: "condizioni", label: "Condizioni", icon: "☠️" },
-  { id: "classi", kind: "classi", label: "Classi", icon: "⚔️" },
-  { id: "scelte-classe", kind: "scelteClasse", label: "Scelte di classe", icon: "🔮" },
-];
 
 const EDITIONS: { value: EditionFilter; label: string }[] = [
   { value: "entrambe", label: "Entrambe" },
@@ -96,17 +81,6 @@ const PAGE_SIZE = 30;
 // la barra degli indirizzi che appare/scompare non deve far "saltare" l'altezza.
 const COMPENDIO_LIST_MAX_HEIGHT = "lg:max-h-[calc(100dvh-19rem)] lg:min-h-[420px]";
 
-const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
-  incantesimi: loadSpells,
-  mostri: loadCreatures,
-  oggetti: loadInventoryItems,
-  razze: loadRaces,
-  talenti: loadFeats,
-  background: loadBackgrounds,
-  condizioni: loadConditions,
-  classi: () => loadClassData().then((data) => data.classes),
-  scelteClasse: loadClassChoices,
-};
 
 export default function CompendiumPage() {
   return (
@@ -196,10 +170,6 @@ function CompendiumPageInner() {
     [selected, activeTabId],
   );
 
-  const testoCondiviso = useMemo(
-    () => (selected ? testoCondivisione(selected.name, activeTab.label) : ""),
-    [selected, activeTab.label],
-  );
 
   // replaceState e non push: sfogliare il Compendio non deve riempire la cronologia di voci da
   // ripercorrere una per una col tasto indietro.
@@ -218,6 +188,34 @@ function CompendiumPageInner() {
   // volo della query — inaffidabile per frasi parziali (es. "palla di" non trovava "Fireball",
   // che pure ha "Palla di Fuoco" come nome ufficiale già collegato).
   const italianIndex = useItalianSearchIndex(kind, true);
+
+  // Nel messaggio va il nome italiano: chi riceve il link legge "Alba", non "Dawn". L'indice è lo
+  // stesso che alimenta la ricerca e i titoli dell'elenco; se una voce non è ancora tradotta
+  // resta il nome inglese, che è comunque meglio di niente.
+  const nomeCondiviso = useMemo(
+    () =>
+      selected
+        ? (bestItalianName(italianIndex, selected.name, selected.source) ?? selected.name)
+        : "",
+    [selected, italianIndex],
+  );
+  // Fuori dall'app si manda il link della pagina pubblica: si apre anche a chi non ha un account,
+  // mentre l'indirizzo interno (percorsoCorrente) porterebbe alla schermata di accesso.
+  const percorsoDaCondividere = useMemo(
+    () =>
+      selected
+        ? percorsoVoceCondivisa({
+            tab: activeTabId,
+            nome: selected.name,
+            fonte: selected.source,
+          })
+        : "",
+    [selected, activeTabId],
+  );
+  const testoCondiviso = useMemo(
+    () => (selected ? testoCondivisione(nomeCondiviso, activeTab.label) : ""),
+    [selected, nomeCondiviso, activeTab.label],
+  );
 
   const filtered = useMemo(() => {
     if (!categoryData || !books) return [];
@@ -507,9 +505,9 @@ function CompendiumPageInner() {
             <div className="space-y-2">
               <div className="flex justify-end">
                 <BottoneCondividi
-                  titolo={selected.name}
+                  titolo={nomeCondiviso}
                   testo={testoCondiviso}
-                  percorso={percorsoCorrente}
+                  percorso={percorsoDaCondividere}
                 />
               </div>
               <EntryDetail

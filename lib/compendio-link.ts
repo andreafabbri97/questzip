@@ -37,3 +37,16 @@ export function leggiVoceDaUrl(search: string): VoceCondivisa | null {
 export function testoCondivisione(nome: string, etichettaCategoria: string): string {
   return `${nome} — ${etichettaCategoria} su QuestZip`;
 }
+
+/**
+ * Percorso della pagina PUBBLICA di una voce: è questo che si manda fuori dall'app, perché si apre
+ * anche senza account. Il percorso interno (percorsoVoce) resta quello della barra del browser,
+ * dove si sta navigando il Compendio vero.
+ */
+export function percorsoVoceCondivisa(voce: VoceCondivisa): string {
+  return `/compendio/condivisa?${new URLSearchParams({
+    tab: voce.tab,
+    v: voce.nome,
+    f: voce.fonte,
+  }).toString()}`;
+}

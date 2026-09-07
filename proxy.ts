@@ -8,10 +8,15 @@ export const config = {
   // registrazione fallisce, portandosi dietro notifiche push e cache offline. È un file statico
   // pubblico, già visibile nel repo e senza alcun dato utente: tenerlo dietro l'autenticazione non
   // proteggeva nulla.
+  // compendio/condivisa è l'unica PAGINA pubblica: serve a far aprire un link mandato fuori
+  // dall'app (WhatsApp e simili) anche a chi non ha un account. Mostra una scheda sola, in sola
+  // lettura, senza elenco né ricerca, e del nostro database legge una riga per chiave esatta
+  // (app/actions/compendio-pubblico.ts). Da qualunque altra parte si vada, il login torna a
+  // essere richiesto.
   // api/compendio/invalida è escluso perché lo chiama uno SCRIPT, che una sessione non ce l'ha (e
   // quando il database non risponde nessuno ce l'avrebbe): si protegge da sé con un segreto
   // dedicato, vedi la route.
   matcher: [
-    "/((?!api/auth|api/compendio|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js).*)",
+    "/((?!api/auth|api/compendio|compendio/condivisa|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js).*)",
   ],
 };
