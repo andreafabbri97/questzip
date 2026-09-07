@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { loadBooks, type BookMeta } from "@/lib/fivetools/books";
 import {
   loadBackgrounds,
@@ -35,6 +36,8 @@ import {
   type Entry,
   type Language,
 } from "@/lib/fivetools/compendio-detail";
+import { BottoneCondividi } from "@/components/bottone-condividi";
+import { leggiVoceDaUrl, percorsoVoce, testoCondivisione } from "@/lib/compendio-link";
 import {
   formatChallengeRating,
   formatCreatureType,
@@ -106,8 +109,26 @@ const LOADERS: Record<CompendiumKind, () => Promise<Entry[]>> = {
 };
 
 export default function CompendiumPage() {
+  return (
+    <Suspense fallback={<p className="text-muted">Caricamento…</p>}>
+      <CompendiumPageInner />
+    </Suspense>
+  );
+}
+
+function CompendiumPageInner() {
+  // Un link condiviso arriva come parametri dell'indirizzo. Letti qui e non in un effetto: sono
+  // gia' disponibili al primo render, quindi la categoria giusta si apre subito.
+  const searchParams = useSearchParams();
+  // Catturata una volta sola all'apertura, non ricalcolata: appena si apre una voce l'indirizzo
+  // viene riscritto, e un valore che seguisse l'indirizzo si azzererebbe da sé prima che i dati
+  // della categoria siano arrivati — cioè prima di poter aprire la voce chiesta dal link.
+  const [voceDaUrl] = useState(() => leggiVoceDaUrl(searchParams.toString()));
+
   const [showRegole, setShowRegole] = useState(false);
-  const [activeTabId, setActiveTabId] = useState<string>(TABS[0].id);
+  const [activeTabId, setActiveTabId] = useState<string>(
+    voceDaUrl && TABS.some((t) => t.id === voceDaUrl.tab) ? voceDaUrl.tab : TABS[0].id,
+  );
   const activeTab = TABS.find((t) => t.id === activeTabId) ?? TABS[0];
   const kind = activeTab.kind;
   const itemFilter = activeTab.itemFilter;
@@ -149,11 +170,44 @@ export default function CompendiumPage() {
     LOADERS[kind]().then((data) => {
       if (cancelled) return;
       setDataByKind((prev) => ({ ...prev, [kind]: data }));
+      // Qui e non in un effetto a parte: prima che i dati arrivino non c'e' niente in cui cercare
+      // la voce, e questo e' esattamente il momento in cui ci sono. La fonte distingue voci
+      // omonime di manuali diversi; un link senza fonte apre la prima che combacia per nome.
+      if (voceDaUrl && activeTabId === voceDaUrl.tab) {
+        const trovata = data.find(
+          (e) => e.name === voceDaUrl.nome && (!voceDaUrl.fonte || e.source === voceDaUrl.fonte),
+        );
+        if (trovata) setSelected(trovata);
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [kind, dataByKind]);
+  }, [kind, dataByKind, voceDaUrl, activeTabId]);
+
+  // Indirizzo della voce aperta: uno solo, usato sia per la barra del browser sia dal tasto
+  // Condividi. Calcolato qui e non nel JSX perché un oggetto creato inline e passato a una
+  // funzione impedisce al compilatore React di conservare le memoizzazioni di questa pagina.
+  const percorsoCorrente = useMemo(
+    () =>
+      percorsoVoce(
+        selected ? { tab: activeTabId, nome: selected.name, fonte: selected.source } : null,
+      ),
+    [selected, activeTabId],
+  );
+
+  const testoCondiviso = useMemo(
+    () => (selected ? testoCondivisione(selected.name, activeTab.label) : ""),
+    [selected, activeTab.label],
+  );
+
+  // replaceState e non push: sfogliare il Compendio non deve riempire la cronologia di voci da
+  // ripercorrere una per una col tasto indietro.
+  useEffect(() => {
+    if (percorsoCorrente !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", percorsoCorrente);
+    }
+  }, [percorsoCorrente]);
 
   const categoryData = dataByKind[kind] ?? null;
   const loadingCategory = categoryData === null;
@@ -450,13 +504,22 @@ export default function CompendiumPage() {
 
         <div className={selected ? "min-w-0" : "hidden lg:block min-w-0"}>
           {selected ? (
-            <EntryDetail
-              kind={kind}
-              entry={selected}
-              books={books}
-              language={language}
-              onBack={() => setSelected(null)}
-            />
+            <div className="space-y-2">
+              <div className="flex justify-end">
+                <BottoneCondividi
+                  titolo={selected.name}
+                  testo={testoCondiviso}
+                  percorso={percorsoCorrente}
+                />
+              </div>
+              <EntryDetail
+                kind={kind}
+                entry={selected}
+                books={books}
+                language={language}
+                onBack={() => setSelected(null)}
+              />
+            </div>
           ) : (
             <div className="flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface/30 p-12 text-center text-muted min-h-[300px]">
               <p>Seleziona un elemento dall&apos;elenco per vedere i dettagli.</p>
