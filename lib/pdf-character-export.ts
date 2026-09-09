@@ -496,12 +496,76 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   // comunque bianco.
   blankLines(ctx, MARGIN + 4, fy - 2, halfW - 8, Math.min(14, Math.max(2, Math.floor((fy - MARGIN - 8) / 12))));
 
-  // Le righe libere per gli appunti riempiono lo spazio che avanza fino al piè di pagina, invece
-  // di un numero fisso: su un personaggio con poche armi/privilegi lo spazio utile è molto di più.
-  const notesX = MARGIN + halfW + 12;
-  const notesY = sectionHeader(ctx, "Appunti di sessione", notesX, by, halfW);
-  const righeDisponibili = Math.min(14, Math.max(3, Math.floor((notesY - MARGIN - 8) / 12)));
-  blankLines(ctx, notesX + 4, notesY - 2, halfW - 8, righeDisponibili);
+  // Colonna destra: le tre cose che sulla scheda del gruppo stanno accanto alle armi e che qui
+  // mancavano del tutto. Gli appunti di sessione, che quella scheda non ha, si sono presi finora
+  // mezza pagina: sono rimasti nella pagina 2 insieme alle note.
+  const destraX = MARGIN + halfW + 12;
+  let dy = sectionHeader(ctx, "Armatura", destraX, by, halfW);
+  // Il personaggio in app ha solo la CA finale: il resto (nome dell'armatura, Destrezza massima,
+  // requisito di Forza, svantaggio a Furtività) sta sul manuale dell'armatura e su carta si
+  // scrive a mano, come sulla scheda cartacea.
+  text(ctx, "Armatura", destraX + 4, dy, { size: 6.5, color: MUTED });
+  ctx.page.drawLine({
+    start: { x: destraX + 46, y: dy - 2 },
+    end: { x: destraX + halfW - 60, y: dy - 2 },
+    thickness: 0.6,
+    color: RULE,
+  });
+  text(ctx, "CA", destraX + halfW - 52, dy, { size: 6.5, color: MUTED });
+  box(ctx, destraX + halfW - 36, dy - 4, 30, 13);
+  centered(ctx, String(character.classeArmatura), destraX + halfW - 21, dy, { size: 9, bold: true });
+  dy -= 18;
+  for (const [etichetta, larghezza] of [
+    ["Des max", 40],
+    ["For richiesta", 40],
+    ["Scudo", 40],
+  ] as const) {
+    text(ctx, etichetta, destraX + 4, dy, { size: 6.5, color: MUTED });
+    box(ctx, destraX + 66, dy - 3, larghezza, 11);
+    dy -= 15;
+  }
+  dot(ctx, destraX + 8, dy + 3, character.abilitaCompetenti.includes("Furtività") ? "vuoto" : "vuoto");
+  text(ctx, "Svantaggio a Furtività", destraX + 16, dy, { size: 7 });
+  dy -= 16;
+
+  dy = sectionHeader(ctx, "Munizioni", destraX, dy, halfW);
+  text(ctx, "TIPO", destraX + 4, dy + 1, { size: 5.5, color: MUTED });
+  text(ctx, "Q.TÀ", destraX + halfW - 44, dy + 1, { size: 5.5, color: MUTED });
+  dy -= 9;
+  for (let i = 0; i < 3; i++) {
+    ctx.page.drawLine({
+      start: { x: destraX + 4, y: dy - 2 },
+      end: { x: destraX + halfW - 50, y: dy - 2 },
+      thickness: 0.6,
+      color: RULE,
+    });
+    box(ctx, destraX + halfW - 46, dy - 4, 40, 12);
+    dy -= 16;
+  }
+  dy -= 4;
+
+  // Consumabili: pozioni, pergamene, cariche. In app stanno nell'inventario con la quantità, qui
+  // hanno una casella per segnare quanti ne restano dopo averne usato uno.
+  dy = sectionHeader(ctx, "Consumabili", destraX, dy, halfW);
+  text(ctx, "RIMASTI", destraX + halfW - 52, dy + 1, { size: 5.5, color: MUTED });
+  dy -= 9;
+  const consumabili = character.inventario.filter((i) => i.quantita > 1).slice(0, 6);
+  for (const voce of consumabili) {
+    text(ctx, voce.nome, destraX + 4, dy, { size: 8, maxWidth: halfW - 62 });
+    box(ctx, destraX + halfW - 46, dy - 3, 22, 11);
+    text(ctx, `/ ${voce.quantita}`, destraX + halfW - 20, dy, { size: 7, color: MUTED });
+    dy -= 15;
+  }
+  for (let i = consumabili.length; i < 6; i++) {
+    ctx.page.drawLine({
+      start: { x: destraX + 4, y: dy - 2 },
+      end: { x: destraX + halfW - 50, y: dy - 2 },
+      thickness: 0.6,
+      color: RULE,
+    });
+    box(ctx, destraX + halfW - 46, dy - 4, 22, 12);
+    dy -= 16;
+  }
 
   pageFooter(ctx, 1, totPagine);
 }
@@ -573,6 +637,27 @@ function drawGearPage(ctx: Ctx, character: Character, totPagine: number) {
   if (character.scelteClasse.length > 0) {
     ry = listBlock("Scelte di classe", character.scelteClasse.map((s) => s.nome), ry);
   }
+  // Competenze in armi, armature e strumenti: la scheda del gruppo le ha come caselle da barrare
+  // e noi non le stampavamo affatto. In app non esistono come dato (si deducono dalla classe),
+  // quindi qui sono caselle vuote — su una scheda stampata e' esattamente cio' che serve.
+  ry = sectionHeader(ctx, "Competenze", rightX, ry, halfW);
+  const gruppiCompetenze: [string, string[]][] = [
+    ["Armature", ["Leggere", "Medie", "Pesanti", "Scudi"]],
+    ["Armi", ["Semplici", "Da guerra"]],
+  ];
+  for (const [etichetta, voci] of gruppiCompetenze) {
+    text(ctx, etichetta, rightX + 4, ry, { size: 6.5, color: MUTED });
+    let cx = rightX + 52;
+    for (const voce of voci) {
+      box(ctx, cx, ry - 1, 7, 7);
+      text(ctx, voce, cx + 10, ry, { size: 7 });
+      cx += 13 + ctx.font.widthOfTextAtSize(voce, 7);
+    }
+    ry -= 13;
+  }
+  text(ctx, "Strumenti", rightX + 4, ry, { size: 6.5, color: MUTED });
+  ry = blankLines(ctx, rightX + 52, ry - 2, halfW - 58, 2, 12) - 4;
+
   ry = listBlock("Linguaggi", character.linguaggi, ry);
   if (character.resistenze.length > 0) ry = listBlock("Resistenze", character.resistenze, ry, 1);
   if (character.immunita.length > 0) ry = listBlock("Immunità", character.immunita, ry, 1);

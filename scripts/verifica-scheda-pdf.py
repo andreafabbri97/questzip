@@ -50,12 +50,23 @@ def controlla(percorso, cartella_immagini=None):
 
         fuori = [t for r, t in testi if not fitz.Rect(pagina.rect).contains(r)]
 
-        print(f"pagina {numero}: {len(testi)} testi, {len(sovrapposti)} sovrapposti, {len(fuori)} fuori pagina")
+        # Anche i riquadri e le linee: l'errore che ha fatto nascere questo script era un blocco
+        # disegnato sopra un altro, non un testo fuori posto.
+        margine = fitz.Rect(pagina.rect)
+        disegni_fuori = [
+            d for d in pagina.get_drawings()
+            if not margine.contains(fitz.Rect(d["rect"]))
+        ]
+
+        print(
+            f"pagina {numero}: {len(testi)} testi, {len(sovrapposti)} sovrapposti, "
+            f"{len(fuori)} fuori pagina, {len(disegni_fuori)} riquadri fuori pagina"
+        )
         for testo1, testo2 in sovrapposti[:10]:
             print(f"    sovrapposti: {testo1!r} <-> {testo2!r}")
         for testo in fuori[:10]:
             print(f"    fuori pagina: {testo!r}")
-        problemi += len(sovrapposti) + len(fuori)
+        problemi += len(sovrapposti) + len(fuori) + len(disegni_fuori)
 
         if cartella_immagini:
             os.makedirs(cartella_immagini, exist_ok=True)

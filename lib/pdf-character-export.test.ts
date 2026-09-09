@@ -95,7 +95,6 @@ describe("pdfFileName", () => {
 describe("cose da barrare sulla scheda stampata", () => {
   const conUsi = () =>
     build({
-      livello: 5,
       classi: [{ nome: "Warlock", livello: 5 }],
       privilegiLimitati: [
         { id: "a", nome: "Maledizione della Strega", usiMax: 1, usiUsati: 0, recupero: "riposoBreve" },
