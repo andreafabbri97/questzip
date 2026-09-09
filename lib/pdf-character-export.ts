@@ -271,12 +271,19 @@ function blankLines(ctx: Ctx, x: number, y: number, w: number, count: number, st
 function pageHeader(ctx: Ctx, character: Character, sottotitolo: string) {
   const livello = totalLevel(character.classi);
   const classi = character.classi.map((c) => `${c.nome} ${c.livello}`).join(" / ");
-  text(ctx, character.nome || "Senza nome", MARGIN, PAGE_H - MARGIN - 12, { size: 17, bold: true });
+  // Il nome si ferma prima del sottotitolo a destra: senza limite, un nome lungo usciva dalla
+  // pagina e finiva stampato SOPRA "COMBATTIMENTO", su tutte e tre le pagine.
+  const larghezzaSottotitolo = ctx.bold.widthOfTextAtSize(safe(sottotitolo.toUpperCase()), 8);
+  text(ctx, character.nome || "Senza nome", MARGIN, PAGE_H - MARGIN - 12, {
+    size: 17,
+    bold: true,
+    maxWidth: CONTENT_W - larghezzaSottotitolo - 16,
+  });
   const riga = [character.razza, classi, `Livello ${livello}`, character.allineamento, character.background]
     .filter(Boolean)
     .join("  ·  ");
   text(ctx, riga, MARGIN, PAGE_H - MARGIN - 25, { size: 8.5, color: MUTED, maxWidth: CONTENT_W - 90 });
-  text(ctx, sottotitolo.toUpperCase(), PAGE_W - MARGIN - ctx.bold.widthOfTextAtSize(safe(sottotitolo.toUpperCase()), 8), PAGE_H - MARGIN - 12, {
+  text(ctx, sottotitolo.toUpperCase(), PAGE_W - MARGIN - larghezzaSottotitolo, PAGE_H - MARGIN - 12, {
     size: 8,
     bold: true,
     color: ACCENT,
@@ -307,7 +314,7 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   // Colonna sinistra: caratteristiche. Strette (52 invece di 74) perche' sulla scheda del gruppo
   // stanno incolonnate accanto a tiri salvezza e abilita', non da sole: cosi' le tre colonne
   // restano larghe uguali e la terza ha spazio per i privilegi, che sono testo lungo.
-  const colW = 52;
+  const colW = 48;
   let y = top;
   for (const ability of ABILITIES) {
     const score = character.caratteristiche[ability];
@@ -320,7 +327,7 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
 
   // Colonna centrale: competenza, tiri salvezza, abilità
   const midX = MARGIN + colW + 12;
-  const midW = 118;
+  const midW = 126;
   let my = top;
 
   box(ctx, midX, my - 22, midW, 22, true);
@@ -347,9 +354,11 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
       skillModifier(character.caratteristiche[skill.abilita], competente, esperto, livello) +
       (character.abilitaBonus[skill.nome] ?? 0);
     dot(ctx, midX + 6, my + 3, esperto ? "doppio" : competente ? "pieno" : "vuoto");
-    text(ctx, skill.nome, midX + 16, my, { size: 8, maxWidth: midW - 60 });
-    text(ctx, ABILITY_LABELS[skill.abilita].slice(0, 3).toUpperCase(), midX + midW - 48, my, { size: 6.5, color: MUTED });
-    text(ctx, formatModifier(bonus), midX + midW - 22, my, { size: 8, bold: true });
+    // maxWidth calcolato sullo spazio VERO che resta: con 58px "Addestrare Animali" veniva
+    // tagliato a "Addestrare An...", e un'abilita' che non si legge non serve a niente.
+    text(ctx, skill.nome, midX + 15, my, { size: 7.5, maxWidth: midW - 58 });
+    text(ctx, ABILITY_LABELS[skill.abilita].slice(0, 3).toUpperCase(), midX + midW - 40, my, { size: 6, color: MUTED });
+    text(ctx, formatModifier(bonus), midX + midW - 20, my, { size: 7.5, bold: true });
     my -= 11.5;
   }
 
@@ -409,8 +418,10 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   }
   my = notaTroncamento(ctx, character.talenti.length, talentiMostrati.length, col1X + 4, my);
   // Le righe libere arrivano fino al piede della pagina: e' la colonna che sulla scheda del
-  // gruppo si riempie a mano salendo di livello.
-  blankLines(ctx, col1X + 4, my - 2, col1W - 8, Math.max(2, Math.floor((my - MARGIN - 10) / 12)), 12);
+  // gruppo si riempie a mano salendo di livello. Nessun minimo forzato: con la colonna gia' piena
+  // (molti talenti) un minimo di due righe le faceva finire sotto il bordo del foglio.
+  const righeTalenti = Math.floor((my - MARGIN - 10) / 12);
+  if (righeTalenti > 0) blankLines(ctx, col1X + 4, my - 2, col1W - 8, righeTalenti, 12);
 
   // Colonna destra: difesa, punti ferita, dadi vita, tiri morte
   const rightX = midX + midW + 12;
@@ -433,9 +444,8 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
       "Visione",
       character.scurovisione && character.visioneRadius > 0 ? `${character.visioneRadius} m` : "-",
     ],
-    // Il valore e' quello calcolato sopra per il riquadro della prima colonna: due calcoli
-    // separati avevano gia' prodotto due numeri diversi nella stessa pagina.
-    ["Percezione passiva", String(percezionePassivaTotale)],
+    // La percezione passiva NON si ripete qui: ha gia' il suo riquadro in fondo alla prima
+    // colonna, dov'e' anche sulla scheda del gruppo. Stamparla due volte era solo rumore.
     ...(castingAbilityP1
       ? ([
           [
@@ -545,15 +555,21 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   // gruppo consulta e barra di continuo, e sta in alto a destra, non in fondo alla pagina.
   ty = sectionHeader(ctx, "Privilegi e tratti limitati", terzaX, ty, terzaW);
   let fy = ty;
-  text(ctx, "RECUPERO", terzaX + terzaW - 108, fy + 1, { size: 5.5, color: MUTED });
-  text(ctx, "USI", terzaX + terzaW - 58, fy + 1, { size: 5.5, color: MUTED });
-  fy -= 9;
-  const privilegiMostrati = character.privilegiLimitati.slice(0, 10);
+  // Nome su una riga tutta sua, recupero e usi sotto: in colonna il nome aveva 44px e
+  // "conoscenza vita passata" si riduceva a tre parole tagliate.
+  const privilegiMostrati = character.privilegiLimitati.slice(0, 7);
   for (const p of privilegiMostrati) {
-    text(ctx, p.nome, terzaX + 4, fy, { size: 7.5, maxWidth: terzaW - 116 });
-    caselleRecupero(ctx, p.recupero, terzaX + terzaW - 108, fy);
-    disegnaUsi(ctx, p, terzaX + terzaW - 58, fy);
-    fy -= 12;
+    text(ctx, p.nome, terzaX + 4, fy, { size: 8, maxWidth: terzaW - 10 });
+    fy -= 10;
+    caselleRecupero(ctx, p.recupero, terzaX + 8, fy);
+    disegnaUsi(ctx, p, terzaX + 62, fy);
+    fy -= 13;
+    ctx.page.drawLine({
+      start: { x: terzaX + 4, y: fy + 5 },
+      end: { x: terzaX + terzaW - 4, y: fy + 5 },
+      thickness: 0.4,
+      color: RULE,
+    });
   }
   fy = notaTroncamento(ctx, character.privilegiLimitati.length, privilegiMostrati.length, terzaX + 4, fy);
   // Righe libere: salendo di livello i privilegi si aggiungono a penna.

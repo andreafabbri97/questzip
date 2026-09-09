@@ -154,3 +154,44 @@ describe("valori che cambiano in sessione", () => {
     expect(altro.length).not.toBe(uno.length);
   });
 });
+
+// Casi limite provati generando il PDF davvero e passandolo a scripts/verifica-scheda-pdf.py:
+// è lì che sono emersi un nome lungo stampato SOPRA il titolo di sezione, righe libere finite
+// sotto il bordo del foglio e nomi di abilità troncati ("Addestrare An...").
+describe("casi limite dell'impaginazione", () => {
+  const lungo = "Nome molto lungo di prova che sfora sicuramente la colonna disponibile";
+
+  it("un nome lunghissimo non invade il titolo di sezione", async () => {
+    const bytes = await exportCharacterToPdf(build({ nome: lungo, razza: lungo, background: lungo }));
+
+    expect(String.fromCharCode(...bytes.slice(0, 5))).toBe("%PDF-");
+  });
+
+  it("una scheda piena in ogni sezione resta dentro le pagine", async () => {
+    const pieno = build({
+      nome: "Pieno",
+      classi: [
+        { nome: "Warlock", livello: 10, sottoclasse: "The Hexblade" },
+        { nome: "Ladro", livello: 10, sottoclasse: "Soulknife" },
+      ],
+      talenti: Array.from({ length: 8 }, (_, i) => ({ id: `t${i}`, nome: `${lungo} ${i}` })),
+      linguaggi: Array.from({ length: 12 }, (_, i) => `${lungo} ${i}`),
+      privilegiLimitati: Array.from({ length: 12 }, (_, i) => ({
+        id: `p${i}`,
+        nome: `${lungo} ${i}`,
+        usiMax: 20,
+        usiUsati: 2,
+        recupero: "riposoBreve" as const,
+      })),
+    });
+
+    await expect(exportCharacterToPdf(pieno)).resolves.toBeInstanceOf(Uint8Array);
+  });
+
+  it("una scheda appena creata non produce pagine rotte", async () => {
+    const bytes = await exportCharacterToPdf(build({ nome: "Nuovo" }));
+
+    // Senza incantesimi la terza pagina non esiste: due pagine, non tre vuote.
+    expect(await numeroPagine(bytes)).toBe(2);
+  });
+});
