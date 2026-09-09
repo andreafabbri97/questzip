@@ -25,6 +25,7 @@ import {
 import { loadBackgrounds, loadRaces } from "@/lib/fivetools/data";
 import { formatClassSummary } from "./helpers";
 import { Autocomplete } from "./autocomplete";
+import { CompendioInfoButton } from "./compendio-info-button";
 import {
   BackgroundTraits,
   ClassFeaturesSection,
@@ -600,6 +601,7 @@ export function CharacterSheet({
                   inputClassName={inputClass}
                   kind="razze"
                 />
+                <CompendioInfoButton kind="razze" nome={character.razza} />
               </label>
               <label className="block">
                 <span className={labelClass}>Allineamento</span>
@@ -626,6 +628,7 @@ export function CharacterSheet({
                   inputClassName={inputClass}
                   kind="background"
                 />
+                <CompendioInfoButton kind="background" nome={character.background} />
               </label>
               <BackgroundTraits background={character.background} />
             </section>

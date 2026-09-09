@@ -7,6 +7,7 @@ import {
   prossimoLivelloConPrivilegi,
 } from "@/lib/privilegi-per-livello";
 import { IntField } from "@/components/int-field";
+import { CompendioInfoButton } from "./compendio-info-button";
 import {
   ABILITIES,
   ABILITY_LABELS,
@@ -82,6 +83,10 @@ export function ClassRow({
             kind="classi"
           />
           <ClassNameWarning name={entry.nome} />
+          {/* La scheda della classe nel Compendio contiene gia' tabella di progressione 1-20,
+              dado vita, competenze, requisiti di multiclasse e le sottoclassi: qui si apre nello
+              stesso modal delle menzioni in chat, senza uscire dal personaggio. */}
+          <CompendioInfoButton kind="classi" nome={entry.nome} label="📖 Progressione" />
         </div>
         <label className="block w-16 shrink-0">
           <span className="text-[10px] uppercase tracking-widest text-muted">Livello</span>

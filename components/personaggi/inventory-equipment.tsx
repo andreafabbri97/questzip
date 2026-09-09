@@ -372,6 +372,21 @@ export function ActiveConditionsSection({
         selected={character.condizioniAttive}
         onToggle={toggle}
       />
+      {/* Cosa comporta davvero una condizione era leggibile solo nel Compendio, cioe' uscendo
+          dalla scheda: qui compare solo per quelle addosso al personaggio, che sono le uniche
+          che interessano in quel momento. */}
+      {character.condizioniAttive.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-edge pt-2">
+          {character.condizioniAttive.map((condizione) => (
+            <CompendioInfoButton
+              key={condizione}
+              kind="condizioni"
+              nome={condizione}
+              label={`📖 ${condizione}`}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
