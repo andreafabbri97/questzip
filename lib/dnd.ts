@@ -122,6 +122,14 @@ export type Weapon = z.infer<typeof weaponSchema>;
 // breve) — sulla scheda cartacea di riferimento dell'utente è una tabella con nome/ricarica/
 // totale/usi, la domanda più comune al tavolo ("quante Rabbie mi restano?") altrimenti risolta
 // solo tenendo il conto a mente o su un foglio a parte.
+/**
+ * Usi "illimitati": un privilegio sempre attivo che non si consuma mai (la Vista del Diavolo di
+ * un warlock). Non esiste un modo di dirlo nella scheda cartacea, e il gruppo aveva preso
+ * l'abitudine di scriverci 99 per ricordarsi che e' perenne: qui quel numero diventa il modo
+ * ufficiale di dirlo, cosi' a schermo e sulla stampa compare "sempre" invece di 99 caselle.
+ */
+export const USI_ILLIMITATI = 99;
+
 export const RECUPERO_OPTIONS = ["riposoBreve", "riposoLungo", "alba"] as const;
 export const RECUPERO_LABELS: Record<(typeof RECUPERO_OPTIONS)[number], string> = {
   riposoBreve: "Riposo breve",

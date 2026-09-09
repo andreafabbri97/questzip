@@ -37,6 +37,7 @@ import {
   type Character,
   type LimitedFeature,
   type MagicItem,
+  USI_ILLIMITATI,
 } from "@/lib/dnd";
 import { loadClassData, loadItems, resolveClassFeatures, resolveSubclassFeatures } from "@/lib/fivetools/data";
 import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
@@ -600,11 +601,14 @@ export function LimitedFeaturesSection({
                   placeholder="Nome (es. Rabbia)"
                   className="input-focus flex-1 min-w-[140px] rounded-md border border-edge bg-surface px-2 py-1.5 text-sm text-foreground"
                 />
-                <label className="flex items-center gap-1.5 text-xs text-muted shrink-0">
+                <label
+                  className="flex items-center gap-1.5 text-xs text-muted shrink-0"
+                  title={`${USI_ILLIMITATI} = sempre attivo, per i privilegi che non si consumano`}
+                >
                   Max
                   <IntField
                     min={1}
-                    max={99}
+                    max={USI_ILLIMITATI}
                     value={f.usiMax}
                     onChange={(value) =>
                       updateFeature(f.id, { usiMax: value, usiUsati: Math.min(f.usiUsati, value) })
@@ -627,12 +631,21 @@ export function LimitedFeaturesSection({
                     </option>
                   ))}
                 </select>
-                <SlotCounter
-                  label="Usi"
-                  max={f.usiMax}
-                  used={f.usiUsati}
-                  onChange={(used) => updateFeature(f.id, { usiUsati: used })}
-                />
+                {/* Un privilegio sempre attivo non si conta: il gruppo scriveva 99 per
+                    ricordarsi che e' perenne (la Vista del Diavolo), e ora quel numero e' il modo
+                    ufficiale di dirlo — niente contatore da azzerare a ogni riposo. */}
+                {f.usiMax >= USI_ILLIMITATI ? (
+                  <span className="shrink-0 rounded-full border border-edge px-2 py-0.5 text-[11px] font-bold text-muted">
+                    sempre attivo
+                  </span>
+                ) : (
+                  <SlotCounter
+                    label="Usi"
+                    max={f.usiMax}
+                    used={f.usiUsati}
+                    onChange={(used) => updateFeature(f.id, { usiUsati: used })}
+                  />
+                )}
                 <button
                   onClick={() => setFeatures(features.filter((x) => x.id !== f.id))}
                   className="text-muted hover:text-danger text-sm shrink-0"

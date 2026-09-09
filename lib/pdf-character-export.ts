@@ -18,6 +18,7 @@ import {
   spellSaveDC,
   spellSlotsForCasterLevel,
   totalLevel,
+  USI_ILLIMITATI,
   warlockLevel,
   xpForNextLevel,
   weaponAttackBonus,
@@ -190,6 +191,11 @@ function disegnaUsi(
 ) {
   const max = Math.max(0, privilegio.usiMax);
   if (max === 0) return;
+  // Sempre attivo: non c'e' niente da barrare, e una fila di caselle direbbe il contrario.
+  if (max >= USI_ILLIMITATI) {
+    text(ctx, "sempre attivo", x, y, { size: 7, color: MUTED });
+    return;
+  }
   if (max > MAX_PALLINI_USI) {
     box(ctx, x, y - 1.5, 16, 9);
     text(ctx, `/ ${max}`, x + 19, y, { size: 7, color: MUTED });
@@ -298,8 +304,10 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   const comp = proficiencyBonus(livello);
   const top = PAGE_H - MARGIN - 44;
 
-  // Colonna sinistra: caratteristiche
-  const colW = 74;
+  // Colonna sinistra: caratteristiche. Strette (52 invece di 74) perche' sulla scheda del gruppo
+  // stanno incolonnate accanto a tiri salvezza e abilita', non da sole: cosi' le tre colonne
+  // restano larghe uguali e la terza ha spazio per i privilegi, che sono testo lungo.
+  const colW = 52;
   let y = top;
   for (const ability of ABILITIES) {
     const score = character.caratteristiche[ability];
@@ -312,7 +320,7 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
 
   // Colonna centrale: competenza, tiri salvezza, abilità
   const midX = MARGIN + colW + 12;
-  const midW = 196;
+  const midW = 118;
   let my = top;
 
   box(ctx, midX, my - 22, midW, 22, true);
@@ -345,10 +353,74 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
     my -= 11.5;
   }
 
+  // Sotto le abilita', quello che sulla scheda del gruppo occupa il resto della prima colonna:
+  // percezione passiva, competenze, linguaggi e talenti. Senza, meta' colonna restava bianca
+  // mentre le altre due arrivavano in fondo alla pagina.
+  const col1X = MARGIN;
+  const col1W = midX + midW - MARGIN;
+  const percezionePassivaTotale =
+    passivePerception(
+      character.caratteristiche.saggezza,
+      character.abilitaCompetenti.includes("Percezione") || character.abilitaEsperte.includes("Percezione"),
+      character.abilitaEsperte.includes("Percezione"),
+      livello,
+    ) +
+    character.percezionePassivaBonus +
+    (character.abilitaBonus["Percezione"] ?? 0);
+  my -= 8;
+  box(ctx, col1X, my - 20, col1W, 20, true);
+  text(ctx, "SAGGEZZA (PERCEZIONE) PASSIVA", col1X + 6, my - 8, { size: 6.5, bold: true, color: MUTED });
+  text(ctx, String(percezionePassivaTotale), col1X + col1W - 22, my - 14, { size: 11, bold: true });
+  my -= 28;
+
+  my = sectionHeader(ctx, "Competenze", col1X, my, col1W);
+  for (const [etichetta, voci] of [
+    ["Armature", ["Leggere", "Medie", "Pesanti", "Scudi"]],
+    ["Armi", ["Semplici", "Da guerra"]],
+  ] as const) {
+    text(ctx, etichetta, col1X + 4, my, { size: 6.5, color: MUTED });
+    let cx = col1X + 46;
+    for (const voce of voci) {
+      box(ctx, cx, my - 1, 7, 7);
+      text(ctx, voce, cx + 9, my, { size: 6.5 });
+      cx += 12 + ctx.font.widthOfTextAtSize(voce, 6.5);
+    }
+    my -= 12;
+  }
+  text(ctx, "Strumenti", col1X + 4, my, { size: 6.5, color: MUTED });
+  my = blankLines(ctx, col1X + 46, my - 2, col1W - 52, 2, 12) - 6;
+
+  my = sectionHeader(ctx, "Linguaggi", col1X, my, col1W);
+  if (character.linguaggi.length > 0) {
+    for (const riga of wrap(ctx.font, character.linguaggi.join(", "), 7.5, col1W - 10)) {
+      text(ctx, riga, col1X + 4, my, { size: 7.5 });
+      my -= 10;
+    }
+    my -= 4;
+  } else {
+    my = blankLines(ctx, col1X + 4, my - 2, col1W - 8, 2, 11) - 4;
+  }
+
+  my = sectionHeader(ctx, "Talenti", col1X, my, col1W);
+  const talentiMostrati = character.talenti.slice(0, 6);
+  for (const talento of talentiMostrati) {
+    text(ctx, talento.nome, col1X + 4, my, { size: 7.5, maxWidth: col1W - 10 });
+    my -= 11;
+  }
+  my = notaTroncamento(ctx, character.talenti.length, talentiMostrati.length, col1X + 4, my);
+  // Le righe libere arrivano fino al piede della pagina: e' la colonna che sulla scheda del
+  // gruppo si riempie a mano salendo di livello.
+  blankLines(ctx, col1X + 4, my - 2, col1W - 8, Math.max(2, Math.floor((my - MARGIN - 10) / 12)), 12);
+
   // Colonna destra: difesa, punti ferita, dadi vita, tiri morte
   const rightX = midX + midW + 12;
-  const rightW = PAGE_W - MARGIN - rightX;
+  // Due colonne, non una larga: sulla scheda del gruppo la seconda tiene il combattimento e la
+  // terza i privilegi, che sono testo lungo e hanno bisogno di tutta l'altezza della pagina.
+  const rightW = 165;
+  const terzaX = rightX + rightW + 12;
+  const terzaW = PAGE_W - MARGIN - terzaX;
   let ry = top;
+  let ty = top;
 
   // Gli stessi riquadri della scheda del gruppo, nello stesso ordine. Visione e valori degli
   // incantesimi stavano solo nelle pagine seguenti: al tavolo servono qui, dove si combatte.
@@ -361,21 +433,9 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
       "Visione",
       character.scurovisione && character.visioneRadius > 0 ? `${character.visioneRadius} m` : "-",
     ],
-    [
-      "Percezione passiva",
-      String(
-        passivePerception(
-          character.caratteristiche.saggezza,
-          character.abilitaCompetenti.includes("Percezione") || character.abilitaEsperte.includes("Percezione"),
-          character.abilitaEsperte.includes("Percezione"),
-          livello,
-        ) +
-          character.percezionePassivaBonus +
-          // Anche il bonus per-abilità su Percezione, altrimenti la stessa pagina stampava
-          // "Percezione +6" nella tabella Abilità e una passiva da 15 invece di 16.
-          (character.abilitaBonus["Percezione"] ?? 0),
-      ),
-    ],
+    // Il valore e' quello calcolato sopra per il riquadro della prima colonna: due calcoli
+    // separati avevano gia' prodotto due numeri diversi nella stessa pagina.
+    ["Percezione passiva", String(percezionePassivaTotale)],
     ...(castingAbilityP1
       ? ([
           [
@@ -450,57 +510,74 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
     }
   }
 
-  // Fascia bassa: armi (con bonus d'attacco e danno già calcolati) e privilegi limitati. Parte
-  // sotto la PIÙ LUNGA delle tre colonne sopra, non da una y fissa: con un valore fisso restava
-  // una fascia bianca enorme in mezzo alla pagina per i personaggi con poche righe in colonna.
-  let by = Math.min(y, my, ry) - 14;
-  const halfW = (CONTENT_W - 12) / 2;
-  by = sectionHeader(ctx, "Armi e attacchi", MARGIN, by, CONTENT_W);
-  text(ctx, "ARMA", MARGIN + 4, by, { size: 6.5, bold: true, color: MUTED });
-  text(ctx, "ATTACCO", MARGIN + 250, by, { size: 6.5, bold: true, color: MUTED });
-  text(ctx, "DANNO", MARGIN + 310, by, { size: 6.5, bold: true, color: MUTED });
+  // Armi nella colonna del combattimento, come sulla scheda del gruppo: prima erano una fascia
+  // larga in fondo alla pagina, lontana dai punti ferita e dalla classe armatura che si guardano
+  // nello stesso momento.
+  let by = ry - 10;
+  const halfW = rightW;
+  by = sectionHeader(ctx, "Armi e attacchi", rightX, by, rightW);
+  text(ctx, "ARMA", rightX + 4, by, { size: 6, bold: true, color: MUTED });
+  text(ctx, "ATT.", rightX + rightW - 74, by, { size: 6, bold: true, color: MUTED });
+  text(ctx, "DANNO", rightX + rightW - 52, by, { size: 6, bold: true, color: MUTED });
   by -= 11;
   const armiMostrate = character.armi.slice(0, 6);
   for (const arma of armiMostrate) {
     const atk = weaponAttackBonus(arma.caratteristica, character.caratteristiche, arma.competente, livello, arma.bonusExtra);
     const dmgMod = weaponDamageModifier(arma.caratteristica, character.caratteristiche, arma.bonusExtra);
-    text(ctx, arma.nome, MARGIN + 4, by, { size: 8, maxWidth: 240 });
-    text(ctx, formatModifier(atk), MARGIN + 250, by, { size: 8, bold: true });
-    text(ctx, `${arma.dadoDanno}${dmgMod !== 0 ? formatModifier(dmgMod) : ""} ${arma.tipoDanno}`.trim(), MARGIN + 310, by, {
-      size: 8,
-      maxWidth: 200,
+    text(ctx, arma.nome, rightX + 4, by, { size: 7.5, maxWidth: rightW - 80 });
+    text(ctx, formatModifier(atk), rightX + rightW - 74, by, { size: 7.5, bold: true });
+    text(ctx, `${arma.dadoDanno}${dmgMod !== 0 ? formatModifier(dmgMod) : ""} ${arma.tipoDanno}`.trim(), rightX + rightW - 52, by, {
+      size: 7.5,
+      maxWidth: 52,
     });
     by -= 11;
   }
-  by = notaTroncamento(ctx, character.armi.length, armiMostrate.length, MARGIN + 4, by);
-  if (character.armi.length === 0) by = blankLines(ctx, MARGIN + 4, by - 2, CONTENT_W - 8, 3);
+  by = notaTroncamento(ctx, character.armi.length, armiMostrate.length, rightX + 4, by);
+  if (character.armi.length === 0) by = blankLines(ctx, rightX + 4, by - 2, rightW - 8, 3);
 
-  by -= 8;
-  const featY = sectionHeader(ctx, "Privilegi a usi limitati", MARGIN, by, halfW);
-  let fy = featY;
-  // Stesse colonne della scheda del gruppo: NOME | RECUPERO (RB/RL/AL) | TOTALE | USI. Il
-  // recupero come tre caselle invece che a parole occupa meno e si legge a colpo d'occhio.
-  text(ctx, "RECUPERO", MARGIN + halfW - 108, fy + 1, { size: 5.5, color: MUTED });
-  text(ctx, "USI", MARGIN + halfW - 60, fy + 1, { size: 5.5, color: MUTED });
+  // TERZA COLONNA — privilegi a usi limitati, come sulla scheda del gruppo: e' la sezione che il
+  // gruppo consulta e barra di continuo, e sta in alto a destra, non in fondo alla pagina.
+  ty = sectionHeader(ctx, "Privilegi e tratti limitati", terzaX, ty, terzaW);
+  let fy = ty;
+  text(ctx, "RECUPERO", terzaX + terzaW - 108, fy + 1, { size: 5.5, color: MUTED });
+  text(ctx, "USI", terzaX + terzaW - 58, fy + 1, { size: 5.5, color: MUTED });
   fy -= 9;
-  const privilegiMostrati = character.privilegiLimitati.slice(0, 8);
+  const privilegiMostrati = character.privilegiLimitati.slice(0, 10);
   for (const p of privilegiMostrati) {
-    text(ctx, p.nome, MARGIN + 4, fy, { size: 8, maxWidth: halfW - 118 });
-    caselleRecupero(ctx, p.recupero, MARGIN + halfW - 108, fy);
-    disegnaUsi(ctx, p, MARGIN + halfW - 62, fy);
-    fy -= 11;
+    text(ctx, p.nome, terzaX + 4, fy, { size: 7.5, maxWidth: terzaW - 116 });
+    caselleRecupero(ctx, p.recupero, terzaX + terzaW - 108, fy);
+    disegnaUsi(ctx, p, terzaX + terzaW - 58, fy);
+    fy -= 12;
   }
-  fy = notaTroncamento(ctx, character.privilegiLimitati.length, privilegiMostrati.length, MARGIN + 4, fy);
-  // Righe libere fino in fondo anche qui, non solo negli appunti: su una scheda STAMPATA i
-  // privilegi si aggiungono salendo di livello, e lo spazio in fondo alla colonna resterebbe
-  // comunque bianco.
-  blankLines(ctx, MARGIN + 4, fy - 2, halfW - 8, Math.min(14, Math.max(2, Math.floor((fy - MARGIN - 8) / 12))));
+  fy = notaTroncamento(ctx, character.privilegiLimitati.length, privilegiMostrati.length, terzaX + 4, fy);
+  // Righe libere: salendo di livello i privilegi si aggiungono a penna.
+  fy = blankLines(ctx, terzaX + 4, fy - 2, terzaW - 8, Math.max(2, 10 - privilegiMostrati.length), 12);
+  ty = fy - 8;
+
+  // Sotto, quello che sulla scheda del gruppo occupa tutta la terza colonna: i privilegi che si
+  // usano in combattimento. Le scelte di classe (suppliche occulte, metamagia, manovre) le
+  // conosciamo; i privilegi di classe e i tratti razziali no, perche' vengono dal Compendio e
+  // ognuno si annota il riassunto che gli serve — quindi righe libere fino in fondo, che e'
+  // esattamente cio' che il gruppo riempie a mano.
+  if (character.scelteClasse.length > 0) {
+    ty = sectionHeader(ctx, "Scelte di classe", terzaX, ty, terzaW);
+    const scelteMostrate = character.scelteClasse.slice(0, 8);
+    for (const scelta of scelteMostrate) {
+      text(ctx, scelta.nome, terzaX + 4, ty, { size: 7.5, maxWidth: terzaW - 10 });
+      ty -= 11;
+    }
+    ty = notaTroncamento(ctx, character.scelteClasse.length, scelteMostrate.length, terzaX + 4, ty);
+    ty -= 6;
+  }
+
+  ty = sectionHeader(ctx, "Privilegi di classe e tratti", terzaX, ty, terzaW);
+  blankLines(ctx, terzaX + 4, ty - 2, terzaW - 8, Math.max(3, Math.floor((ty - MARGIN - 10) / 12)), 12);
 
   // Colonna destra: le tre cose che sulla scheda del gruppo stanno accanto alle armi e che qui
   // mancavano del tutto. Gli appunti di sessione, che quella scheda non ha, si sono presi finora
   // mezza pagina: sono rimasti nella pagina 2 insieme alle note.
-  const destraX = MARGIN + halfW + 12;
-  let dy = sectionHeader(ctx, "Armatura", destraX, by, halfW);
+  const destraX = rightX;
+  let dy = sectionHeader(ctx, "Armatura", destraX, by - 8, rightW);
   // Il personaggio in app ha solo la CA finale: il resto (nome dell'armatura, Destrezza massima,
   // requisito di Forza, svantaggio a Furtività) sta sul manuale dell'armatura e su carta si
   // scrive a mano, come sulla scheda cartacea.
@@ -556,7 +633,10 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
     text(ctx, `/ ${voce.quantita}`, destraX + halfW - 20, dy, { size: 7, color: MUTED });
     dy -= 15;
   }
-  for (let i = consumabili.length; i < 6; i++) {
+  // Le righe libere si fermano prima del piè di pagina invece di essere sei fisse: con molte armi
+  // la colonna arrivava a sfiorare il numero di pagina.
+  const spazioRighe = Math.max(0, Math.floor((dy - MARGIN - 14) / 16));
+  for (let i = consumabili.length; i < Math.min(6, consumabili.length + spazioRighe); i++) {
     ctx.page.drawLine({
       start: { x: destraX + 4, y: dy - 2 },
       end: { x: destraX + halfW - 50, y: dy - 2 },
@@ -630,35 +710,12 @@ function drawGearPage(ctx: Ctx, character: Character, totPagine: number) {
     return cursor - 6;
   };
 
-  ry = listBlock("Talenti", character.talenti.map((t) => t.nome), ry);
   if (character.infusioniConosciute.length > 0) {
     ry = listBlock("Infusioni conosciute", character.infusioniConosciute.map((i) => i.nome), ry);
   }
   if (character.scelteClasse.length > 0) {
     ry = listBlock("Scelte di classe", character.scelteClasse.map((s) => s.nome), ry);
   }
-  // Competenze in armi, armature e strumenti: la scheda del gruppo le ha come caselle da barrare
-  // e noi non le stampavamo affatto. In app non esistono come dato (si deducono dalla classe),
-  // quindi qui sono caselle vuote — su una scheda stampata e' esattamente cio' che serve.
-  ry = sectionHeader(ctx, "Competenze", rightX, ry, halfW);
-  const gruppiCompetenze: [string, string[]][] = [
-    ["Armature", ["Leggere", "Medie", "Pesanti", "Scudi"]],
-    ["Armi", ["Semplici", "Da guerra"]],
-  ];
-  for (const [etichetta, voci] of gruppiCompetenze) {
-    text(ctx, etichetta, rightX + 4, ry, { size: 6.5, color: MUTED });
-    let cx = rightX + 52;
-    for (const voce of voci) {
-      box(ctx, cx, ry - 1, 7, 7);
-      text(ctx, voce, cx + 10, ry, { size: 7 });
-      cx += 13 + ctx.font.widthOfTextAtSize(voce, 7);
-    }
-    ry -= 13;
-  }
-  text(ctx, "Strumenti", rightX + 4, ry, { size: 6.5, color: MUTED });
-  ry = blankLines(ctx, rightX + 52, ry - 2, halfW - 58, 2, 12) - 4;
-
-  ry = listBlock("Linguaggi", character.linguaggi, ry);
   if (character.resistenze.length > 0) ry = listBlock("Resistenze", character.resistenze, ry, 1);
   if (character.immunita.length > 0) ry = listBlock("Immunità", character.immunita, ry, 1);
   if (character.vulnerabilita.length > 0) ry = listBlock("Vulnerabilità", character.vulnerabilita, ry, 1);
