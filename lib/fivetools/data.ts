@@ -1,4 +1,5 @@
 import { RAW_BASE } from "@/lib/fivetools/books";
+import { ordinaPrivilegiSottoclasse } from "@/lib/fivetools/ordine-privilegi";
 import type { FiveEntry } from "@/lib/fivetools/entries";
 import { incantesimiDaSources, type IncantesimoDiClasse } from "@/lib/fivetools/incantesimi-classe";
 
@@ -234,6 +235,8 @@ export interface RawSubclass {
   additionalSpells?: Partial<
     Record<"expanded" | "prepared" | "known" | "innate", Record<string, unknown>>
   >[];
+  /** Ordine in cui il manuale presenta i privilegi: "Soul Blades|Rogue||Soulknife|TCE|9". */
+  subclassFeatures?: string[];
 }
 
 export interface RawSubclassFeature {
@@ -605,7 +608,7 @@ export function resolveSubclassFeatures(
   subclass: RawSubclass,
 ): RawSubclassFeature[] {
   const shortName = subclass.shortName ?? subclass.name;
-  return data.subclassFeatures
+  const trovate = data.subclassFeatures
     .filter(
       (feature) =>
         feature.className === subclass.className &&
@@ -617,8 +620,10 @@ export function resolveSubclassFeatures(
         // Erano 150 su 2.454: righe cliccabili che aprivano un riquadro vuoto, e conteggi
         // sfalsati che impedivano di abbinare i nomi italiani (vedi abbinaPrivilegiTradotti).
         (feature.entries?.length ?? 0) > 0,
-    )
-    .sort((a, b) => a.level - b.level);
+    );
+  // Non basta ordinare per livello: dentro lo stesso livello i "figli" stanno prima della voce
+  // che li introduce, e la frase che li annuncia finiva in fondo (vedi ordine-privilegi.ts).
+  return ordinaPrivilegiSottoclasse(trovate, subclass.subclassFeatures);
 }
 
 /** Risolve le feature di classe (non di sottoclasse), ordinate per livello. */
