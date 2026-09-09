@@ -9,6 +9,13 @@ export function formatTableCell(cell: TableCell | undefined): string {
   if (typeof cell === "string") return stripTags(cell);
   if (typeof cell === "number") return String(cell);
   if (cell.type === "bonus") return cell.value !== undefined ? `+${cell.value}` : "—";
+  // Celle con un tiro invece di un numero: l'Attacco Furtivo del Ladro sale 1d6, 2d6, 3d6… e la
+  // colonna mostrava solo trattini perché qui si cercava "value", che in queste celle non c'è.
+  if (cell.toRoll?.length) {
+    return cell.toRoll
+      .map((d) => `${d.number}d${d.faces}${d.modifier ? (d.modifier > 0 ? `+${d.modifier}` : String(d.modifier)) : ""}`)
+      .join(" + ");
+  }
   return cell.value !== undefined ? String(cell.value) : "—";
 }
 

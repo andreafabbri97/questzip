@@ -34,8 +34,11 @@ test.describe("Tratti & Talenti: privilegi di classe filtrati per livello, privi
     // la traduzione ufficiale/IA sia arrivata prima di cliccare, altrimenti un click troppo rapido
     // aprirebbe il modal con la traduzione dal vivo di riserva invece del testo IA di qualità
     // migliore (race condition vista durante lo sviluppo, non un bug del componente).
-    const metamagicRow = page.getByRole("button", { name: "Metamagia (Metamagic) Liv. 3" });
+    // Il livello non sta più sulla riga ma nell'intestazione del gruppo ("Livello 3"): sulla riga
+    // c'è invece da dove viene il privilegio, classe o sottoclasse.
+    const metamagicRow = page.getByRole("button", { name: /^Metamagia \(Metamagic\)/ });
     await expect(metamagicRow).toBeVisible();
+    await expect(page.getByText("Livello 3").first()).toBeVisible();
     // Affinità Elementale/Elemental Affinity (sottoclasse) arriva solo al 6° livello: NON deve
     // comparire — prima di questa modifica l'elenco mostrava sempre tutti e 20 i livelli.
     await expect(page.getByText("Elemental Affinity", { exact: false })).not.toBeVisible();

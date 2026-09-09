@@ -187,7 +187,17 @@ export interface RawOptionalFeature {
   entries: FiveEntry[];
 }
 
-export type TableCell = string | number | { type: string; value?: number };
+// Le celle "dice" sono quelle che nel manuale contengono un tiro invece di un numero: l'Attacco
+// Furtivo del Ladro, le Arti Marziali del Monaco. Senza questo caso la colonna restava piena di
+// trattini (segnalato dall'utente sulla tabella del Ladro).
+export type TableCell =
+  | string
+  | number
+  | {
+      type: string;
+      value?: number;
+      toRoll?: { number: number; faces: number; modifier?: number }[];
+    };
 
 export interface ClassTableGroup {
   title?: string;

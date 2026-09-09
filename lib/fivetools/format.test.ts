@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatCreatureType, formatDuration, formatRarity, formatTime } from "./format";
+import {
+  formatCreatureType,
+  formatDuration,
+  formatRarity,
+  formatTableCell,
+  formatTime,
+} from "./format";
 
 // I dati 5etools esprimono SEMPRE l'unità al singolare, con la quantità in un campo separato: le
 // vecchie chiavi plurali del dizionario ("minutes"/"hours") non venivano quindi mai raggiunte e su
@@ -60,5 +66,23 @@ describe("formatRarity / formatCreatureType", () => {
   it("lascia passare invariato un valore non riconosciuto", () => {
     expect(formatRarity("qualcosa")).toBe("qualcosa");
     expect(formatCreatureType("qualcosa")).toBe("qualcosa");
+  });
+});
+
+describe("formatTableCell: celle con un tiro", () => {
+  // La colonna "Attacco furtivo" del Ladro mostrava un trattino a ogni livello: queste celle non
+  // hanno "value" ma "toRoll", e il formattatore non lo conosceva.
+  it("rende un dado come si legge sul manuale", () => {
+    expect(formatTableCell({ type: "dice", toRoll: [{ number: 2, faces: 6 }] })).toBe("2d6");
+  });
+
+  it("somma i dadi multipli e riporta il modificatore col segno", () => {
+    expect(
+      formatTableCell({ type: "dice", toRoll: [{ number: 1, faces: 8 }, { number: 1, faces: 4, modifier: 2 }] }),
+    ).toBe("1d8 + 1d4+2");
+  });
+
+  it("resta un trattino se la cella non ha né valore né tiro", () => {
+    expect(formatTableCell({ type: "dice" })).toBe("—");
   });
 });

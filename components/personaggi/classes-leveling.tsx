@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  abbinaPrivilegiTradotti,
+  dividiPerLivello,
+  prossimoLivelloConPrivilegi,
+} from "@/lib/privilegi-per-livello";
 import { IntField } from "@/components/int-field";
 import {
   ABILITIES,
@@ -114,6 +119,7 @@ export function ClassRow({
           key={entry.sottoclasse}
           subclassName={entry.sottoclasse}
           className={entry.nome}
+          livello={entry.livello}
         />
       )}
     </div>
@@ -222,9 +228,11 @@ function ClassSubclassPicker({
 function SubclassFeaturesToggle({
   subclassName,
   className,
+  livello,
 }: {
   subclassName: string;
   className: string;
+  livello: number;
 }) {
   // CHIUSA di default, a differenza di razza/classe/background qui accanto: l'elenco dei
   // privilegi di sottoclasse è il più lungo della scheda e si apriva sempre tutto, spingendo in
@@ -237,6 +245,14 @@ function SubclassFeaturesToggle({
   >(null);
   const ia = useTraduzioneIa("classi", subclassName, subclassSource ?? "", !!subclassSource);
   const iaFeatures = ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null;
+
+  // L'elenco del Compendio arriva sempre completo fino al 20°: senza dividerlo, un Ladro di 5°
+  // si trovava davanti anche i privilegi del 9° e del 13° come se fossero gia' suoi.
+  const divisiIa = iaFeatures ? dividiPerLivello(iaFeatures, livello) : null;
+  const divisiEn = features ? dividiPerLivello(features, livello) : null;
+  // Solo il livello serve qui: le due liste hanno forme diverse (testo tradotto o entries).
+  const futuri: { level: number }[] = divisiIa?.futuri ?? divisiEn?.futuri ?? [];
+  const prossimo = prossimoLivelloConPrivilegi(futuri);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,8 +288,11 @@ function SubclassFeaturesToggle({
       {showFeatures && (
         <div className="mt-2 space-y-3 border-t border-edge pt-3">
           {!features && <p className="text-sm text-muted">Caricamento…</p>}
-          {iaFeatures
-            ? iaFeatures.map((feature, index) => (
+          {/* Quello che il personaggio ha GIA': l'elenco arriva completo fino al 20° livello, e
+              senza questa distinzione un Ladro di 5° si trovava davanti anche i privilegi del 9°
+              e del 13° come se fossero suoi. */}
+          {divisiIa
+            ? divisiIa.ottenuti.map((feature, index) => (
                 <div
                   key={`${feature.name}-${feature.level}-${index}`}
                   className="rounded-lg border border-edge bg-surface p-3"
@@ -285,7 +304,7 @@ function SubclassFeaturesToggle({
                   <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
                 </div>
               ))
-            : features?.map((feature) => (
+            : divisiEn?.ottenuti.map((feature) => (
                 <div
                   key={`${feature.name}-${feature.level}`}
                   className="rounded-lg border border-edge bg-surface p-3"
@@ -297,6 +316,13 @@ function SubclassFeaturesToggle({
                   <EntriesBlock entries={feature.entries} language="it" />
                 </div>
               ))}
+          {/* Cosa arriva dopo, come promemoria e non come elenco: al tavolo serve sapere che
+              qualcosa manca e a che livello, non leggerlo adesso. */}
+          {prossimo !== null && (
+            <p className="text-xs text-muted">
+              Altri {futuri.length} privilegi a partire dal {prossimo}° livello di questa classe.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -357,17 +383,20 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
     subclassSource ?? "",
     !!(classEntry.sottoclasse && subclassSource),
   );
-  const buildQueueByLevel = (text: string | null | undefined) => {
-    const map = new Map<number, { name: string; text: string }[]>();
-    for (const f of text ? parseIaClassText(text) : []) {
-      const items = map.get(f.level) ?? [];
-      items.push({ name: f.name, text: f.text });
-      map.set(f.level, items);
-    }
-    return map;
-  };
-  const classIaByLevel = buildQueueByLevel(classIa?.descrizioneIta);
-  const subclassIaByLevel = buildQueueByLevel(subclassIa?.descrizioneIta);
+  // L'abbinamento e' per livello e in ordine, ma vale solo dove i due elenchi hanno la stessa
+  // lunghezza: altrove i nomi scivolerebbero e in scheda comparirebbe il nome di un altro
+  // privilegio (vedi lib/privilegi-per-livello.ts). Le due fonti restano separate.
+  const tradottiPerFeature = useMemo(() => {
+    if (!features) return [];
+    const daFonte = (origine: "class" | "subclass", testo: string | null | undefined) => {
+      const diQuestaFonte = features.filter((f) => f.origin === origine);
+      const abbinati = abbinaPrivilegiTradotti(diQuestaFonte, testo ? parseIaClassText(testo) : []);
+      return new Map(diQuestaFonte.map((f, i) => [f, abbinati[i]]));
+    };
+    const perClasse = daFonte("class", classIa?.descrizioneIta);
+    const perSottoclasse = daFonte("subclass", subclassIa?.descrizioneIta);
+    return features.map((f) => (f.origin === "class" ? perClasse.get(f) : perSottoclasse.get(f)) ?? null);
+  }, [features, classIa?.descrizioneIta, subclassIa?.descrizioneIta]);
 
   useEffect(() => {
     let cancelled = false;
@@ -428,9 +457,18 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
           {/* Elenco compatto, come gli incantesimi conosciuti: una riga per privilegio invece del
               testo intero sempre visibile — il dettaglio si apre in un modal al click. */}
           {features?.map((feature, index) => {
-            const queueByLevel = feature.origin === "class" ? classIaByLevel : subclassIaByLevel;
-            const ia = queueByLevel.get(feature.level)?.shift();
+            const ia = tradottiPerFeature[index];
+            // Un'intestazione quando cambia il livello: l'elenco di un personaggio di 9° e' lungo
+            // una ventina di righe tutte uguali, e la domanda al tavolo e' sempre "cosa ho preso
+            // a che livello".
+            const primoDelLivello = index === 0 || features[index - 1].level !== feature.level;
             return (
+              <div key={`gruppo-${feature.level}-${index}`} className="contents">
+              {primoDelLivello && (
+                <p className="pt-2 text-[10px] uppercase tracking-widest text-muted first:pt-0">
+                  Livello {feature.level}
+                </p>
+              )}
               <button
                 key={`${feature.name}-${feature.level}-${index}`}
                 onClick={() =>
@@ -458,8 +496,13 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
                     <DualName text={feature.name} kind="classi" source={feature.source} inline />
                   )}
                 </span>
-                <span className="text-xs text-muted shrink-0">Liv. {feature.level}</span>
+                {/* Da dove viene: in multiclasse con sottoclasse le righe sono tante e sapere
+                    se un privilegio e' della classe o dell'archetipo cambia dove cercarlo. */}
+                <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted">
+                  {feature.origin === "subclass" ? "sottoclasse" : "classe"}
+                </span>
               </button>
+              </div>
             );
           })}
         </div>
