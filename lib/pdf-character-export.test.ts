@@ -88,3 +88,49 @@ describe("pdfFileName", () => {
     expect(pdfFileName(build({ nome: "🐉🔥" }))).toBe("personaggio-questzip.pdf");
   });
 });
+
+// Il gruppo usa la scheda STAMPATA al tavolo: quello che si consuma durante una sessione deve
+// potersi barrare a penna. È il primo appunto arrivato guardando l'esportazione ("inserire una
+// sezione in cui segnarsi gli usi delle abilità man mano").
+describe("cose da barrare sulla scheda stampata", () => {
+  const conUsi = () =>
+    build({
+      livello: 5,
+      classi: [{ nome: "Warlock", livello: 5 }],
+      privilegiLimitati: [
+        { id: "a", nome: "Maledizione della Strega", usiMax: 1, usiUsati: 0, recupero: "riposoBreve" },
+        { id: "b", nome: "Dadi di Energia Psionica", usiMax: 8, usiUsati: 3, recupero: "riposoLungo" },
+      ],
+      ispirazione: 2,
+      affaticamento: 1,
+    });
+
+  // Il testo dentro un PDF è compresso, quindi non lo si può cercare come stringa: qui si
+  // verifica che la scheda si generi con i dati che vanno barrati, e che i casi limite non la
+  // rompano. La verifica di come APPARE si fa con scripts/verifica-scheda-pdf.py, che rende le
+  // pagine e cerca testi sovrapposti.
+  it("genera la scheda con privilegi, ispirazione e affaticamento da barrare", async () => {
+    const bytes = await exportCharacterToPdf(conUsi());
+
+    expect(String.fromCharCode(...bytes.slice(0, 5))).toBe("%PDF-");
+    expect(bytes.length).toBeGreaterThan(4000);
+  });
+
+  it("regge un privilegio con moltissimi usi senza uscire dal riquadro", async () => {
+    const tanti = build({
+      privilegiLimitati: [
+        { id: "c", nome: "Punti Stregoneria", usiMax: 20, usiUsati: 7, recupero: "riposoLungo" },
+      ],
+    });
+
+    // Oltre una certa quantità i pallini non entrerebbero: si ripiega su una casella da riempire
+    // a penna. Deve comunque generare senza errori.
+    await expect(exportCharacterToPdf(tanti)).resolves.toBeInstanceOf(Uint8Array);
+  });
+
+  it("un personaggio senza privilegi limitati non rompe la pagina", async () => {
+    await expect(exportCharacterToPdf(build({ privilegiLimitati: [] }))).resolves.toBeInstanceOf(
+      Uint8Array,
+    );
+  });
+});

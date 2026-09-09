@@ -172,6 +172,69 @@ function dot(ctx: Ctx, x: number, y: number, mode: "vuoto" | "pieno" | "doppio")
   }
 }
 
+/**
+ * Usi di un privilegio limitato: un pallino per uso, pieni quelli gia' spesi.
+ *
+ * Prima c'era solo il numero ("5/8"), che su una scheda STAMPATA non serve a niente: al tavolo
+ * quel valore cambia ad ogni scontro e va segnato a penna man mano — e' il primo appunto arrivato
+ * dal gruppo guardando l'esportazione. Sopra una certa quantita' i pallini non entrerebbero nella
+ * colonna (i punti stregoneria di un incantatore alto arrivano a 17 o 20): li' si torna al
+ * numero, con una casella vuota accanto per scriverci quanti ne restano.
+ */
+const MAX_PALLINI_USI = 12;
+function disegnaUsi(
+  ctx: Ctx,
+  privilegio: { usiMax: number; usiUsati: number },
+  x: number,
+  y: number,
+) {
+  const max = Math.max(0, privilegio.usiMax);
+  if (max === 0) return;
+  if (max > MAX_PALLINI_USI) {
+    box(ctx, x, y - 1.5, 16, 9);
+    text(ctx, `/ ${max}`, x + 19, y, { size: 7, color: MUTED });
+    return;
+  }
+  for (let i = 0; i < max; i++) {
+    dot(ctx, x + 4 + i * 8, y + 3, i < privilegio.usiUsati ? "pieno" : "vuoto");
+  }
+}
+
+/**
+ * Recupero come tre caselle marcate RB / RL / AL (riposo breve, riposo lungo, alba), con piena
+ * quella del privilegio: e' la resa della scheda cartacea del gruppo, e a parole ("riposo lungo")
+ * rubava spazio al nome del privilegio, che e' la cosa da leggere.
+ */
+function caselleRecupero(ctx: Ctx, recupero: Character["privilegiLimitati"][number]["recupero"], x: number, y: number) {
+  const voci = [
+    ["RB", "riposoBreve"],
+    ["RL", "riposoLungo"],
+    ["AL", "alba"],
+  ] as const;
+  voci.forEach(([sigla, valore], i) => {
+    const attivo = recupero === valore;
+    dot(ctx, x + 3 + i * 17, y + 3, attivo ? "pieno" : "vuoto");
+    text(ctx, sigla, x + 8 + i * 17, y, { size: 5.5, bold: attivo, color: attivo ? INK : MUTED });
+  });
+}
+
+/** Etichetta a sinistra e una fila di pallini a destra, pieni fino al valore raggiunto. */
+function rigaDiPallini(
+  ctx: Ctx,
+  etichetta: string,
+  valore: number,
+  massimo: number,
+  x: number,
+  y: number,
+  larghezza: number,
+) {
+  text(ctx, etichetta, x, y, { size: 8 });
+  const inizio = x + larghezza - 18 - massimo * 9;
+  for (let i = 0; i < massimo; i++) {
+    dot(ctx, inizio + i * 9, y + 3, i < valore ? "pieno" : "vuoto");
+  }
+}
+
 /** Avvisa quando un elenco è stato tagliato per ragioni di spazio. Una scheda STAMPATA che omette
  * in silenzio la settima arma è peggio di una che lo dichiara: chi la usa al tavolo non ha modo di
  * accorgersene confrontandola con lo schermo. */
@@ -287,10 +350,17 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   const rightW = PAGE_W - MARGIN - rightX;
   let ry = top;
 
+  // Gli stessi riquadri della scheda del gruppo, nello stesso ordine. Visione e valori degli
+  // incantesimi stavano solo nelle pagine seguenti: al tavolo servono qui, dove si combatte.
+  const castingAbilityP1 = primaryCastingAbility(character.classi);
   const stats: [string, string][] = [
     ["Classe Armatura", String(character.classeArmatura)],
     ["Iniziativa", formatModifier(abilityModifier(character.caratteristiche.destrezza) + character.iniziativaBonus)],
     ["Velocità", `${character.velocita} m`],
+    [
+      "Visione",
+      character.scurovisione && character.visioneRadius > 0 ? `${character.visioneRadius} m` : "-",
+    ],
     [
       "Percezione passiva",
       String(
@@ -306,6 +376,24 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
           (character.abilitaBonus["Percezione"] ?? 0),
       ),
     ],
+    ...(castingAbilityP1
+      ? ([
+          [
+            "CD incantesimi",
+            String(
+              spellSaveDC(livello, character.caratteristiche[castingAbilityP1]) +
+                character.cdIncantesimiBonus,
+            ),
+          ],
+          [
+            "Attacco incantesimi",
+            formatModifier(
+              spellAttackBonus(livello, character.caratteristiche[castingAbilityP1]) +
+                character.attaccoIncantesimiBonus,
+            ),
+          ],
+        ] as [string, string][])
+      : []),
   ];
   const statW = (rightW - 6) / 2;
   stats.forEach(([label, value], i) => {
@@ -315,7 +403,9 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
     centered(ctx, label.toUpperCase(), bx + statW / 2, by - 11, { size: 6, bold: true, color: MUTED });
     centered(ctx, value, bx + statW / 2, by - 28, { size: 14, bold: true });
   });
-  ry -= 86;
+  // Quante righe di riquadri sono state disegnate davvero: erano quattro fisse, e aggiungendone
+  // altri (visione, valori degli incantesimi) il blocco dei punti ferita ci finiva sopra.
+  ry -= Math.ceil(stats.length / 2) * 40 + 6;
 
   ry = sectionHeader(ctx, "Punti ferita", rightX, ry, rightW);
   box(ctx, rightX, ry - 30, rightW, 34);
@@ -326,10 +416,10 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   ry -= 40;
 
   const dadiVitaTot = livello;
-  box(ctx, rightX, ry - 22, rightW, 22, true);
-  text(ctx, "DADI VITA", rightX + 6, ry - 9, { size: 6.5, bold: true, color: MUTED });
-  text(ctx, `${Math.max(0, dadiVitaTot - character.dadiVitaUsati)} / ${dadiVitaTot} disponibili`, rightX + 6, ry - 18, { size: 8 });
-  ry -= 30;
+  box(ctx, rightX, ry - 26, rightW, 26, true);
+  text(ctx, "DADI VITA", rightX + 6, ry - 10, { size: 6.5, bold: true, color: MUTED });
+  disegnaUsi(ctx, { usiMax: dadiVitaTot, usiUsati: character.dadiVitaUsati }, rightX + 6, ry - 22);
+  ry -= 34;
 
   ry = sectionHeader(ctx, "Tiri salvezza contro la morte", rightX, ry, rightW);
   text(ctx, "Successi", rightX + 6, ry, { size: 7, color: MUTED });
@@ -342,13 +432,16 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   // Stato: ispirazione, affaticamento, follia, condizioni — la scheda cartacea di riferimento non
   // ha un posto per le condizioni attive, ma al tavolo sono proprio la cosa che si dimentica.
   ry = sectionHeader(ctx, "Stato", rightX, ry, rightW);
-  text(ctx, `Ispirazione: ${character.ispirazione}/${MAX_ISPIRAZIONE}`, rightX + 6, ry, { size: 8 });
-  ry -= 11;
-  text(ctx, `Affaticamento: ${character.affaticamento}/6`, rightX + 6, ry, { size: 8 });
-  ry -= 11;
+  // Caselle e non numeri: ispirazione, affaticamento e follia cambiano di continuo durante una
+  // sessione, e su carta si barrano — e' la stessa richiesta arrivata per i privilegi limitati.
+  // Sulla scheda del gruppo l'ispirazione e' proprio una griglia di caselle.
+  rigaDiPallini(ctx, "Ispirazione", character.ispirazione, MAX_ISPIRAZIONE, rightX + 6, ry, rightW);
+  ry -= 12;
+  rigaDiPallini(ctx, "Affaticamento", character.affaticamento, 6, rightX + 6, ry, rightW);
+  ry -= 12;
   if (character.livelloFollia > 0) {
-    text(ctx, `Follia: ${character.livelloFollia}/6`, rightX + 6, ry, { size: 8 });
-    ry -= 11;
+    rigaDiPallini(ctx, "Follia", character.livelloFollia, 6, rightX + 6, ry, rightW);
+    ry -= 12;
   }
   if (character.condizioniAttive.length > 0) {
     for (const line of wrap(ctx.font, `Condizioni: ${character.condizioniAttive.join(", ")}`, 8, rightW - 12)) {
@@ -385,11 +478,16 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   by -= 8;
   const featY = sectionHeader(ctx, "Privilegi a usi limitati", MARGIN, by, halfW);
   let fy = featY;
+  // Stesse colonne della scheda del gruppo: NOME | RECUPERO (RB/RL/AL) | TOTALE | USI. Il
+  // recupero come tre caselle invece che a parole occupa meno e si legge a colpo d'occhio.
+  text(ctx, "RECUPERO", MARGIN + halfW - 108, fy + 1, { size: 5.5, color: MUTED });
+  text(ctx, "USI", MARGIN + halfW - 60, fy + 1, { size: 5.5, color: MUTED });
+  fy -= 9;
   const privilegiMostrati = character.privilegiLimitati.slice(0, 8);
   for (const p of privilegiMostrati) {
-    text(ctx, p.nome, MARGIN + 4, fy, { size: 8, maxWidth: halfW - 110 });
-    text(ctx, `${Math.max(0, p.usiMax - p.usiUsati)}/${p.usiMax}`, MARGIN + halfW - 96, fy, { size: 8, bold: true });
-    text(ctx, RECUPERO_LABELS[p.recupero], MARGIN + halfW - 66, fy, { size: 6.5, color: MUTED });
+    text(ctx, p.nome, MARGIN + 4, fy, { size: 8, maxWidth: halfW - 118 });
+    caselleRecupero(ctx, p.recupero, MARGIN + halfW - 108, fy);
+    disegnaUsi(ctx, p, MARGIN + halfW - 62, fy);
     fy -= 11;
   }
   fy = notaTroncamento(ctx, character.privilegiLimitati.length, privilegiMostrati.length, MARGIN + 4, fy);
@@ -579,14 +677,15 @@ function drawSpellsPage(ctx: Ctx, character: Character, totPagine: number) {
     let sx = MARGIN + 4;
     slots.forEach((max, i) => {
       if (max <= 0) return;
-      const disponibili = Math.max(0, max - (character.slotUsati[i] ?? 0));
       text(ctx, `${i + 1}°`, sx, y, { size: 7, color: MUTED });
-      text(ctx, `${disponibili}/${max}`, sx + 12, y, { size: 8.5, bold: true });
+      // Un pallino per slot, pieni quelli gia' spesi: su carta gli slot si barrano man mano, ed
+      // e' la stessa richiesta arrivata per i privilegi a usi limitati.
+      disegnaUsi(ctx, { usiMax: max, usiUsati: character.slotUsati[i] ?? 0 }, sx + 10, y);
       sx += 52;
     });
     if (pact.slots > 0) {
       text(ctx, `Patto (${pact.slotLevel}°)`, sx, y, { size: 7, color: MUTED });
-      text(ctx, `${Math.max(0, pact.slots - character.slotPattoUsati)}/${pact.slots}`, sx + 44, y, { size: 8.5, bold: true });
+      disegnaUsi(ctx, { usiMax: pact.slots, usiUsati: character.slotPattoUsati }, sx + 42, y);
     }
   } else {
     text(ctx, "Questo personaggio non ha slot incantesimo.", MARGIN + 4, y, { size: 8, color: MUTED });
