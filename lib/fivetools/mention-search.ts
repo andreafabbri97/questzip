@@ -150,6 +150,16 @@ const candidatesByKindPromise = new Map<CompendiumKind, Promise<MentionCandidate
 // categorie (mostri da solo ha ~4500 voci) solo per scartarle subito dopo col filtro su kind.
 // Bug segnalato dall'utente: il primo bottone "Verifica" aperto su qualsiasi pagina restava
 // "in caricamento" per un momento percepibile proprio perché tirava dentro l'intero Compendio.
+/**
+ * Scalda la cache di una categoria senza aspettarla: da usare quando si INTUISCE che servirà
+ * (il puntatore sopra un bottone), mai al montaggio di una scheda — caricare in anticipo il
+ * catalogo di ogni categoria presente, solo per decidere se mostrare un bottone, e' esattamente
+ * il traffico che nell'agosto 2026 ha esaurito la quota del database.
+ */
+export function precaricaCandidati(kind: CompendiumKind): void {
+  void loadMentionCandidatesForKind(kind).catch(() => {});
+}
+
 function loadMentionCandidatesForKind(kind: CompendiumKind): Promise<MentionCandidate[]> {
   let promise = candidatesByKindPromise.get(kind);
   if (!promise) {

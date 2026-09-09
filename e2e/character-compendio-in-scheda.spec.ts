@@ -83,4 +83,25 @@ test.describe("Scheda: il Compendio si apre senza uscire dal personaggio", () =>
     );
     expect(scorrimentoLaterale).toBe(false);
   });
+
+  // Il motivo per cui i bottoni "ci mettevano un po'": per decidere SE mostrarsi, ogni categoria
+  // presente in scheda si scaricava il catalogo intero più le tabelle di traduzione, a ogni
+  // apertura e anche per chi non avrebbe cliccato niente. Ora il lavoro parte al clic.
+  test("aprire la scheda non scarica i cataloghi del Compendio", async ({ page }) => {
+    const catalogo: string[] = [];
+    page.on("request", (req) => {
+      if (req.url().includes("conditionsdiseases.json")) catalogo.push(req.url());
+    });
+
+    await page.getByRole("button", { name: /Combattimento/ }).click();
+    const info = page.getByRole("button", { name: "📖 Avvelenato" });
+    await expect(info).toBeVisible();
+    // Il bottone c'è già, e finora non è stato scaricato niente per saperlo.
+    expect(catalogo).toHaveLength(0);
+
+    await info.click();
+    await expect(page.getByText(/svantaggio/i).first()).toBeVisible({ timeout: 15000 });
+    // Solo ora, e solo perché l'utente ha voluto leggere.
+    expect(catalogo.length).toBeGreaterThan(0);
+  });
 });
