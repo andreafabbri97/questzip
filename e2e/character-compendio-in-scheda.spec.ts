@@ -58,6 +58,9 @@ test.describe("Scheda: il Compendio si apre senza uscire dal personaggio", () =>
 
     await expect(page.getByText("Che cosa hai adesso")).toBeVisible({ timeout: 20000 });
     await expect(page.getByText(/Ai livelli successivi/)).toBeVisible();
+    // La descrizione generale della sottoclasse: nel testo italiano è la voce che porta il suo
+    // stesso nome, e nei dati inglesi non esiste — prima veniva scartata insieme al resto.
+    await expect(page.getByText(/lame psichiche|psionic|psichic/i).first()).toBeVisible();
   });
 
   test("una condizione addosso al personaggio dice cosa comporta", async ({ page }) => {

@@ -3,6 +3,7 @@ import {
   abbinaPrivilegiTradotti,
   dividiPerLivello,
   prossimoLivelloConPrivilegi,
+  separaIntroduzione,
 } from "./privilegi-per-livello";
 
 // Livelli presi da un caso vero: il Furfante Arcano di un Ladro 5 ha già i privilegi del 3°, non
@@ -101,5 +102,37 @@ describe("abbinaPrivilegiTradotti", () => {
 
   it("senza testo tradotto non abbina nulla", () => {
     expect(abbinaPrivilegiTradotti([{ name: "Sneak Attack", level: 1 }], [])).toEqual([null]);
+  });
+});
+
+describe("separaIntroduzione", () => {
+  // Il testo italiano di una sottoclasse si apre con una voce che porta il suo stesso nome: è la
+  // descrizione generale, e nei dati inglesi non esiste come privilegio — quindi finiva scartata.
+  it("estrae la voce che porta il nome della sottoclasse", () => {
+    const voci = [
+      { name: "Mente Aberrante", level: 3 },
+      { name: "Incantesimi Psionici", level: 1 },
+      { name: "Mente Telepatica", level: 6 },
+    ];
+
+    const { introduzione, privilegi } = separaIntroduzione(voci, "Mente Aberrante");
+
+    expect(introduzione?.name).toBe("Mente Aberrante");
+    expect(privilegi.map((p) => p.name)).toEqual(["Incantesimi Psionici", "Mente Telepatica"]);
+  });
+
+  it("ignora accenti e apostrofi nel confronto", () => {
+    const voci = [{ name: "Lama dell'Anima", level: 3 }];
+
+    expect(separaIntroduzione(voci, "Lama dell'anima").introduzione?.name).toBe("Lama dell'Anima");
+  });
+
+  it("se non c'è nessuna voce introduttiva lascia i privilegi intatti", () => {
+    const voci = [{ name: "Attacco furtivo", level: 1 }];
+
+    const { introduzione, privilegi } = separaIntroduzione(voci, "Lama Spirituale");
+
+    expect(introduzione).toBeNull();
+    expect(privilegi).toHaveLength(1);
   });
 });

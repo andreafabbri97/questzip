@@ -62,3 +62,34 @@ export function abbinaPrivilegiTradotti<T extends { level: number }>(
 
   return privilegi.map((p) => code.get(p.level)?.shift() ?? null);
 }
+
+/**
+ * Separa il paragrafo introduttivo della sottoclasse dai suoi privilegi.
+ *
+ * Il testo italiano di una sottoclasse comincia con una voce che porta il NOME della sottoclasse
+ * stessa ("Mente Aberrante", "Canto della Lama"): è la descrizione generale, non un privilegio.
+ * Nei dati inglesi non esiste come voce a sé, quindi restava senza abbinamento e veniva scartata —
+ * cioè si perdeva proprio la spiegazione di che cosa sia quella sottoclasse.
+ */
+export function separaIntroduzione<T extends { name: string }>(
+  voci: T[],
+  nomeSottoclasse: string | null | undefined,
+): { introduzione: T | null; privilegi: T[] } {
+  const atteso = normalizzaNome(nomeSottoclasse ?? "");
+  if (!atteso) return { introduzione: null, privilegi: voci };
+  const indice = voci.findIndex((v) => normalizzaNome(v.name) === atteso);
+  if (indice === -1) return { introduzione: null, privilegi: voci };
+  return {
+    introduzione: voci[indice],
+    privilegi: [...voci.slice(0, indice), ...voci.slice(indice + 1)],
+  };
+}
+
+/** Confronto tollerante ad accenti, maiuscole e apostrofi, come altrove nel progetto. */
+function normalizzaNome(nome: string): string {
+  return nome
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}

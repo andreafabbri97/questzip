@@ -5,6 +5,7 @@ import {
   abbinaPrivilegiTradotti,
   dividiPerLivello,
   prossimoLivelloConPrivilegi,
+  separaIntroduzione,
 } from "@/lib/privilegi-per-livello";
 import { IntField } from "@/components/int-field";
 import { CompendioInfoButton } from "./compendio-info-button";
@@ -249,11 +250,18 @@ function SubclassFeaturesToggle({
     { name: string; level: number; entries: import("@/lib/fivetools/entries").FiveEntry[] }[] | null
   >(null);
   const ia = useTraduzioneIa("classi", subclassName, subclassSource ?? "", !!subclassSource);
-  const iaFeatures = ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null;
+  const iaTutte = ia?.descrizioneIta ? parseIaClassText(ia.descrizioneIta) : null;
+  // Il testo italiano si apre con una voce che porta il nome della sottoclasse: e' la descrizione
+  // generale, non un privilegio. Nei dati inglesi non esiste, quindi finiva scartata insieme al
+  // resto — cioe' si perdeva proprio la spiegazione di che cosa sia quella sottoclasse.
+  const { introduzione, privilegi: iaFeatures } = separaIntroduzione(
+    iaTutte ?? [],
+    ia?.nomeIta ?? subclassName,
+  );
 
   // L'elenco del Compendio arriva sempre completo fino al 20°: senza dividerlo, un Ladro di 5°
   // si trovava davanti anche i privilegi del 9° e del 13° come se fossero gia' suoi.
-  const divisiIa = iaFeatures ? dividiPerLivello(iaFeatures, livello) : null;
+  const divisiIa = iaTutte ? dividiPerLivello(iaFeatures, livello) : null;
   const divisiEn = features ? dividiPerLivello(features, livello) : null;
   // Solo il livello serve qui: le due liste hanno forme diverse (testo tradotto o entries).
   const futuri: { level: number }[] = divisiIa?.futuri ?? divisiEn?.futuri ?? [];
@@ -293,6 +301,9 @@ function SubclassFeaturesToggle({
       {showFeatures && (
         <div className="mt-2 space-y-3 border-t border-edge pt-3">
           {!features && <p className="text-sm text-muted">Caricamento…</p>}
+          {introduzione && (
+            <p className="text-sm italic leading-relaxed text-muted">{introduzione.text}</p>
+          )}
           {/* Quello che il personaggio ha GIA'. La distinzione serve perche' l'elenco arriva
               completo fino al 20°: senza, un Ladro di 5° si trovava davanti anche i privilegi del
               9° e del 13° come se fossero suoi. */}
