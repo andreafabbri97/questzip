@@ -10,7 +10,7 @@ test.describe("Scheda: il Compendio si apre senza uscire dal personaggio", () =>
       nome: "Test Compendio",
       razza: "Elf",
       background: "Acolyte",
-      classi: [{ nome: "Rogue", livello: 5 }],
+      classi: [{ nome: "Rogue", livello: 5, sottoclasse: "Soulknife" }],
       condizioniAttive: ["Avvelenato"],
     });
     await page.goto("/personaggi");
@@ -28,6 +28,18 @@ test.describe("Scheda: il Compendio si apre senza uscire dal personaggio", () =>
     await expect(page).toHaveURL(/\/personaggi/);
   });
 
+  // Dal modal della classe si vedono anche gli incantesimi che quella classe può imparare e le
+  // scelte disponibili: era l'altro motivo per cui bisognava andare nel Compendio.
+  test("il modal della classe mostra anche gli incantesimi e le scelte della classe", async ({
+    page,
+  }) => {
+    await page.getByRole("button", { name: /Info & Personalità/ }).click();
+    await page.getByRole("button", { name: "📖 Progressione" }).first().click();
+
+    await expect(page.getByText("Progressione").first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/Incantesimi/).first()).toBeVisible();
+  });
+
   test("razza e background hanno la loro scheda", async ({ page }) => {
     await page.getByRole("button", { name: /Info & Personalità/ }).click();
 
@@ -35,6 +47,17 @@ test.describe("Scheda: il Compendio si apre senza uscire dal personaggio", () =>
     await expect(bottoni.first()).toBeVisible({ timeout: 20000 });
     // Uno per la razza e uno per il background.
     await expect(bottoni).toHaveCount(2);
+  });
+
+  // Servono a decidere come salire di livello: erano stati ridotti a un conteggio, che al tavolo
+  // basta ma per pianificare no.
+  test("la sottoclasse mostra sia quello che hai sia quello che arriva dopo", async ({ page }) => {
+    await page.getByRole("button", { name: /Info & Personalità/ }).click();
+    // Il blocco della sottoclasse è chiuso di default: è il più lungo della scheda.
+    await page.getByRole("button", { name: /Come funziona/ }).first().click();
+
+    await expect(page.getByText("Che cosa hai adesso")).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/Ai livelli successivi/)).toBeVisible();
   });
 
   test("una condizione addosso al personaggio dice cosa comporta", async ({ page }) => {

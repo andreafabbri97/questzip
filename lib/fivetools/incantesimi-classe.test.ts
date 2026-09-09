@@ -141,3 +141,32 @@ describe("incantesimiDelleSottoclassi", () => {
     ]);
   });
 });
+
+describe("incantesimiDiSottoclasse: nome pulito", () => {
+  // Il Furfante Arcano riceve "mage hand#c": dopo il cancelletto c'è il MODO in cui l'incantesimo
+  // è concesso (come trucchetto), non una parte del nome — e a schermo si leggeva "mage hand#c".
+  it("toglie il suffisso dopo il cancelletto", () => {
+    const sottoclasse = {
+      name: "Arcane Trickster",
+      className: "Rogue",
+      classSource: "PHB",
+      source: "PHB",
+      additionalSpells: [{ known: { "3": ["mage hand#c"] } }],
+    };
+
+    expect(incantesimiDiSottoclasse(sottoclasse).map((i) => i.name)).toEqual(["mage hand"]);
+  });
+
+  // I filtri ("tutti gli incantesimi da mago di livello 0-1") non sono nomi e non devono comparire.
+  it("ignora i filtri per lista di classe", () => {
+    const sottoclasse = {
+      name: "Arcane Trickster",
+      className: "Rogue",
+      classSource: "PHB",
+      source: "PHB",
+      additionalSpells: [{ expanded: { "3": [{ all: "level=0|class=Wizard" }] } }],
+    };
+
+    expect(incantesimiDiSottoclasse(sottoclasse)).toEqual([]);
+  });
+});

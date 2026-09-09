@@ -293,9 +293,12 @@ function SubclassFeaturesToggle({
       {showFeatures && (
         <div className="mt-2 space-y-3 border-t border-edge pt-3">
           {!features && <p className="text-sm text-muted">Caricamento…</p>}
-          {/* Quello che il personaggio ha GIA': l'elenco arriva completo fino al 20° livello, e
-              senza questa distinzione un Ladro di 5° si trovava davanti anche i privilegi del 9°
-              e del 13° come se fossero suoi. */}
+          {/* Quello che il personaggio ha GIA'. La distinzione serve perche' l'elenco arriva
+              completo fino al 20°: senza, un Ladro di 5° si trovava davanti anche i privilegi del
+              9° e del 13° come se fossero suoi. */}
+          {features && (divisiIa?.ottenuti.length ?? divisiEn?.ottenuti.length ?? 0) > 0 && (
+            <p className="text-[10px] uppercase tracking-widest text-muted">Che cosa hai adesso</p>
+          )}
           {divisiIa
             ? divisiIa.ottenuti.map((feature, index) => (
                 <div
@@ -321,13 +324,39 @@ function SubclassFeaturesToggle({
                   <EntriesBlock entries={feature.entries} language="it" />
                 </div>
               ))}
-          {/* Cosa arriva dopo, come promemoria e non come elenco: al tavolo serve sapere che
-              qualcosa manca e a che livello, non leggerlo adesso. */}
+          {/* Cosa arriva DOPO, leggibile per intero: serve a decidere come salire di livello, che
+              e' l'altra meta' del lavoro sulla scheda. Sta sotto e smorzato, cosi' al tavolo non si
+              confonde con quello che il personaggio ha davvero. */}
           {prossimo !== null && (
-            <p className="text-xs text-muted">
-              Altri {futuri.length} privilegi a partire dal {prossimo}° livello di questa classe.
+            <p className="pt-1 text-[10px] uppercase tracking-widest text-muted">
+              Ai livelli successivi — dal {prossimo}°
             </p>
           )}
+          {divisiIa
+            ? divisiIa.futuri.map((feature, index) => (
+                <div
+                  key={`futuro-${feature.name}-${feature.level}-${index}`}
+                  className="rounded-lg border border-dashed border-edge bg-surface/50 p-3 opacity-75"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    {feature.name}{" "}
+                    <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">{feature.text}</p>
+                </div>
+              ))
+            : divisiEn?.futuri.map((feature) => (
+                <div
+                  key={`futuro-${feature.name}-${feature.level}`}
+                  className="rounded-lg border border-dashed border-edge bg-surface/50 p-3 opacity-75"
+                >
+                  <p className="text-sm font-bold text-foreground mb-1.5">
+                    <DualName text={feature.name} inline />{" "}
+                    <span className="text-xs font-normal text-muted">(liv. {feature.level})</span>
+                  </p>
+                  <EntriesBlock entries={feature.entries} language="it" />
+                </div>
+              ))}
         </div>
       )}
     </div>

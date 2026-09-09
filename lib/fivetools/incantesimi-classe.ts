@@ -92,7 +92,10 @@ export function incantesimiDiSottoclasse(sottoclasse: Sottoclasse): IncantesimoD
     if (typeof valore === "string") {
       // "shield", "aid|xphb", e anche "fire shield|" con la fonte lasciata vuota
       const [nome, fonte] = valore.split("|");
-      const pulito = nome.trim();
+      // Il suffisso dopo "#" dice COME l'incantesimo e' concesso ("mage hand#c" = come
+      // trucchetto): non fa parte del nome, e senza toglierlo il Furfante Arcano mostrava
+      // "mage hand#c" al posto di "Mano Magica".
+      const pulito = nome.split("#")[0].trim();
       if (!pulito) return;
       trovati.set(`${pulito.toLowerCase()}|${fonte ?? ""}`, {
         name: pulito,
