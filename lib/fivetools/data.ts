@@ -610,7 +610,13 @@ export function resolveSubclassFeatures(
       (feature) =>
         feature.className === subclass.className &&
         feature.subclassShortName === shortName &&
-        feature.subclassSource === subclass.source,
+        feature.subclassSource === subclass.source &&
+        // Voci SENZA testo: nei dati 5etools alcune feature compaiono due volte, una col
+        // contenuto e una come segnaposto vuoto a un altro livello ("Channel Divinity: Preserve
+        // Life" sta al 2° col suo testo e al 3° vuota; "The Hexblade" al 1° e di nuovo al 3°).
+        // Erano 150 su 2.454: righe cliccabili che aprivano un riquadro vuoto, e conteggi
+        // sfalsati che impedivano di abbinare i nomi italiani (vedi abbinaPrivilegiTradotti).
+        (feature.entries?.length ?? 0) > 0,
     )
     .sort((a, b) => a.level - b.level);
 }
