@@ -43,4 +43,27 @@ test.describe("Scheda: privilegi di classe", () => {
     await expect(tabella).toContainText("1d6");
     await expect(tabella).toContainText("3d6");
   });
+
+  // "Lame dell'Anima" (9° livello) introduce due poteri con i due punti e poi li elenca come
+  // riferimenti ad altri privilegi: il testo si fermava lì e i poteri non comparivano.
+  test("un privilegio che rimanda ad altri li nomina invece di lasciare la frase a metà", async ({
+    page,
+  }) => {
+    await injectTestCharacter(page, {
+      nome: "Test Lame",
+      classi: [{ nome: "Ladro", livello: 9, sottoclasse: "Soulknife" }],
+    });
+
+    await page.goto("/personaggi");
+    await page.getByText("Test Lame", { exact: true }).first().click();
+    await page.getByRole("button", { name: /Tratti & Talenti/ }).click();
+
+    const sezione = page.locator("section").filter({ hasText: "Privilegi di classe" });
+    await sezione.getByRole("button", { name: /Soul Blades|Lame dell/ }).first().click();
+
+    const modal = page.getByRole("dialog").first();
+    await expect(modal).toBeVisible({ timeout: 20000 });
+    await expect(modal.getByText(/Homing Strikes|Colpi/i).first()).toBeVisible();
+    await expect(modal.getByText(/Psychic Teleportation|Teletrasporto/i).first()).toBeVisible();
+  });
 });

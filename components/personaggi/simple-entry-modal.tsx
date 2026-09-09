@@ -63,7 +63,12 @@ export function SimpleEntryModal({
       }`}
       onClick={onClose}
     >
+      {/* Dichiarato come dialogo, al pari degli altri modal dell'app: senza, chi usa uno screen
+          reader non riceve alcun annuncio quando si apre. */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={data?.title ? `Dettaglio: ${data.title}` : "Dettaglio"}
         className={`card-elevated w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
           data ? "animate-modal-in" : "animate-modal-out"
         }`}

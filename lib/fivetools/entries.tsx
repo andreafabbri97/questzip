@@ -7,6 +7,17 @@ export interface FiveEntryObject {
   entries?: FiveEntry[];
   items?: FiveEntry[];
   by?: string;
+  // Riferimenti a un altro privilegio invece del suo testo: "Homing Strikes|Rogue|PHB|Soulknife|TCE|9".
+  // Il privilegio referenziato e' comunque elencato per conto suo, qui serve solo il nome.
+  subclassFeature?: string;
+  classFeature?: string;
+  optionalfeature?: string;
+}
+
+/** Nome leggibile di un riferimento: la prima parte prima delle barre verticali. */
+function nomeRiferimento(entry: FiveEntryObject): string {
+  const riferimento = entry.subclassFeature ?? entry.classFeature ?? entry.optionalfeature ?? "";
+  return stripTags(riferimento.split("|")[0] ?? "").trim();
 }
 
 export type FiveEntry = string | FiveEntryObject;
@@ -70,6 +81,25 @@ function EntryBlock({ entry }: { entry: FiveEntry }) {
           {entry.by && <p className="not-italic text-xs mt-1">— {stripTags(entry.by)}</p>}
         </blockquote>
       );
+    // Contenitore di alternative (i due poteri fra cui sceglie la Lama Spirituale al 9°): il
+    // blocco in se' non ha testo, ma il suo contenuto si'.
+    case "options":
+      return <RenderEntries entries={entry.entries} />;
+    // Rimando a un altro privilegio: senza questo caso il testo si fermava ai due punti che lo
+    // introducevano ("...questi poteri che usano i tuoi dadi di Energia Psionica:") e i poteri
+    // sparivano. Il privilegio vero e' comunque elencato per conto suo, con la sua descrizione.
+    case "refSubclassFeature":
+    case "refClassFeature":
+    case "refOptionalfeature": {
+      const nome = nomeRiferimento(entry);
+      if (!nome) return null;
+      return (
+        <p className="flex gap-2.5 text-[0.925rem] text-foreground/90 leading-relaxed">
+          <span className="mt-2 size-1.5 rounded-full bg-accent shrink-0" />
+          <span className="font-bold text-foreground">{nome}</span>
+        </p>
+      );
+    }
     default:
       // tabelle, immagini e altri blocchi rari non sono renderizzati in questa versione
       return null;
@@ -127,8 +157,16 @@ export function flattenEntries(entries: FiveEntry[] | undefined): string[] {
         blocks.push(listItemText(entry));
         break;
       case "quote":
+      case "options":
         blocks.push(...flattenEntries(entry.entries));
         break;
+      case "refSubclassFeature":
+      case "refClassFeature":
+      case "refOptionalfeature": {
+        const nome = nomeRiferimento(entry);
+        if (nome) blocks.push(nome);
+        break;
+      }
       default:
         break;
     }

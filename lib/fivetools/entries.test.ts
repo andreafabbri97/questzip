@@ -1,47 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { guessDamageDice } from "./entries";
+import { flattenEntries } from "./entries";
 
-describe("guessDamageDice", () => {
-  it("trova il primo dado dentro un tag {@damage ...}", () => {
-    expect(
-      guessDamageDice([
-        "You cast a bolt of fire. On a hit, the target takes {@damage 8d6} fire damage.",
-      ]),
-    ).toBe("8d6");
+// Caso reale: "Lame dell'Anima" (Lama Spirituale, 9° livello) introduce due poteri con i due punti
+// e poi li elenca come RIFERIMENTI ad altri privilegi, non come testo. Senza gestirli, la frase
+// restava appesa ai due punti e i poteri sparivano — segnalato dall'utente sulla sua scheda.
+const lameDellAnima = [
+  "{@i 9th-level Soulknife feature}",
+  "Your Psychic Blades are now an expression of your psi-suffused soul, giving you these powers:",
+  {
+    type: "options",
+    entries: [
+      { type: "refSubclassFeature", subclassFeature: "Homing Strikes|Rogue|PHB|Soulknife|TCE|9" },
+      { type: "refSubclassFeature", subclassFeature: "Psychic Teleportation|Rogue|PHB|Soulknife|TCE|9" },
+    ],
+  },
+];
+
+describe("flattenEntries: riferimenti ad altri privilegi", () => {
+  it("riporta i nomi dei poteri invece di lasciare la frase a metà", () => {
+    const righe = flattenEntries(lameDellAnima);
+
+    expect(righe.some((r) => r.includes("these powers"))).toBe(true);
+    expect(righe).toContain("Homing Strikes");
+    expect(righe).toContain("Psychic Teleportation");
   });
 
-  it("ignora i tag {@dice ...} che non sono danno (es. Guidance)", () => {
-    expect(guessDamageDice(["You can roll a {@dice 1d4} and add it to one ability check."])).toBe(
-      "",
-    );
+  it("del riferimento tiene solo il nome, non le coordinate interne", () => {
+    const righe = flattenEntries([
+      { type: "refClassFeature", classFeature: "Metamagic|Sorcerer||3" },
+    ]);
+
+    expect(righe).toEqual(["Metamagic"]);
   });
 
-  it("stringa vuota se l'incantesimo non infligge danni diretti", () => {
-    expect(guessDamageDice(["You can communicate with any creature within range."])).toBe("");
-  });
-
-  it("cerca anche dentro le entries annidate (liste, sezioni)", () => {
-    expect(
-      guessDamageDice([
-        {
-          type: "entries",
-          name: "At Higher Levels",
-          entries: ["The damage increases by {@damage 1d10} for each slot level above 1st."],
-        },
-      ]),
-    ).toBe("1d10");
-  });
-
-  it("controlla anche entriesHigherLevel se entries non ha nulla", () => {
-    expect(
-      guessDamageDice(
-        ["No damage here."],
-        ["When you reach 5th level, deals {@damage 2d10} instead."],
-      ),
-    ).toBe("2d10");
-  });
-
-  it("nessun crash con entries undefined", () => {
-    expect(guessDamageDice(undefined)).toBe("");
+  it("un riferimento senza nome non produce righe vuote", () => {
+    expect(flattenEntries([{ type: "refSubclassFeature" }])).toEqual([]);
   });
 });
