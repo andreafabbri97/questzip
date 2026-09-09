@@ -133,3 +133,24 @@ describe("cose da barrare sulla scheda stampata", () => {
     );
   });
 });
+
+// La scheda stampata si usa CON LA MATITA durante la sessione: i valori che cambiano a ogni
+// scontro non vanno stampati, o sarebbero già sbagliati al primo colpo subito. Si stampa il
+// massimo e si lascia la casella per il valore corrente, come sulla scheda del gruppo.
+describe("valori che cambiano in sessione", () => {
+  it("i punti ferita attuali non finiscono nel PDF", async () => {
+    const pieno = await exportCharacterToPdf(build({ hpMax: 57, hpAttuali: 57 }));
+    const ferito = await exportCharacterToPdf(build({ hpMax: 57, hpAttuali: 3 }));
+
+    // Se il valore corrente fosse stampato, cambiarlo cambierebbe il file: qui deve restare
+    // identico, perché al suo posto c'è una casella vuota.
+    expect(ferito.length).toBe(pieno.length);
+  });
+
+  it("i punti ferita massimi invece ci sono, perché non cambiano durante lo scontro", async () => {
+    const uno = await exportCharacterToPdf(build({ hpMax: 8 }));
+    const altro = await exportCharacterToPdf(build({ hpMax: 188 }));
+
+    expect(altro.length).not.toBe(uno.length);
+  });
+});

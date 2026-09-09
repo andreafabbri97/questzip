@@ -468,12 +468,18 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   ry -= Math.ceil(stats.length / 2) * 40 + 6;
 
   ry = sectionHeader(ctx, "Punti ferita", rightX, ry, rightW);
-  box(ctx, rightX, ry - 30, rightW, 34);
-  text(ctx, "Attuali", rightX + 6, ry - 10, { size: 6.5, bold: true, color: MUTED });
-  text(ctx, `${character.hpAttuali} / ${character.hpMax}`, rightX + 6, ry - 24, { size: 13, bold: true });
-  text(ctx, "Temporanei", rightX + rightW / 2 + 6, ry - 10, { size: 6.5, bold: true, color: MUTED });
-  text(ctx, String(character.hpTemporanei), rightX + rightW / 2 + 6, ry - 24, { size: 13, bold: true });
-  ry -= 40;
+  // Il MASSIMO si stampa, gli ATTUALI no: cambiano ad ogni colpo, e un numero stampato sarebbe
+  // gia' sbagliato al primo scontro. Sulla scheda del gruppo quel campo e' lasciato vuoto apposta
+  // e si scrive a matita — qui si fa lo stesso, con una casella abbastanza grande per cancellare
+  // e riscrivere. Il valore vero resta nell'app, che e' dove si aggiorna davvero.
+  box(ctx, rightX, ry - 34, rightW, 38);
+  text(ctx, "MASSIMI", rightX + 6, ry - 10, { size: 6, bold: true, color: MUTED });
+  text(ctx, String(character.hpMax), rightX + 6, ry - 26, { size: 14, bold: true });
+  text(ctx, "ATTUALI", rightX + 62, ry - 10, { size: 6, bold: true, color: MUTED });
+  box(ctx, rightX + 60, ry - 30, 44, 20);
+  text(ctx, "TEMP.", rightX + 116, ry - 10, { size: 6, bold: true, color: MUTED });
+  box(ctx, rightX + 112, ry - 30, 44, 20);
+  ry -= 44;
 
   const dadiVitaTot = livello;
   box(ctx, rightX, ry - 26, rightW, 26, true);
@@ -684,8 +690,20 @@ function drawGearPage(ctx: Ctx, character: Character, totPagine: number) {
   ly -= 16;
 
   ly = sectionHeader(ctx, "Monete", MARGIN, ly, halfW);
-  text(ctx, `Oro ${character.monete.oro}    Argento ${character.monete.argento}    Rame ${character.monete.rame}`, MARGIN + 4, ly, { size: 8.5 });
-  ly -= 18;
+  // Le monete si spendono in sessione: il valore di partenza si stampa piccolo sotto la casella,
+  // e quello aggiornato si scrive a matita nella casella.
+  const monete: [string, number][] = [
+    ["Oro", character.monete.oro],
+    ["Argento", character.monete.argento],
+    ["Rame", character.monete.rame],
+  ];
+  monete.forEach(([etichetta, valore], i) => {
+    const mx = MARGIN + 4 + i * ((halfW - 8) / 3);
+    text(ctx, etichetta, mx, ly, { size: 6.5, color: MUTED });
+    box(ctx, mx, ly - 16, 42, 13);
+    text(ctx, `partenza ${valore}`, mx, ly - 24, { size: 5.5, color: MUTED });
+  });
+  ly -= 34;
 
   ly = sectionHeader(ctx, "Oggetti magici", MARGIN, ly, halfW);
   const magiciMostrati = character.oggettiMagici.slice(0, 12);
@@ -852,7 +870,12 @@ function drawSpellsPage(ctx: Ctx, character: Character, totPagine: number) {
   // di ogni blocco e si passa alla colonna 2 superata la metà del totale.
   const blocchi = livelli.map((lvl) => {
     const spells = perLivello.get(lvl) ?? [];
-    return { titolo: lvl === 0 ? "Trucchetti" : `Livello ${lvl}`, spells, altezza: 29 + spells.length * 10.5 };
+    return {
+      livello: lvl,
+      titolo: lvl === 0 ? "Trucchetti" : `Livello ${lvl}`,
+      spells,
+      altezza: 29 + spells.length * 10.5,
+    };
   });
   const meta = blocchi.reduce((sum, b) => sum + b.altezza, 0) / 2;
   let accumulato = 0;
@@ -878,6 +901,19 @@ function drawSpellsPage(ctx: Ctx, character: Character, totPagine: number) {
     }
 
     colY[col] = sectionHeader(ctx, blocco.titolo, colX[col], colY[col], halfW);
+    // Gli slot di QUESTO livello, accanto al suo titolo: sulla scheda del gruppo ogni livello ha
+    // il suo "slot totali / slot spesi" li' dove stanno i suoi incantesimi, non in una riga sola
+    // in cima alla pagina — che e' dove finirebbero a cercarli mentre si gioca.
+    const slotDelLivello = blocco.livello > 0 ? (slots[blocco.livello - 1] ?? 0) : 0;
+    if (slotDelLivello > 0) {
+      text(ctx, "Slot", colX[col] + halfW - 96, colY[col] + 15, { size: 5.5, color: MUTED });
+      disegnaUsi(
+        ctx,
+        { usiMax: slotDelLivello, usiUsati: character.slotUsati[blocco.livello - 1] ?? 0 },
+        colX[col] + halfW - 78,
+        colY[col] + 14,
+      );
+    }
     let esauriti = false;
     for (const spell of blocco.spells) {
       if (esauriti) {
