@@ -62,7 +62,9 @@ export function DiceRollerModal({
       onClick={onClose}
     >
       <div
-        className={`card-elevated w-full max-w-md max-h-[85vh] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
+        // Su desktop un po' più largo del telefono, come il modal dei dadi della barra in alto:
+        // è lo stesso tiro, cambia solo da dove lo si lancia.
+        className={`card-elevated w-full max-w-md sm:max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
           preset ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}

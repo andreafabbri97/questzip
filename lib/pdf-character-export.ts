@@ -3,7 +3,6 @@ import {
   MAX_ISPIRAZIONE,
   ABILITIES,
   ABILITY_LABELS,
-  RECUPERO_LABELS,
   abilityModifier,
   carryingCapacityKg,
   formatModifier,

@@ -1,3 +1,4 @@
+import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { PDFDocument } from "pdf-lib";
 import { characterSchema, newCharacter, type Character } from "@/lib/dnd";
@@ -10,6 +11,44 @@ function build(overrides: Partial<Character> = {}): Character {
 async function numeroPagine(bytes: Uint8Array): Promise<number> {
   const pdf = await PDFDocument.load(bytes as unknown as ArrayBuffer);
   return pdf.getPageCount();
+}
+
+/**
+ * Le parole davvero stampate sulle pagine.
+ *
+ * Il testo di un PDF sta dentro stream compressi, quindi cercarlo come stringa nel file non
+ * funziona: prima si decomprimono. Di quello che ne esce si tengono solo gli operatori di
+ * disegno del testo (`<...> Tj`, che pdf-lib scrive in esadecimale), così restano fuori i
+ * metadati del file — compresa la data di creazione, che cambia a ogni generazione e renderebbe
+ * impossibile confrontare due schede.
+ */
+function testoStampato(bytes: Uint8Array): string[] {
+  const file = Buffer.from(bytes);
+  const parole: string[] = [];
+  let da = 0;
+  for (;;) {
+    const apertura = file.indexOf("stream", da);
+    if (apertura === -1) break;
+    let inizio = apertura + "stream".length;
+    if (file[inizio] === 0x0d) inizio++;
+    if (file[inizio] === 0x0a) inizio++;
+    const fine = file.indexOf("endstream", inizio);
+    if (fine === -1) break;
+    const dati = file.subarray(inizio, fine);
+    let contenuto: string;
+    try {
+      contenuto = inflateSync(dati).toString("latin1");
+    } catch {
+      continue; // non è un flusso compresso: nessun testo da leggere qui
+    } finally {
+      da = fine + "endstream".length;
+    }
+    for (const [, esadecimale] of contenuto.matchAll(/<([0-9A-Fa-f]+)>\s*Tj/g)) {
+      const parola = Buffer.from(esadecimale, "hex").toString("latin1");
+      if (parola.trim()) parole.push(parola);
+    }
+  }
+  return parole;
 }
 
 describe("exportCharacterToPdf", () => {
@@ -139,19 +178,22 @@ describe("cose da barrare sulla scheda stampata", () => {
 // massimo e si lascia la casella per il valore corrente, come sulla scheda del gruppo.
 describe("valori che cambiano in sessione", () => {
   it("i punti ferita attuali non finiscono nel PDF", async () => {
-    const pieno = await exportCharacterToPdf(build({ hpMax: 57, hpAttuali: 57 }));
-    const ferito = await exportCharacterToPdf(build({ hpMax: 57, hpAttuali: 3 }));
+    const pieno = await exportCharacterToPdf(build({ hpMax: 188, hpAttuali: 188 }));
+    const ferito = await exportCharacterToPdf(build({ hpMax: 188, hpAttuali: 137 }));
 
-    // Se il valore corrente fosse stampato, cambiarlo cambierebbe il file: qui deve restare
-    // identico, perché al suo posto c'è una casella vuota.
-    expect(ferito.length).toBe(pieno.length);
+    // Al posto del valore corrente c'è una casella vuota, quindi due schede dello stesso
+    // personaggio a mezzo scontro di distanza stampano le stesse identiche parole.
+    expect(testoStampato(ferito)).toEqual(testoStampato(pieno));
+    expect(testoStampato(ferito)).not.toContain("137");
+    // Se il lettore di PDF qui sopra smettesse di trovare testo, i due controlli sopra
+    // passerebbero confrontando il nulla: questa riga se ne accorge.
+    expect(testoStampato(ferito).length).toBeGreaterThan(50);
   });
 
   it("i punti ferita massimi invece ci sono, perché non cambiano durante lo scontro", async () => {
-    const uno = await exportCharacterToPdf(build({ hpMax: 8 }));
-    const altro = await exportCharacterToPdf(build({ hpMax: 188 }));
-
-    expect(altro.length).not.toBe(uno.length);
+    // Il confronto è sulle parole stampate, non sul peso del file: "8" e "188" una volta
+    // compressi occupano lo stesso spazio, e il test passava o falliva per caso.
+    expect(testoStampato(await exportCharacterToPdf(build({ hpMax: 188 })))).toContain("188");
   });
 });
 
