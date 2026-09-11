@@ -340,8 +340,8 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
     const competente = character.trsCompetenti.includes(ability);
     const bonus = savingThrowModifier(character.caratteristiche[ability], competente, livello) + (character.trsBonus[ability] ?? 0);
     dot(ctx, midX + 6, my + 3, competente ? "pieno" : "vuoto");
-    text(ctx, ABILITY_LABELS[ability], midX + 16, my, { size: 8 });
-    text(ctx, formatModifier(bonus), midX + midW - 22, my, { size: 8, bold: true });
+    text(ctx, ABILITY_LABELS[ability], midX + 15, my, { size: 8 });
+    text(ctx, formatModifier(bonus), midX + midW - 20, my, { size: 8, bold: true });
     my -= 11.5;
   }
 
@@ -483,25 +483,25 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   // e si scrive a matita — qui si fa lo stesso, con una casella abbastanza grande per cancellare
   // e riscrivere. Il valore vero resta nell'app, che e' dove si aggiorna davvero.
   box(ctx, rightX, ry - 34, rightW, 38);
-  text(ctx, "MASSIMI", rightX + 6, ry - 10, { size: 6, bold: true, color: MUTED });
-  text(ctx, String(character.hpMax), rightX + 6, ry - 26, { size: 14, bold: true });
-  text(ctx, "ATTUALI", rightX + 62, ry - 10, { size: 6, bold: true, color: MUTED });
-  box(ctx, rightX + 60, ry - 30, 44, 20);
+  text(ctx, "MASSIMI", rightX + 4, ry - 10, { size: 6, bold: true, color: MUTED });
+  text(ctx, String(character.hpMax), rightX + 4, ry - 26, { size: 14, bold: true });
+  text(ctx, "ATTUALI", rightX + 42, ry - 10, { size: 6, bold: true, color: MUTED });
+  box(ctx, rightX + 40, ry - 30, 44, 20);
   text(ctx, "TEMP.", rightX + 116, ry - 10, { size: 6, bold: true, color: MUTED });
   box(ctx, rightX + 112, ry - 30, 44, 20);
   ry -= 44;
 
   const dadiVitaTot = livello;
   box(ctx, rightX, ry - 26, rightW, 26, true);
-  text(ctx, "DADI VITA", rightX + 6, ry - 10, { size: 6.5, bold: true, color: MUTED });
-  disegnaUsi(ctx, { usiMax: dadiVitaTot, usiUsati: character.dadiVitaUsati }, rightX + 6, ry - 22);
+  text(ctx, "DADI VITA", rightX + 4, ry - 10, { size: 6.5, bold: true, color: MUTED });
+  disegnaUsi(ctx, { usiMax: dadiVitaTot, usiUsati: character.dadiVitaUsati }, rightX + 4, ry - 22);
   ry -= 34;
 
   ry = sectionHeader(ctx, "Tiri salvezza contro la morte", rightX, ry, rightW);
-  text(ctx, "Successi", rightX + 6, ry, { size: 7, color: MUTED });
+  text(ctx, "Successi", rightX + 4, ry, { size: 7, color: MUTED });
   [0, 1, 2].forEach((i) => dot(ctx, rightX + 58 + i * 12, ry + 3, i < character.tiriMorteSuccessi ? "pieno" : "vuoto"));
   ry -= 13;
-  text(ctx, "Fallimenti", rightX + 6, ry, { size: 7, color: MUTED });
+  text(ctx, "Fallimenti", rightX + 4, ry, { size: 7, color: MUTED });
   [0, 1, 2].forEach((i) => dot(ctx, rightX + 58 + i * 12, ry + 3, i < character.tiriMorteFallimenti ? "pieno" : "vuoto"));
   ry -= 22;
 
@@ -511,17 +511,17 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
   // Caselle e non numeri: ispirazione, affaticamento e follia cambiano di continuo durante una
   // sessione, e su carta si barrano — e' la stessa richiesta arrivata per i privilegi limitati.
   // Sulla scheda del gruppo l'ispirazione e' proprio una griglia di caselle.
-  rigaDiPallini(ctx, "Ispirazione", character.ispirazione, MAX_ISPIRAZIONE, rightX + 6, ry, rightW);
+  rigaDiPallini(ctx, "Ispirazione", character.ispirazione, MAX_ISPIRAZIONE, rightX + 4, ry, rightW);
   ry -= 12;
-  rigaDiPallini(ctx, "Affaticamento", character.affaticamento, 6, rightX + 6, ry, rightW);
+  rigaDiPallini(ctx, "Affaticamento", character.affaticamento, 6, rightX + 4, ry, rightW);
   ry -= 12;
   if (character.livelloFollia > 0) {
-    rigaDiPallini(ctx, "Follia", character.livelloFollia, 6, rightX + 6, ry, rightW);
+    rigaDiPallini(ctx, "Follia", character.livelloFollia, 6, rightX + 4, ry, rightW);
     ry -= 12;
   }
   if (character.condizioniAttive.length > 0) {
     for (const line of wrap(ctx.font, `Condizioni: ${character.condizioniAttive.join(", ")}`, 8, rightW - 12)) {
-      text(ctx, line, rightX + 6, ry, { size: 8 });
+      text(ctx, line, rightX + 4, ry, { size: 8 });
       ry -= 10;
     }
   }

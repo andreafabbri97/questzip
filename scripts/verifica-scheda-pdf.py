@@ -15,6 +15,8 @@ import itertools
 import os
 import sys
 
+from collections import Counter
+
 import fitz
 
 # Sotto questa frazione dell'area piu' piccola due testi si toccano soltanto (accenti, apici):
@@ -66,7 +68,21 @@ def controlla(percorso, cartella_immagini=None):
             print(f"    sovrapposti: {testo1!r} <-> {testo2!r}")
         for testo in fuori[:10]:
             print(f"    fuori pagina: {testo!r}")
-        problemi += len(sovrapposti) + len(fuori) + len(disegni_fuori)
+        # Colonne storte: due allineamenti a 1-3 punti di distanza non sono due colonne, sono
+        # una colonna sbagliata. A occhio si vedono subito, nei numeri no — finche' non si
+        # contano. Cosi' sono stati trovati tiri salvezza e abilita' sfalsati di un punto, e i
+        # testi dentro i riquadri rientrati di due rispetto al resto della colonna.
+        partenze = Counter(round(r.x0) for r, _ in testi)
+        usate = sorted(partenze)
+        storte = [
+            (a, b)
+            for a, b in zip(usate, usate[1:])
+            if 0 < b - a <= 3 and partenze[a] >= 4 and partenze[b] >= 4
+        ]
+        for a, b in storte:
+            print(f"    colonne disallineate: x={a} e x={b}")
+
+        problemi += len(sovrapposti) + len(fuori) + len(disegni_fuori) + len(storte)
 
         if cartella_immagini:
             os.makedirs(cartella_immagini, exist_ok=True)
