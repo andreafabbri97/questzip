@@ -46,11 +46,14 @@ export function DiceModal({ open, onClose }: { open: boolean; onClose: () => voi
       onClick={onClose}
     >
       <div
-        // Su telefono il tetto sale a 90dvh: "dvh" e non "vh" perché vh conta anche la barra
-        // degli indirizzi, quindi 85vh poteva già sforare l'area davvero visibile. Su desktop
-        // resta 85vh ma il pannello è un po' più largo (richiesta dell'utente): i dadi 3D e la
-        // cronologia dei tiri stanno più comodi, senza arrivare al modal gigante.
-        className={`card-elevated w-full max-w-lg sm:max-w-xl max-h-[90dvh] sm:max-h-[85vh] flex flex-col rounded-xl border border-edge bg-background overflow-hidden ${
+        // Il tetto in altezza è tutto lo schermo MENO il margine dell'overlay qui sopra (pt-10
+        // + p-4 su telefono, p-4 sopra e sotto da tablet in su): così il pannello è alto quanto
+        // si può — richiesta dell'utente, per vedere più cronologia senza scorrere — e non può
+        // sbordare, perché il numero non è una percentuale scelta a occhio ma esattamente lo
+        // spazio che resta. "dvh" e non "vh" perché vh conta anche la barra degli indirizzi del
+        // telefono, che visibile non è. In larghezza un filo più del telefono, non di più: un
+        // modal gigante starebbe solo largo.
+        className={`card-elevated w-full max-w-lg sm:max-w-xl max-h-[calc(100dvh-3.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col rounded-xl border border-edge bg-background overflow-hidden ${
           open ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}
