@@ -60,19 +60,31 @@ describe("askRulesAssistant", () => {
     expect(prompt).not.toContain("Scambi precedenti");
   });
 
-  it("manda al massimo gli ultimi 3 scambi anche se la cronologia è più lunga", async () => {
+  it("manda al massimo gli ultimi 5 scambi anche se la cronologia è più lunga", async () => {
     askGeminiMock.mockResolvedValue("Risposta.");
-    await askRulesAssistant("Domanda attuale", [
-      { question: "Domanda 1", answer: "Risposta 1" },
-      { question: "Domanda 2", answer: "Risposta 2" },
-      { question: "Domanda 3", answer: "Risposta 3" },
-      { question: "Domanda 4", answer: "Risposta 4" },
-    ]);
+    await askRulesAssistant(
+      "Domanda attuale",
+      [1, 2, 3, 4, 5, 6].map((n) => ({ question: `Domanda ${n}`, answer: `Risposta ${n}` })),
+    );
 
     const prompt = askGeminiMock.mock.calls[0][0].prompt as string;
     expect(prompt).not.toContain("Domanda 1");
-    expect(prompt).toContain("Domanda 2");
-    expect(prompt).toContain("Domanda 4");
+    for (const n of [2, 3, 4, 5, 6]) expect(prompt).toContain(`Domanda ${n}`);
+  });
+
+  // La cronologia la manda il browser: chi la gonfiasse a mano non deve poter spedire al modello
+  // un prompt enorme a ogni domanda.
+  it("taglia domande e risposte precedenti troppo lunghe", async () => {
+    askGeminiMock.mockResolvedValue("Risposta.");
+    await askRulesAssistant("Domanda attuale", [
+      { question: "D".repeat(5000), answer: "R".repeat(50000) },
+    ]);
+
+    const prompt = askGeminiMock.mock.calls[0][0].prompt as string;
+    expect(prompt).toContain("D".repeat(500));
+    expect(prompt).not.toContain("D".repeat(501));
+    expect(prompt).toContain("R".repeat(1500));
+    expect(prompt).not.toContain("R".repeat(1501));
   });
 });
 

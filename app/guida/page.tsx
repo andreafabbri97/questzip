@@ -432,7 +432,7 @@ export default async function GuidaPage() {
             <>
               <strong>Assistente regole</strong> — icona 🤖 in header, apre una domanda/risposta
               veloce sulle regole di D&amp;D 5e ancorata (dove possibile) alle voci vere del
-              Compendio. Ricorda gli <strong>ultimi 3 scambi</strong> della stessa conversazione
+              Compendio. Ricorda gli <strong>ultimi 5 scambi</strong> della stessa conversazione
               (così una domanda di seguito tipo &quot;e a un livello più alto?&quot; viene capita),
               ma non l&apos;intera cronologia: oltre quella soglia va ripetuto il contesto.
             </>,

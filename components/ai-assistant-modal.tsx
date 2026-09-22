@@ -17,7 +17,7 @@ interface Exchange {
 // Quanti scambi precedenti passiamo all'IA come contesto — deve combaciare con MAX_HISTORY in
 // app/actions/ai-assistant.ts (non importato da lì apposta: quel file è "use server", questo file
 // è "use client", e il numero serve solo per il testo mostrato qui, non per la logica vera).
-const REMEMBERED_EXCHANGES = 3;
+const REMEMBERED_EXCHANGES = 5;
 
 /** Domanda veloce sulle regole D&D 5e durante la sessione ("quanto danno fa X", "come funziona
  * Y") — mostrate impilate come in una chat perché è più naturale da leggere di un singolo

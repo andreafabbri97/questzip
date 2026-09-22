@@ -202,11 +202,18 @@ export interface RulesAssistantExchange {
   answer: string;
 }
 
-// Quanti scambi precedenti si allegano come contesto — un tetto basso perché serve solo a capire
-// domande di seguito ellittiche ("e a un livello più alto?", "e per un mago invece?"), non a
-// sostenere una conversazione lunga: più scambi vecchi nel prompt non migliorano la risposta e
-// costano solo caratteri.
-const MAX_HISTORY = 3;
+// Quanti scambi precedenti si allegano come contesto. Serve a capire domande di seguito
+// ellittiche ("e a un livello più alto?", "e per un mago invece?"): erano 3, portati a 5 su
+// richiesta dell'utente perché al tavolo un filo di domande sullo stesso argomento li superava
+// in fretta. Resta un tetto, non tutta la conversazione: scambi vecchi non migliorano la
+// risposta e costano solo caratteri.
+const MAX_HISTORY = 5;
+
+// La cronologia arriva dal browser, quindi la sua lunghezza non è garantita: la domanda ha lo
+// stesso limite di quella attuale, la risposta un margine ampio (il modello ne scrive 4-5 frasi).
+// Senza, cinque scambi gonfiati a mano bastavano a mandare al modello un prompt enorme.
+const MAX_CARATTERI_DOMANDA = 500;
+const MAX_CARATTERI_RISPOSTA = 1500;
 
 /** Assistente regole D&D 5e in chat — pensato per una domanda veloce al tavolo ("quanto danno fa
  * X", "come funziona Y"). Ancorato ai dati veri del Compendio di QuestZip quando la domanda cita
@@ -224,7 +231,7 @@ export async function askRulesAssistant(
   // Come per le bozze IA: senza questo controllo la quota Gemini del progetto è spendibile da
   // chiunque, dato che /campagne è raggiungibile senza login.
   await requireUserId();
-  const trimmed = question.trim().slice(0, 500);
+  const trimmed = question.trim().slice(0, MAX_CARATTERI_DOMANDA);
   if (!trimmed) return null;
 
   const candidates = await findMatchingCandidates(trimmed).catch(() => [] as MentionCandidate[]);
@@ -236,7 +243,10 @@ export async function askRulesAssistant(
       ? `Dati ufficiali dal Compendio di QuestZip, pertinenti alla domanda (usali come fonte primaria per qualunque dettaglio numerico o di regole — se la domanda chiede altro, ignorali):\n${excerpts.map((e) => `- ${e}`).join("\n")}\n\n`
       : "";
 
-  const recentHistory = history.slice(-MAX_HISTORY);
+  const recentHistory = (Array.isArray(history) ? history : []).slice(-MAX_HISTORY).map((h) => ({
+    question: String(h?.question ?? "").slice(0, MAX_CARATTERI_DOMANDA),
+    answer: String(h?.answer ?? "").slice(0, MAX_CARATTERI_RISPOSTA),
+  }));
   const historyBlock =
     recentHistory.length > 0
       ? `Scambi precedenti in questa stessa conversazione, per capire domande di seguito che fanno riferimento a quanto già chiesto (es. "e a un livello più alto?"):\n${recentHistory.map((h) => `D: ${h.question}\nR: ${h.answer}`).join("\n")}\n\n`
