@@ -86,6 +86,7 @@ import {
 } from "@/lib/fivetools/incantesimi-classe";
 import { bestItalianName, buildItalianNameIndex, type ItalianNameIndex } from "@/lib/fivetools/italian-names";
 import { correggiTerminiDnd } from "@/lib/traduzione-termini";
+import { descrizioneUfficialeUsabile } from "@/lib/fivetools/testo-ufficiale";
 export { bestItalianName } from "@/lib/fivetools/italian-names";
 export type { ItalianNameIndex } from "@/lib/fivetools/italian-names";
 
@@ -1329,7 +1330,13 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
 
   const ufficiale = useMemo(() => {
     if (language !== "it" || !itaOggetti) return null;
-    return findUfficiale(itaOggetti, translatedName, item.name, item.source, { varianti: true });
+    const trovato = findUfficiale(itaOggetti, translatedName, item.name, item.source, {
+      varianti: true,
+    });
+    // Armi e armature comuni non hanno una descrizione nella tabella del manuale: al suo posto
+    // l'OCR raccoglie la lettera della colonna "Tipo" ("M", "R"). Mostrarla non aggiunge niente e
+    // fa perdere i dati veri dell'oggetto, che stanno nel ramo qui sotto.
+    return trovato && descrizioneUfficialeUsabile(trovato.descrizione) ? trovato : null;
   }, [language, itaOggetti, translatedName, item.name, item.source]);
 
   if (ufficiale) {
