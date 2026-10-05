@@ -20,7 +20,11 @@ import { useLocalCollection } from "@/lib/storage";
 import { characterSchema, duplicaCharacter, newCharacter, totalLevel, type Character } from "@/lib/dnd";
 import { importCharacterFromPdf } from "@/lib/pdf-character-import";
 import { CharacterSheet } from "@/components/personaggi/character-sheet-core";
-import { formatClassSummary } from "@/components/personaggi/helpers";
+import {
+  formatClassSummary,
+  idSchedaDaRicerca,
+  indirizzoScheda,
+} from "@/components/personaggi/helpers";
 
 function ExportImport({
   characters,
@@ -213,7 +217,28 @@ type CloudStatus = "syncing" | "synced" | "error";
 
 export default function CharactersPage() {
   const { items, persist, loaded } = useLocalCollection("questzip:personaggi", characterSchema);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // Quale scheda è aperta sta nell'indirizzo, non solo in memoria: ricaricando la pagina si
+  // tornava all'elenco (vedi idSchedaDaRicerca). Letto una volta sola all'avvio — sul server
+  // "window" non esiste e il primo render è comunque "Caricamento…", perché i personaggi stanno
+  // in localStorage.
+  const [editingId, setEditingId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : idSchedaDaRicerca(window.location.search),
+  );
+
+  // Apre o chiude una scheda scrivendolo anche nell'indirizzo. pushState e non replaceState: così
+  // il tasto Indietro riporta all'elenco invece di uscire dai Personaggi.
+  const apriScheda = (id: string | null) => {
+    setEditingId(id);
+    window.history.pushState(null, "", indirizzoScheda(window.location.pathname, id));
+  };
+
+  // Indietro e Avanti del browser cambiano l'indirizzo senza rimontare la pagina: senza questo,
+  // l'elenco e l'indirizzo finirebbero per raccontare due cose diverse.
+  useEffect(() => {
+    const onPopState = () => setEditingId(idSchedaDaRicerca(window.location.search));
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   // Il localStorage resta la copia "veloce" (scritta solo al salvataggio esplicito dalla scheda,
   // vedi CharacterSheet); questo stato riflette solo il backup in background sull'account — vedi
   // app/actions/character-sync.ts.
@@ -293,14 +318,14 @@ export default function CharactersPage() {
 
   const remove = (id: string) => {
     persist(items.filter((item) => item.id !== id));
-    setEditingId(null);
+    apriScheda(null);
     deleteCharacterRemote(id).catch(() => {});
   };
 
   const create = () => {
     const character = newCharacter();
     upsert(character);
-    setEditingId(character.id);
+    apriScheda(character.id);
   };
 
   // La copia parte dalla scheda SALVATA (items), non dalla bozza aperta: il bottone nella scheda è
@@ -311,7 +336,7 @@ export default function CharactersPage() {
     if (!originale) return;
     const copia = duplicaCharacter(originale, items.map((item) => item.nome));
     upsert(copia);
-    setEditingId(copia.id);
+    apriScheda(copia.id);
   };
 
   if (!loaded) {
@@ -326,7 +351,7 @@ export default function CharactersPage() {
         onSave={upsert}
         onDelete={() => remove(editing.id)}
         onDuplicate={() => duplicate(editing.id)}
-        onBack={() => setEditingId(null)}
+        onBack={() => apriScheda(null)}
         cloudStatus={cloudStatus[editing.id]}
       />
     );
@@ -363,7 +388,7 @@ export default function CharactersPage() {
           {items.map((character) => (
             <li key={character.id}>
               <button
-                onClick={() => setEditingId(character.id)}
+                onClick={() => apriScheda(character.id)}
                 className="w-full h-full text-left card-elevated rounded-xl border border-edge bg-surface p-4 hover:border-accent/50 hover:bg-surface-raised transition-colors"
               >
                 <div className="flex items-center justify-between">

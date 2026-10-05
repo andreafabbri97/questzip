@@ -118,6 +118,8 @@ export default async function GuidaPage() {
           bottone <strong>&quot;↕ Ordina per livello&quot;</strong> rimette in fila righe aggiunte in
           momenti diversi, trucchetti per primi. I campi di testo libero (personalità, aspetto,
           note) si allargano da soli per mostrare tutto quello che contengono, senza tagliare.
+          E la scheda aperta resta aperta: se ricarichi la pagina la ritrovi dov'eri, e il tasto
+          Indietro del browser ti riporta all'elenco dei personaggi.
         </p>
         <SottoTitolo>Salvataggio: funziona come un documento</SottoTitolo>
         <p>
