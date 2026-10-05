@@ -110,6 +110,15 @@ export default async function GuidaPage() {
           <strong> cercabile anche in italiano</strong>: scrivere &quot;ladro&quot; trova gli stessi
           risultati di &quot;rogue&quot;.
         </Suggerimento>
+        <SottoTitolo>Piccole comodità al tavolo</SottoTitolo>
+        <p>
+          Dalla scheda si tira <strong>tutto</strong>: tiri salvezza, abilità, armi, incantesimi e
+          anche l&apos;<strong>iniziativa</strong> (il dado accanto al numero, nella scheda
+          Combattimento) — col bonus extra già compreso. Nell&apos;elenco degli incantesimi il
+          bottone <strong>&quot;↕ Ordina per livello&quot;</strong> rimette in fila righe aggiunte in
+          momenti diversi, trucchetti per primi. I campi di testo libero (personalità, aspetto,
+          note) si allargano da soli per mostrare tutto quello che contengono, senza tagliare.
+        </p>
         <SottoTitolo>Salvataggio: funziona come un documento</SottoTitolo>
         <p>
           Le modifiche restano una <strong>bozza locale</strong> finché non premi il bottone

@@ -10,6 +10,7 @@ import {
   duplicaCharacter,
   characterSchema,
   knownSpellSchema,
+  ordinaIncantesimiPerLivello,
   hitDiceRecoveredOnLongRest,
   isAsiLevelFor,
   levelForXp,
@@ -534,5 +535,55 @@ describe("parseCharacterRemoto", () => {
   it("restituisce il dato grezzo se la riga e' irrecuperabile, invece di perdere il backup", () => {
     const rotta = { nome: "Rotta", classi: "non un array" };
     expect(parseCharacterRemoto(rotta)).toBe(rotta);
+  });
+});
+
+describe("ordinaIncantesimiPerLivello", () => {
+  const voce = (nome: string, livello: number) => ({
+    id: nome || `vuoto-${livello}`,
+    nome,
+    livello,
+    preparato: false,
+    dadoDanno: "",
+  });
+
+  // L'elenco segue l'ordine in cui si aggiungono le righe, cioe' l'ordine in cui gli incantesimi
+  // vengono in mente: dopo un paio di livelli i livelli sono mescolati e in scheda non c'era modo
+  // di rimetterli in fila (segnalato dall'utente).
+  it("mette i trucchetti in cima e sale di livello", () => {
+    const ordinati = ordinaIncantesimiPerLivello([
+      voce("Palla di Fuoco", 3),
+      voce("Guida", 0),
+      voce("Benedizione", 1),
+    ]);
+
+    expect(ordinati.map((s) => s.livello)).toEqual([0, 1, 3]);
+  });
+
+  it("a pari livello ordina per nome, ignorando accenti e maiuscole", () => {
+    const ordinati = ordinaIncantesimiPerLivello([
+      voce("santuario", 1),
+      voce("Èrmetismo", 1),
+      voce("Benedizione", 1),
+    ]);
+
+    expect(ordinati.map((s) => s.nome)).toEqual(["Benedizione", "Èrmetismo", "santuario"]);
+  });
+
+  // Una riga appena aggiunta e' senza nome e di livello 0: ordinandola per livello finirebbe in
+  // cima, cioe' lontano da dove la si sta compilando.
+  it("lascia in fondo le righe ancora senza nome", () => {
+    const ordinati = ordinaIncantesimiPerLivello([voce("", 0), voce("Palla di Fuoco", 3)]);
+
+    expect(ordinati.map((s) => s.nome)).toEqual(["Palla di Fuoco", ""]);
+  });
+
+  it("non perde ne' duplica incantesimi, e non tocca l'elenco originale", () => {
+    const originale = [voce("Palla di Fuoco", 3), voce("Guida", 0)];
+
+    const ordinati = ordinaIncantesimiPerLivello(originale);
+
+    expect(ordinati).toHaveLength(2);
+    expect(originale.map((s) => s.nome)).toEqual(["Palla di Fuoco", "Guida"]);
   });
 });

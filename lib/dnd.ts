@@ -659,6 +659,28 @@ export function spellSaveDC(level: number, abilityScore: number): number {
   return 8 + proficiencyBonus(level) + abilityModifier(abilityScore);
 }
 
+/**
+ * Riordina gli incantesimi per livello — i trucchetti in cima — e a parità di livello per nome.
+ *
+ * L'elenco in scheda resta nell'ordine in cui si aggiungono le righe, cioè l'ordine in cui
+ * vengono in mente al tavolo: dopo un paio di livelli i livelli sono mescolati e non c'era modo di
+ * rimetterli in fila (segnalato dall'utente). È un'azione esplicita e non un ordinamento
+ * automatico della vista, perché cambiare il livello di una riga mentre la si compila la farebbe
+ * saltare via da sotto il cursore.
+ *
+ * Le righe ancora senza nome restano in fondo: sono quelle appena aggiunte, e si stanno
+ * compilando proprio adesso.
+ */
+export function ordinaIncantesimiPerLivello(incantesimi: KnownSpell[]): KnownSpell[] {
+  const senzaNome = (s: KnownSpell) => (s.nome.trim() === "" ? 1 : 0);
+  return [...incantesimi].sort(
+    (a, b) =>
+      senzaNome(a) - senzaNome(b) ||
+      a.livello - b.livello ||
+      a.nome.localeCompare(b.nome, "it", { sensitivity: "base" }),
+  );
+}
+
 export function spellAttackBonus(level: number, abilityScore: number): number {
   return proficiencyBonus(level) + abilityModifier(abilityScore);
 }

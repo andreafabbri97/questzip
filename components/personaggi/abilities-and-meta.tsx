@@ -41,6 +41,7 @@ import {
 } from "@/lib/dnd";
 import { loadClassData, loadItems, resolveClassFeatures, resolveSubclassFeatures } from "@/lib/fivetools/data";
 import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
+import { TextareaAuto } from "@/components/textarea-auto";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
 import { LocalInfoButton } from "./local-info-button";
@@ -719,9 +720,12 @@ export function PhysicalDescriptionSection({
             ).map(([key, label]) => (
               <label key={key} className="block">
                 <span className="text-[10px] uppercase tracking-widest text-muted">{label}</span>
-                <input
+                {/* Non più <input>: in due colonne su telefono, "capelli rasati, cicatrice
+                    sul collo" si leggeva per un terzo. */}
+                <TextareaAuto
                   value={character[key]}
-                  onChange={(event) => set(key, event.target.value)}
+                  onChange={(valore) => set(key, valore)}
+                  minRows={1}
                   className={fieldClass}
                 />
               </label>

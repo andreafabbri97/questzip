@@ -15,6 +15,7 @@ import { loadFeats, loadInventoryItems, type RawItem } from "@/lib/fivetools/dat
 import { DualName } from "@/lib/fivetools/compendio-detail";
 import { weightLbToKg } from "@/lib/fivetools/format";
 import { findCompendioMatch } from "@/lib/fivetools/mention-search";
+import { TextareaAuto } from "@/components/textarea-auto";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
 
@@ -43,46 +44,46 @@ export function PersonalitySection({
         <div className="mt-3 grid sm:grid-cols-2 gap-3 border-t border-edge pt-3">
           <label className="block">
             <span className="text-[10px] uppercase tracking-widest text-muted">Tratti caratteriali</span>
-            <textarea
+            <TextareaAuto
               value={character.tratti}
-              onChange={(event) => set("tratti", event.target.value)}
-              rows={3}
+              onChange={(valore) => set("tratti", valore)}
+              minRows={3}
               className={fieldClass}
             />
           </label>
           <label className="block">
             <span className="text-[10px] uppercase tracking-widest text-muted">Legami</span>
-            <textarea
+            <TextareaAuto
               value={character.legami}
-              onChange={(event) => set("legami", event.target.value)}
-              rows={3}
+              onChange={(valore) => set("legami", valore)}
+              minRows={3}
               className={fieldClass}
             />
           </label>
           <label className="block">
             <span className="text-[10px] uppercase tracking-widest text-muted">Ideali</span>
-            <textarea
+            <TextareaAuto
               value={character.ideali}
-              onChange={(event) => set("ideali", event.target.value)}
-              rows={3}
+              onChange={(valore) => set("ideali", valore)}
+              minRows={3}
               className={fieldClass}
             />
           </label>
           <label className="block">
             <span className="text-[10px] uppercase tracking-widest text-muted">Difetti</span>
-            <textarea
+            <TextareaAuto
               value={character.difetti}
-              onChange={(event) => set("difetti", event.target.value)}
-              rows={3}
+              onChange={(valore) => set("difetti", valore)}
+              minRows={3}
               className={fieldClass}
             />
           </label>
           <label className="block">
             <span className="text-[10px] uppercase tracking-widest text-muted">Nemici</span>
-            <textarea
+            <TextareaAuto
               value={character.nemici}
-              onChange={(event) => set("nemici", event.target.value)}
-              rows={3}
+              onChange={(valore) => set("nemici", valore)}
+              minRows={3}
               className={fieldClass}
             />
           </label>

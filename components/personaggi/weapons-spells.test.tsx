@@ -216,6 +216,44 @@ describe("SpellListSection", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  // L'elenco resta nell'ordine in cui si aggiungono le righe: dopo un paio di livelli i livelli
+  // sono mescolati e non c'era modo di rimetterli in fila (segnalato dall'utente).
+  it("il bottone rimette l'elenco in ordine di livello", async () => {
+    const user = userEvent.setup();
+    function Harness() {
+      const [character, setCharacter] = useState(
+        baseCharacter({
+          classi: [{ nome: "Chierico", livello: 9 }],
+          incantesimi: [
+            { id: "s1", nome: "Spirito Guardiano", livello: 3, preparato: true, dadoDanno: "" },
+            { id: "s2", nome: "Guida", livello: 0, preparato: true, dadoDanno: "" },
+            { id: "s3", nome: "Benedizione", livello: 1, preparato: true, dadoDanno: "" },
+          ],
+        }),
+      );
+      return <SpellListSection character={character} onChange={setCharacter} />;
+    }
+    render(<Harness />);
+
+    const livelli = () =>
+      screen.getAllByLabelText("Livello incantesimo").map((campo) => (campo as HTMLInputElement).value);
+    expect(livelli()).toEqual(["3", "0", "1"]);
+
+    await user.click(screen.getByRole("button", { name: /Ordina per livello/ }));
+
+    expect(livelli()).toEqual(["0", "1", "3"]);
+  });
+
+  it("senza almeno due incantesimi il bottone per ordinare non si mostra", () => {
+    const character = baseCharacter({
+      classi: [{ nome: "Chierico", livello: 9 }],
+      incantesimi: [{ id: "s1", nome: "Guida", livello: 0, preparato: true, dadoDanno: "" }],
+    });
+    render(<SpellListSection character={character} onChange={() => {}} />);
+
+    expect(screen.queryByRole("button", { name: /Ordina per livello/ })).not.toBeInTheDocument();
+  });
+
   it("scegliendo un incantesimo dal Compendio precompila da sola il dado danno se vuoto", async () => {
     const user = userEvent.setup();
     function Harness() {

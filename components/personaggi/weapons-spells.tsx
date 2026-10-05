@@ -8,6 +8,7 @@ import {
   canonicalClassName,
   formatModifier,
   multiclassCasterLevel,
+  ordinaIncantesimiPerLivello,
   primaryCastingAbility,
   spellAttackBonus,
   totalLevel,
@@ -347,11 +348,24 @@ export function SpellListSection({
 
   return (
     <section className="card-elevated rounded-xl border border-edge bg-surface p-5 space-y-3">
-      <div className="flex items-center justify-between">
+      {/* flex-wrap: su telefono i due bottoni non stanno in riga col titolo e vanno a capo
+          invece di stringersi. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="text-sm uppercase tracking-widest text-muted">Incantesimi conosciuti</h2>
-        <button onClick={addSpell} className="text-xs font-bold text-accent-strong hover:underline">
-          + Aggiungi incantesimo
-        </button>
+        <div className="flex items-center gap-3">
+          {character.incantesimi.length > 1 && (
+            <button
+              onClick={() => setIncantesimi(ordinaIncantesimiPerLivello(character.incantesimi))}
+              className="text-xs font-bold text-muted hover:text-foreground hover:underline"
+              title="Rimette l'elenco in ordine di livello, trucchetti per primi"
+            >
+              ↕ Ordina per livello
+            </button>
+          )}
+          <button onClick={addSpell} className="text-xs font-bold text-accent-strong hover:underline">
+            + Aggiungi incantesimo
+          </button>
+        </div>
       </div>
       <DiceRollerModal preset={dicePreset} onClose={() => setDicePreset(null)} />
       {character.incantesimi.length === 0 && (

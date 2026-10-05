@@ -23,6 +23,9 @@ import {
   type ClassEntry,
 } from "@/lib/dnd";
 import { loadBackgrounds, loadRaces } from "@/lib/fivetools/data";
+import { TextareaAuto } from "@/components/textarea-auto";
+import { DiceRollerModal, type DiceRollerPreset } from "@/components/dice-roller-modal";
+import { InitiativeCard } from "./initiative-card";
 import { formatClassSummary } from "./helpers";
 import { Autocomplete } from "./autocomplete";
 import { CompendioInfoButton } from "./compendio-info-button";
@@ -209,6 +212,13 @@ export function CharacterSheet({
 
   const [hpAmount, setHpAmount] = useState(1);
 
+  // Iniziativa: si tira a ogni singolo scontro, ed era l'unico numero della scheda da cui non si
+  // poteva tirare — tiri salvezza, abilità, armi e incantesimi hanno tutti il loro 🎲 (richiesta
+  // dell'utente). Stesso modal dadi, così il tiro finisce anche nella cronologia condivisa.
+  const [dicePreset, setDicePreset] = useState<DiceRollerPreset | null>(null);
+  const iniziativaMod =
+    abilityModifier(character.caratteristiche.destrezza) + character.iniziativaBonus;
+
   // Il danno consuma prima i PF temporanei e solo l'eccedenza intacca i PF veri (regola RAW) —
   // la cura invece non li ripristina mai (i temporanei non si "curano", si riassegnano da capo).
   const applyDamage = () => {
@@ -237,6 +247,7 @@ export function CharacterSheet({
 
   return (
     <div className="space-y-6 max-w-2xl lg:max-w-5xl 2xl:max-w-6xl [@media(min-width:2200px)]:max-w-[1600px] mx-auto">
+      <DiceRollerModal preset={dicePreset} onClose={() => setDicePreset(null)} />
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <button onClick={handleBack} className="text-sm text-muted hover:text-foreground shrink-0">
           ← Personaggi
@@ -486,21 +497,12 @@ export function CharacterSheet({
                     {formatModifier(proficiencyBonus(totalLevel(character.classi)))}
                   </p>
                 </div>
-                <div className="rounded-lg border border-edge bg-surface-raised px-2 sm:px-3 py-2 text-center">
-                  <span className={labelClass}>Iniziativa</span>
-                  <p className="text-lg font-bold text-foreground">
-                    {formatModifier(
-                      abilityModifier(character.caratteristiche.destrezza) + character.iniziativaBonus,
-                    )}
-                  </p>
-                  <IntField
-                    value={character.iniziativaBonus}
-                    onChange={(value) => set("iniziativaBonus", value)}
-                    className="mt-1 w-full rounded-md border border-edge bg-surface px-2 py-1 text-center text-xs text-foreground"
-                    placeholder="bonus"
-                    aria-label="Bonus extra all'iniziativa"
-                  />
-                </div>
+                <InitiativeCard
+                  modificatore={iniziativaMod}
+                  bonusExtra={character.iniziativaBonus}
+                  onBonusExtraChange={(value) => set("iniziativaBonus", value)}
+                  onRoll={setDicePreset}
+                />
                 <div className="rounded-lg border border-edge bg-surface-raised px-2 sm:px-3 py-2 text-center">
                   <span className={labelClass}>Percezione passiva</span>
                   <p className="text-lg font-bold text-foreground">
@@ -685,11 +687,11 @@ export function CharacterSheet({
           <section className="card-elevated rounded-xl border border-edge bg-surface p-5">
             <label className="block">
               <span className={labelClass}>Note</span>
-              <textarea
+              <TextareaAuto
                 value={character.note}
-                onChange={(event) => set("note", event.target.value)}
+                onChange={(valore) => set("note", valore)}
                 placeholder="Retroscena, alleati, altri dettagli…"
-                rows={5}
+                minRows={5}
                 className={inputClass}
               />
             </label>
