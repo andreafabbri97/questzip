@@ -75,7 +75,14 @@ function ExportPdfButton({ character }: { character: Character }) {
     setError(false);
     try {
       const { exportCharacterToPdf, pdfFileName } = await import("@/lib/pdf-character-export");
-      const bytes = await exportCharacterToPdf(character);
+      // I privilegi di classe, sottoclasse e razza non stanno nella scheda: vivono nel Compendio.
+      // Vanno quindi caricati adesso, o la loro colonna esce vuota (è quello che faceva). Se il
+      // catalogo non risponde si stampa lo stesso, con quella sezione a righe libere: un PDF
+      // incompleto al tavolo serve, un errore no.
+      const privilegi = await import("@/lib/privilegi-scheda")
+        .then((m) => m.caricaPrivilegiScheda(character))
+        .catch(() => []);
+      const bytes = await exportCharacterToPdf(character, privilegi);
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");

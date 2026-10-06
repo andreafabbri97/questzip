@@ -237,3 +237,52 @@ describe("casi limite dell'impaginazione", () => {
     expect(await numeroPagine(bytes)).toBe(2);
   });
 });
+
+// La colonna "Privilegi di classe e tratti" usciva sempre vuota: quei dati non stanno nella scheda
+// ma nel Compendio, e chi genera il PDF non li caricava (segnalato dall'utente, "non vengono per
+// niente estrapolati").
+describe("privilegi di classe sul foglio", () => {
+  const privilegi = [
+    { nome: "Arti Marziali", livello: 1, origine: "classe" as const },
+    { nome: "Colpo Stordente", livello: 5, origine: "classe" as const },
+    { nome: "Soffio del Drago", livello: 3, origine: "sottoclasse" as const },
+    { nome: "Natura Senza Morte", origine: "razza" as const },
+  ];
+
+  it("stampa i privilegi che gli vengono passati", async () => {
+    const parole = testoStampato(await exportCharacterToPdf(build(), privilegi));
+
+    expect(parole).toContain("Arti Marziali");
+    expect(parole).toContain("Colpo Stordente");
+    expect(parole).toContain("Soffio del Drago");
+    expect(parole).toContain("Natura Senza Morte");
+  });
+
+  it("accanto a ciascuno stampa il livello, e un trattino per i tratti di razza", async () => {
+    const parole = testoStampato(await exportCharacterToPdf(build(), privilegi));
+
+    // "5" e' il livello di Colpo Stordente; il trattino e' di Natura Senza Morte, che non ha livello.
+    expect(parole).toContain("5");
+    expect(parole).toContain("-");
+  });
+
+  // Senza elenco il foglio resta quello di prima, con le righe da riempire a penna: e' quello che
+  // succede se il catalogo non risponde.
+  it("senza privilegi genera comunque la scheda", async () => {
+    await expect(exportCharacterToPdf(build())).resolves.toBeInstanceOf(Uint8Array);
+  });
+
+  // Un personaggio di alto livello ne ha piu' di quanti ne stia in colonna: meglio dirlo che
+  // lasciar credere che siano tutti li'.
+  it("quando non ci stanno tutti lo dice invece di tagliarli in silenzio", async () => {
+    const tanti = Array.from({ length: 80 }, (_, i) => ({
+      nome: `Privilegio numero ${i + 1}`,
+      livello: (i % 20) + 1,
+      origine: "classe" as const,
+    }));
+
+    const parole = testoStampato(await exportCharacterToPdf(build(), tanti));
+
+    expect(parole.some((p) => p.includes("e altri"))).toBe(true);
+  });
+});

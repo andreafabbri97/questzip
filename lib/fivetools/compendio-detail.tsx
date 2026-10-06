@@ -37,6 +37,10 @@ import {
 import type { CreatureSpellcasting } from "@/lib/fivetools/data";
 import { translateBatch, useTranslatedText } from "@/lib/fivetools/translate";
 import { stripTags } from "@/lib/fivetools/tags";
+// Spostate in un file puro perché servono anche all'esportazione in PDF (lib/privilegi-scheda.ts),
+// che non può tirarsi dietro questo componente: ri-esportate per non toccare chi le importa da qui.
+export { parseIaClassText, parseIaRaceText } from "@/lib/fivetools/testo-ia";
+import { parseIaClassText } from "@/lib/fivetools/testo-ia";
 import {
   formatAC,
   formatAbilityIncrease,
@@ -163,7 +167,9 @@ const traduzioniPromises = new Map<
   string,
   Promise<Awaited<ReturnType<typeof getTraduzioneIa>> | null>
 >();
-function loadTraduzioneIa(kind: CompendiumKind, name: string, source: string) {
+// Esportata: la usa anche lib/privilegi-scheda.ts (elenco privilegi per l'esportazione in
+// PDF), che ha bisogno della stessa riga tradotta e della stessa cache.
+export function loadTraduzioneIa(kind: CompendiumKind, name: string, source: string) {
   const chiave = `${kind}|${name}|${source}`;
   let promise = traduzioniPromises.get(chiave);
   if (!promise) {
@@ -1029,35 +1035,6 @@ function parseIaCreatureText(text: string): Map<string, { name: string; text: st
 
 // Formato scritto da self-translate-fetch.mjs per kind "classi": una riga per caratteristica,
 // "Nome (Liv. N): testo" — stessa idea di parseIaCreatureText sopra, ma con il livello al posto
-// del prefisso azione/reazione (le classi non hanno quella distinzione).
-const CLASS_FEATURE_LINE_RE = /^(.*?) \(Liv\. (\d+)\): ([\s\S]*)$/;
-export function parseIaClassText(text: string): { name: string; level: number; text: string }[] {
-  const items: { name: string; level: number; text: string }[] = [];
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue;
-    const match = line.match(CLASS_FEATURE_LINE_RE);
-    if (match) items.push({ name: match[1], level: Number(match[2]), text: match[3] });
-  }
-  return items;
-}
-
-// Formato scritto da self-translate-fetch.mjs per kind "razze": paragrafi separati da riga vuota,
-// "Nome: testo" (niente livello, le razze non ne hanno) — stessa idea di parseIaClassText. Il
-// paragrafo introduttivo e le intestazioni di sottorazza ("— Elfo Alto —") non hanno ":" e vengono
-// scartati di proposito: qui servono solo i tratti veri e propri, mostrati come righe cliccabili
-// nella scheda del personaggio.
-const RACE_TRAIT_PARAGRAPH_RE = /^([^:\n]{1,60}): ([\s\S]*)$/;
-export function parseIaRaceText(text: string): { name: string; text: string }[] {
-  const items: { name: string; text: string }[] = [];
-  for (const paragraph of text.split("\n\n")) {
-    const trimmed = paragraph.trim();
-    if (!trimmed) continue;
-    const match = trimmed.match(RACE_TRAIT_PARAGRAPH_RE);
-    if (match) items.push({ name: match[1], text: match[2] });
-  }
-  return items;
-}
-
 function CreatureDetail({ creature, language }: { creature: RawCreature; language: Language }) {
   const abilities: [string, number][] = [
     ["FOR", creature.str],

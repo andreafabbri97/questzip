@@ -252,8 +252,16 @@ export interface RawClassFeature {
   name: string;
   className: string;
   classSource: string;
+  /** Manuale in cui compare il privilegio: può essere diverso da quello della classe, perché le
+   * regole varianti di Tasha's aggiungono privilegi alle classi del Manuale del Giocatore. */
+  source?: string;
   level: number;
   entries: FiveEntry[];
+  /** Privilegio OPZIONALE (regole varianti di Tasha's, es. "Dedicated Weapon" del monaco): non si
+   * ha per il solo fatto di aver raggiunto quel livello, lo si sceglie al posto di qualcos'altro e
+   * il tavolo deve usare quelle regole. Tenerlo separato è anche ciò che permette di far
+   * combaciare l'elenco inglese col testo italiano del manuale, che gli opzionali non li ha. */
+  isClassFeatureVariant?: boolean;
 }
 
 interface SpellFile {

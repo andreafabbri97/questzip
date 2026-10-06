@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { EntriesBlock } from "@/lib/fivetools/compendio-detail";
 import type { FiveEntry } from "@/lib/fivetools/entries";
@@ -10,6 +10,12 @@ const CLOSE_ANIMATION_MS = 150;
 
 export interface SimpleEntryData {
   title: string;
+  /** Titolo da mostrare, quando il nome tradotto non è una semplice stringa ma va risolto da un
+   * componente (DualName per i privilegi di classe). Senza, il modal mostrava il nome inglese
+   * grezzo mentre l'elenco da cui si era cliccato mostrava quello italiano: due nomi diversi per
+   * la stessa voce, a un dito di distanza (segnalato dall'utente con "DEDICATED WEAPON"). `title`
+   * resta comunque obbligatorio, perché è quello che leggono gli screen reader. */
+  titleNode?: ReactNode;
   meta?: string;
   entries: FiveEntry[];
   // Testo italiano già risolto (ufficiale o cache IA, qualità migliore della traduzione al volo)
@@ -76,7 +82,7 @@ export function SimpleEntryModal({
       >
         <div className="flex items-center justify-between gap-3 border-b border-edge px-4 py-2.5 shrink-0">
           <span className="text-xs font-bold uppercase tracking-widest text-muted">
-            📖 {data?.title ?? ""}
+            📖 {data?.titleNode ?? data?.title ?? ""}
           </span>
           <button
             onClick={onClose}

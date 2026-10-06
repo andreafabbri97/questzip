@@ -44,8 +44,27 @@ function resolveTag(tag: string, content: string): string {
   }
 }
 
+// I tag possono stare uno dentro l'altro: il privilegio "Dedicated Weapon" del monaco comincia
+// con "{@i 2nd-level monk {@variantrule optional class features|tce|optional feature}}". Una
+// singola passata non basta — e soprattutto non basta una regex che accetti qualsiasi cosa fino
+// alla prima graffa di chiusura, perche' si mangerebbe il tag esterno insieme a quello interno
+// restituendo l'ultimo segmento dopo le pipe ("optional feature") e lasciando una graffa orfana:
+// in scheda si leggeva "funzionalita' opzionale}" (segnalato dall'utente).
+//
+// Con [^{}] la regex riconosce solo il tag PIU' INTERNO, quello senza altri tag dentro; risolto
+// quello, il giro successivo vede il padre ormai semplice. Tre passate coprono qualsiasi
+// annidamento reale di 5etools; il ciclo si ferma da se' quando non cambia piu' niente, cosi' un
+// tag malformato (una graffa mai chiusa) resta com'e' invece di bloccare la pagina.
+const MAX_PASSATE = 3;
+
 export function stripTags(text: string): string {
-  return text.replace(/\{@(\w+)(?:\s+([^}]*))?\}/g, (_, tag: string, content = "") =>
-    resolveTag(tag, content.trim()),
-  );
+  let risultato = text;
+  for (let passata = 0; passata < MAX_PASSATE && risultato.includes("{@"); passata++) {
+    const precedente = risultato;
+    risultato = risultato.replace(/\{@(\w+)(?:\s+([^{}]*))?\}/g, (_, tag: string, content = "") =>
+      resolveTag(tag, content.trim()),
+    );
+    if (risultato === precedente) break;
+  }
+  return risultato;
 }

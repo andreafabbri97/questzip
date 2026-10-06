@@ -48,6 +48,7 @@ import {
 } from "@/lib/fivetools/compendio-detail";
 import type { FiveEntry } from "@/lib/fivetools/entries";
 import { formatSubclassTitle } from "@/lib/fivetools/format";
+import { trovaRazza } from "@/lib/fivetools/trova-razza";
 import { Autocomplete } from "./autocomplete";
 import { loadClassNames, rollDie } from "./helpers";
 import { SimpleEntryModal, type SimpleEntryData } from "./simple-entry-modal";
@@ -400,6 +401,8 @@ type LeveledFeature = {
   // "Draconic Bloodline" dello Stregone, che compare (per un motivo dei dati 5etools) sia come
   // feature di sottoclasse al 1° livello sia di nuovo al 3°, senza una riga IA corrispondente.
   origin: "class" | "subclass";
+  /** Regola variante di Tasha's: si sceglie, non arriva da sola col livello. */
+  opzionale?: boolean;
 };
 
 function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
@@ -409,6 +412,12 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
   const [showFeatures, setShowFeatures] = useState(true);
   const [selected, setSelected] = useState<SimpleEntryData | null>(null);
   const [classSource, setClassSource] = useState<string | null>(null);
+  // Il nome della classe COM'È NEL CATALOGO (inglese). La riga di traduzione è indicizzata
+  // così, mentre in scheda la classe è scritta in italiano ("Monaco"): cercandola con il nome
+  // scritto non si trovava mai niente e tutti i privilegi della classe base restavano in
+  // inglese, mentre quelli della sottoclasse — scritta in inglese — erano tradotti. Da qui
+  // schede metà in una lingua e metà nell'altra (segnalato dall'utente).
+  const [classNameEn, setClassNameEn] = useState<string | null>(null);
   const [subclassSource, setSubclassSource] = useState<string | null>(null);
   const [features, setFeatures] = useState<LeveledFeature[] | null>(null);
 
@@ -421,7 +430,12 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
   // testo IA generato indipendentemente, quindi solo l'ordine ALL'INTERNO della stessa fonte è
   // garantito coerente — mischiarle in un solo elenco per livello ha causato un abbinamento
   // sbagliato reale (vedi nota su LeveledFeature.origin).
-  const classIa = useTraduzioneIa("classi", classEntry.nome, classSource ?? "", !!classSource);
+  const classIa = useTraduzioneIa(
+    "classi",
+    classNameEn ?? "",
+    classSource ?? "",
+    !!(classNameEn && classSource),
+  );
   const subclassIa = useTraduzioneIa(
     "classi",
     classEntry.sottoclasse ?? "",
@@ -434,6 +448,11 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
   const tradottiPerFeature = useMemo(() => {
     if (!features) return [];
     const daFonte = (origine: "class" | "subclass", testo: string | null | undefined) => {
+      // Dentro anche gli OPZIONALI: il testo italiano è stato prodotto dallo stesso elenco di
+      // 5etools, quindi li contiene nello stesso ordine ("Arma Dedicata" c'è, al 2° livello del
+      // monaco). Toglierli qui faceva fallire il confronto dei conteggi e l'intero livello
+      // ricadeva sulla traduzione dal vivo, di qualità più bassa: "Deviare i missili" invece di
+      // "Deviare Proiettili". Si distinguono dopo, con l'etichetta, non prima.
       const diQuestaFonte = features.filter((f) => f.origin === origine);
       const abbinati = abbinaPrivilegiTradotti(diQuestaFonte, testo ? parseIaClassText(testo) : []);
       return new Map(diQuestaFonte.map((f, i) => [f, abbinati[i]]));
@@ -452,12 +471,20 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
       );
       if (!cls) return;
       setClassSource(cls.source);
+      setClassNameEn(cls.name);
       // Solo i privilegi FINO al livello attuale del personaggio in questa classe — prima
       // mostrava sempre l'intera classe (1-20), un semplice copia-incolla del Compendio senza
       // rapporto col personaggio reale (segnalato dall'utente).
       const classFeatures: LeveledFeature[] = resolveClassFeatures(data, cls)
         .filter((f) => f.level <= classEntry.livello)
-        .map((f) => ({ name: f.name, level: f.level, entries: f.entries, source: f.classSource, origin: "class" }));
+        .map((f) => ({
+          name: f.name,
+          level: f.level,
+          entries: f.entries,
+          source: f.source ?? f.classSource,
+          origin: "class" as const,
+          opzionale: f.isClassFeatureVariant === true,
+        }));
 
       let subclassFeatures: LeveledFeature[] = [];
       const subclassName = classEntry.sottoclasse?.trim();
@@ -518,8 +545,16 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
                 key={`${feature.name}-${feature.level}-${index}`}
                 onClick={() =>
                   setSelected({
-                    title: feature.name,
-                    meta: `Liv. ${feature.level}`,
+                    title: ia?.name ?? feature.name,
+                    // Stesso nome che si legge nella riga appena cliccata: se il manuale italiano
+                    // non ha quel privilegio (succede con quelli opzionali di Tasha's) ci pensa
+                    // DualName, che è esattamente ciò che fa l'elenco qui sotto.
+                    titleNode: ia ? undefined : (
+                      <DualName text={feature.name} kind="classi" source={feature.source} inline />
+                    ),
+                    // Il nome inglese resta visibile accanto al livello: serve per ritrovare il
+                    // privilegio sul manuale, che è in inglese.
+                    meta: `Liv. ${feature.level}${ia ? ` · ${feature.name}` : ""}`,
                     entries: feature.entries,
                     textIt: ia ? [ia.text] : undefined,
                   })
@@ -544,7 +579,11 @@ function ClassFeaturesToggle({ classEntry }: { classEntry: ClassEntry }) {
                 {/* Da dove viene: in multiclasse con sottoclasse le righe sono tante e sapere
                     se un privilegio e' della classe o dell'archetipo cambia dove cercarlo. */}
                 <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted">
-                  {feature.origin === "subclass" ? "sottoclasse" : "classe"}
+                  {feature.opzionale
+                    ? "opzionale"
+                    : feature.origin === "subclass"
+                      ? "sottoclasse"
+                      : "classe"}
                 </span>
               </button>
               </div>
@@ -652,44 +691,12 @@ export function RaceTraits({ razza }: { razza: string }) {
   useEffect(() => {
     const raw = razza.trim();
     if (!raw) return;
-    // Un'annotazione personale tra parentesi (es. "Rinato (ex umano)", per ricordarsi la razza di
-    // partenza prima di un lignaggio come Rinato/Sangue Strigo) non fa parte del nome della razza
-    // — va staccata prima di cercare un match, altrimenti nessuna razza reale combacia mai.
-    // Segnalato dall'utente: "Rinato" è un lignaggio VERO (Van Richten's Guide to Ravenloft),
-    // non homebrew — "ex umano" era solo la sua nota personale sulla razza di partenza.
-    const cleaned = raw.replace(/\s*\([^)]*\)\s*$/, "").trim() || raw;
     let cancelled = false;
     Promise.all([loadRaces(), loadRazzeIta()]).then(([races, itaRazze]) => {
       if (cancelled) return;
-      const byEnglishName = (name: string) =>
-        races.filter((r) => r.name.toLowerCase() === name.toLowerCase());
-      // Alcune fonti (es. "LFL") ridefiniscono una razza già esistente altrove via "_copy" senza
-      // portare con sé i tratti veri (entries mancante) — .find() da solo può pescare quella
-      // invece della fonte "piena", mostrando zero privilegi per una razza che invece ne ha. E
-      // quando PIÙ fonti hanno entrambe contenuto reale (es. "Reborn" esiste sia come VRGR sia
-      // come ristampa RHW), va preferita quella per cui esiste testo ufficiale italiano collegato
-      // — altrimenti si rischia di agganciare la fonte "gemella" senza traduzione invece di
-      // quella con la traduzione vera già pronta (visto proprio con Reborn/VRGR vs Reborn/RHW).
-      const bestOf = (matches: RawRace[]) => {
-        const withEntries = matches.filter((r) => Array.isArray(r.entries) && r.entries.length > 0);
-        const withUfficiale = withEntries.find((r) =>
-          itaRazze.some((u) => u.nomeInglese === r.name && u.fonteInglese === r.source),
-        );
-        return withUfficiale ?? withEntries[0] ?? matches[0] ?? null;
-      };
-
-      let matches = byEnglishName(raw);
-      if (matches.length === 0) matches = byEnglishName(cleaned);
-      if (matches.length === 0) {
-        // Il testo scritto potrebbe essere il nome ufficiale ITALIANO (es. "Rinato") invece di
-        // quello inglese usato dall'autocompletamento (es. "Reborn") — risali alla voce inglese
-        // tramite il collegamento nomeInglese della riga ufficiale.
-        const officialMatch = itaRazze.find(
-          (r) => r.nomeInglese && r.nome.toLowerCase() === cleaned.toLowerCase(),
-        );
-        if (officialMatch?.nomeInglese) matches = byEnglishName(officialMatch.nomeInglese);
-      }
-      setRace(bestOf(matches));
+      // Scelta della razza: stessa funzione usata dall'esportazione in PDF (vedi trovaRazza),
+      // perché la stessa domanda posta da due punti diversi deve dare la stessa risposta.
+      setRace(trovaRazza(races, itaRazze, raw));
     });
     return () => {
       cancelled = true;

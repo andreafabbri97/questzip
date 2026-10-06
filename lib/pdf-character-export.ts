@@ -25,6 +25,7 @@ import {
   type Character,
 } from "@/lib/dnd";
 import { SKILLS } from "@/lib/dnd-tables";
+import type { PrivilegioScheda } from "@/lib/privilegi-scheda";
 
 /**
  * Esporta una scheda personaggio come PDF stampabile — il verso di
@@ -304,7 +305,12 @@ function pageFooter(ctx: Ctx, pagina: number, totale: number) {
 
 // --- Pagina 1: quello che serve davvero durante il combattimento -----------------------------
 
-function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
+function drawCombatPage(
+  ctx: Ctx,
+  character: Character,
+  totPagine: number,
+  privilegi: PrivilegioScheda[],
+) {
   pageHeader(ctx, character, "Combattimento");
   const livello = totalLevel(character.classi);
   const comp = proficiencyBonus(livello);
@@ -591,8 +597,37 @@ function drawCombatPage(ctx: Ctx, character: Character, totPagine: number) {
     ty -= 6;
   }
 
+  // I privilegi di classe, sottoclasse e razza non sono dati della scheda: vivono nel Compendio e
+  // arrivano qui gia' risolti (vedi lib/privilegi-scheda.ts), perche' chi genera il PDF li carica
+  // prima. Finche' non e' stato cosi', questa sezione usciva sempre vuota — la richiesta
+  // dell'utente e' stata esattamente questa: "non vengono per niente estrapolati".
+  // Se il caricamento non riesce (si e' offline, il catalogo non risponde) resta la scheda di
+  // prima, con le righe da riempire a penna: meglio un foglio come quello di ieri che nessun
+  // foglio.
   ty = sectionHeader(ctx, "Privilegi di classe e tratti", terzaX, ty, terzaW);
-  blankLines(ctx, terzaX + 4, ty - 2, terzaW - 8, Math.max(3, Math.floor((ty - MARGIN - 10) / 12)), 12);
+  const ALTEZZA_RIGA_PRIVILEGIO = 10.5;
+  const spazioPrivilegi = Math.max(0, Math.floor((ty - MARGIN - 4) / ALTEZZA_RIGA_PRIVILEGIO));
+  // Una riga si tiene da parte per la nota "e altri N", che altrimenti finirebbe sotto il bordo.
+  const quanti =
+    privilegi.length > spazioPrivilegi ? Math.max(0, spazioPrivilegi - 1) : spazioPrivilegi;
+  const privilegiStampati = privilegi.slice(0, quanti);
+  for (const privilegio of privilegiStampati) {
+    // Il livello a sinistra, incolonnato: al tavolo la domanda e' "cosa ho preso a che livello", e
+    // un trattino dice "questo ce l'hai da sempre" (i tratti di razza).
+    text(ctx, privilegio.livello ? String(privilegio.livello) : "-", terzaX + 4, ty, {
+      size: 6.5,
+      color: MUTED,
+    });
+    text(ctx, privilegio.nome, terzaX + 15, ty, { size: 7.5, maxWidth: terzaW - 21 });
+    ty -= ALTEZZA_RIGA_PRIVILEGIO;
+  }
+  ty = notaTroncamento(ctx, privilegi.length, privilegiStampati.length, terzaX + 4, ty);
+  // Lo spazio che avanza resta a righe: i privilegi si aggiungono salendo di livello, e il foglio
+  // si usa a matita.
+  const righeRimaste = Math.floor((ty - MARGIN - 4) / 12);
+  if (righeRimaste > 0) {
+    blankLines(ctx, terzaX + 4, ty - 2, terzaW - 8, Math.min(righeRimaste, privilegi.length > 0 ? 6 : 99), 12);
+  }
 
   // Colonna destra: le tre cose che sulla scheda del gruppo stanno accanto alle armi e che qui
   // mancavano del tutto. Gli appunti di sessione, che quella scheda non ha, si sono presi finora
@@ -975,7 +1010,16 @@ function drawSpellsPage(ctx: Ctx, character: Character, totPagine: number) {
 
 /** Genera il PDF stampabile della scheda. Ritorna i byte: il chiamante decide cosa farne
  * (download nel browser), stesso ruolo dell'export JSON già esistente. */
-export async function exportCharacterToPdf(character: Character): Promise<Uint8Array> {
+/**
+ * @param privilegi Privilegi di classe, sottoclasse e razza gia' risolti dal Compendio (vedi
+ * caricaPrivilegiScheda). Facoltativi: senza, la sezione resta a righe libere come prima — e'
+ * quello che succede se il catalogo non risponde, e un PDF senza quell'elenco resta comunque
+ * utilizzabile al tavolo.
+ */
+export async function exportCharacterToPdf(
+  character: Character,
+  privilegi: PrivilegioScheda[] = [],
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -1003,9 +1047,11 @@ export async function exportCharacterToPdf(character: Character): Promise<Uint8A
     character.incantesimi.length > 0 ||
     multiclassCasterLevel(character.classi) > 0 ||
     warlockLevel(character.classi) > 0;
+  const paginaCombattimento = (ctx: Ctx, c: Character, tot: number) =>
+    drawCombatPage(ctx, c, tot, privilegi);
   const pagine = haIncantesimi
-    ? [drawCombatPage, drawGearPage, drawSpellsPage]
-    : [drawCombatPage, drawGearPage];
+    ? [paginaCombattimento, drawGearPage, drawSpellsPage]
+    : [paginaCombattimento, drawGearPage];
 
   for (const draw of pagine) {
     const page = pdf.addPage([PAGE_W, PAGE_H]);

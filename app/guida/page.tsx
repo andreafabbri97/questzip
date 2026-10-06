@@ -121,6 +121,13 @@ export default async function GuidaPage() {
           E la scheda aperta resta aperta: se ricarichi la pagina la ritrovi dov&apos;eri, e il tasto
           Indietro del browser ti riporta all&apos;elenco dei personaggi.
         </p>
+        <p>
+          L&apos;<strong>esportazione in PDF</strong> include anche i privilegi di classe, di
+          sottoclasse e i tratti di razza, con il livello a fianco: sono presi dal Compendio nel
+          momento in cui generi il foglio. I privilegi <strong>opzionali</strong> (le regole
+          varianti di Tasha&apos;s) restano fuori dalla stampa e in scheda sono segnati come tali:
+          non si ottengono salendo di livello, si scelgono.
+        </p>
         <SottoTitolo>Salvataggio: funziona come un documento</SottoTitolo>
         <p>
           Le modifiche restano una <strong>bozza locale</strong> finché non premi il bottone
