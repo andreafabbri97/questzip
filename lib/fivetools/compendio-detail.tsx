@@ -1036,6 +1036,11 @@ function parseIaCreatureText(text: string): Map<string, { name: string; text: st
 // Formato scritto da self-translate-fetch.mjs per kind "classi": una riga per caratteristica,
 // "Nome (Liv. N): testo" — stessa idea di parseIaCreatureText sopra, ma con il livello al posto
 function CreatureDetail({ creature, language }: { creature: RawCreature; language: Language }) {
+  // Una manciata di PNG (i figli Cassalanter e i monelli di Waterdeep: Dragon Heist) compare nel
+  // bestiario solo come voce di indice: il manuale non da' loro alcun blocco statistiche. Non c'e'
+  // niente da recuperare, ma senza questo controllo la scheda mostrava "—" ovunque e "(NaN)" su
+  // tutte e sei le caratteristiche, come se fosse l'app a non riuscire a leggere i dati.
+  const senzaStatistiche = creature.str === undefined || creature.str === null;
   const abilities: [string, number][] = [
     ["FOR", creature.str],
     ["DES", creature.dex],
@@ -1147,22 +1152,34 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
         {formatSize(creature.size)} {formatCreatureType(creature.type)} ·{" "}
         {formatAlignment(creature.alignment)}
       </p>
-      <div className="grid grid-cols-2 @sm:grid-cols-4 @2xl:grid-cols-8 gap-3">
-        <Stat label="CA" value={formatAC(creature.ac)} />
-        <Stat label="PF" value={formatHP(creature.hp)} />
-        <Stat label="Velocità" value={formatSpeed(creature.speed, language)} />
-        <Stat label="Grado sfida" value={formatChallengeRating(creature.cr)} />
-      </div>
-      <div className="grid grid-cols-6 gap-2 text-center">
-        {abilities.map(([label, score]) => (
-          <div key={label} className="rounded-lg border border-edge bg-surface-raised py-2">
-            <p className="text-[10px] uppercase tracking-widest text-muted">{label}</p>
-            <p className="text-sm font-bold text-foreground">
-              {score} ({formatModifier(abilityModifier(score))})
-            </p>
+      {senzaStatistiche ? (
+        <div className="rounded-lg border border-edge bg-surface-raised p-3">
+          <p className="text-sm text-muted">
+            Questo personaggio non ha un blocco di statistiche: nel manuale compare solo nel testo
+            dell&apos;avventura. Se ti serve al tavolo, prendi le statistiche di una creatura simile
+            dal Compendio.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 @sm:grid-cols-4 @2xl:grid-cols-8 gap-3">
+            <Stat label="CA" value={formatAC(creature.ac)} />
+            <Stat label="PF" value={formatHP(creature.hp)} />
+            <Stat label="Velocità" value={formatSpeed(creature.speed, language)} />
+            <Stat label="Grado sfida" value={formatChallengeRating(creature.cr)} />
           </div>
-        ))}
-      </div>
+          <div className="grid grid-cols-6 gap-2 text-center">
+            {abilities.map(([label, score]) => (
+              <div key={label} className="rounded-lg border border-edge bg-surface-raised py-2">
+                <p className="text-[10px] uppercase tracking-widest text-muted">{label}</p>
+                <p className="text-sm font-bold text-foreground">
+                  {score} ({formatModifier(abilityModifier(score))})
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {/* Righe che prima mancavano del tutto: senza tiri salvezza, resistenze e immunità una
           scheda non si può usare al tavolo (segnalato sul Glabrezu, che ha anche incantesimi
           innati). Ordine e nomi sono quelli dello stat block stampato. */}

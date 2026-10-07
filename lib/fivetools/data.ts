@@ -2,6 +2,11 @@ import { RAW_BASE } from "@/lib/fivetools/books";
 import { ordinaPrivilegiSottoclasse } from "@/lib/fivetools/ordine-privilegi";
 import type { FiveEntry } from "@/lib/fivetools/entries";
 import { incantesimiDaSources, type IncantesimoDiClasse } from "@/lib/fivetools/incantesimi-classe";
+import {
+  risolviCopie,
+  type RiferimentoCopia,
+  type TemplateCreatura,
+} from "./risolvi-copia";
 
 // Array (non solo il tipo) apposta: serve anche a runtime per validare un CompendiumKind che
 // arriva da fuori TypeScript — es. un token menzione #{Nome|kind|fonte} scritto a mano dentro un
@@ -88,6 +93,9 @@ export interface CreatureSpellcasting {
 export interface RawCreature {
   name: string;
   source: string;
+  /** Rimando a un'altra creatura da cui ereditare tutto il resto: sciolto al caricamento da
+   *  risolviCopie(), quindi chi legge una RawCreature lo trova sempre gia' risolto. */
+  _copy?: RiferimentoCopia;
   size?: string[];
   type?: string | { type: string; tags?: string[] };
   alignment?: string[];
@@ -329,7 +337,16 @@ export function loadCreatures(): Promise<RawCreature[]> {
           files.map((file) => fetchJson<BestiaryFile>(`${RAW_BASE}/bestiary/${file}`)),
         );
       })
-      .then((files) => files.flatMap((file) => file?.monster ?? []));
+      .then(async (files) => {
+        const creature = files.flatMap((file) => file?.monster ?? []);
+        // Un quarto del bestiario non ha statistiche proprie ma eredita da un'altra creatura
+        // (vedi risolvi-copia.ts): senza questo passaggio quelle schede arrivavano al Compendio
+        // con tutti i campi vuoti e "(NaN)" al posto delle caratteristiche.
+        const template = await fetchJson<{ monsterTemplate?: TemplateCreatura[] }>(
+          `${RAW_BASE}/bestiary/template.json`,
+        );
+        return risolviCopie(creature, template?.monsterTemplate ?? []);
+      });
   }
   return creaturesPromise;
 }
