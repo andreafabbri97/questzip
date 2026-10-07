@@ -103,7 +103,7 @@ export default async function GuidaPage() {
         <p>
           La scheda personaggio è organizzata in 5 schede in stile Roll20: Combattimento,
           Incantesimi, Inventario, Tratti &amp; Talenti, Info &amp; Personalità. In alto resta sempre
-          visibile ritratto, nome, razza/classe/livello.
+          visibile nome, razza/classe/livello.
         </p>
         <Suggerimento>
           Razza, classe, talenti, oggetti e incantesimi hanno l&apos;autocompletamento dal Compendio,

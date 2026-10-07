@@ -317,18 +317,7 @@ export function CharacterSheet({
       {/* Identità sempre visibile a prescindere dal tab aperto — stesso principio della banda
           col nome ripetuta su ogni pagina della scheda cartacea di riferimento: durante il gioco
           non deve mai servire cambiare tab solo per ricordarsi di chi è questa scheda. */}
-      <div className="card-elevated flex items-center gap-3 rounded-xl border border-edge bg-surface px-4 py-3">
-        {character.ritrattoUrl ? (
-          // URL arbitrario fornito dal giocatore, non un asset locale ottimizzabile da next/image
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={character.ritrattoUrl}
-            alt=""
-            className="size-12 shrink-0 rounded-full border border-edge object-cover"
-          />
-        ) : (
-          <span className="size-12 shrink-0 rounded-full bg-surface-raised" />
-        )}
+      <div className="card-elevated rounded-xl border border-edge bg-surface px-4 py-3">
         <div className="min-w-0">
           <p className="heading-ornate truncate text-lg font-bold text-foreground">
             {character.nome || "Senza nome"}

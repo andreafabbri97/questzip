@@ -687,26 +687,6 @@ export function PhysicalDescriptionSection({
       </button>
       {expanded && (
         <div className="mt-3 space-y-3 border-t border-edge pt-3">
-          {character.ritrattoUrl && (
-            // URL arbitrario fornito dal giocatore, non un asset locale ottimizzabile da next/image
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={character.ritrattoUrl}
-              alt={character.nome}
-              className="max-h-64 rounded-lg border border-edge mx-auto"
-            />
-          )}
-          <label className="block">
-            <span className="text-[10px] uppercase tracking-widest text-muted">
-              URL ritratto (opzionale)
-            </span>
-            <input
-              value={character.ritrattoUrl}
-              onChange={(event) => set("ritrattoUrl", event.target.value)}
-              placeholder="https://…"
-              className={fieldClass}
-            />
-          </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {(
               [

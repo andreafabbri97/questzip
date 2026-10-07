@@ -221,16 +221,15 @@ const rawCharacterSchema = z.object({
   ideali: z.string().default(""),
   difetti: z.string().default(""),
   nemici: z.string().default(""),
-  // Aspetto fisico — presente sulla scheda cartacea di riferimento (pagina 2, riquadro insieme
-  // al ritratto), qui campi tutti testo libero (l'età di un elfo o un non-morto non è sempre un
-  // numero) invece di forzare un formato specifico.
+  // Aspetto fisico — presente sulla scheda cartacea di riferimento (pagina 2), qui campi tutti
+  // testo libero (l'età di un elfo o un non-morto non è sempre un numero) invece di forzare un
+  // formato specifico.
   eta: z.string().default(""),
   altezza: z.string().default(""),
   peso: z.string().default(""),
   occhi: z.string().default(""),
   carnagione: z.string().default(""),
   capelli: z.string().default(""),
-  ritrattoUrl: z.string().default(""),
   /**
    * Punti ispirazione, da 0 a 4 (richiesta dell'utente: al suo tavolo se ne accumulano più d'uno,
    * e la scheda ufficiale in PDF ha infatti quattro caselle).
@@ -471,7 +470,6 @@ export function newCharacter(): Character {
     occhi: "",
     carnagione: "",
     capelli: "",
-    ritrattoUrl: "",
     ispirazione: 0,
     dadiVitaUsati: 0,
     affaticamento: 0,
