@@ -487,8 +487,13 @@ export function DiceRoller({
             quest'ultimo da solo: quello riflette solo il tiro GIÀ FINITO, restava invisibile per
             tutta la vera animazione (che si vede dal vivo sul canvas mentre la promise di
             roll() è ancora in sospeso) e "scattava" visibile solo a risultato già pronto. */}
+        {/* Altezza legata alla finestra invece che fissa: su un telefono alto o su un monitor il
+            riquadro dei dadi guadagna spazio (richiesta dell'utente, c'era parecchio vuoto sopra
+            e sotto), mentre il min() lo tiene entro una frazione dell'altezza disponibile su
+            schermi bassi e in orizzontale, dove un valore fisso piu' grande farebbe scrollare il
+            modal invece di ingrandirlo. */}
         {dice3dStatus !== "unavailable" && (
-          <div className="relative mb-3 h-44 sm:h-60 w-full">
+          <div className="relative mb-3 h-[min(15rem,34dvh)] sm:h-[min(20rem,40dvh)] w-full">
             <div
               className={`h-full w-full overflow-hidden rounded-lg border border-edge bg-surface-raised/60 transition-opacity duration-300 ${
                 dice3dInFlight || latest?.usedDice3D ? "opacity-100" : "opacity-0"
@@ -520,7 +525,7 @@ export function DiceRoller({
         {!hideBigNumber && (
           <div className="[perspective:400px]">
             <div
-              className={`text-6xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
+              className={`text-6xl sm:text-7xl font-display font-bold ${rolling ? "animate-dice" : ""} ${
                 isCrit ? "text-accent-strong" : isFumble ? "text-danger" : "text-foreground"
               }`}
             >

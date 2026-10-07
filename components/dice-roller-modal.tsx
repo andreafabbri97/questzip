@@ -67,7 +67,7 @@ export function DiceRollerModal({
         // meno il margine dell'overlay — qui sopra è pt-16 + p-4 su telefono, p-4 sopra e sotto
         // da tablet in su. Il tetto calcolato invece che a percentuale è l'unico modo perché sia
         // il più alto possibile senza rischiare di uscire dai bordi.
-        className={`card-elevated w-full max-w-md sm:max-w-lg max-h-[calc(100dvh-5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
+        className={`card-elevated w-full max-w-md sm:max-w-xl max-h-[calc(100dvh-5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
           preset ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}
