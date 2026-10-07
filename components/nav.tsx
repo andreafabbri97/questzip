@@ -11,6 +11,7 @@ import { AiAssistantModal } from "@/components/ai-assistant-modal";
 import { useRealtime } from "@/components/realtime-provider";
 import { useGuardedNavigation } from "@/components/unsaved-changes-provider";
 import { isAiAvailable } from "@/app/actions/ai";
+import { inizialeUtente } from "@/lib/iniziale-utente";
 
 type NavLink =
   | { kind: "link"; href: string; label: string; icon: string }
@@ -140,6 +141,7 @@ export function Nav() {
 
 // Compare solo se GEMINI_API_KEY è configurata sul server — controllato una volta all'apertura
 // (nessun bottone che poi fallisce ogni volta che lo premi se l'IA non è disponibile).
+
 function AiAssistantButton() {
   const [available, setAvailable] = useState(false);
   const [open, setOpen] = useState(false);
@@ -255,7 +257,12 @@ function AccountButton() {
       className="flex items-center gap-2 text-sm text-muted hover:text-foreground transition-colors"
       title="Il tuo profilo"
     >
-      {session.user.image && (
+      {/* Il segnaposto non e' un vezzo: senza, chi non ha una foto sull'account Google non vedeva
+          NIENTE qui: l'immagine non c'era e il nome accanto e' nascosto sotto i 1024px, quindi su
+          telefono questo collegamento era un elemento vuoto, invisibile e intoccabile — per quegli
+          utenti il profilo era semplicemente irraggiungibile (segnalato: "il mio amico non vede
+          l'icona del suo account"). */}
+      {session.user.image ? (
         <Image
           src={session.user.image}
           alt=""
@@ -263,6 +270,13 @@ function AccountButton() {
           height={24}
           className="rounded-full object-cover"
         />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="flex size-6 shrink-0 items-center justify-center rounded-full border border-edge bg-surface-raised text-[11px] font-bold text-muted"
+        >
+          {inizialeUtente(session.user.name, session.user.email)}
+        </span>
       )}
       <span className="hidden lg:inline truncate max-w-[160px]">{session.user.name}</span>
     </Link>
