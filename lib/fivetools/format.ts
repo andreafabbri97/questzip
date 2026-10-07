@@ -254,10 +254,28 @@ export function formatRarity(rarity: string | undefined): string {
   return RARITY_NAMES[rarity.toLowerCase()] ?? rarity;
 }
 
+function nomeTipoCreatura(codice: string): string {
+  return CREATURE_TYPE_NAMES[codice.toLowerCase()] ?? codice;
+}
+
+/**
+ * Il tipo di una creatura, che non e' sempre una parola sola.
+ *
+ * Sei creature (i famigli di Acquisitions Incorporated, l'Empireo, la cavalcatura planare del
+ * Paladino) possono essere di piu' tipi a scelta, e lo dichiarano con { choose: [...] } annidato
+ * dentro "type". Chiamare toLowerCase() su quell'oggetto lanciava un'eccezione e portava
+ * l'INTERA pagina del Compendio alla schermata di errore: si vedeva ordinando i mostri per grado
+ * sfida, perche' quelle creature non ne hanno uno e finivano cosi' in cima all'elenco, dove
+ * prima non comparivano mai (segnalato dall'utente).
+ */
 export function formatCreatureType(type: RawCreature["type"]): string {
   if (!type) return "—";
   const raw = typeof type === "string" ? type : type.type;
-  return CREATURE_TYPE_NAMES[raw?.toLowerCase() ?? ""] ?? raw;
+  if (typeof raw === "string") return nomeTipoCreatura(raw);
+  const scelte = raw?.choose;
+  if (!Array.isArray(scelte) || scelte.length === 0) return "—";
+  const nomi = scelte.map(nomeTipoCreatura);
+  return nomi.length === 1 ? nomi[0] : `${nomi.slice(0, -1).join(", ")} o ${nomi.at(-1)}`;
 }
 
 const ABILITY_ABBR: Record<string, string> = {

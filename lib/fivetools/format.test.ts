@@ -67,6 +67,26 @@ describe("formatRarity / formatCreatureType", () => {
     expect(formatRarity("qualcosa")).toBe("qualcosa");
     expect(formatCreatureType("qualcosa")).toBe("qualcosa");
   });
+
+  // Sei creature (famigli di Acquisitions Incorporated, Empireo, cavalcatura planare) possono
+  // essere di piu' tipi a scelta. Su quella forma annidata si chiamava toLowerCase() di un
+  // oggetto: eccezione, e l'INTERA pagina del Compendio finiva nella schermata di errore. Si
+  // vedeva ordinando i mostri per grado sfida, perche' queste creature non ne hanno uno e
+  // finivano in cima all'elenco, dove prima non comparivano mai.
+  it("elenca i tipi quando la creatura puo' essere di piu' tipi a scelta", () => {
+    expect(formatCreatureType({ type: { choose: ["celestial", "fey", "fiend"] } })).toBe(
+      "celestiale, folletto o immondo",
+    );
+    expect(formatCreatureType({ type: { choose: ["celestial", "fiend"] }, tags: ["titan"] })).toBe(
+      "celestiale o immondo",
+    );
+    expect(formatCreatureType({ type: { choose: ["dragon"] } })).toBe("drago");
+  });
+
+  it("non esplode se il tipo e' una forma che non conosciamo", () => {
+    expect(formatCreatureType({ type: { choose: [] } })).toBe("—");
+    expect(formatCreatureType(undefined)).toBe("—");
+  });
 });
 
 describe("formatTableCell: celle con un tiro", () => {

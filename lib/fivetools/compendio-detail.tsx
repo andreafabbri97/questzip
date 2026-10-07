@@ -533,7 +533,7 @@ export function SourceBadge({ source, books }: { source: string; books: Map<stri
   const edition: Edition = meta?.edition ?? "2014";
   return (
     <span
-      className={`text-[10px] font-bold rounded-full px-2 py-0.5 border ${
+      className={`text-[10px] font-bold rounded-full px-2 py-0.5 border whitespace-nowrap ${
         edition === "2024"
           ? "border-accent bg-accent/15 text-accent-strong"
           : "border-edge text-muted"
@@ -575,11 +575,19 @@ export function EntryDetail({
       <button onClick={onBack} className="text-sm text-muted hover:text-foreground lg:hidden">
         ← Risultati
       </button>
+      {/* min-w-0 sul titolo e shrink-0 sul badge: in un contenitore flex un figlio non si
+          restringe sotto la larghezza del proprio contenuto (min-width: auto di default), quindi
+          un nome lungo come "Basilisco a Minaccia Ridotta" sfondava il riquadro e spingeva il
+          badge della fonte fuori dallo schermo del telefono (segnalato dall'utente con
+          screenshot). break-words spezza anche la singola parola interminabile, che su schermo
+          stretto resterebbe comunque piu' larga della colonna. */}
       <div className="flex items-start justify-between gap-3">
-        <h2 className="heading-ornate text-2xl font-display font-bold text-accent-strong">
+        <h2 className="heading-ornate min-w-0 break-words text-xl @sm:text-2xl font-display font-bold text-accent-strong">
           <DualName text={entry.name} kind={kind} source={entry.source} language={language} />
         </h2>
-        <SourceBadge source={entry.source} books={books} />
+        <span className="shrink-0">
+          <SourceBadge source={entry.source} books={books} />
+        </span>
       </div>
       {meta && <p className="text-xs text-muted -mt-2">{meta.name}</p>}
 

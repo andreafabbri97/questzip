@@ -97,7 +97,9 @@ export interface RawCreature {
    *  risolviCopie(), quindi chi legge una RawCreature lo trova sempre gia' risolto. */
   _copy?: RiferimentoCopia;
   size?: string[];
-  type?: string | { type: string; tags?: string[] };
+  // "type" non e' sempre una parola: sei creature (famigli e cavalcature planari, l'Empireo)
+  // possono essere di piu' tipi A SCELTA e lo dichiarano con { choose: [...] } annidato.
+  type?: string | { type: string | { choose: string[] }; tags?: string[] };
   alignment?: string[];
   ac?: ({ ac: number; from?: string[] } | number)[];
   hp?: { average?: number; formula?: string } | number;
