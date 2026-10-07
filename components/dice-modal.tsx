@@ -40,7 +40,7 @@ export function DiceModal({ open, onClose }: { open: boolean; onClose: () => voi
       aria-hidden={!open}
       // pt-10 invece di pt-16 su telefono: quei 24px in meno di margine cieco vanno tutti alla
       // cronologia dei tiri, che è la parte che si vuole vedere di più (richiesta dell'utente).
-      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-10 sm:pt-4 ${
+      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-4 ${
         open ? "animate-overlay-in" : "animate-overlay-out pointer-events-none"
       }`}
       onClick={onClose}
@@ -53,7 +53,7 @@ export function DiceModal({ open, onClose }: { open: boolean; onClose: () => voi
         // spazio che resta. "dvh" e non "vh" perché vh conta anche la barra degli indirizzi del
         // telefono, che visibile non è. In larghezza un filo più del telefono, non di più: un
         // modal gigante starebbe solo largo.
-        className={`card-elevated w-full max-w-lg sm:max-w-xl max-h-[calc(100dvh-3.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col rounded-xl border border-edge bg-background overflow-hidden ${
+        className={`card-elevated w-full max-w-lg sm:max-w-xl max-h-[calc(100dvh-max(1.5rem,env(safe-area-inset-top))-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col rounded-xl border border-edge bg-background overflow-hidden ${
           open ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}

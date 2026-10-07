@@ -56,7 +56,7 @@ export function DiceRollerModal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-16 sm:pt-4 ${
+      className={`fixed inset-0 z-40 flex items-start sm:items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm p-4 pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-4 ${
         preset ? "animate-overlay-in" : "animate-overlay-out"
       }`}
       onClick={onClose}
@@ -64,10 +64,15 @@ export function DiceRollerModal({
       <div
         // Stesse misure del modal dei dadi della barra in alto (è lo stesso tiro, cambia solo da
         // dove lo si lancia): un filo più largo da tablet in su, e in altezza tutto lo schermo
-        // meno il margine dell'overlay — qui sopra è pt-16 + p-4 su telefono, p-4 sopra e sotto
-        // da tablet in su. Il tetto calcolato invece che a percentuale è l'unico modo perché sia
-        // il più alto possibile senza rischiare di uscire dai bordi.
-        className={`card-elevated w-full max-w-md sm:max-w-xl max-h-[calc(100dvh-5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
+        // meno il margine dell'overlay.
+        //
+        // Sopra c'erano 64px fissi di margine, che su telefono erano vuoto sprecato (segnalato
+        // dall'utente con lo screenshot: "c'è del margine sopra vuoto"). Nel browser l'overlay
+        // comincia già sotto la barra di stato e ne basta la metà; ad app installata invece
+        // arriva fino in cima allo schermo, e lì serve scansare notch e isola dinamica — da cui
+        // il max() con la zona sicura, che prende il maggiore fra i due casi invece di scegliere
+        // un valore fisso che sarebbe sbagliato per uno dei due.
+        className={`card-elevated w-full max-w-md sm:max-w-xl max-h-[calc(100dvh-max(1.5rem,env(safe-area-inset-top))-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col rounded-xl border border-edge bg-surface overflow-hidden ${
           preset ? "animate-modal-in" : "animate-modal-out"
         }`}
         onClick={(event) => event.stopPropagation()}
