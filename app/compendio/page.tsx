@@ -36,7 +36,7 @@ import {
   testoCondivisione,
 } from "@/lib/compendio-link";
 import {
-  formatChallengeRating,
+  formatSfidaCreatura,
   formatCreatureType,
   formatHitDie,
   formatRarity,
@@ -919,7 +919,7 @@ function EntrySubtitle({ kind, entry }: { kind: CompendiumKind; entry: Entry }) 
     const creature = entry as RawCreature;
     return (
       <span className="text-xs text-muted">
-        GS {formatChallengeRating(creature.cr)} · {formatCreatureType(creature.type)}
+        GS {formatSfidaCreatura(creature)} · {formatCreatureType(creature.type)}
       </span>
     );
   }

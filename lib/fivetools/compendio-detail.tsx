@@ -45,7 +45,7 @@ import {
   formatAC,
   formatAbilityIncrease,
   formatAlignment,
-  formatChallengeRating,
+  formatSfidaCreatura,
   formatComponents,
   formatCreatureType,
   formatDamageType,
@@ -1174,7 +1174,7 @@ function CreatureDetail({ creature, language }: { creature: RawCreature; languag
             <Stat label="CA" value={formatAC(creature.ac)} />
             <Stat label="PF" value={formatHP(creature.hp)} />
             <Stat label="Velocità" value={formatSpeed(creature.speed, language)} />
-            <Stat label="Grado sfida" value={formatChallengeRating(creature.cr)} />
+            <Stat label="Grado sfida" value={formatSfidaCreatura(creature)} />
           </div>
           <div className="grid grid-cols-6 gap-2 text-center">
             {abilities.map(([label, score]) => (

@@ -111,6 +111,12 @@ export interface RawCreature {
   wis: number;
   cha: number;
   cr?: string | { cr: string };
+  /** Alcune creature non hanno un grado sfida ma un LIVELLO (i blocchi generici tipo "Esperto",
+   *  i PNG delle avventure recenti). */
+  level?: number;
+  /** Le creature evocate non hanno grado sfida: il loro bonus di competenza e' quello di chi le
+   *  evoca, e il manuale lo scrive qui ("equals your Proficiency Bonus"). */
+  pbNote?: string;
   senses?: string[];
   passive?: number;
   languages?: string[];

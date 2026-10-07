@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatCreatureType,
+  formatSfidaCreatura,
   formatDuration,
   formatRarity,
   formatTableCell,
@@ -86,6 +87,46 @@ describe("formatRarity / formatCreatureType", () => {
   it("non esplode se il tipo e' una forma che non conosciamo", () => {
     expect(formatCreatureType({ type: { choose: [] } })).toBe("—");
     expect(formatCreatureType(undefined)).toBe("—");
+  });
+});
+
+describe("formatSfidaCreatura", () => {
+  const creatura = (extra: Record<string, unknown>) =>
+    ({ name: "X", source: "Y", str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, ...extra }) as never;
+
+  it("mostra il grado sfida quando c'e'", () => {
+    expect(formatSfidaCreatura(creatura({ cr: "3" }))).toBe("3");
+    expect(formatSfidaCreatura(creatura({ cr: { cr: "1/2" } }))).toBe("1/2");
+  });
+
+  // Un centinaio di creature mostrava solo un trattino. Quasi nessuna e' incompleta: o e'
+  // descritta da un livello, o e' un'evocazione la cui competenza e' quella di chi la evoca.
+  // Il dato c'era nel manuale e veniva buttato via (chiesto dall'utente).
+  it("per chi ha un livello al posto del grado sfida, mostra il livello", () => {
+    expect(formatSfidaCreatura(creatura({ level: 11 }))).toBe("Livello 11");
+    expect(formatSfidaCreatura(creatura({ level: 1 }))).toBe("Livello 1");
+  });
+
+  it("per le evocazioni dice che la competenza e' quella dell'evocatore", () => {
+    expect(formatSfidaCreatura(creatura({ pbNote: "equals your Proficiency Bonus" }))).toBe(
+      "competenza come la tua",
+    );
+    expect(formatSfidaCreatura(creatura({ pbNote: "equals your bonus" }))).toBe(
+      "competenza come la tua",
+    );
+  });
+
+  it("una nota che non conosciamo si mostra com'e', invece di sparire", () => {
+    expect(formatSfidaCreatura(creatura({ pbNote: "see sidebar" }))).toBe("see sidebar");
+  });
+
+  it("il trattino resta solo quando non c'e' davvero niente", () => {
+    expect(formatSfidaCreatura(creatura({}))).toBe("—");
+    expect(formatSfidaCreatura(creatura({ pbNote: "   " }))).toBe("—");
+  });
+
+  it("il grado sfida vince sugli altri due, se presenti insieme", () => {
+    expect(formatSfidaCreatura(creatura({ cr: "5", level: 3, pbNote: "x" }))).toBe("5");
   });
 });
 

@@ -92,6 +92,29 @@ export function formatChallengeRating(cr: RawCreature["cr"]): string {
   return typeof cr === "string" ? cr : cr.cr;
 }
 
+/**
+ * Cosa scrivere nella casella "Grado sfida", che per un centinaio di creature era un trattino.
+ *
+ * Quasi nessuna di quelle e' incompleta: semplicemente un grado sfida non ce l'ha. Ventuno sono
+ * descritte da un LIVELLO (i blocchi generici come "Esperto", i png delle avventure recenti) e
+ * quarantatre sono evocazioni, la cui competenza e' quella di chi le evoca. In entrambi i casi il
+ * dato esiste nel manuale e veniva buttato via: il trattino faceva sembrare che mancasse
+ * qualcosa (chiesto dall'utente: "come mai alcuni mostri non hanno un grado sfida?").
+ */
+export function formatSfidaCreatura(creature: RawCreature): string {
+  if (creature.cr) return formatChallengeRating(creature.cr);
+  if (typeof creature.level === "number") return `Livello ${creature.level}`;
+  const nota = creature.pbNote?.trim();
+  if (nota) {
+    // La nota e' quasi sempre la stessa formula inglese; le due varianti note si traducono, il
+    // resto passa com'e' invece di sparire.
+    if (/equals your proficiency bonus/i.test(nota)) return "competenza come la tua";
+    if (/equals your bonus/i.test(nota)) return "competenza come la tua";
+    return nota;
+  }
+  return "—";
+}
+
 export function formatTime(time: { number: number; unit: string }[] | undefined): string {
   if (!time || time.length === 0) return "—";
   return time.map(({ number, unit }) => formatTimeUnit(number, unit)).join(" o ");
