@@ -1153,7 +1153,7 @@ export function LevelUpWizard({
           <div className="flex items-center gap-3">
             <button
               onClick={confirm}
-              className="rounded-md bg-accent-strong px-3 py-1.5 text-sm font-bold text-white hover:opacity-90"
+              className="rounded-md bg-accent-strong px-3 py-1.5 text-sm font-bold text-background hover:opacity-90"
             >
               Conferma livello {newLevel}
             </button>

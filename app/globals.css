@@ -15,7 +15,39 @@
   --muted: #a89e90;
   --accent: #e0a83e;
   --accent-strong: #f2c14e;
-  --danger: #c0453e;
+  --danger: #d45952;
+  /* Profondita' e bagliori: erano scritti in nero fisso dentro le utility piu' sotto. Spostati
+     qui perche' su fondo chiaro un'ombra nera al 30% sporca invece di dare rilievo. */
+  --ombra-vicina: rgba(0, 0, 0, 0.3);
+  --ombra-lontana: rgba(0, 0, 0, 0.45);
+  --ombra-lontana-hover: rgba(0, 0, 0, 0.55);
+  --alone-pagina: rgba(224, 168, 62, 0.08);
+  --ombra-titolo: rgba(0, 0, 0, 0.4);
+  --alone-titolo: rgba(224, 168, 62, 0.18);
+}
+
+/* Tema chiaro: stessa identita' da taverna (pergamena e oro), non un bianco da foglio di calcolo.
+   L'oro e' piu' scuro di quello notturno perche' #e0a83e su carta chiara non raggiunge il
+   contrasto minimo leggibile. Si attiva con data-theme="chiaro" sull'<html>, messo dal SERVER in
+   base alla preferenza dell'account (vedi app/layout.tsx): cosi' la prima pennellata e' gia'
+   quella giusta e chi usa il tema chiaro non vede un lampo scuro a ogni caricamento. */
+:root[data-theme="chiaro"] {
+  color-scheme: light;
+  --background: #f6f1e7;
+  --surface: #fffdf9;
+  --surface-raised: #f0e8d9;
+  --border: #d6c9b2;
+  --foreground: #2b2419;
+  --muted: #6a6052;
+  --accent: #8a5d11;
+  --accent-strong: #7d540f;
+  --danger: #a32e27;
+  --ombra-vicina: rgba(90, 72, 40, 0.1);
+  --ombra-lontana: rgba(90, 72, 40, 0.16);
+  --ombra-lontana-hover: rgba(90, 72, 40, 0.22);
+  --alone-pagina: rgba(138, 93, 17, 0.07);
+  --ombra-titolo: rgba(255, 255, 255, 0.6);
+  --alone-titolo: rgba(138, 93, 17, 0.12);
 }
 
 /* Firefox */
@@ -60,7 +92,7 @@ body {
   background: var(--background);
   background-image: radial-gradient(
       ellipse 80% 50% at 50% -20%,
-      rgba(224, 168, 62, 0.08),
+      var(--alone-pagina),
       transparent
     );
   color: var(--foreground);
@@ -79,8 +111,8 @@ h3 {
    stessi valori arbitrari in decine di className sparsi, per poterle ritoccare da un solo posto. */
 @utility card-elevated {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 8px 24px -8px rgba(0, 0, 0, 0.45);
+    0 1px 2px var(--ombra-vicina),
+    0 8px 24px -8px var(--ombra-lontana);
 }
 
 @utility card-elevated-hover {
@@ -90,8 +122,8 @@ h3 {
     transform 0.1s ease;
   &:hover {
     box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.3),
-      0 12px 32px -8px rgba(0, 0, 0, 0.55);
+      0 1px 2px var(--ombra-vicina),
+      0 12px 32px -8px var(--ombra-lontana-hover);
     transform: translateY(-1px);
   }
   /* Feedback tattile alla pressione (dito/click) — prima solo poche card/bottoni lo avevano a
@@ -130,7 +162,7 @@ h3 {
 /* Sottile rifinitura sui titoli in stile "insegna da taverna" — un filo di profondità invece del
    testo piatto, coerente col resto del tema oro/ambra. */
 .heading-ornate {
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 0 24px rgba(224, 168, 62, 0.18);
+  text-shadow: 0 1px 0 var(--ombra-titolo), 0 0 24px var(--alone-titolo);
   letter-spacing: 0.01em;
 }
 

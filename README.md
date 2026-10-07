@@ -16,7 +16,7 @@ Gestore di campagne **D&D 5e** per master e giocatori. PWA installabile su telef
 - **📘 Guida e FAQ** — pagina `/guida` (icona ❓ in header), pensata per i giocatori: primi passi per master/giocatore, come funziona ogni sezione, un walkthrough passo-passo per gestire una sessione dal vivo (esplorazione, combattimento, XP/level-up, un esempio concreto di imboscata), FAQ e problemi comuni.
 
 I personaggi sono salvati in `localStorage` **e** sul tuo account su database (stesso click su "Salva" scrive entrambi) — non si perdono più cambiando dispositivo o svuotando il browser, e un modal avvisa se stai per uscire dalla scheda con modifiche non salvate. Le campagne vivono su database condiviso, così master e giocatori vedono la stessa cosa. Il Compendio interroga il mirror dati di 5e.tools in tempo reale (richiede connessione; il primo caricamento di ogni scheda può richiedere qualche secondo). La traduzione italiana usa l'endpoint pubblico non ufficiale di Google Translate (gratuito, nessuna chiave, ma senza garanzie di continuità/qualità).
-
+- **Tema chiaro o scuro** — scelto dal Profilo e salvato sull'account (`users.tema`), quindi valido su ogni dispositivo; applicato dal server nel layout per evitare il lampo di tema sbagliato al caricamento.
 ## Configurazione (variabili d'ambiente)
 
 Necessarie in `.env.local` (sviluppo) e nelle Environment Variables del progetto Vercel (produzione):

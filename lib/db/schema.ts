@@ -29,6 +29,12 @@ export const users = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
+  // Tema dell'interfaccia scelto dall'utente. Sta QUI e non in localStorage perche' la scelta
+  // deve seguire l'account su qualunque dispositivo (richiesta esplicita dell'utente), ed e'
+  // anche cio' che permette al server di rendere subito la pagina col tema giusto: con la sola
+  // preferenza nel browser la prima pennellata sarebbe sempre scura, con un lampo visibile a chi
+  // usa il tema chiaro.
+  tema: text("tema").notNull().default("scuro"),
 });
 
 export const accounts = pgTable(

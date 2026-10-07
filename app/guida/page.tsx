@@ -403,7 +403,7 @@ export default async function GuidaPage() {
       {/* ---------------------------------------------------------------- Profilo e PWA */}
       <Sezione id="profilo-pwa" titolo="📱 Profilo e app sul telefono">
         <p>
-          Il <Link href="/profilo" className="text-accent-strong hover:underline">Profilo</Link> (clicca il tuo nome/avatar in header) raccoglie: i personaggi creati, le campagne a cui partecipi, la lista amici, l&apos;interruttore per le notifiche push su quel dispositivo, il bottone per installare l&apos;app e il logout.
+          Il <Link href="/profilo" className="text-accent-strong hover:underline">Profilo</Link> (clicca il tuo nome/avatar in header) raccoglie: i personaggi creati, le campagne a cui partecipi, la lista amici, l&apos;interruttore per le notifiche push su quel dispositivo, la scelta fra tema chiaro e scuro, il bottone per installare l&apos;app e il logout.
         </p>
         <SottoTitolo>Installare QuestZip come app</SottoTitolo>
         <p>
@@ -418,6 +418,12 @@ export default async function GuidaPage() {
           Attivandole dal Profilo, ricevi una notifica del sistema operativo (anche ad app chiusa)
           per richieste di amicizia, inviti campagna e nuovi messaggi in chat — sono per dispositivo,
           quindi vanno attivate su ciascun telefono/browser dove vuoi riceverle.
+        </p>
+
+        <p>
+          <strong>Tema chiaro o scuro.</strong> Dal Profilo, sezione &quot;Tema&quot;: la scelta è
+          salvata sul tuo account, quindi ti segue su ogni dispositivo con cui accedi — non devi
+          rifarla su telefono e computer separatamente.
         </p>
         <SottoTitolo>Uso offline (wifi assente o instabile)</SottoTitolo>
         <p>
