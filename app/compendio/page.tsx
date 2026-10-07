@@ -12,7 +12,7 @@ import {
   type RawRace,
   type RawSpell,
 } from "@/lib/fivetools/data";
-import { translateText } from "@/lib/fivetools/translate";
+import { traduzioneGiaNota, translateText } from "@/lib/fivetools/translate";
 import { FlagIcon } from "@/components/flag-icon";
 import { getRegoleIta } from "@/app/actions/compendio-ita";
 import {
@@ -69,6 +69,8 @@ function crToNumber(cr: RawCreature["cr"]): number {
   const n = Number(s);
   return Number.isNaN(n) ? -1 : n;
 }
+
+const INIZIALE_NON_ALFABETICA = /^[^\p{L}\p{N}]+/u;
 
 const RARITY_ORDER = ["none", "common", "uncommon", "rare", "very rare", "legendary", "artifact"];
 
@@ -249,8 +251,16 @@ function CompendiumPageInner() {
         return itemFilter === "magici" ? isMagico : !isMagico;
       })
       .sort((a, b) => {
+        // Deve essere ESATTAMENTE la stringa che si legge nella riga: DualName prende il nome
+        // ufficiale, poi quello tradotto in archivio e infine una traduzione gia' nota (vecchia
+        // cache del browser). Qui mancava l'ultimo anello, quindi una voce senza nome in archivio
+        // veniva ordinata sull'inglese pur comparendo in italiano: '"Il Demogorgon"' finiva dopo
+        // "Tessitore del Buio" perche' confrontato come '"The Demogorgon"'.
         const nomeOrdinamento = (e: Entry) =>
-          (language === "it" ? bestItalianName(italianIndex, e.name, e.source) : null) ?? e.name;
+          (language === "it"
+            ? (bestItalianName(italianIndex, e.name, e.source) ??
+              traduzioneGiaNota(e.name, "en", "it"))
+            : null) ?? e.name;
         if (sortMode === "cr" && kind === "mostri") {
           const diff = crToNumber((a as RawCreature).cr) - crToNumber((b as RawCreature).cr);
           if (diff !== 0) return diff;
@@ -275,7 +285,10 @@ function CompendiumPageInner() {
         // (impostazione predefinita) l'elenco risultava ordinato secondo una lingua che l'utente
         // non vede — "Vista del Diavolo" finiva sotto la D di "Devil's Sight". Il confronto usa
         // la locale italiana, così accenti e maiuscole seguono le regole giuste.
-        return nomeOrdinamento(a).localeCompare(nomeOrdinamento(b), "it", { sensitivity: "base" });
+        // Virgolette e simboli iniziali non devono decidere la posizione: '"Il Demogorgon"'
+        // si cerca alla I come ogni altro nome, non in un angolo dell'elenco.
+        const perConfronto = (e: Entry) => nomeOrdinamento(e).replace(INIZIALE_NON_ALFABETICA, "");
+        return perConfronto(a).localeCompare(perConfronto(b), "it", { sensitivity: "base" });
       });
   }, [categoryData, books, query, edition, translatedQuery, sortMode, kind, itemFilter, italianIndex, language]);
 

@@ -124,14 +124,22 @@ function persistCache() {
   }
 }
 
-export async function translateText(
+/**
+ * La traduzione che si puo' dare SUBITO, senza rete: glossario fisso o cache gia' in locale.
+ *
+ * Serve a chi deve decidere adesso e non puo' aspettare una promise — in particolare
+ * l'ORDINAMENTO del Compendio, che prima ordinava sul nome inglese mentre l'elenco mostrava
+ * quello italiano preso anche da qui: il risultato era una lista che all'utente appariva fuori
+ * ordine (il Demogorgon finiva dopo "Tessitore del Buio" perche' veniva confrontato come
+ * "The Demogorgon"). Restituisce null quando servirebbe davvero chiamare il traduttore.
+ */
+export function traduzioneGiaNota(
   text: string,
   source: "en" | "it",
   target: "en" | "it",
-): Promise<string | null> {
+): string | null {
   const trimmed = text.trim();
-  if (!trimmed) return trimmed;
-
+  if (!trimmed) return null;
   if (source === "en" && target === "it") {
     const known = KNOWN_EN_TO_IT[trimmed.toLowerCase()];
     if (known) return known;
@@ -140,12 +148,26 @@ export async function translateText(
     const known = KNOWN_IT_TO_EN[trimmed.toLowerCase()] ?? KNOWN_IT_TO_EN_EXTRA[trimmed.toLowerCase()];
     if (known) return known;
   }
+  // la correzione si applica anche a quel che esce dalla cache: un testo salvato in una sessione
+  // precedente, con "famigliare" al posto di "famiglio", resterebbe altrimenti sbagliato per sempre
+  const salvata = loadCache()[`${source}>${target}:${trimmed}`];
+  if (!salvata) return null;
+  return target === "it" ? correggiTerminiDnd(salvata) : salvata;
+}
+
+export async function translateText(
+  text: string,
+  source: "en" | "it",
+  target: "en" | "it",
+): Promise<string | null> {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+
+  const subito = traduzioneGiaNota(trimmed, source, target);
+  if (subito) return subito;
 
   const store = loadCache();
   const key = `${source}>${target}:${trimmed}`;
-  // la correzione si applica anche a quel che esce dalla cache: un testo salvato in una sessione
-  // precedente, con "famigliare" al posto di "famiglio", resterebbe altrimenti sbagliato per sempre
-  if (store[key]) return target === "it" ? correggiTerminiDnd(store[key]) : store[key];
 
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(trimmed)}`;

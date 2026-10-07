@@ -38,13 +38,19 @@ export function buildItalianNameIndex(official: OfficialNameRow[], ia: IaNameRow
   const officialAnyMap = new Map<string, string>();
   for (const row of official) {
     if (row.nomeInglese && row.fonteInglese) {
-      officialMap.set(`${row.nomeInglese}|${row.fonteInglese}`, row.nome);
-      if (!officialAnyMap.has(row.nomeInglese)) officialAnyMap.set(row.nomeInglese, row.nome);
+      officialMap.set(`${row.nomeInglese}|${row.fonteInglese}`, row.nome.trim());
+      if (!officialAnyMap.has(row.nomeInglese)) officialAnyMap.set(row.nomeInglese, row.nome.trim());
     }
   }
   const iaMap = new Map<string, string>();
   for (const row of ia) {
-    if (row.nomeIta) iaMap.set(`${row.name}|${row.source}`, row.nomeIta);
+    // trim: una manciata di nomi tradotti e' finita in archivio con uno spazio davanti
+    // (" TESSITORE DEL BUIO"). Invisibile a leggerlo, ma in un elenco alfabetico quello spazio
+    // sposta la voce, e la lista sembra fuori ordine senza motivo apparente. Si ripulisce QUI,
+    // non solo nel database, perche' lo stesso difetto puo' rientrare col prossimo testo
+    // importato e questo indice e' il punto da cui passano tutti: Compendio, autocompletamento,
+    // mention in chat e assistente regole.
+    if (row.nomeIta?.trim()) iaMap.set(`${row.name}|${row.source}`, row.nomeIta.trim());
   }
   return { official: officialMap, officialAny: officialAnyMap, ia: iaMap };
 }
