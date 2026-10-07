@@ -130,11 +130,17 @@ export type Weapon = z.infer<typeof weaponSchema>;
  */
 export const USI_ILLIMITATI = 99;
 
-export const RECUPERO_OPTIONS = ["riposoBreve", "riposoLungo", "alba"] as const;
+// "mai" sta per le risorse che si consumano e basta: gli usi di un kit del guaritore, le cariche
+// di una bacchetta usa-e-getta, le pozioni. Prima non c'era modo di tenerne il conto qui — ogni
+// contatore andava per forza dichiarato come ricaricabile a un riposo, e l'app lo riempiva da
+// sola al primo riposo utile, regalando usi che il personaggio non ha. Chi si trovava in questa
+// situazione finiva per segnarsi il numero a parte, fuori dalla scheda.
+export const RECUPERO_OPTIONS = ["riposoBreve", "riposoLungo", "alba", "mai"] as const;
 export const RECUPERO_LABELS: Record<(typeof RECUPERO_OPTIONS)[number], string> = {
   riposoBreve: "Riposo breve",
   riposoLungo: "Riposo lungo",
   alba: "Alba",
+  mai: "Non si ricarica",
 };
 export const limitedFeatureSchema = z.object({
   id: z.string(),

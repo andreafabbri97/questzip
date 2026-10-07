@@ -587,3 +587,34 @@ describe("ordinaIncantesimiPerLivello", () => {
     expect(originale.map((s) => s.nome)).toEqual(["Palla di Fuoco", "Guida"]);
   });
 });
+
+describe("privilegi che non si ricaricano", () => {
+  const conKit = (): Character => ({
+    ...newCharacter(),
+    nome: "Prova",
+    classi: [{ nome: "Chierico", livello: 9 }],
+    privilegiLimitati: [
+      { id: "a", nome: "Kit del guaritore", usiMax: 10, usiUsati: 4, recupero: "mai" },
+      { id: "b", nome: "Incanalare Divinita", usiMax: 2, usiUsati: 2, recupero: "riposoLungo" },
+      { id: "c", nome: "Ki", usiMax: 7, usiUsati: 7, recupero: "riposoBreve" },
+    ],
+  });
+
+  // Gli usi di un kit, di una bacchetta usa-e-getta o di una pozione si consumano e basta: un
+  // riposo non li riporta indietro. Senza questa opzione il contatore andava per forza
+  // dichiarato ricaricabile, e l'app regalava usi che il personaggio non ha.
+  it("un riposo lungo ricarica tutto il resto ma non quelli con recupero 'mai'", () => {
+    const dopo = applyLongRest(conKit());
+
+    expect(dopo.privilegiLimitati.find((f) => f.id === "a")?.usiUsati).toBe(4);
+    expect(dopo.privilegiLimitati.find((f) => f.id === "b")?.usiUsati).toBe(0);
+    expect(dopo.privilegiLimitati.find((f) => f.id === "c")?.usiUsati).toBe(0);
+  });
+
+  it("nemmeno un riposo breve li tocca", () => {
+    const dopo = applyShortRest(conKit());
+
+    expect(dopo.privilegiLimitati.find((f) => f.id === "a")?.usiUsati).toBe(4);
+    expect(dopo.privilegiLimitati.find((f) => f.id === "c")?.usiUsati).toBe(0);
+  });
+});

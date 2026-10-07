@@ -254,6 +254,23 @@ export function InventorySection({
                 />
                 <span className="text-[10px] text-muted">kg</span>
               </label>
+              {/* Il campo esisteva nei dati da sempre ma non era disegnato da nessuna parte:
+                  quello che ci finiva dentro era invisibile a chi usa la scheda. Serve per le
+                  cose che il nome da solo non dice — quanti usi restano di un kit, a chi
+                  appartiene un oggetto, se e' gia' stato identificato. */}
+              <input
+                value={item.note}
+                onChange={(event) =>
+                  setInventario(
+                    character.inventario.map((i) =>
+                      i.id === item.id ? { ...i, note: event.target.value } : i,
+                    ),
+                  )
+                }
+                placeholder="Note (usi rimasti, a chi appartiene…)"
+                aria-label={`Note su ${item.nome || "oggetto"}`}
+                className="input-focus w-full rounded-md border border-edge bg-surface px-2 py-1 text-xs text-foreground placeholder:text-muted/60"
+              />
               <CompendioInfoButton kind="oggetti" nome={item.nome} />
             </div>
           ))}
