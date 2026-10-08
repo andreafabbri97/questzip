@@ -23,6 +23,9 @@ import { pulisciCorpoScheda } from "../../lib/ocr-cleanup.ts";
 import { togliTestatinePagina } from "../../lib/testatine-pagina.ts";
 import { togliProsaDiPagina } from "../../lib/prosa-di-pagina.ts";
 import { risolviCopie } from "../../lib/fivetools/risolvi-copia.ts";
+import { ricuciParoleSpezzate } from "../../lib/parole-spezzate.ts";
+import { togliRigheIllegibili } from "../../lib/righe-illeggibili.ts";
+import { caricaVocabolario } from "./vocabolario.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sql = neon(process.env.DATABASE_URL);
@@ -79,7 +82,12 @@ const pulisci = (t) => pulisciCorpoScheda(togliTestatinePagina(t ?? "")).trim();
 // dadi il testo "più lungo" vinceva proprio perché si portava dietro la coda. Non lo si fa sul
 // testo già in tabella: lì la stessa pulizia passa da togli-prosa-schede.mjs, che prima di
 // scrivere controlla di non aver tagliato troppo.
-const pulisciNuovo = (t) => togliProsaDiPagina(pulisci(t));
+// E le altre due pulizie che il database ha già avuto: le parole spezzate e le righe di glifi.
+// Senza, l'uscita del parser risultava "più lunga" di una scheda appena ripulita proprio per i
+// glifi che si portava dietro, e a parità di dadi la rimpiazzava: venti schede tornavano com'erano.
+const vocabolario = await caricaVocabolario(sql);
+const pulisciNuovo = (t) =>
+  togliRigheIllegibili(ricuciParoleSpezzate(togliProsaDiPagina(pulisci(t)), vocabolario).testo, vocabolario.nota).testo;
 
 const index = await (await fetch(`${B}/bestiary/index.json`)).json();
 const files = await Promise.all(
@@ -120,6 +128,18 @@ for (const file of readdirSync(path.join(__dirname, "parsed")).filter((f) => /^t
   for (const voce of voci ?? []) {
     trascritteAMano.add(`${voce.nome}|${fonte}`);
     if (voce._differenze_verificate) differenzeVerificate.add(`${voce.nome}|${fonte}`);
+  }
+}
+// Lo stesso vale per le schede sistemate a mano in un altro modo: le sezioni rimesse al loro posto
+// (risuddividi-sezioni.mjs) e i refusi corretti uno per uno (correggi-refusi.mjs). L'uscita del
+// parser quelle correzioni non le ha, e riportarla nel database le cancellerebbe.
+for (const file of readdirSync(path.join(__dirname, "parsed")).filter((f) => /^(sezioni|refusi|prosa)-mostri-.*\.json$/.test(f))) {
+  const { voci } = JSON.parse(readFileSync(path.join(__dirname, "parsed", file), "utf-8"));
+  for (const voce of voci ?? []) {
+    trascritteAMano.add(`${voce.nome}|${voce.fonte}`);
+    // Una voce rinominata da correggi-refusi.mjs sta nel database col nome nuovo: senza questo
+    // la protezione cercherebbe il nome vecchio e la scheda tornerebbe sostituibile.
+    if (voce.rinomina) trascritteAMano.add(`${voce.rinomina}|${voce.fonte}`);
   }
 }
 
@@ -181,6 +201,7 @@ for (const r of righe) {
     esito.intatte++;
     continue;
   }
+  if (motivo === "sostituita" && elenco) console.log(`  sostituita: ${r.nome} [${r.fonte}] (${testoVecchio.length} -> ${testoScelto.length} car)`);
   if (motivo === "sostituita") esito.sostituite++;
   else esito.ripulite++;
   if (applica) {
@@ -194,7 +215,7 @@ for (const r of righe) {
 
 console.log(`${applica ? "" : "[PROVA] "}schede col testo sostituito: ${esito.sostituite} (dadi recuperati: ${dadiRecuperati})`);
 console.log(`schede solo ripulite sul posto: ${esito.ripulite} — invariate: ${esito.intatte}`);
-console.log(`trascritte a mano, lasciate come sono: ${esito.protette}`);
+console.log(`trascritte o sistemate a mano, lasciate come sono: ${esito.protette}`);
 console.log(`senza una scheda rigenerata da confrontare: ${esito.senzaScheda.length}`);
 console.log(`testo nuovo scartato perché troppo lungo rispetto all'originale: ${esito.scartate.length}`);
 console.log(`dadi ancora diversi dall'originale: ${esito.ancoraDiverse.length} schede`);

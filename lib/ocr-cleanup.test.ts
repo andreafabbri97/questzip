@@ -287,6 +287,167 @@ describe("riparaDadiNelTesto", () => {
 });
 
 describe("pulisciCorpoScheda", () => {
+  // Refusi del corsivo dei titoletti, trovati cercando nelle schede le parole che non esistono.
+  it("rimette le parentesi tonde dove il corsivo le ha fatte uscire graffe", () => {
+    expect(pulisciCorpoScheda("Tocco Guaritore (3/Giorno}. Il deva tocca un'altra creatura.")).toBe(
+      "Tocco Guaritore (3/Giorno). Il deva tocca un'altra creatura.",
+    );
+    expect(pulisciCorpoScheda("Risucchio di Energia {Costa 2 Azioni). Ogni creatura")).toBe(
+      "Risucchio di Energia (Costa 2 Azioni). Ogni creatura",
+    );
+  });
+
+  it("corregge «Ciorno», «q uest'ultima» e l'ordinale dei livelli di incantesimo", () => {
+    expect(pulisciCorpoScheda("Spruzzo Fetido (1/Ciorno). Animare Macigni (1/Ciarno).")).toBe(
+      "Spruzzo Fetido (1/Giorno). Animare Macigni (1/Giorno).",
+    );
+    expect(pulisciCorpoScheda("verso il bersaglio, q uest'ultimo subisce 7 (2d6) danni")).toBe(
+      "verso il bersaglio, quest'ultimo subisce 7 (2d6) danni",
+    );
+    expect(pulisciCorpoScheda('3" livello (3 slot): dissolvi magie\n2• livello (3 slot): invisibilità')).toBe(
+      "3° livello (3 slot): dissolvi magie\n2° livello (3 slot): invisibilità",
+    );
+    // Le virgolette vere restano: l'ordinale si corregge solo davanti a «livello».
+    expect(pulisciCorpoScheda('la parola "fuoco" pronunciata')).toBe('la parola "fuoco" pronunciata');
+  });
+
+  // Trovato confrontando le distanze con i piedi dell'originale.
+  it("ricompone la distanza spezzata davanti all'unità di misura", () => {
+    expect(pulisciCorpoScheda("portata 1, 5 m o gittata 9/36 m, un bersaglio")).toBe("portata 1,5 m o gittata 9/36 m, un bersaglio");
+    expect(pulisciCorpoScheda("una creatura visibile entro 1 8 metri")).toBe("una creatura visibile entro 18 metri");
+    expect(pulisciCorpoScheda("portata 1,5 m o gittata 6/1 8 m, un bersaglio")).toBe("portata 1,5 m o gittata 6/18 m, un bersaglio");
+    expect(pulisciCorpoScheda("gittata 1 8/72 m, un bersaglio")).toBe("gittata 18/72 m, un bersaglio");
+    expect(pulisciCorpoScheda("gittata 45/1 83 m, un bersaglio")).toBe("gittata 45/183 m, un bersaglio");
+    expect(pulisciCorpoScheda("gittata 1, 5/6 m, un bersaglio")).toBe("gittata 1,5/6 m, un bersaglio");
+    expect(pulisciCorpoScheda("entro un raggio di 1 50 metri")).toBe("entro un raggio di 150 metri");
+    expect(pulisciCorpoScheda("a più di 1, 5 km dal bersaglio")).toBe("a più di 1,5 km dal bersaglio");
+  });
+
+  // Forme contate sulla tabella intera: ognuna stava in decine di schede.
+  describe("forme ricorrenti", () => {
+    it("ricompone la frequenza degli incantesimi innati", () => {
+      expect(pulisciCorpoScheda("A volontà: luci danzanti\nl/giorno ciascuno: levitazione")).toBe(
+        "A volontà: luci danzanti\n1/giorno ciascuno: levitazione",
+      );
+      expect(pulisciCorpoScheda("ragnatela l /giorno: dominare persone")).toBe("ragnatela 1/giorno: dominare persone");
+      expect(pulisciCorpoScheda("respirare sott'acqua 1 /giorno: tentacoli neri")).toBe("respirare sott'acqua 1/giorno: tentacoli neri");
+      expect(pulisciCorpoScheda("3/giorno ciascuno: paura")).toBe("3/giorno ciascuno: paura");
+    });
+
+    it("rimette l'articolo a inizio frase, non il pronome in mezzo", () => {
+      expect(pulisciCorpoScheda("Multiattacco. li drago può usare la Presenza")).toBe("Multiattacco. Il drago può usare la Presenza");
+      expect(pulisciCorpoScheda("Colpo di Ali (Costa 2 Azioni). li drago sbatte le ali.")).toBe(
+        "Colpo di Ali (Costa 2 Azioni). Il drago sbatte le ali.",
+      );
+      expect(pulisciCorpoScheda("li leviatano può eseguire 3 azioni leggendarie")).toBe("Il leviatano può eseguire 3 azioni leggendarie");
+      expect(pulisciCorpoScheda("afferra i nemici e li trascina a sé")).toBe("afferra i nemici e li trascina a sé");
+      expect(pulisciCorpoScheda("i bersagli vicini:\nli colpisce tutti")).toBe("i bersagli vicini:\nli colpisce tutti");
+    });
+
+    it("ricompone il bonus per colpire", () => {
+      expect(pulisciCorpoScheda("Attacco con arma da mischia: +1 0 al tiro per colpire")).toBe(
+        "Attacco con arma da mischia: +10 al tiro per colpire",
+      );
+      expect(pulisciCorpoScheda("Attacco con Arma da Mischia:+ 17 al tiro per colpire")).toBe(
+        "Attacco con Arma da Mischia: +17 al tiro per colpire",
+      );
+      expect(pulisciCorpoScheda("a mischia: + 1 1 al tiro per colpire")).toBe("a mischia: +11 al tiro per colpire");
+      expect(pulisciCorpoScheda("Attacco con arma a distanza: +1 3 al tiro per\ncolpire, gittata 18/72 m")).toBe(
+        "Attacco con arma a distanza: +13 al tiro per\ncolpire, gittata 18/72 m",
+      );
+    });
+
+    it("legge lo zero e il cinque scambiati per lettere", () => {
+      expect(pulisciCorpoScheda("Quando la culla scende a O punti ferita")).toBe("Quando la culla scende a 0 punti ferita");
+      expect(pulisciCorpoScheda("uno scudo che scende a un bonus di +O è distrutto")).toBe(
+        "uno scudo che scende a un bonus di +0 è distrutto",
+      );
+      expect(pulisciCorpoScheda("termina il suo turno con O punti ferita, muore")).toBe("termina il suo turno con 0 punti ferita, muore");
+      expect(pulisciCorpoScheda("danni perforanti o S (1d8 + 1) danni")).toBe("danni perforanti o 5 (1d8 + 1) danni");
+      expect(pulisciCorpoScheda("Ragnatela (Ricarica S-6). Attacco")).toBe("Ragnatela (Ricarica 5-6). Attacco");
+      expect(pulisciCorpoScheda("metallo non magico in l round.")).toBe("metallo non magico in 1 round.");
+      // "a O" davanti a un nome proprio non è uno zero.
+      expect(pulisciCorpoScheda("fedele a O Grande Antico")).toBe("fedele a O Grande Antico");
+    });
+
+    it("ricompone la CD degli incantesimi", () => {
+      expect(pulisciCorpoScheda("(CD del tiro salvezza sull'incantesimo 1 3):")).toBe("(CD del tiro salvezza sull'incantesimo 13):");
+    });
+
+    it("riattacca l'apostrofo alla parola", () => {
+      expect(pulisciCorpoScheda("l 'effetto svanisce in quell 'area")).toBe("l'effetto svanisce in quell'area");
+      expect(pulisciCorpoScheda("spese all' inizio del proprio turno")).toBe("spese all'inizio del proprio turno");
+      expect(pulisciCorpoScheda("non usa u n'azione per svegliarlo")).toBe("non usa un'azione per svegliarlo");
+      expect(pulisciCorpoScheda("tre attacchi Lancia dell' Erebo")).toBe("tre attacchi Lancia dell'Erebo");
+    });
+
+    it("ricuce le parole che nessun vocabolario separerebbe", () => {
+      expect(pulisciCorpoScheda("CD 24, altri menti viene buttato a terra")).toBe("CD 24, altrimenti viene buttato a terra");
+      expect(pulisciCorpoScheda("finché il ram pollo non muore")).toBe("finché il rampollo non muore");
+      expect(pulisciCorpoScheda("i suoi pu nti ferita massimi")).toBe("i suoi punti ferita massimi");
+    });
+
+    it("rimette l'elle del corsivo letta come barra", () => {
+      expect(pulisciCorpoScheda("Runa de/fuoco. Il gigante")).toBe("Runa del fuoco. Il gigante");
+      expect(pulisciCorpoScheda("Armatura del/a fornace")).toBe("Armatura della fornace");
+      expect(pulisciCorpoScheda("entro 1,5 metri da/l'urlatore")).toBe("entro 1,5 metri dall'urlatore");
+      expect(pulisciCorpoScheda("Ritrarre i/filamento. Una creatura")).toBe("Ritrarre il filamento. Una creatura");
+      expect(pulisciCorpoScheda("Mu/tiattacco. Il lucertoloide")).toBe("Multiattacco. Il lucertoloide");
+      expect(pulisciCorpoScheda("arma elemento/e, dissolvi magie")).toBe("arma elementale, dissolvi magie");
+      expect(pulisciCorpoScheda("por/ore con gli onimo/i, por/ore con i vegeto/i")).toBe(
+        "parlare con gli animali, parlare con i vegetali",
+      );
+    });
+
+    it("lascia le barre vere", () => {
+      expect(pulisciCorpoScheda("Colpo a segno/mancato: il gigante")).toBe("Colpo a segno/mancato: il gigante");
+      expect(pulisciCorpoScheda("3/giorno: ingrandire/ridurre, cecità/sordità")).toBe("3/giorno: ingrandire/ridurre, cecità/sordità");
+      expect(pulisciCorpoScheda("una bestia e/o un umanoide")).toBe("una bestia e/o un umanoide");
+      // Controesempi della revisione del codice: ognuno veniva rovinato dalla prima versione.
+      expect(pulisciCorpoScheda("la creatura/l'oggetto bersagliato")).toBe("la creatura/l'oggetto bersagliato");
+      expect(pulisciCorpoScheda("si muove su/giù, da/verso il bersaglio, a/per i/gli alleati")).toBe(
+        "si muove su/giù, da/verso il bersaglio, a/per i/gli alleati",
+      );
+    });
+
+    it("non scambia per refusi le cose che gli somigliano", () => {
+      // Tre misure, non «6,9 m».
+      expect(pulisciCorpoScheda("linee lunghe 3, 6, 9 m")).toBe("linee lunghe 3, 6, 9 m");
+      // Litri al giorno, non una frequenza.
+      expect(pulisciCorpoScheda("consuma 5 l/giorno di acqua")).toBe("consuma 5 l/giorno di acqua");
+      // L'Ovest e l'inizio di un nome, non uno zero.
+      expect(pulisciCorpoScheda("si sposta da E a O di 9 metri")).toBe("si sposta da E a O di 9 metri");
+      expect(pulisciCorpoScheda("appartiene a O'Brien")).toBe("appartiene a O'Brien");
+      // Una citazione fra apici, non un'elisione staccata.
+      expect(pulisciCorpoScheda("ha un 'ordine' segreto")).toBe("ha un 'ordine' segreto");
+    });
+
+    it("legge lo zero anche quando la frase va a capo", () => {
+      expect(pulisciCorpoScheda("il suo massimo dei punti ferita\na O, il bersaglio muore")).toBe(
+        "il suo massimo dei punti ferita\na 0, il bersaglio muore",
+      );
+      expect(pulisciCorpoScheda("i suoi punti ferita non scendono\na O finché")).toBe("i suoi punti ferita non scendono\na 0 finché");
+      expect(pulisciCorpoScheda("viene ridotto a O.")).toBe("viene ridotto a 0.");
+    });
+  });
+
+  it("legge come cifre l'elle e l'esse di una distanza", () => {
+    expect(pulisciCorpoScheda("portata l,5 m, un bersaglio")).toBe("portata 1,5 m, un bersaglio");
+    expect(pulisciCorpoScheda("portata l, 5 m, una creatura")).toBe("portata 1,5 m, una creatura");
+    expect(pulisciCorpoScheda("entro l,S metri dal ghast")).toBe("entro 1,5 metri dal ghast");
+    expect(pulisciCorpoScheda("portata 1, S m o gittata 6/18 m")).toBe("portata 1,5 m o gittata 6/18 m");
+    expect(pulisciCorpoScheda("nel raggio di l 8 metri")).toBe("nel raggio di 18 metri");
+  });
+
+  it("non tocca le distanze già scritte bene né i numeri che precedono una distanza", () => {
+    expect(pulisciCorpoScheda("portata 1,5 m o gittata 9/36 m")).toBe("portata 1,5 m o gittata 9/36 m");
+    expect(pulisciCorpoScheda("si sposta per 3d6 x 3 metri")).toBe("si sposta per 3d6 x 3 metri");
+    expect(pulisciCorpoScheda("misura dagli 1,8 ai 3 metri")).toBe("misura dagli 1,8 ai 3 metri");
+    expect(pulisciCorpoScheda("telepatia 3 6 m")).toBe("telepatia 36 m");
+    // Due numeri veri restano due: una gittata, un elenco.
+    expect(pulisciCorpoScheda("gittata 6/18 m, e fino a 2 o 3 m")).toBe("gittata 6/18 m, e fino a 2 o 3 m");
+  });
+
   it("ripara la prima cifra del danno medio letta come elle", () => {
     expect(pulisciCorpoScheda("Colpito: l3 (2d8 + 4) danni perforanti.")).toBe(
       "Colpito: 13 (2d8 + 4) danni perforanti.",
@@ -389,6 +550,43 @@ describe("refusi delle schede dei mostri", () => {
     expect(pulisciTestoOcr("l'incandescente combat\u00ad timento emblematico")).toBe(
       "l'incandescente combattimento emblematico",
     );
+  });
+});
+
+describe("ripristinaTestoOggettiMagici: i simboli rimasti nel testo", () => {
+  it("la f letta come parentesi davanti a qualunque parola", () => {
+    expect(ripristinaTestoOggettiMagici("una cintura della {orza dei giganti")).toBe("una cintura della forza dei giganti");
+    expect(ripristinaTestoOggettiMagici("Questa verga di {attura drow")).toBe("Questa verga di fattura drow");
+    expect(ripristinaTestoOggettiMagici("associato alla [reccia assassina")).toBe("associato alla freccia assassina");
+  });
+
+  it("la quadra al posto di «l'» e di «I»", () => {
+    expect(ripristinaTestoOggettiMagici("comprendere e parlare [Abissale. Inoltre")).toBe("comprendere e parlare l'Abissale. Inoltre");
+    expect(ripristinaTestoOggettiMagici("parlare e capire ['Ignan. Se")).toBe("parlare e capire l'Ignan. Se");
+    expect(ripristinaTestoOggettiMagici("o lance. [l personaggio può")).toBe("o lance. Il personaggio può");
+    expect(ripristinaTestoOggettiMagici("[ punti ferita persi a causa")).toBe("I punti ferita persi a causa");
+  });
+
+  it("il trattino basso, l'uguale e l'euro rimasti accanto alle parole", () => {
+    expect(ripristinaTestoOggettiMagici("per lei termina_ La mazza recupera")).toBe("per lei termina. La mazza recupera");
+    expect(ripristinaTestoOggettiMagici("la potenza di ogni_ singola sfera")).toBe("la potenza di ogni singola sfera");
+    expect(ripristinaTestoOggettiMagici("Alla fine di ogni = suo turno")).toBe("Alla fine di ogni suo turno");
+    expect(ripristinaTestoOggettiMagici("la impugna,= può usare")).toBe("la impugna, può usare");
+    expect(ripristinaTestoOggettiMagici("spendere 1 carica €, se una porta")).toBe("spendere 1 carica e, se una porta");
+    expect(ripristinaTestoOggettiMagici("al suo interno €e trasportate")).toBe("al suo interno e trasportate");
+  });
+
+  it("«@gni» e lo zero fra due rarità", () => {
+    expect(ripristinaTestoOggettiMagici("di 1 minuto. @gni sfera emana")).toBe("di 1 minuto. Ogni sfera emana");
+    expect(ripristinaTestoOggettiMagici("(+1) rara (+2)0 molto rara (+3)")).toBe("(+1) rara (+2) o molto rara (+3)");
+  });
+
+  // Il confine di parola di JavaScript non vede le lettere accentate: questa non veniva trovata.
+  it("rimette l'apostrofo anche alle parole che finiscono con un accento", () => {
+    expect(ripristinaTestoOggettiMagici("trasformarne lestremità in una testa")).toBe("trasformarne l'estremità in una testa");
+    // …senza prendere per articolo l'inizio di un'altra parola.
+    expect(ripristinaTestoOggettiMagici("lanello d'oro e larmatura")).toBe("l'anello d'oro e l'armatura");
+    expect(ripristinaTestoOggettiMagici("un collanello")).toBe("un collanello");
   });
 });
 

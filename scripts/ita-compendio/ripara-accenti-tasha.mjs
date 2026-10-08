@@ -13,6 +13,8 @@
 // Uso: node --env-file=../../.env.local ripara-accenti-tasha.mjs [--applica]
 import { neon } from "@neondatabase/serverless";
 import { pulisciTestoOcr, ripristinaAccentiPersi } from "../../lib/ocr-cleanup.ts";
+import { riparaRefusiDaVocabolario } from "../../lib/refusi-da-vocabolario.ts";
+import { caricaVocabolario } from "./vocabolario.mjs";
 
 const sql = neon(process.env.DATABASE_URL);
 const applica = process.argv.includes("--applica");
@@ -24,7 +26,17 @@ const TABELLE = {
   compendio_ita_oggetto: ["descrizione"],
 };
 
-const ripara = (testo) => pulisciTestoOcr(ripristinaAccentiPersi(testo));
+// L'accento finale perso su parole che l'elenco chiuso di ripristinaAccentiPersi non ha
+// («superiorita», «perche», «finche»). Lo rimette la regola di lib/refusi-da-vocabolario.ts,
+// limitata agli accenti: solo dove la parola senza accento non esiste e quella accentata non ha
+// un'altra lettura (-tà, -ù, -ché). La prima versione, scritta qui, accettava qualunque forma
+// accentata conosciuta dal vocabolario: bastava che al dizionario mancasse «sfoggio» perché
+// diventasse «sfoggiò».
+const vocabolario = await caricaVocabolario(sql);
+const perRefusi = { nota: vocabolario.nota, comune: (p) => vocabolario.peso(p) >= 2 };
+const accentiDalVocabolario = (testo) => riparaRefusiDaVocabolario(testo, perRefusi, ["accento"]).testo;
+
+const ripara = (testo) => accentiDalVocabolario(pulisciTestoOcr(ripristinaAccentiPersi(testo)));
 
 /** Applica la riparazione a ogni stringa di una struttura (le razze tengono i tratti in JSON). */
 function profondo(valore) {
@@ -86,5 +98,26 @@ for (const s of sottoclassi) {
   }
 }
 console.log(`${"introduzioni di sottoclasse".padEnd(28)} ${introToccate} su ${sottoclassi.length}`);
-console.log(`\n${applica ? "" : "[PROVA] "}righe riparate: ${righeToccate + introToccate}`);
+
+// Le scelte di classe (manovre, infusioni, suppliche) e gli incantesimi che in cache hanno il testo
+// preso dallo stesso PDF: «il guerriero pud spendere un dado di superiorita».
+const inCache = await sql`
+  SELECT kind, name, source, descrizione_ita FROM compendio_traduzione_ia
+  WHERE kind IN ('scelteClasse', 'incantesimi') AND source = 'TCE' AND descrizione_ita IS NOT NULL`;
+let cacheToccate = 0;
+for (const r of inCache) {
+  const nuova = ripara(r.descrizione_ita);
+  if (nuova === r.descrizione_ita) continue;
+  cacheToccate++;
+  if (esempi.length < 8) {
+    const i = [...r.descrizione_ita].findIndex((ch, k) => ch !== nuova[k]);
+    esempi.push(`${r.name}: …${r.descrizione_ita.slice(Math.max(0, i - 30), i + 30)}… -> …${nuova.slice(Math.max(0, i - 30), i + 30)}…`);
+  }
+  if (applica) {
+    await sql`UPDATE compendio_traduzione_ia SET descrizione_ita = ${nuova}, updated_at = now()
+              WHERE kind = ${r.kind} AND name = ${r.name} AND source = ${r.source}`;
+  }
+}
+console.log(`${"scelte di classe e incantesimi in cache".padEnd(28)} ${cacheToccate} su ${inCache.length}`);
+console.log(`\n${applica ? "" : "[PROVA] "}righe riparate: ${righeToccate + introToccate + cacheToccate}`);
 for (const e of esempi) console.log(`  ${e}`);

@@ -203,7 +203,8 @@ const esito = { riparate: 0, intatte: 0, campi: {}, daGuardare: [] };
 const esempi = {};
 const conta = (campo, prima, dopo, nome) => {
   esito.campi[campo] = (esito.campi[campo] ?? 0) + 1;
-  (esempi[campo] ??= []).length < 3 && esempi[campo].push(`${nome}: ${JSON.stringify(prima)} -> ${JSON.stringify(dopo)}`);
+  esempi[campo] ??= [];
+  if (esempi[campo].length < 3) esempi[campo].push(`${nome}: ${JSON.stringify(prima)} -> ${JSON.stringify(dopo)}`);
 };
 
 for (const r of righe) {

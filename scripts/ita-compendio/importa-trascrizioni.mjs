@@ -193,7 +193,13 @@ for (const voce of voci) {
   }
   if (originali) {
     const inglese = originali.get(`${aggancio.nome_inglese}|${aggancio.fonte_inglese}`);
-    if (inglese) {
+    // Una voce che tocca solo le righe d'intestazione di un mostro (una resistenza scritta in un
+    // modo che non si ricostruisce dall'originale) non ha dadi né CD da confrontare: il confronto
+    // con le sezioni dell'originale darebbe sempre "mancano tutti i dadi".
+    // Una scheda NUOVA senza sezioni non è una correzione dell'intestazione: è una scheda vuota, e
+    // deve passare dal confronto (che la respinge) invece di essere inserita senza controlli.
+    const soloIntestazione = tabella === "compendio_ita_mostro" && !nuova && !SEZIONI_MOSTRO.some((c) => c in campi);
+    if (inglese && !soloIntestazione) {
       const daControllare = nuova && tabella === "compendio_ita_mostro" ? SEZIONI_MOSTRO.map((c) => campi[c]) : Object.values(campi);
       const italiano = daControllare.filter((v) => typeof v === "string").join("\n");
       const dadiDiversi = differenzeDiDadi(italiano, inglese);

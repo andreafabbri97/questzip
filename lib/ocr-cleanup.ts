@@ -205,8 +205,108 @@ export function pulisciCorpoScheda(testo: string): string {
       "$1Il ",
     )
     // "l: Raggio paralizzante": la voce numero 1 di un elenco, con la cifra letta come elle.
-    .replace(/^l: /gm, "1: ");
-  return riparato;
+    .replace(/^l: /gm, "1: ")
+    // "(3/Ciorno}", "{Costa 2 Azioni)": nel corsivo dei titoletti la parentesi tonda esce graffa.
+    // In una scheda le graffe non esistono, quindi la sostituzione non può sbagliare.
+    .replace(/\{/g, "(")
+    .replace(/\}/g, ")")
+    // "(3/Ciorno)", "(1/Ciarno)": la G maiuscola del corsivo letta come C.
+    .replace(/\bCi[oa]rno\b/g, "Giorno")
+    // "q uest'ultima": la q staccata dal resto. "q" da sola non è una parola.
+    .replace(/\bq uest(?=['’])/g, "quest")
+    // "3" livello (3 slot)", "2• livello": il simbolo dell'ordinale negli elenchi degli incantesimi.
+    .replace(/\b([1-9])\s?["•](?= livello\b)/g, "$1°")
+    // "portata 1, 5 m", "entro 1 8 metri": la distanza spezzata in due dalla colonna stretta. Davanti
+    // all'unità di misura due cifre staccate sono un numero solo — lo ha mostrato il confronto con
+    // i piedi dell'originale: 180 schede avevano un "5 m" al posto di un "1,5 m".
+    // Solo «N, 5»: le distanze con la virgola sono sempre mezzi metri. E non in mezzo a un elenco
+    // («linee di 3, 6, 9 m» sono tre misure, non «6,9 m»).
+    .replace(/(?<!, ?)\b(\d), 5(?=(?:\/\d+)? (?:m|metri|km)\b)/g, "$1,5")
+    .replace(/(?<![\d,/] ?)\b(\d) (\d)(?= (?:m|metri)\b)/g, "$1$2")
+    // "portata l,5 m", "entro 1, S metri", "portata l,S m": l'uno letto come elle e il cinque come
+    // esse. Davanti all'unità di misura non possono essere altro.
+    .replace(/\b[lI1], ?[5S](?= (?:m|metri|km)\b)/g, "1,5")
+    .replace(/\bl (\d)(?= (?:m|metri)\b)/g, "1$1")
+    // "gittata 6/1 8 m", "gittata 1 8/72 m", "entro 1 50 metri", "gittata 45/1 83 m": l'uno iniziale
+    // staccato anche dentro una gittata doppia e davanti alle centinaia.
+    .replace(/(?<![\d,] ?)\b1 (\d{1,2})(?=(?:\/\d+(?:,\d+)?)? (?:m|metri)\b)/g, "1$1")
+    .replace(/(?<!, ?)\b(\d), 5(?= (?:cm|centimetri)\b)/g, "$1,5")
+    // "portata 1,5 mo gittata 6/18 m": l'unità attaccata alla congiunzione.
+    .replace(/(\d) mo (?=gittata\b)/g, "$1 m o ");
+  return riparaFormeRicorrenti(riparato);
+}
+
+// L'elle del corsivo letta come barra, insieme alla a letta come o: parole intere che nessuna
+// regola generale può ricostruire. Sono i titoletti e i nomi degli incantesimi, che nelle schede
+// stanno in corsivo.
+const PAROLE_COL_CORSIVO_ROTTO: [RegExp, string][] = [
+  [/\bMu\/tiattacco\b/g, "Multiattacco"],
+  [/\bMultiottacco\b/g, "Multiattacco"],
+  [/\b([Ee])lemento\/e\b/g, "$1lementale"],
+  [/\bfu\/mine\b/g, "fulmine"],
+  [/\bmo\/edizione\b/g, "maledizione"],
+  [/\bMuta\/orma\b/g, "Mutaforma"],
+  [/\bpor\/ore con\b/g, "parlare con"],
+  [/\bonimo\/i\b/g, "animali"],
+  [/\bvegeto\/i\b/g, "vegetali"],
+  [/\ba\/fuoco\b/g, "al fuoco"],
+  [/\bi\/filamento\b/g, "il filamento"],
+  [/\bCia11el\/otto\b/g, "Giavellotto"],
+];
+
+/**
+ * Le forme di lettura sbagliata che tornano uguali in decine di schede. Ognuna è una sequenza
+ * che in una scheda non può voler dire altro: per questo si correggono a regola e non una per una.
+ * Trovate contando le forme sulla tabella intera (ottobre 2026): "l/giorno" stava in 79 schede,
+ * il bonus per colpire spezzato in 87, lo zero letto come O in 94.
+ */
+function riparaFormeRicorrenti(testo: string): string {
+  const riparato = testo
+    // "l/giorno ciascuno", "l /giorno", "1 /giorno": la frequenza degli incantesimi innati.
+    // Non dopo un numero: «5 l/giorno di acqua» sono litri.
+    .replace(/(?<!\d ?)\b[lI] ?\/ ?giorno\b/g, "1/giorno")
+    .replace(/\b(\d) \/ ?giorno\b/g, "$1/giorno")
+    // "Multiattacco. li drago può…": l'articolo a inizio frase letto come "li". Dopo un punto il
+    // pronome "li" non può stare (sarebbe maiuscolo), quindi è sempre l'articolo.
+    .replace(/(?:(?<=[.!?]\)?\s)|^)li (?=\p{Ll})/gu, "Il ")
+    // "+1 3 al tiro per colpire", ":+ 17 al tiro": il bonus per colpire spezzato o staccato dal segno
+    // (la frase può andare a capo dopo "per").
+    .replace(/\+ ?(\d) (\d)(?=\sal\s+tiro\s+per\s+colpire)/g, "+$1$2")
+    .replace(/\+ (\d+)(?=\sal\s+tiro\s+per\s+colpire)/g, "+$1")
+    .replace(/:(?=\+\d+\sal\s+tiro\s+per\s+colpire)/g, ": ")
+    // "scende a O punti ferita", "un bonus di +O": lo zero letto come O maiuscola.
+    // Solo dove si parla di un numero che scende («scende a O», «ridotto a O», «punti ferita a O»):
+    // una «a O» qualunque può essere l'Ovest di «da E a O» o l'inizio di un nome.
+    .replace(/(?<=\b(?:scend\p{L}*|ridott\p{L}|riduc\p{L}*|ridurr\p{L}+|portat\p{L}|ferita|pari)\s+a\s)O\b(?!['’])/gu, "0")
+    .replace(/\+O\b/g, "+0")
+    .replace(/\bO(?= punti ferita\b)/g, "0")
+    // "Colpito: S (1d8 + 1)", "(Ricarica S-6)": il cinque letto come esse.
+    .replace(/\bS(?= \(\d+d\d)/g, "5")
+    .replace(/\bS(?=-6\))/g, "5")
+    // "in l round": l'uno letto come elle davanti a un'unità di tempo.
+    .replace(/(?<=\b(?:in|per|di|ogni|entro) )l (?=round\b|minut[oi]\b|or[ae]\b)/g, "1 ")
+    // "sull'incantesimo 1 3)": la CD degli incantesimi spezzata.
+    .replace(/(?<=sull['’]incantesimo )1 (\d)(?=[),])/g, "1$1")
+    // "l 'effetto", "quell 'area", "all' inizio", "u n'azione": l'apostrofo staccato dalla parola.
+    .replace(/\bu n(?=['’]\p{L})/gu, "un")
+    // Non se la parola dopo è chiusa da un altro apice: «un 'ordine' segreto» è una citazione.
+    .replace(/(?<=\b(?:l|un|d|dell|all|nell|sull|dall|quell|quest|coll|sott|tutt|nessun|ciascun|qualcos|mezz|senz|anch))\s(?=['’]\p{L}+(?!['’\p{L}]))/giu, "")
+    .replace(/(?<=\b(?:l|un|d|dell|all|nell|sull|dall|quell|quest)['’]) (?=[aeiouàèéìòùh])/giu, "")
+    // "altri menti cade a terra prono": le menti sono femminili, "altri menti" non esiste.
+    .replace(/\baltri menti\b/g, "altrimenti")
+    // "ram pollo": il rampollo di Bigby spezzato dalla sillabazione; "ram" non è una parola.
+    .replace(/\b([Rr])am pollo\b/g, "$1ampollo")
+    .replace(/\bpu nti(?= ferita\b)/g, "punti")
+    // "da/l'urlatore", "de/l'incubo": l'elle doppia del corsivo, la prima letta come barra.
+    // Solo dopo la radice di una preposizione articolata: «la creatura/l'oggetto» è una barra vera.
+    .replace(/(?<=\b(?:[Dd]e|[Dd]a|[Nn]e|[Ss]u|[Aa]|[Cc]o))\/l(?=['’]\p{L})/gu, "ll")
+    // "del/a fornace": la stessa cosa dentro la preposizione articolata.
+    .replace(/(?<=\b(?:de|da|ne|su)l)\/(?=[aeo]\b)/gi, "l")
+    // "Runa de/fuoco", "Avversione a/fuoco", "Ritrarre i/filamento": l'elle e lo spazio che la segue.
+    // Solo «de/»: «de» da solo non è italiano, quindi è sempre «del». Con «a», «da», «su», «i»
+    // la barra può essere vera («su/giù», «da/verso»): quelle viste stanno nell'elenco qui sopra.
+    .replace(/(?<=\b[Dd]e)\/(?=\p{Ll}{3,})/gu, "l ");
+  return PAROLE_COL_CORSIVO_ROTTO.reduce((t, [da, a]) => t.replace(da, a), riparato);
 }
 
 /** Sostituisce le lettere che l'OCR ha messo al posto di cifre: l/I valgono 1, O/o valgono 0. */
@@ -331,7 +431,9 @@ const SENZA_APOSTROFO = [
   "lallineamento", "lesplosione", "lenergia", "lincantesimo",
 ];
 const PREFISSI_ELISI = ["dell", "dall", "nell", "sull", "all", "quest", "l", "d"];
-const RE_SENZA_APOSTROFO = new RegExp(`\\b(${SENZA_APOSTROFO.join("|")})\\b`, "gi");
+// Niente \b in coda: per JavaScript la "à" non è una lettera di parola, e "lestremità" non
+// veniva mai trovata. Il confine si scrive a mano, con le lettere accentate.
+const RE_SENZA_APOSTROFO = new RegExp(`(?<![\\p{L}'’])(${SENZA_APOSTROFO.join("|")})(?![\\p{L}'’])`, "giu");
 
 /**
  * Ripara i refusi sistematici del catalogo "Oggetti magici A-Z", letto con l'OCR da pagine
@@ -361,6 +463,28 @@ export function ripristinaTestoOggettiMagici(testo: string): string {
       .replace(/\b([Ff])uttua/g, "$1luttua")
       // "danni da {uoco", "muro di [uoco": la f letta come parentesi.
       .replace(/[{[]uoco\b/g, "fuoco")
+      // Lo stesso davanti a qualunque parola: "{orza", "{attura drow", "si {rantuma", "[reccia".
+      // Una graffa aperta in mezzo a una frase non esiste; la quadra è una f solo davanti a una
+      // parola in minuscolo (davanti a una maiuscola è un'elle con l'apostrofo, vedi sotto).
+      .replace(/\{(?=[a-zà-ù]{2,})/g, "f")
+      .replace(/(?<=\s)\[(?=[a-zà-ù]{4,})/g, "f")
+      // La quadra al posto di "l'" e di "I": "parlare [Abissale", "capire ['Ignan", "[l personaggio",
+      // "[ punti ferita persi" in testa alla frase.
+      .replace(/\['(?=[A-ZÀ-Ù])/g, "l'")
+      .replace(/(?<=\s)\[(?=[A-ZÀ-Ù][a-zà-ù])/g, "l'")
+      .replace(/(^|[.!?] )\[l (?=[a-zà-ù])/g, "$1Il ")
+      .replace(/(^|[.!?] )\[ (?=[a-zà-ù])/g, "$1I ")
+      // Il trattino basso al posto del punto fermo ("termina_ La mazza") o di niente ("ogni_ suo").
+      .replace(/_ (?=[A-ZÀ-Ù])/g, ". ")
+      .replace(/_ (?=[a-zà-ù])/g, " ")
+      // L'uguale rimasto dopo una parola: "ogni = suo turno", "la impugna,= può".
+      .replace(/ = (?=[a-zà-ù])/g, " ")
+      .replace(/,= /g, ", ")
+      // L'euro attaccato: "1 carica €, se", "al suo interno €e trasportate".
+      .replace(/(?<=\s)€e?(?=[,\s])/g, "e")
+      .replace(/(^|[.!?] )@gni\b/g, "$1Ogni")
+      // "rara (+2)0 molto rara (+3)": la "o" fra due rarità letta come zero.
+      .replace(/\)0 (?=[a-zà-ù])/g, ") o ")
       // Niente \b dopo "più": per JavaScript la "ù" non è una lettera di parola, e fra "ù" e lo
       // spazio non vede alcun confine.
       .replace(/\b(\d) 0 (pi[uù]|meno)(?=\s|$)/g, "$1 o $2")

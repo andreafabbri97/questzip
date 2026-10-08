@@ -18,6 +18,12 @@ const STOPWORDS = new Set([
   "Sono", "Come", "Loro", "Ogni", "Anche", "Altri", "Altre", "Molti", "Molte",
 ]);
 
+// Pagine che non sono contenuto: copertina, riconoscimenti, cartina (i nomi sparsi sulla mappa,
+// letti a caso) e indice analitico. Nel Compendio erano solo rumore, e l'indice faceva comparire
+// la Costa della Spada nella ricerca di qualunque nome. Stesso elenco, per pagina d'inizio della
+// sezione, in ripulisci-regole-costa-spada.mjs, che le toglie dal database già caricato.
+const PAGINE_SENZA_CONTENUTO = new Set([1, 4, 7, 160, 161, 162]);
+
 function cleanText(raw) {
   return raw
     .replace(/�/g, "'")
@@ -27,7 +33,9 @@ function cleanText(raw) {
 }
 
 function dominantKeyword(text) {
-  const words = text.match(/\b[A-ZÀ-Ý][a-zà-ÿ]{3,}\b/g) ?? [];
+  // Niente \b: per JavaScript una lettera accentata non è una lettera di parola, e «Città»
+  // finiva a «Citt» (era il titolo della sezione su Baldur's Gate).
+  const words = text.match(/(?<!\p{L})\p{Lu}\p{Ll}{3,}(?!\p{L})/gu) ?? [];
   const counts = new Map();
   for (const w of words) {
     if (STOPWORDS.has(w)) continue;
@@ -47,7 +55,7 @@ function dominantKeyword(text) {
 const data = JSON.parse(readFileSync(path.join(EXTRACTED_DIR, "costa_spada.json"), "utf-8"));
 const pages = data.pages
   .map((p) => ({ page: p.page + 1, text: cleanText(p.text ?? ""), keyword: dominantKeyword(p.text ?? "") }))
-  .filter((p) => p.text.length >= 80);
+  .filter((p) => p.text.length >= 80 && !PAGINE_SENZA_CONTENUTO.has(p.page));
 
 const sections = [];
 let current = null;
