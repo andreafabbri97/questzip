@@ -894,16 +894,21 @@ export const compendioItaClassi = pgTable("compendio_ita_classe", {
 });
 
 // Regole generali/lore (non incantesimi/mostri/razze/classi): "Regole principali" e "Guida
-// agli Avventurieri della Costa della Spada", entrambi PDF scansionati senza text layer,
-// estratti via OCR (scripts/ita-compendio/ocr_extract_pdf.py) — qualità nettamente inferiore
-// al resto del compendio (vero testo dai PDF, non riconosciuto da un'immagine). Una sezione
-// per pagina, mostrata in app con un badge esplicito che avvisa della qualità OCR.
+// agli Avventurieri della Costa della Spada", entrambi PDF scansionati senza text layer. La
+// prima è stata riscritta a mano; la seconda è letta con l'OCR, che dà le parole con la loro
+// posizione: da lì si ricostruiscono colonne, capoversi e titoli, e le sezioni sono quelle
+// dell'indice del libro (scripts/ita-compendio/sezioni-costa-spada.mjs). Resta un testo
+// riconosciuto da un'immagine, mostrato in app con un badge che lo dice.
 export const compendioItaRegole = pgTable("compendio_ita_regola", {
   id: uuid("id").primaryKey().defaultRandom(),
   titolo: text("titolo").notNull(),
   testo: text("testo").notNull(),
   pagina: integer("pagina"),
   fonte: text("fonte").notNull(),
+  // Il posto della sezione nel libro. `pagina` da sola non basta più a ordinarle da quando la
+  // Costa della Spada è divisa per voci: in una pagina ci sono tre divinità, o il capitolo, la
+  // sua prima parte e il primo luogo. Vuota per le fonti che hanno una sezione per pagina.
+  ordine: integer("ordine"),
 });
 
 // Oggetti magici in italiano, estratti via OCR da un PDF privato ("Oggetti Magici (Dm e Book

@@ -550,7 +550,7 @@ const REGOLE_FONTI_AFFIDABILI = new Set(["regole_base", "phb_regole", "dm_regole
 
 const REGOLE_WARNINGS: Record<string, string> = {
   costa_spada:
-    "estratta via OCR da scansioni (non un vero testo digitale come il resto del compendio): può contenere errori di riconoscimento. Utile per una ricerca rapida, non garantita parola per parola.",
+    "letta via OCR da una scansione (non un vero testo digitale come il resto del compendio): capitoli, capoversi e tabelle sono stati ricostruiti e ricontrollati, ma qualche errore di riconoscimento può essere rimasto. Non è garantita parola per parola.",
 };
 
 // Sezione a sé, fuori dal sistema kind/Entry/LOADERS del resto del Compendio: quel sistema
@@ -772,7 +772,9 @@ function RegoleSection() {
     return sections
       .filter((s) => fonte === "tutte" || s.fonte === fonte)
       .filter((s) => !q || s.titolo.toLowerCase().includes(q) || s.testo.toLowerCase().includes(q))
-      .sort((a, b) => (a.pagina ?? 0) - (b.pagina ?? 0));
+      // Per pagina, e dentro la pagina nell'ordine del libro (più sezioni possono cominciare
+      // nella stessa: il capitolo, la sua prima parte, la prima voce).
+      .sort((a, b) => (a.pagina ?? 0) - (b.pagina ?? 0) || (a.ordine ?? 0) - (b.ordine ?? 0));
   }, [sections, fonte, query]);
 
   const selectedSection = selected !== null ? (sections?.find((s) => s.id === selected) ?? null) : null;
@@ -786,7 +788,7 @@ function RegoleSection() {
           {fonte === "tutte" ? (
             <>
               ⚠️ Regole Principali, Manuale del Giocatore e Manuale del Master sono testo
-              affidabile (digitale vero o trascritto a mano); le altre fonti fra i risultati sono{" "}
+              affidabile (digitale vero o trascritto a mano); la Costa della Spada è{" "}
               {REGOLE_WARNINGS.costa_spada}
             </>
           ) : (

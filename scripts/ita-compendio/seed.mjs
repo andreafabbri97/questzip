@@ -184,6 +184,7 @@ async function seedRegole(bookKey) {
       testo: s.testo,
       pagina: s.pagina,
       fonte: s.fonte,
+      ordine: s.ordine ?? null,
     });
   }
   console.log(`${sections.length} sezioni di regole caricate da ${bookKey}.`);

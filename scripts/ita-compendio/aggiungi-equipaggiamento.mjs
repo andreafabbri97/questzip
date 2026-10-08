@@ -69,7 +69,7 @@ for (const [nomeParsato, valore] of Object.entries(mappa.voci)) {
   if (!inglese) { saltate.push(`${nomeItaliano} — "${valore.en}" non è una voce ${fonteInglese} di 5etools`); continue; }
   if (giaInTabella.has(nomeItaliano) || giaAgganciati.has(valore.en)) { saltate.push(`${nomeItaliano} — già in tabella`); continue; }
 
-  // Una manciata di voci non compare come riga di tabella nell'estrazione (il Ninnolo, l'Abaco, la
+  // Una manciata di voci non compare come riga di tabella nell'estrazione (l'Oggetto Insolito, l'Abaco, la
   // Rete, lo Scudo): il nome italiano è quello del manuale ma non c'è un costo estratto con cui
   // verificare l'abbinamento. Entrano lo stesso — sono nomi senza ambiguità possibile — ma vengono
   // contate a parte, così non sembrano verificate come le altre.
