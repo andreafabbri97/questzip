@@ -6,6 +6,7 @@ import {
   quotaIlleggibile,
   riparaDadiFraParentesi,
   ripristinaAccentiPersi,
+  ripristinaTestoOggettiMagici,
   togliColonnaCaratteristiche,
 } from "./ocr-cleanup";
 
@@ -343,6 +344,69 @@ describe("refusi delle schede dei mostri", () => {
   it("toglie il trattino di sillabazione invisibile", () => {
     expect(pulisciTestoOcr("l'incandescente combat\u00ad timento emblematico")).toBe(
       "l'incandescente combattimento emblematico",
+    );
+  });
+});
+
+describe("ripristinaTestoOggettiMagici", () => {
+  // Frasi vere del catalogo degli oggetti magici, come erano nel Compendio.
+  it("rimette la congiunzione e il verbo letti come simboli", () => {
+    expect(ripristinaTestoOggettiMagici("pu\u00f2 usare un'azione \u20ac spendere 1 carica")).toBe(
+      "pu\u00f2 usare un'azione e spendere 1 carica",
+    );
+    expect(ripristinaTestoOggettiMagici("la tunica non & mai considerata")).toBe(
+      "la tunica non \u00e8 mai considerata",
+    );
+  });
+
+  it("ricompone le legature perse", () => {
+    expect(ripristinaTestoOggettiMagici("i danni efettuati, un efetto, gli infigge 2d6, il tipo infitto")).toBe(
+      "i danni effettuati, un effetto, gli infligge 2d6, il tipo inflitto",
+    );
+    expect(ripristinaTestoOggettiMagici("la scopa smette di futtuare e Lefletto termina")).toBe(
+      "la scopa smette di fluttuare e L'effetto termina",
+    );
+    expect(ripristinaTestoOggettiMagici("subisce 4d6 danni da {uoco")).toBe("subisce 4d6 danni da fuoco");
+  });
+
+  it("rimette gli apostrofi spariti", () => {
+    expect(ripristinaTestoOggettiMagici("pronuncia la parola dordine ogni giorno allalba")).toBe(
+      "pronuncia la parola d'ordine ogni giorno all'alba",
+    );
+    expect(ripristinaTestoOggettiMagici("Se spende lultima carica, Lanello si sbriciola")).toBe(
+      "Se spende l'ultima carica, L'anello si sbriciola",
+    );
+    expect(ripristinaTestoOggettiMagici("con questarma magica, allinterno dellarmatura")).toBe(
+      "con quest'arma magica, all'interno dell'armatura",
+    );
+  });
+
+  // \u00c8 il motivo dell'elenco chiuso: queste cominciano come le forme rotte ma sono parole vere.
+  it("non mette apostrofi dentro parole vere", () => {
+    const testo = "la lama riflette la luna, il lato della lancia allarma le guardie, dato che dalla torre";
+    expect(ripristinaTestoOggettiMagici(testo)).toBe(testo);
+  });
+
+  it("ripara lo zero letto al posto della congiunzione", () => {
+    expect(ripristinaTestoOggettiMagici("spendere 1 0 pi\u00f9 cariche")).toBe("spendere 1 o pi\u00f9 cariche");
+    expect(ripristinaTestoOggettiMagici("che usi Forza 0 Costituzione")).toBe("che usi Forza o Costituzione");
+  });
+
+  it("lascia stare gli zeri veri", () => {
+    const testo = "scende a 0 punti ferita. La velocit\u00e0 \u00e8 ridotta a 0 fino al turno successivo, costa 10 mo";
+    expect(ripristinaTestoOggettiMagici(testo)).toBe(testo);
+  });
+
+  it("ripara i dadi e i numeri incollati", () => {
+    expect(ripristinaTestoOggettiMagici("Si tira un dl00e si consulta la tabella")).toBe(
+      "Si tira un d100 e si consulta la tabella",
+    );
+    expect(ripristinaTestoOggettiMagici("ha gi\u00e0 Idl0 livelli di energia")).toBe("ha gi\u00e0 1d10 livelli di energia");
+    expect(ripristinaTestoOggettiMagici("un risultato di 20al tiro per colpire")).toBe(
+      "un risultato di 20 al tiro per colpire",
+    );
+    expect(ripristinaTestoOggettiMagici("recupera 1d6 + 1 cariche e infligge 2d10 danni")).toBe(
+      "recupera 1d6 + 1 cariche e infligge 2d10 danni",
     );
   });
 });

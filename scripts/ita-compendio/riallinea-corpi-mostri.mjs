@@ -15,12 +15,13 @@
 // lungo dell'originale da far pensare che si sia mangiato la prosa della pagina.
 //
 // Uso: node --env-file=../../.env.local riallinea-corpi-mostri.mjs [--applica] [--elenco]
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { neon } from "@neondatabase/serverless";
 import { pulisciCorpoScheda } from "../../lib/ocr-cleanup.ts";
 import { togliTestatinePagina } from "../../lib/testatine-pagina.ts";
+import { togliProsaDiPagina } from "../../lib/prosa-di-pagina.ts";
 import { risolviCopie } from "../../lib/fivetools/risolvi-copia.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -74,6 +75,11 @@ function testoInglese(valore) {
 }
 
 const pulisci = (t) => pulisciCorpoScheda(togliTestatinePagina(t ?? "")).trim();
+// Dall'uscita del parser si toglie anche la prosa della pagina, PRIMA del confronto: a parità di
+// dadi il testo "più lungo" vinceva proprio perché si portava dietro la coda. Non lo si fa sul
+// testo già in tabella: lì la stessa pulizia passa da togli-prosa-schede.mjs, che prima di
+// scrivere controlla di non aver tagliato troppo.
+const pulisciNuovo = (t) => togliProsaDiPagina(pulisci(t));
 
 const index = await (await fetch(`${B}/bestiary/index.json`)).json();
 const files = await Promise.all(
@@ -102,7 +108,17 @@ function schedeDi(libro) {
   return schedePerLibro.get(libro);
 }
 
-const esito = { sostituite: 0, ripulite: 0, intatte: 0, senzaScheda: [], scartate: [], ancoraDiverse: [] };
+// Le schede trascritte a mano dalle pagine (parsed/trascritti-mostri-*.json) non si sostituiscono
+// mai con l'uscita del parser: sono già il testo giusto, e proprio per questo sono più CORTE di
+// quelle rigenerate, che si portano dietro righe di rumore. A parità di dadi il criterio "più
+// lungo è meglio" le avrebbe sovrascritte alla prima esecuzione successiva.
+const trascritteAMano = new Set();
+for (const file of readdirSync(path.join(__dirname, "parsed")).filter((f) => /^trascritti-mostri-.*\.json$/.test(f))) {
+  const { fonte, voci } = JSON.parse(readFileSync(path.join(__dirname, "parsed", file), "utf-8"));
+  for (const voce of voci ?? []) trascritteAMano.add(`${voce.nome}|${fonte}`);
+}
+
+const esito = { sostituite: 0, ripulite: 0, intatte: 0, protette: 0, senzaScheda: [], scartate: [], ancoraDiverse: [] };
 let dadiRecuperati = 0;
 
 for (const r of righe) {
@@ -123,10 +139,12 @@ for (const r of righe) {
 
   let scelto = vecchio;
   let motivo = null;
-  if (!scheda) {
+  if (trascritteAMano.has(`${r.nome}|${r.fonte}`)) {
+    esito.protette++;
+  } else if (!scheda) {
     esito.senzaScheda.push(`${r.nome} [${r.fonte}]`);
   } else {
-    const nuovo = Object.fromEntries(SEZIONI.map(([colonna, campo]) => [colonna, pulisci(scheda[campo])]));
+    const nuovo = Object.fromEntries(SEZIONI.map(([colonna, campo]) => [colonna, pulisciNuovo(scheda[campo])]));
     const testoNuovo = Object.values(nuovo).join("\n");
     const scartoVecchio = eng ? scarto(dadi(testoVecchio), dadiEng) : null;
     const scartoNuovo = eng ? scarto(dadi(testoNuovo), dadiEng) : null;
@@ -135,7 +153,9 @@ for (const r of righe) {
       eng &&
       (scartoNuovo < scartoVecchio ||
         (scartoNuovo === scartoVecchio && testoNuovo.length > testoVecchio.length * 1.05));
-    if (migliore && !troppoLungo) {
+    // E nemmeno troppo corto: se scende sotto l'originale e sotto ciò che c'era, ha perso qualcosa.
+    const troppoCorto = eng && testoNuovo.length < Math.min(testoVecchio.length, 0.95 * lunghezzaEng);
+    if (migliore && !troppoLungo && !troppoCorto) {
       scelto = nuovo;
       motivo = "sostituita";
       dadiRecuperati += scartoVecchio - scartoNuovo;
@@ -168,6 +188,7 @@ for (const r of righe) {
 
 console.log(`${applica ? "" : "[PROVA] "}schede col testo sostituito: ${esito.sostituite} (dadi recuperati: ${dadiRecuperati})`);
 console.log(`schede solo ripulite sul posto: ${esito.ripulite} — invariate: ${esito.intatte}`);
+console.log(`trascritte a mano, lasciate come sono: ${esito.protette}`);
 console.log(`senza una scheda rigenerata da confrontare: ${esito.senzaScheda.length}`);
 console.log(`testo nuovo scartato perché troppo lungo rispetto all'originale: ${esito.scartate.length}`);
 console.log(`dadi ancora diversi dall'originale: ${esito.ancoraDiverse.length} schede`);

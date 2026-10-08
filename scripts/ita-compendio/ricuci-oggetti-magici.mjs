@@ -15,7 +15,7 @@
 // minuscola, dopo un punto una maiuscola.
 //
 // Uso: node --env-file=../../.env.local ricuci-oggetti-magici.mjs [--applica]
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { neon } from "@neondatabase/serverless";
@@ -136,9 +136,20 @@ pagine.forEach((pagina, p) => {
   }
 });
 
+// Le voci trascritte a mano dalle pagine (parsed/trascritti-oggetti-magici-*.json) sono già il
+// testo giusto: qui non si toccano. I loro punti e virgola sono quelli stampati sul manuale, e una
+// regola pensata per i refusi dell'OCR li rovinerebbe.
+const trascritteAMano = new Set();
+for (const file of readdirSync(path.join(__dirname, "parsed")).filter((f) => /^trascritti-oggetti-magici-.*\.json$/.test(f))) {
+  for (const voce of JSON.parse(readFileSync(path.join(__dirname, "parsed", file), "utf-8")).voci ?? []) {
+    trascritteAMano.add(voce.nome);
+  }
+}
+
 // Prima i più troncati: se due oggetti si contendono lo stesso orfano, vince chi ne ha più bisogno.
 const candidati = [];
 for (const r of righe) {
+  if (trascritteAMano.has(r.nome)) continue;
   const en = inglese.get(`${r.nome_inglese}|${r.fonte_inglese}`);
   if (!en) continue;
   const testoEn = prosa(en);

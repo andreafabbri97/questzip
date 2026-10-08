@@ -289,3 +289,72 @@ export function ripristinaAccentiPersi(testo: string): string {
       .replace(A_ACCENTATA, (m) => `${m.slice(0, -1)}à`)
   );
 }
+
+// Parole a cui l'OCR ha tolto l'apostrofo, incollando l'articolo o la preposizione al nome:
+// "la parola dordine", "ogni giorno allalba", "spende lultima carica". Elenco CHIUSO, ricavato
+// contando le forme nel catalogo degli oggetti magici: una regola generale ("l" + vocale) farebbe
+// a pezzi parole vere — "luna", "lama", "dato", "allarma" cominciano allo stesso modo.
+const SENZA_APOSTROFO = [
+  "dordine", "dorigine", "dacqua", "daria", "dolio", "darme", "dargento", "desistenza",
+  "allalba", "allinterno", "allinizio", "allesterno", "allaltra",
+  "dallinterno", "dallaltro", "dallincantesimo", "dallaspetto", "dallanello",
+  "dellarmatura", "dellaria", "dellolio", "dellacqua", "dellincantesimo",
+  "questarma", "questultimo",
+  "lultima", "lanello", "laltra", "lelmo", "lapparato", "lelsa", "lestremità",
+  "loriginale", "liniziativa", "larmatura", "labitacolo", "lacqua", "laspetto", "lelemento",
+  "lodore", "lintervento", "lordine", "lapplicazione", "lolio", "lintera", "laccesso", "lalbero",
+  "lallineamento", "lesplosione", "lenergia", "lincantesimo",
+];
+const PREFISSI_ELISI = ["dell", "dall", "nell", "sull", "all", "quest", "l", "d"];
+const RE_SENZA_APOSTROFO = new RegExp(`\\b(${SENZA_APOSTROFO.join("|")})\\b`, "gi");
+
+/**
+ * Ripara i refusi sistematici del catalogo "Oggetti magici A-Z", letto con l'OCR da pagine
+ * fotografate (fonte `oggetti_magici`).
+ *
+ * È un OCR diverso da quello dei bestiari e sbaglia in modo diverso, ma sempre uguale: la
+ * congiunzione "e" in corsivo diventa "€", "è" diventa "&", le legature "ff" e "fl" perdono una
+ * lettera ("efetto", "infigge", "futtua"), gli apostrofi spariscono ("dordine", "allalba") e in
+ * "1 o più cariche" la "o" è letta come zero. Nessuna di queste forme esiste in italiano, quindi
+ * si torna indietro senza indovinare.
+ *
+ * Il punto e virgola al posto della virgola (286 casi) NON si corregge qui: non si riconosce dal
+ * testo, serve il confronto con l'originale — vedi scripts/ita-compendio/ripara-ocr-oggetti-magici.mjs.
+ */
+export function ripristinaTestoOggettiMagici(testo: string): string {
+  return (
+    testo
+      // Un simbolo dell'euro in un manuale dove tutto si paga in monete d'oro è sempre una "e".
+      .replace(/(^|\s)€(?=\s|$)/g, "$1e")
+      .replace(/ & /g, " è ")
+      // Legature perse. "efletto" è la stessa parola con la legatura letta a metà.
+      .replace(/\b([Ee])f(?:l)?ett/g, "$1ffett")
+      // La stessa parola con l'articolo incollato davanti: "lefetto" ha perso legatura e apostrofo.
+      .replace(/\b([Ll])ef(?:l)?ett/g, "$1'effett")
+      .replace(/\b([Ii])nfi(?=gg|tt)/g, "$1nfli")
+      .replace(/\b([Aa])ferr/g, "$1fferr")
+      .replace(/\b([Ff])uttua/g, "$1luttua")
+      // "danni da {uoco", "muro di [uoco": la f letta come parentesi.
+      .replace(/[{[]uoco\b/g, "fuoco")
+      // Niente \b dopo "più": per JavaScript la "ù" non è una lettera di parola, e fra "ù" e lo
+      // spazio non vede alcun confine.
+      .replace(/\b(\d) 0 (pi[uù]|meno)(?=\s|$)/g, "$1 o $2")
+      .replace(/\bpiu(?=\s|[,.;:)]|$)/g, "più")
+      // "Forza 0 Costituzione", "Media 0 Grande": fra due parole di cui la seconda maiuscola uno
+      // zero non può stare (dopo uno zero vero viene un'unità, o un punto).
+      .replace(/(?<=[a-zà-ù]) 0 (?=[A-ZÀ-Ù][a-zà-ù]{2,})/g, " o ")
+      // Dadi con le cifre lette come lettere, fuori dalle parentesi: "un dl00", "Idl0 livelli".
+      .replace(/\b([lI\d]{0,2})d[lI]([0O]{1,2})(e)?\b/g, (_m, quanti: string, zeri: string, e?: string) => {
+        // "si tira un dl00e si consulta": la congiunzione è rimasta attaccata al dado.
+        return `${quanti.replace(/[lI]/g, "1")}d1${zeri.replace(/O/g, "0")}${e ? " e" : ""}`;
+      })
+      // La cifra incollata alla parola che segue: "un risultato di 20al tiro per colpire".
+      .replace(/\b(\d+)(al|del|di)\b/g, "$1 $2")
+      .replace(/#l\s?ai\b/g, "+1 ai")
+      .replace(RE_SENZA_APOSTROFO, (forma) => {
+        const minuscola = forma.toLowerCase();
+        const prefisso = PREFISSI_ELISI.find((p) => minuscola.startsWith(p)) ?? "";
+        return `${forma.slice(0, prefisso.length)}'${forma.slice(prefisso.length)}`;
+      })
+  );
+}
