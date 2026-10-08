@@ -1021,7 +1021,11 @@ const IA_CREATURE_GROUP_ORDER = ["Tratti", "Azioni", "Azioni bonus", "Reazioni",
 
 function parseIaCreatureText(text: string): Map<string, { name: string; text: string }[]> {
   const groups = new Map<string, { name: string; text: string }[]>();
-  for (const line of text.split("\n")) {
+  // I tag di 5etools sopravvivono alla traduzione e nessuno li scioglieva su questo ramo: 166
+  // creature mostravano "{@recharge}" alla lettera in mezzo alla frase italiana, come l'Arma +1
+  // mostrava il suo segnaposto (segnalato dall'utente). "it" perche' qui il testo e' italiano:
+  // renderli in inglese darebbe "(Recharge 6)" dentro una descrizione tradotta.
+  for (const line of stripTags(text, "it").split("\n")) {
     if (!line.trim()) continue;
     let label = "Tratti";
     let rest = line;

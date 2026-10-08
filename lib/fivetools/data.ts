@@ -7,6 +7,7 @@ import {
   type RiferimentoCopia,
   type TemplateCreatura,
 } from "./risolvi-copia";
+import { risolviSegnapostoProfondo, valoriVariante } from "./segnaposto-variante";
 
 // Array (non solo il tipo) apposta: serve anche a runtime per validare un CompendiumKind che
 // arriva da fuori TypeScript — es. un token menzione #{Nome|kind|fonte} scritto a mano dentro un
@@ -394,7 +395,12 @@ function normalizzaVariante(v: RawMagicVariant): RawItem | null {
     rarity: dati.rarity,
     type: v.type,
     reqAttune: dati.reqAttune,
-    entries: dati.entries,
+    // I numeri di queste voci non stanno nel testo ma in campi accanto, richiamati con
+    // `{=bonusWeaponAttack}` e simili. Senza scioglierli il Compendio stampava il rimando alla
+    // lettera, cioe' proprio il valore che si cercava (vedi segnaposto-variante.ts).
+    entries: dati.entries
+      ? risolviSegnapostoProfondo(dati.entries, valoriVariante(v.name, dati))
+      : dati.entries,
   };
 }
 

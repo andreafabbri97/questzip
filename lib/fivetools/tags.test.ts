@@ -42,3 +42,32 @@ describe("stripTags", () => {
     expect(stripTags("Nessun tag qui.")).toBe("Nessun tag qui.");
   });
 });
+
+describe("stripTags in italiano", () => {
+  // Il Compendio ha la traduzione italiana, ma i frammenti meccanici restavano in inglese in
+  // mezzo alla frase tradotta. Su "{@recharge}" era peggio: nessuno lo scioglieva affatto sul
+  // ramo italiano e 166 creature lo mostravano alla lettera (segnalato dall'utente).
+  it("rende la ricarica in italiano", () => {
+    expect(stripTags("Occhi Lampeggianti {@recharge}:", "it")).toBe("Occhi Lampeggianti (Ricarica 6):");
+    expect(stripTags("Soffio {@recharge 5}:", "it")).toBe("Soffio (Ricarica 5-6):");
+  });
+
+  it("usa CD e non DC, che in italiano e' un'altra cosa", () => {
+    expect(stripTags("Tiro salvezza {@dc 15}.", "it")).toBe("Tiro salvezza CD 15.");
+    expect(stripTags("Tiro salvezza {@dc 15}.")).toBe("Tiro salvezza DC 15.");
+  });
+
+  it("traduce il tipo di attacco e il 'colpito'", () => {
+    expect(stripTags("{@atk mw} {@h}", "it")).toBe("Attacco con Arma da Mischia: Colpito: ");
+    expect(stripTags("{@atk rs}", "it")).toBe("Attacco con Incantesimo a Distanza:");
+  });
+
+  it("i valori numerici non cambiano con la lingua", () => {
+    expect(stripTags("{@hit 7} e {@damage 2d6}", "it")).toBe("+7 e 2d6");
+    expect(stripTags("{@hit 7} e {@damage 2d6}")).toBe("+7 e 2d6");
+  });
+
+  it("senza indicare la lingua resta l'inglese, come prima", () => {
+    expect(stripTags("{@recharge}")).toBe("(Recharge 6)");
+  });
+});

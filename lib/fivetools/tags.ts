@@ -17,20 +17,35 @@ const ATK_TAGS: Record<string, string> = {
   rs: "Ranged Spell Attack:",
 };
 
-function resolveTag(tag: string, content: string): string {
+const ATK_TAGS_IT: Record<string, string> = {
+  mw: "Attacco con Arma da Mischia:",
+  rw: "Attacco con Arma a Distanza:",
+  ms: "Attacco con Incantesimo da Mischia:",
+  rs: "Attacco con Incantesimo a Distanza:",
+};
+
+/** La lingua in cui rendere i frammenti meccanici dei tag. */
+export type LinguaTag = "en" | "it";
+
+function resolveTag(tag: string, content: string, lingua: LinguaTag): string {
   const parts = content.split("|");
+  const it = lingua === "it";
 
   switch (tag) {
     case "atk":
-      return ATK_TAGS[parts[0]] ?? parts[0];
+      return (it ? ATK_TAGS_IT : ATK_TAGS)[parts[0]] ?? parts[0];
     case "hit":
       return `${Number(parts[0]) >= 0 ? "+" : ""}${parts[0]}`;
     case "dc":
-      return `DC ${parts[0]}`;
+      // In italiano la Classe Difficoltà si abbrevia CD, non DC: lasciarlo in inglese dentro una
+      // frase italiana confondeva proprio il numero che serve al tavolo.
+      return `${it ? "CD" : "DC"} ${parts[0]}`;
     case "h":
-      return "Hit: ";
-    case "recharge":
-      return parts[0] ? `(Recharge ${parts[0]}-6)` : "(Recharge 6)";
+      return it ? "Colpito: " : "Hit: ";
+    case "recharge": {
+      const quando = parts[0] ? `${parts[0]}-6` : "6";
+      return it ? `(Ricarica ${quando})` : `(Recharge ${quando})`;
+    }
     case "chance":
       return `${parts[0]}%`;
     // Tag dove i segmenti dopo il primo sono metadati di collegamento (capitolo, filtri di
@@ -57,12 +72,12 @@ function resolveTag(tag: string, content: string): string {
 // tag malformato (una graffa mai chiusa) resta com'e' invece di bloccare la pagina.
 const MAX_PASSATE = 3;
 
-export function stripTags(text: string): string {
+export function stripTags(text: string, lingua: LinguaTag = "en"): string {
   let risultato = text;
   for (let passata = 0; passata < MAX_PASSATE && risultato.includes("{@"); passata++) {
     const precedente = risultato;
     risultato = risultato.replace(/\{@(\w+)(?:\s+([^{}]*))?\}/g, (_, tag: string, content = "") =>
-      resolveTag(tag, content.trim()),
+      resolveTag(tag, content.trim(), lingua),
     );
     if (risultato === precedente) break;
   }
