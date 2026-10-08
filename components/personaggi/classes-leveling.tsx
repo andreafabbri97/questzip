@@ -792,8 +792,11 @@ export function RaceTraits({ razza }: { razza: string }) {
 }
 
 export function BackgroundTraits({ background }: { background: string }) {
-  // Espanso di default, stesso motivo di showFeatures sopra.
-  const [showTraits, setShowTraits] = useState(true);
+  // CHIUSO di default, al contrario dei privilegi di classe e dei tratti di razza. Quelli
+  // servono durante il gioco e vanno trovati senza un click in piu'; il background e' narrativa,
+  // si legge una volta a inizio campagna e poi occupa mezza schermata ogni volta che si apre
+  // "Info & Personalita" (segnalato dall'utente).
+  const [showTraits, setShowTraits] = useState(false);
   const [data, setData] = useState<RawBackground | null | undefined>(undefined);
 
   useEffect(() => {

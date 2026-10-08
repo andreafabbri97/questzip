@@ -838,6 +838,9 @@ export const compendioItaMostri = pgTable("compendio_ita_mostro", {
   pe: text("pe"),
   tratti: text("tratti").notNull().default(""),
   azioni: text("azioni").notNull().default(""),
+  // Sezione a sé nei manuali dal 2021 in poi (Mostri del Multiverso, Fizban, Bigby). Finché non
+  // aveva una colonna, il parser la scambiava per il titolo del capitolo dopo e troncava la scheda.
+  azioniBonus: text("azioni_bonus").notNull().default(""),
   azioniLeggendarie: text("azioni_leggendarie").notNull().default(""),
   reazioni: text("reazioni").notNull().default(""),
   numericSuspect: boolean("numeric_suspect").notNull().default(false),

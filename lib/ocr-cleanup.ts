@@ -88,13 +88,100 @@ const PAROLE_CORROTTE: Sostituzione[] = [
 const CARATTERI_DI_CONTROLLO = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g;
 
 export function pulisciTestoOcr(testo: string): string {
-  let out = testo.replace(CARATTERI_DI_CONTROLLO, "");
+  let out = testo
+    .replace(CARATTERI_DI_CONTROLLO, "")
+    // Il trattino "morbido" (U+00AD) segna il punto in cui il PDF ha spezzato una parola a
+    // fine riga. A schermo non si vede, ma resta nel testo con lo spazio che lo segue:
+    // "combat­ timento" si leggeva "combat timento" e non si trovava cercando la parola.
+    .replace(/\u00ad\s*/g, "");
   for (const [pattern, sostituto] of PAROLE_CORROTTE) {
     out = typeof sostituto === "string" ? out.replace(pattern, sostituto) : out.replace(pattern, sostituto);
   }
   // Spazi multipli DENTRO una riga (non gli a capo, che portano la struttura dei paragrafi e che
   // TestoStrutturato usa per distinguere titoli, elenchi e tabelle).
   return out.replace(/[^\S\n]{2,}/g, " ");
+}
+
+// Le facce che un dado può avere: è ciò che permette di riparare i dadi senza rischi. Una
+// parentesi diventa "(1d10 + 3)" solo se, tradotte le lettere in cifre, ne esce un dado che
+// esiste — "(dolo)" o "(lodi)" non ci arriveranno mai.
+const FACCE_DI_DADO = new Set(["2", "3", "4", "6", "8", "10", "12", "20", "100"]);
+
+/**
+ * Ripara i dadi scritti fra parentesi, dove l'OCR ha letto le cifre come lettere.
+ *
+ * Nel testo delle azioni il danno ha sempre la forma "13 (3d6 + 3)", e nei manuali scansionati la
+ * parentesi è il punto più martoriato: "(ldlO + 3)" per (1d10 + 3), "(Sd6)" per (5d6),
+ * "(14d l 0 + 42)" per (14d10 + 42), "{2d& + 4)" per (2d8 + 4). pulisciTestoOcr si ferma a
+ * "ld6": qui le lettere sbagliate sono anche DOPO la d, e spesso con uno spazio in mezzo.
+ *
+ * Fuori dalle parentesi non si tocca niente: lì una "l" o una "S" sono quasi sempre lettere vere.
+ */
+export function riparaDadiFraParentesi(testo: string): string {
+  return testo.replace(
+    /[({]([\dlIOoS&\s]*d[\dlIOoS&\s]+(?:[+\-−][\dlIOoS&\s]+)?)[)}]/g,
+    (intero, dentro: string) => {
+      const cifre = dentro
+        .replace(/[lI]/g, "1")
+        .replace(/[Oo]/g, "0")
+        .replace(/S/g, "5")
+        .replace(/&/g, "8")
+        .replace(/\s+/g, "");
+      const m = cifre.match(/^(\d+)d(\d+)(?:([+\-−])(\d+))?$/);
+      if (!m || !FACCE_DI_DADO.has(m[2])) return intero;
+      return m[3] ? `(${m[1]}d${m[2]} ${m[3]} ${m[4]})` : `(${m[1]}d${m[2]})`;
+    },
+  );
+}
+
+// La colonna delle caratteristiche dello stat block, finita in testa ai tratti: una sigla per
+// riga ("INT") e sotto il suo valore ("12 (+l)"). Succede quando nel PDF la colonna sta di fianco
+// alla riga "Sfida" e l'estrazione la legge dopo.
+const RIGA_SIGLA = /^(?:FOR|DES|COS|I ?NT|SAG|SAC|CAR)$/i;
+const RIGA_PUNTEGGIO = /^[\dlISOo ]{1,5}\s?[({]\s?[+\-−·]?\s?[\dlISOo ]{1,3}[)}]$/;
+
+/** Toglie le righe della colonna delle caratteristiche rimaste in cima a una sezione. */
+export function togliColonnaCaratteristiche(testo: string): string {
+  const righe = testo.split("\n");
+  const tenute: string[] = [];
+  let i = 0;
+  for (; i < righe.length; i++) {
+    const riga = righe[i].trim();
+    if (RIGA_SIGLA.test(riga) || RIGA_PUNTEGGIO.test(riga)) continue;
+    // "Bonus di Competenza +2" sta fra la Sfida e i tratti, in mezzo alla colonna colata: è
+    // un'informazione vera e resta, ma non interrompe la ricerca delle righe da togliere.
+    if (/^Bonus di competenza/i.test(riga)) {
+      tenute.push(righe[i]);
+      continue;
+    }
+    break;
+  }
+  return [...tenute, ...righe.slice(i)].join("\n");
+}
+
+/**
+ * Pulizia del testo di tratti e azioni di una scheda di mostro: quella generale, più le due
+ * riparazioni che hanno senso solo dentro uno stat block.
+ */
+export function pulisciCorpoScheda(testo: string): string {
+  const riparato = riparaDadiFraParentesi(pulisciTestoOcr(togliColonnaCaratteristiche(testo)))
+    // "Colpito: 1 3 (3d6 + 3) danni": il danno medio, spezzato in due dalla colonna stretta. Si
+    // ricompone solo davanti alla parentesi dei dadi, dove due cifre staccate non possono essere
+    // due numeri distinti.
+    .replace(/\b(\d) (\d)(?= \(\d+d\d+)/g, "$1$2")
+    // "CD 1 4": stessa spezzatura sulla classe difficoltà, che è sempre un numero solo.
+    .replace(/\bCD (\d) (\d)\b/g, "CD $1$2")
+    // "I l dragocchio": l'articolo letto come due lettere staccate. "I l" non è italiano.
+    .replace(/\bI l\b/g, "Il")
+    // "11 bersaglio deve...": lo stesso articolo letto come il numero undici. Solo a inizio
+    // frase e non davanti a un'unità di misura, dove undici è un numero vero.
+    .replace(
+      /(^|[.:;!?]\s+)11 (?!(?:metri|punti|danni|creature|cariche|ore|minuti|round|giorni|anni|kg|m)\b)(?=[a-zà-ù]{3,})/gm,
+      "$1Il ",
+    )
+    // "l: Raggio paralizzante": la voce numero 1 di un elenco, con la cifra letta come elle.
+    .replace(/^l: /gm, "1: ");
+  return riparato;
 }
 
 /** Sostituisce le lettere che l'OCR ha messo al posto di cifre: l/I valgono 1, O/o valgono 0. */
@@ -154,4 +241,51 @@ export function quotaIlleggibile(testo: string): number {
       /[a-zà-ù][A-ZÀ-Ù]/.test(p), // maiuscola in mezzo
   ).length;
   return rotte / parole.length;
+}
+
+// Le parole in "-ità" (e simili) che compaiono nei testi di regole. Elenco CHIUSO: "ferita",
+// "vita", "limita", "evita", "capita" finiscono allo stesso modo e sono giuste così.
+const PAROLE_IN_A_ACCENTATA = [
+  "velocita", "abilita", "immunita", "oscurita", "opportunita", "invisibilita", "capacita",
+  "profondita", "mostruosita", "entita", "divinita", "qualita", "quantita", "possibilita",
+  "furtivita", "vulnerabilita", "citta", "rapidita", "volonta", "difficolta", "liberta", "realta",
+];
+const A_ACCENTATA = new RegExp(`\\b(${PAROLE_IN_A_ACCENTATA.join("|")})\\b`, "gi");
+
+/**
+ * Rimette gli accenti a un testo estratto da un PDF che li ha persi.
+ *
+ * Il Calderone di Tasha ha uno strato di testo in cui le vocali accentate sono state lette in
+ * modo sistematico come qualcos'altro: ogni "è" è diventata "é" (o "@"), "ù" è diventata "t",
+ * "ti" o "tt" ("pit", "piti", "pitt"), "ò" è diventata "d" ("pud", "cid") e la "à" finale ha
+ * perso l'accento ("velocita", "meta"). Proprio perché l'errore è sempre lo stesso si può
+ * tornare indietro senza indovinare: nessuna di queste forme è una parola italiana.
+ *
+ * Va applicata SOLO ai testi che vengono da quel manuale: altrove "é" isolata o "meta" possono
+ * essere giuste, e la funzione le cambierebbe comunque.
+ *
+ * Restano fuori di proposito le coppie davvero ambigue (da/dà, la/là, si/sì, ne/né, se/sé): lì
+ * l'accento perso non si riconosce dalla parola, e sbagliarlo cambierebbe il senso della frase.
+ */
+export function ripristinaAccentiPersi(testo: string): string {
+  const conIniziale = (originale: string, corretta: string) =>
+    /^[A-ZÀ-Ù]/.test(originale) ? corretta[0].toUpperCase() + corretta.slice(1) : corretta;
+  return (
+    testo
+      // Parola spezzata a fine riga dal PDF e ricucita con trattino e spazio: "incan- tesimi".
+      .replace(/([a-zà-ù]{2,})- ([a-zà-ù]{2,})/g, "$1$2")
+      .replace(/(?<![\p{L}'’])é(?![\p{L}'’])/gu, "è")
+      .replace(/(?<![\p{L}'’])É(?![\p{L}'’])/gu, "È")
+      .replace(/ @ /g, " è ")
+      .replace(/\b(pud|puo)\b/gi, (m) => conIniziale(m, "può"))
+      // "pit:" compare proprio così: i due punti sono un avanzo della "ù".
+      .replace(/\b(pit[it]?:?|piu)(?=[\s,.;)])/gi, (m) => conIniziale(m, "più"))
+      .replace(/\bcid\b/gi, (m) => conIniziale(m, "ciò"))
+      .replace(/\bperd\b/gi, (m) => conIniziale(m, "però"))
+      .replace(/\bgia\b/gi, (m) => conIniziale(m, "già"))
+      .replace(/\bcosi\b/gi, (m) => conIniziale(m, "così"))
+      // "la metà dei danni", "metà della sua velocità": sempre seguita da una preposizione.
+      .replace(/\bmeta(?= d[eai])/gi, (m) => conIniziale(m, "metà"))
+      .replace(A_ACCENTATA, (m) => `${m.slice(0, -1)}à`)
+  );
 }

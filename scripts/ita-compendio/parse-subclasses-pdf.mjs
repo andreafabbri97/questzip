@@ -194,16 +194,28 @@ for (const sub of bookSubclasses) {
   }
 
   // descrizioneIta NON è un paragrafo semplice: è "Nome (Liv. N): testo" una riga per privilegio
-  // (scritto da self-translate-fetch.mjs, letto da parseIaClassText in compendio-detail.tsx per
-  // l'elenco espandibile "Liv. X · Nome" in scheda) — si sostituisce SOLO la prima riga (il nome
-  // e il paragrafo introduttivo della sottoclasse) con la versione presa dal manuale vero,
-  // mantenendo intatte le righe successive (gli altri privilegi, ancora di origine IA finché non
-  // vengono verificati anche quelli).
+  // (scritto da self-translate-fetch.mjs, letto da parseIaClassText in lib/fivetools/testo-ia.ts
+  // per l'elenco "Liv. X · Nome" in scheda). Si sostituisce SOLO la riga dell'introduzione, cioè
+  // quella che porta il nome della sottoclasse, lasciando intatte le altre (i privilegi, ancora
+  // di origine IA finché non vengono verificati anche quelli).
+  //
+  // La si cerca per NOME, non si dà per scontato che sia la prima: finché le righe seguivano
+  // l'ordine grezzo di 5etools, in cinque sottoclassi la prima era un privilegio vero (Orso,
+  // Parata Agile, Campo Protettivo...) e sostituirla alla cieca lo cancellava, lasciando per
+  // giunta due introduzioni. Se la riga non si trova, meglio rinunciare che scrivere sopra altro.
   const existingLines = (existing.descrizioneIta ?? "").split("\n");
-  const firstLineMatch = existingLines[0]?.match(/^(.*?) \(Liv\. (\d+)\):/);
-  const level = firstLineMatch ? firstLineMatch[2] : "?";
-  const restLines = existingLines.slice(1);
-  const newDescrizione = [`${existing.nomeIta} (Liv. ${level}): ${paragraph}`, ...restLines].join("\n");
+  const introIndex = existingLines.findIndex((line) => {
+    const m = line.match(/^(.*?) \(Liv\. (\d+)\):/);
+    return m && normalize(m[1]) === target;
+  });
+  if (introIndex === -1) {
+    needsReview.push({ name: sub.name, source: sub.source, nomeIaAttuale: existing.nomeIta, reason: "nessuna riga porta il nome della sottoclasse: introduzione non sostituita" });
+    continue;
+  }
+  const level = existingLines[introIndex].match(/ \(Liv\. (\d+)\):/)[1];
+  const newLines = existingLines.slice();
+  newLines[introIndex] = `${existing.nomeIta} (Liv. ${level}): ${paragraph}`;
+  const newDescrizione = newLines.join("\n");
 
   matched++;
   console.log(`✓ ${sub.name} (${sub.source}) -> "${existing.nomeIta}": ${paragraph.slice(0, 90)}...`);

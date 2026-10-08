@@ -2,14 +2,19 @@
 // toccarle) le voci in cui l'OCR ha prodotto rumore invece di testo.
 // Uso: node --env-file=../../.env.local pulisci-ocr.mjs [--dry-run]
 import { neon } from "@neondatabase/serverless";
-import { pulisciNumeriStatBlock, pulisciTestoOcr, quotaIlleggibile } from "../../lib/ocr-cleanup.ts";
+import {
+  pulisciCorpoScheda,
+  pulisciNumeriStatBlock,
+  pulisciTestoOcr,
+  quotaIlleggibile,
+} from "../../lib/ocr-cleanup.ts";
 
 const sql = neon(process.env.DATABASE_URL);
 const dryRun = process.argv.includes("--dry-run");
 
 const CAMPI = {
   compendio_ita_incantesimo: ["descrizione", "tempo_di_lancio", "gittata", "componenti", "durata"],
-  compendio_ita_mostro: ["tratti", "azioni", "azioni_leggendarie", "reazioni", "sensi", "linguaggi"],
+  compendio_ita_mostro: ["tratti", "azioni", "azioni_bonus", "azioni_leggendarie", "reazioni", "sensi", "linguaggi"],
   compendio_ita_oggetto: ["descrizione"],
   compendio_ita_talento: ["descrizione", "prerequisito"],
   compendio_ita_razza: ["introduzione"],
@@ -53,6 +58,10 @@ for (const [tabella, colonne] of Object.entries(CAMPI_NUMERICI)) {
 }
 console.log(`${dryRun ? "[PROVA] " : ""}stat block con numeri ricomposti: ${numeriModificati}`);
 
+const CORPO_SCHEDA = new Set(
+  ["tratti", "azioni", "azioni_bonus", "azioni_leggendarie", "reazioni"].map((c) => `compendio_ita_mostro.${c}`),
+);
+
 let modificate = 0;
 const illeggibili = [];
 
@@ -63,7 +72,9 @@ for (const [tabella, colonne] of Object.entries(CAMPI)) {
     for (const c of colonne) {
       const v = riga[c];
       if (typeof v !== "string" || !v) continue;
-      const pulito = pulisciTestoOcr(v);
+      // Tratti e azioni hanno refusi che esistono solo dentro uno stat block (i dadi fra
+      // parentesi, la colonna delle caratteristiche colata in testa): pulizia dedicata.
+      const pulito = CORPO_SCHEDA.has(`${tabella}.${c}`) ? pulisciCorpoScheda(v) : pulisciTestoOcr(v);
       if (pulito !== v) patch[c] = pulito;
       if (quotaIlleggibile(v) > 0.5) {
         illeggibili.push({ tabella, id: riga.id, campo: c, estratto: v.trim().slice(0, 60) });

@@ -999,11 +999,16 @@ const ACTION_GROUPS: { key: keyof RawCreature; label: string }[] = [
   { key: "legendary", label: "Azioni leggendarie" },
 ];
 
-const ITA_MONSTER_SECTIONS: { key: "tratti" | "azioni" | "azioniLeggendarie" | "reazioni"; label: string }[] = [
+// Nell'ordine in cui le stampa il manuale: azioni bonus e reazioni prima delle leggendarie.
+const ITA_MONSTER_SECTIONS: {
+  key: "tratti" | "azioni" | "azioniBonus" | "reazioni" | "azioniLeggendarie";
+  label: string;
+}[] = [
   { key: "tratti", label: "Tratti" },
   { key: "azioni", label: "Azioni" },
-  { key: "azioniLeggendarie", label: "Azioni leggendarie" },
+  { key: "azioniBonus", label: "Azioni bonus" },
   { key: "reazioni", label: "Reazioni" },
+  { key: "azioniLeggendarie", label: "Azioni leggendarie" },
 ];
 
 // Il testo IA dei mostri (compendio_traduzione_ia.descrizioneIta) è un unico blob piatto, non la
@@ -2024,9 +2029,17 @@ function ClassDetail({ cls, language }: { cls: RawClass; language: Language }) {
   const subclasses = useMemo(() => {
     if (!classData) return [];
     const names = new Set<string>();
-    return classData.subclasses
-      .filter((sub) => sub.className === cls.name && sub.classSource === cls.source)
-      .filter((sub) => (names.has(sub.name) ? false : (names.add(sub.name), true)));
+    return (
+      classData.subclasses
+        .filter((sub) => sub.className === cls.name && sub.classSource === cls.source)
+        // Una stessa sottoclasse puo' esistere in piu' manuali (la Lama Spirituale sta sia in
+        // Tasha's sia nel Manuale 2024) e l'eliminazione dei doppioni qui sotto tiene la PRIMA
+        // che incontra. Senza questo ordinamento il Ladro 2024 mostrava la Lama Spirituale di
+        // Tasha's, cioe' la versione di un'altra edizione: si preferisce quella pubblicata nello
+        // stesso manuale della classe che si sta leggendo.
+        .sort((a, b) => Number(b.source === cls.source) - Number(a.source === cls.source))
+        .filter((sub) => (names.has(sub.name) ? false : (names.add(sub.name), true)))
+    );
   }, [classData, cls]);
 
   const subclassesBlock = classData && subclasses.length > 0 && (

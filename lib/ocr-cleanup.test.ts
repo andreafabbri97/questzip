@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { pulisciNumeriStatBlock, pulisciTestoOcr, quotaIlleggibile } from "./ocr-cleanup";
+import {
+  pulisciCorpoScheda,
+  pulisciNumeriStatBlock,
+  pulisciTestoOcr,
+  quotaIlleggibile,
+  riparaDadiFraParentesi,
+  ripristinaAccentiPersi,
+  togliColonnaCaratteristiche,
+} from "./ocr-cleanup";
 
 describe("pulisciTestoOcr", () => {
   it("ripara l'intestazione ricorrente degli incantesimi", () => {
@@ -173,5 +181,168 @@ describe("zero letto al posto della congiunzione o", () => {
     expect(pulisciTestoOcr("quando scende a 0 punti ferita")).toBe("quando scende a 0 punti ferita");
     expect(pulisciTestoOcr("la verga possiede 0 cariche rimaste")).toBe("la verga possiede 0 cariche rimaste");
     expect(pulisciTestoOcr("velocità pari a 0 metri")).toBe("velocità pari a 0 metri");
+  });
+});
+
+describe("riparaDadiFraParentesi", () => {
+  // I casi veri trovati nel bestiario: la parentesi del danno è il punto più rovinato dall'OCR.
+  it("rimette le cifre al posto delle lettere", () => {
+    expect(riparaDadiFraParentesi("Colpo: 8 (ldlO + 3) danni perforanti")).toBe(
+      "Colpo: 8 (1d10 + 3) danni perforanti",
+    );
+    expect(riparaDadiFraParentesi("subisce 17 (Sd6) danni da freddo")).toBe(
+      "subisce 17 (5d6) danni da freddo",
+    );
+    expect(riparaDadiFraParentesi("Punti Ferita 119 (14d l 0 + 42)")).toBe(
+      "Punti Ferita 119 (14d10 + 42)",
+    );
+    expect(riparaDadiFraParentesi("8 {l d& + 4) danni contundenti")).toBe(
+      "8 (1d8 + 4) danni contundenti",
+    );
+  });
+
+  it("normalizza gli spazi di un dado già giusto", () => {
+    expect(riparaDadiFraParentesi("11 (2d6+4) danni")).toBe("11 (2d6 + 4) danni");
+    expect(riparaDadiFraParentesi("3 (1d6 - 1) danni")).toBe("3 (1d6 - 1) danni");
+  });
+
+  // Il vincolo sulle facce è ciò che rende sicura la regola: senza, qualunque parentesi fatta di
+  // quelle lettere verrebbe "riparata".
+  it("non tocca le parentesi che non sono dadi", () => {
+    for (const testo of ["(dolo)", "(solo di giorno)", "(ricarica 5-6)", "(1d7)", "(lodi)", "(S)"]) {
+      expect(riparaDadiFraParentesi(testo)).toBe(testo);
+    }
+  });
+
+  it("non tocca le lettere fuori dalle parentesi", () => {
+    const testo = "Il Soldato colpisce l'Ogre (2d8 + 4) e lo Spettro";
+    expect(riparaDadiFraParentesi(testo)).toBe(testo);
+  });
+});
+
+describe("togliColonnaCaratteristiche", () => {
+  it("toglie sigle e punteggi rimasti in cima ai tratti", () => {
+    const testo = "INT\n12 (+l)\nSAG\n14 (+2)\nDevozione draconica. Mentre l'ufficiale vede un drago...";
+    expect(togliColonnaCaratteristiche(testo)).toBe(
+      "Devozione draconica. Mentre l'ufficiale vede un drago...",
+    );
+  });
+
+  it("si ferma alla prima riga di testo vero, senza guardare oltre", () => {
+    const testo = "Anfibio. Può respirare in aria e in acqua.\nCAR\n10 (+0)";
+    expect(togliColonnaCaratteristiche(testo)).toBe(testo);
+  });
+
+  it("tiene il bonus di competenza che sta in mezzo alla colonna", () => {
+    const testo = "INT\n12 (+l)\nBonus di Competenza +2\nCAR\n16 (+3)\nNatura insolita. Non mangia.";
+    expect(togliColonnaCaratteristiche(testo)).toBe(
+      "Bonus di Competenza +2\nNatura insolita. Non mangia.",
+    );
+  });
+
+  it("lascia stare un testo che comincia in modo normale", () => {
+    expect(togliColonnaCaratteristiche("Carica. Se il toro si muove...")).toBe(
+      "Carica. Se il toro si muove...",
+    );
+  });
+});
+
+describe("pulisciCorpoScheda", () => {
+  it("ricompone il danno medio spezzato davanti ai dadi", () => {
+    expect(pulisciCorpoScheda("Colpo: 1 3 (3d6 + 3) danni perforanti.")).toBe(
+      "Colpo: 13 (3d6 + 3) danni perforanti.",
+    );
+  });
+
+  it("ricompone la classe difficoltà spezzata", () => {
+    expect(pulisciCorpoScheda("tiro salvezza su Costituzione con CD 1 4.")).toBe(
+      "tiro salvezza su Costituzione con CD 14.",
+    );
+  });
+
+  // Due numeri veri accanto, senza dadi dopo: non vanno fusi.
+  it("non fonde due numeri distinti", () => {
+    expect(pulisciCorpoScheda("colpisce 2 o 3 bersagli entro 9 metri")).toBe(
+      "colpisce 2 o 3 bersagli entro 9 metri",
+    );
+  });
+});
+
+describe("ripristinaAccentiPersi", () => {
+  // Frasi vere degli incantesimi di Tasha, così come erano finite nel Compendio.
+  it("rimette gli accenti persi in modo sistematico", () => {
+    expect(ripristinaAccentiPersi("l'incantatore pud muovere la lama")).toBe(
+      "l'incantatore può muovere la lama",
+    );
+    expect(ripristinaAccentiPersi("La lama é in grado di attraversare")).toBe(
+      "La lama è in grado di attraversare",
+    );
+    expect(ripristinaAccentiPersi("Se il bersaglio @ una creatura")).toBe(
+      "Se il bersaglio è una creatura",
+    );
+    expect(ripristinaAccentiPersi("uno slot di livello pit: alto che")).toBe(
+      "uno slot di livello più alto che",
+    );
+    expect(ripristinaAccentiPersi("non pitt di 9 metri, il metodo piti diretto")).toBe(
+      "non più di 9 metri, il metodo più diretto",
+    );
+    expect(ripristinaAccentiPersi("subisce soltanto la meta di quei danni")).toBe(
+      "subisce soltanto la metà di quei danni",
+    );
+    expect(ripristinaAccentiPersi("Velocita 9 m, se possiede gia uno stile")).toBe(
+      "Velocità 9 m, se possiede già uno stile",
+    );
+    expect(ripristinaAccentiPersi("Pud usare cid che trova")).toBe("Può usare ciò che trova");
+  });
+
+  it("ricuce le parole spezzate a fine riga", () => {
+    expect(ripristinaAccentiPersi("uno di questi incan- tesimi senza spendere slot")).toBe(
+      "uno di questi incantesimi senza spendere slot",
+    );
+  });
+
+  // Finiscono in "-ita" ma sono giuste: per questo l'elenco delle parole è chiuso.
+  it("non tocca le parole che finiscono allo stesso modo ma non vogliono l'accento", () => {
+    const testo = "recupera 1 punto ferita, evita il colpo e limita i danni per tutta la vita";
+    expect(ripristinaAccentiPersi(testo)).toBe(testo);
+  });
+
+  it("non tocca le é dentro una parola né le coppie ambigue", () => {
+    const testo = "finché non usa di nuovo il privilegio, dopodiché la creatura si sposta da sé";
+    expect(ripristinaAccentiPersi(testo)).toBe(testo);
+  });
+
+  it("non tocca un trattino vero", () => {
+    expect(ripristinaAccentiPersi("un semi-piano e l'auto-guarigione")).toBe(
+      "un semi-piano e l'auto-guarigione",
+    );
+  });
+});
+
+describe("refusi delle schede dei mostri", () => {
+  it("ricompone l'articolo letto a pezzi o come numero", () => {
+    expect(pulisciCorpoScheda("Natura insolita. I l dragocchio non ha bisogno di mangiare.")).toBe(
+      "Natura insolita. Il dragocchio non ha bisogno di mangiare.",
+    );
+    expect(pulisciCorpoScheda("4: Raggio infuocato. 11 bersaglio deve effettuare un tiro salvezza")).toBe(
+      "4: Raggio infuocato. Il bersaglio deve effettuare un tiro salvezza",
+    );
+  });
+
+  it("lascia stare l'undici quando è un numero", () => {
+    const testo = "Colpito: 11 (2d6 + 4) danni. 11 metri più in là, altre 11 creature.";
+    expect(pulisciCorpoScheda(testo)).toBe(testo);
+  });
+
+  it("ripristina la prima voce di un elenco numerato", () => {
+    expect(pulisciCorpoScheda("raggi oculari:\nl: Raggio paralizzante.\n2: Raggio debilitante.")).toBe(
+      "raggi oculari:\n1: Raggio paralizzante.\n2: Raggio debilitante.",
+    );
+  });
+
+  it("toglie il trattino di sillabazione invisibile", () => {
+    expect(pulisciTestoOcr("l'incandescente combat\u00ad timento emblematico")).toBe(
+      "l'incandescente combattimento emblematico",
+    );
   });
 });

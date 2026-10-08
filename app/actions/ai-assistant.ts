@@ -102,7 +102,7 @@ async function buildContestoUfficiale(candidate: MentionCandidate): Promise<stri
         campo("velocita") && `velocità ${campo("velocita")}`,
         campo("sfida") && `Grado Sfida ${campo("sfida")}`,
       ].filter(Boolean).join(", ");
-      const corpo = [campo("tratti"), campo("azioni")].filter(Boolean).join(" ");
+      const corpo = [campo("tratti"), campo("azioni"), campo("azioniBonus")].filter(Boolean).join(" ");
       return `${intestazione} — ${dati}. ${truncate(corpo, MAX_EXCERPT_CHARS)}`;
     }
     case "oggetti": {

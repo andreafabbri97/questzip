@@ -100,7 +100,35 @@ const OPTIONAL_FIELD_LABELS = [
 ];
 const OPTIONAL_FIELD_RE = new RegExp(`^(${OPTIONAL_FIELD_LABELS.join("|")})\\s+(.*)$`, "i");
 
-const SECTION_HEADING_RE = /^(AZIONI LEGGENDARIE|AZIONI DA MITO|AZIONI|REAZIONI|TRATTI)$/;
+// Le intestazioni di sezione dello stat block, e il campo in cui finisce ciò che le segue.
+//
+// Si confrontano SENZA spazi: nei manuali scansionati il maiuscoletto esce a lettere staccate
+// ("AZ I O N I", "R EAZ I O N E"), e per anni l'elenco è stato anche incompleto — mancavano le
+// AZIONI BONUS, che nei manuali dal 2021 in poi compaiono in una scheda su tre, e il singolare
+// usato quando la voce è una sola. Una sezione non riconosciuta non è un dettaglio: fineStatBlock
+// qui sotto prende per "titolo del capitolo successivo" ogni riga in maiuscolo che non sia una
+// sezione, quindi tagliava la scheda proprio lì. Erano 335 mostri su 661 senza azioni, o senza
+// tutto quello che veniva dopo le azioni bonus.
+const SEZIONI = {
+  TRATTI: "tratti",
+  AZIONI: "azioni",
+  AZIONE: "azioni",
+  AZIONIBONUS: "azioniBonus",
+  AZIONEBONUS: "azioniBonus",
+  REAZIONI: "reazioni",
+  REAZIONE: "reazioni",
+  AZIONILEGGENDARIE: "azioniLeggendarie",
+  AZIONELEGGENDARIA: "azioniLeggendarie",
+  // Le azioni mitiche stanno in coda alle leggendarie, e si leggono insieme a quelle.
+  AZIONIDAMITO: "azioniLeggendarie",
+  AZIONIMITICHE: "azioniLeggendarie",
+};
+
+/** Il campo a cui appartiene un'intestazione di sezione, o null se la riga non lo è. */
+function sezioneDi(linea) {
+  if (!/^[A-ZÀ-Ù][A-ZÀ-Ù\s]*$/.test(linea)) return null;
+  return SEZIONI[linea.replace(/\s+/g, "")] ?? null;
+}
 
 // Lo stat block finisce prima del prossimo mostro: in mezzo c'è la prosa del manuale (la storia dei
 // giganti, i riquadri, a volte un capitolo intero). Senza un confine, tutto quel testo finiva nelle
@@ -110,10 +138,10 @@ const SECTION_HEADING_RE = /^(AZIONI LEGGENDARIE|AZIONI DA MITO|AZIONI|REAZIONI|
 // maiuscole sono quelle (i nomi dei tratti sono in grassetto, non in maiuscolo), mentre le sigle
 // delle caratteristiche (FOR, DES, CAR...) si fermano a tre lettere.
 function fineStatBlock(bodyLines) {
-  const indiceAzioni = bodyLines.findIndex((l) => /^AZIONI$/.test(l));
+  const indiceAzioni = bodyLines.findIndex((l) => sezioneDi(l) === "azioni");
   for (let i = 0; i < bodyLines.length; i++) {
     const linea = bodyLines[i];
-    if (SECTION_HEADING_RE.test(linea)) continue;
+    if (sezioneDi(linea)) continue;
     // solo lettere maiuscole, spazi e apostrofi: le righe con cifre o punteggiatura sono avanzi
     // d'impaginazione ("DRAC!TO" al posto della testatina, ",.OGNI BEHOLDER È CONVINTO 01...") e
     // ricompaiono in mezzo a un blocco per intero, non alla sua fine
@@ -584,17 +612,12 @@ function parseBook(bookKey) {
       }
     }
 
-    const sections = { tratti: [], azioni: [], azioniLeggendarie: [], reazioni: [] };
+    const sections = { tratti: [], azioni: [], azioniBonus: [], azioniLeggendarie: [], reazioni: [] };
     let activeSectionKey = "tratti";
     for (const line of bodyLines) {
-      const sectionMatch = line.match(SECTION_HEADING_RE);
-      if (sectionMatch) {
-        const heading = sectionMatch[1];
-        activeSectionKey =
-          heading === "AZIONI" ? "azioni"
-          : heading === "AZIONI LEGGENDARIE" || heading === "AZIONI DA MITO" ? "azioniLeggendarie"
-          : heading === "REAZIONI" ? "reazioni"
-          : "tratti";
+      const sezione = sezioneDi(line);
+      if (sezione) {
+        activeSectionKey = sezione;
         continue;
       }
       sections[activeSectionKey].push(line);
@@ -637,6 +660,7 @@ function parseBook(bookKey) {
       pe: anchor.pe,
       tratti: sections.tratti.join("\n"),
       azioni: sections.azioni.join("\n"),
+      azioniBonus: sections.azioniBonus.join("\n"),
       azioniLeggendarie: sections.azioniLeggendarie.join("\n"),
       reazioni: sections.reazioni.join("\n"),
       numericSuspect,

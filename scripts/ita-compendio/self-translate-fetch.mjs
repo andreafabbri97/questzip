@@ -10,6 +10,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { and, eq, isNull } from "drizzle-orm";
 import { writeFileSync } from "node:fs";
 import { compendioTraduzioniIa } from "../../lib/db/schema.ts";
+import { ordinaPrivilegiSottoclasse } from "../../lib/fivetools/ordine-privilegi.ts";
 
 const sql = neon(process.env.DATABASE_URL);
 const db = drizzle(sql);
@@ -286,9 +287,20 @@ if (kind === "classi") {
     const key = `${s.name}|${s.source}`;
     if (rawByKey.has(key)) continue;
     const feats = entries.subclassFeatures.filter(
-      (f) => f.subclassShortName === s.shortName && f.subclassSource === s.source && f.className === s.className,
+      (f) =>
+        f.subclassShortName === s.shortName &&
+        f.subclassSource === s.source &&
+        f.className === s.className &&
+        // I segnaposto senza testo (lo stesso privilegio ripetuto vuoto a un altro livello)
+        // producevano righe "Nome (Liv. N): " che in scheda aprivano un riquadro vuoto.
+        (f.entries?.length ?? 0) > 0,
     );
-    rawByKey.set(key, feats);
+    // Stesso ordine e stesso filtro di resolveSubclassFeatures (lib/fivetools/data.ts): chi legge
+    // il testo italiano lo abbina ai privilegi PER POSIZIONE dentro ciascun livello, quindi le
+    // due liste devono nascere dalla stessa regola. Nell'ordine grezzo di 5etools i "figli"
+    // stanno prima della voce che li introduce, e in italiano "Lame dell'Anima" finiva dopo i
+    // suoi due poteri (l'ordinamento per livello di englishText è stabile e non lo tocca).
+    rawByKey.set(key, ordinaPrivilegiSottoclasse(feats, s.subclassFeatures));
   }
 } else {
   rawByKey = new Map(entries.map((e) => [`${e.name}|${e.source}`, e]));
