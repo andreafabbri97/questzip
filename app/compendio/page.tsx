@@ -43,6 +43,12 @@ import {
   formatSchool,
   formatSize,
 } from "@/lib/fivetools/format";
+import {
+  etichettaVerso,
+  ordinaVoci,
+  type SortDirection,
+  type SortMode,
+} from "@/lib/fivetools/ordinamento-compendio";
 
 // "Oggetti magici" e "Oggetti comuni" condividono lo stesso CompendiumKind ("oggetti" — stessa
 // forma dati RawItem, stesso caricatore loadInventoryItems, stessa ricerca/traduzione/Verifica di
@@ -56,23 +62,6 @@ const EDITIONS: { value: EditionFilter; label: string }[] = [
   { value: "2014", label: "2014" },
   { value: "2024", label: "2024/25" },
 ];
-
-type SortMode = "nome" | "cr" | "rarita" | "livello" | "manuale";
-
-function crToNumber(cr: RawCreature["cr"]): number {
-  const s = typeof cr === "string" ? cr : (cr?.cr ?? "");
-  if (s === "") return -1;
-  if (s.includes("/")) {
-    const [n, d] = s.split("/").map(Number);
-    return d ? n / d : -1;
-  }
-  const n = Number(s);
-  return Number.isNaN(n) ? -1 : n;
-}
-
-const INIZIALE_NON_ALFABETICA = /^[^\p{L}\p{N}]+/u;
-
-const RARITY_ORDER = ["none", "common", "uncommon", "rare", "very rare", "legendary", "artifact"];
 
 const PAGE_SIZE = 30;
 
@@ -114,6 +103,7 @@ function CompendiumPageInner() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Entry | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("nome");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const [books, setBooks] = useState<Map<string, BookMeta> | null>(null);
   const [dataByKind, setDataByKind] = useState<Partial<Record<CompendiumKind, Entry[]>>>({});
@@ -226,7 +216,7 @@ function CompendiumPageInner() {
       translatedQuery && translatedQuery.query === query.trim()
         ? translatedQuery.english.toLowerCase()
         : null;
-    return categoryData
+    const filtrate = categoryData
       .filter((entry) => {
         if (!q) return true;
         if (entry.name.toLowerCase().includes(q)) return true;
@@ -249,48 +239,25 @@ function CompendiumPageInner() {
         if (kind !== "oggetti" || !itemFilter) return true;
         const isMagico = ((entry as RawItem).rarity ?? "none") !== "none";
         return itemFilter === "magici" ? isMagico : !isMagico;
-      })
-      .sort((a, b) => {
-        // Deve essere ESATTAMENTE la stringa che si legge nella riga: DualName prende il nome
-        // ufficiale, poi quello tradotto in archivio e infine una traduzione gia' nota (vecchia
-        // cache del browser). Qui mancava l'ultimo anello, quindi una voce senza nome in archivio
-        // veniva ordinata sull'inglese pur comparendo in italiano: '"Il Demogorgon"' finiva dopo
-        // "Tessitore del Buio" perche' confrontato come '"The Demogorgon"'.
-        const nomeOrdinamento = (e: Entry) =>
-          (language === "it"
-            ? (bestItalianName(italianIndex, e.name, e.source) ??
-              traduzioneGiaNota(e.name, "en", "it"))
-            : null) ?? e.name;
-        if (sortMode === "cr" && kind === "mostri") {
-          const diff = crToNumber((a as RawCreature).cr) - crToNumber((b as RawCreature).cr);
-          if (diff !== 0) return diff;
-        }
-        if (sortMode === "rarita" && kind === "oggetti") {
-          const diff =
-            RARITY_ORDER.indexOf((a as RawItem).rarity ?? "none") -
-            RARITY_ORDER.indexOf((b as RawItem).rarity ?? "none");
-          if (diff !== 0) return diff;
-        }
-        if (sortMode === "livello" && kind === "incantesimi") {
-          const diff = (a as RawSpell).level - (b as RawSpell).level;
-          if (diff !== 0) return diff;
-        }
-        if (sortMode === "manuale") {
-          const diff = (books.get(a.source)?.name ?? a.source).localeCompare(
-            books.get(b.source)?.name ?? b.source,
-          );
-          if (diff !== 0) return diff;
-        }
-        // Ordina per il nome MOSTRATO, non per quello inglese: con l'interfaccia in italiano
-        // (impostazione predefinita) l'elenco risultava ordinato secondo una lingua che l'utente
-        // non vede — "Vista del Diavolo" finiva sotto la D di "Devil's Sight". Il confronto usa
-        // la locale italiana, così accenti e maiuscole seguono le regole giuste.
-        // Virgolette e simboli iniziali non devono decidere la posizione: '"Il Demogorgon"'
-        // si cerca alla I come ogni altro nome, non in un angolo dell'elenco.
-        const perConfronto = (e: Entry) => nomeOrdinamento(e).replace(INIZIALE_NON_ALFABETICA, "");
-        return perConfronto(a).localeCompare(perConfronto(b), "it", { sensitivity: "base" });
       });
-  }, [categoryData, books, query, edition, translatedQuery, sortMode, kind, itemFilter, italianIndex, language]);
+    // Le regole dell'ordinamento (chi non ha un grado di sfida va in fondo, i due versi, il nome
+    // come spareggio) stanno in lib/fivetools/ordinamento-compendio.ts, dove si possono provare.
+    return ordinaVoci(filtrate, {
+      modo: sortMode,
+      direzione: sortDirection,
+      kind,
+      // Deve essere ESATTAMENTE la stringa che si legge nella riga: DualName prende il nome
+      // ufficiale, poi quello tradotto in archivio e infine una traduzione gia' nota (vecchia
+      // cache del browser). Senza l'ultimo anello una voce senza nome in archivio veniva ordinata
+      // sull'inglese pur comparendo in italiano: '"Il Demogorgon"' finiva dopo "Tessitore del
+      // Buio" perche' confrontato come '"The Demogorgon"'.
+      nomeMostrato: (e) =>
+        (language === "it"
+          ? (bestItalianName(italianIndex, e.name, e.source) ?? traduzioneGiaNota(e.name, "en", "it"))
+          : null) ?? e.name,
+      nomeManuale: (e) => books.get(e.source)?.name ?? e.source,
+    });
+  }, [categoryData, books, query, edition, translatedQuery, sortMode, sortDirection, kind, itemFilter, italianIndex, language]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
@@ -326,6 +293,7 @@ function CompendiumPageInner() {
               setSelected(null);
               setPage(0);
               setSortMode("nome");
+              setSortDirection("asc");
             }}
             className={`card-elevated-hover rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
               !showRegole && activeTabId === tab.id
@@ -399,7 +367,11 @@ function CompendiumPageInner() {
         </div>
 
         <div className="flex-1 min-w-[180px]">
-          <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">Ordina per</p>
+          <p className="text-[10px] uppercase tracking-widest text-muted mb-1.5">
+            Ordina per{" "}
+            {/* Su telefono non c'è un suggerimento al passaggio del mouse: il gesto va detto. */}
+            <span className="normal-case tracking-normal">· tocca di nuovo per invertire</span>
+          </p>
           <div className="flex flex-wrap gap-2">
             {(
               [
@@ -411,22 +383,38 @@ function CompendiumPageInner() {
                 ...(kind === "incantesimi" ? [{ value: "livello", label: "Livello" } as const] : []),
                 { value: "manuale", label: "Manuale" },
               ] as { value: SortMode; label: string }[]
-            ).map((option) => (
-              <button
-                key={option.value}
-                onClick={() => {
-                  setSortMode(option.value);
-                  setPage(0);
-                }}
-                className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
-                  sortMode === option.value
-                    ? "glow-accent border-accent bg-accent/15 text-accent-strong"
-                    : "border-edge bg-surface-raised text-muted hover:text-foreground"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+            ).map((option) => {
+              const attivo = sortMode === option.value;
+              return (
+                <button
+                  key={option.value}
+                  aria-pressed={attivo}
+                  title={attivo ? "Tocca di nuovo per invertire l'ordine" : undefined}
+                  onClick={() => {
+                    // Il pulsante già attivo inverte il verso; un altro riparte dal verso naturale.
+                    if (attivo) {
+                      setSortDirection((verso) => (verso === "asc" ? "desc" : "asc"));
+                    } else {
+                      setSortMode(option.value);
+                      setSortDirection("asc");
+                    }
+                    setPage(0);
+                  }}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
+                    attivo
+                      ? "glow-accent border-accent bg-accent/15 text-accent-strong"
+                      : "border-edge bg-surface-raised text-muted hover:text-foreground"
+                  }`}
+                >
+                  {option.label}
+                  {attivo && (
+                    <span className="ml-1.5 font-normal whitespace-nowrap">
+                      {etichettaVerso(option.value, sortDirection)}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
