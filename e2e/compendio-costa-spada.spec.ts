@@ -35,4 +35,17 @@ test.describe("Compendio: le Regole della Costa della Spada", () => {
     await expect(riga).toHaveCount(1);
     expect((await riga.innerText()).split(" — ")).toHaveLength(4);
   });
+
+  test("se le regole non arrivano lo dice, invece di restare in caricamento", async ({ page }) => {
+    await page.goto("/compendio");
+    // Le regole arrivano con una server action, cioè una POST alla pagina: qui la si fa fallire
+    // come farebbe la rete (o il database irraggiungibile).
+    await page.route("**/compendio**", (route) =>
+      route.request().method() === "POST" ? route.abort() : route.continue(),
+    );
+    await page.getByRole("button", { name: "📚Regole" }).click();
+
+    await expect(page.getByText("Impossibile caricare le regole.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Caricamento in corso…")).toHaveCount(0);
+  });
 });

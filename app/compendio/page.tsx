@@ -761,9 +761,14 @@ function RegoleSection() {
   const [fonte, setFonte] = useState<string>("tutte");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  // Senza questo, una lettura fallita (rete, database irraggiungibile) lasciava il pannello fermo
+  // su «Caricamento in corso…» per sempre: il resto del Compendio lo dice, le Regole no.
+  const [nonCaricate, setNonCaricate] = useState(false);
 
   useEffect(() => {
-    getRegoleIta().then(setSections);
+    getRegoleIta()
+      .then(setSections)
+      .catch(() => setNonCaricate(true));
   }, []);
 
   const filtered = useMemo(() => {
@@ -833,8 +838,13 @@ function RegoleSection() {
 
       <div className="lg:grid lg:grid-cols-[360px_1fr] 2xl:grid-cols-[520px_1fr] [@media(min-width:2200px)]:grid-cols-[600px_1fr] lg:gap-6 lg:items-start">
         <div className={selectedSection ? "hidden lg:block space-y-2" : "space-y-2"}>
-          {sections === null && (
+          {sections === null && !nonCaricate && (
             <p className="text-sm text-muted text-center py-6">Caricamento in corso…</p>
+          )}
+          {nonCaricate && (
+            <p className="text-sm text-danger text-center py-6">
+              Impossibile caricare le regole. Verifica la connessione e riprova.
+            </p>
           )}
           {sections && filtered.length === 0 && (
             <p className="text-sm text-muted text-center py-6">Nessun risultato.</p>
