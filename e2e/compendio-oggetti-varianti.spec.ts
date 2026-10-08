@@ -28,4 +28,37 @@ test.describe("Compendio: varianti generiche e voci di famiglia", () => {
       await expect(page.getByText(italiano).first()).toBeVisible();
     });
   }
+
+  // Le voci di una famiglia (i dieci Tatuaggi Assorbenti, gli Anelli di Resistenza, le Pietre
+  // Ioun) non hanno un testo proprio: nei dati c'è un rimando `{#itemEntry …}` al testo comune,
+  // con accanto il tipo di danno o il colore. Il rimando non veniva sciolto: in inglese si leggeva
+  // il rimando alla lettera, in italiano la sua "traduzione" — 101 oggetti senza descrizione.
+  test("un oggetto di famiglia mostra il testo comune, con i suoi valori, in entrambe le lingue", async ({
+    page,
+  }) => {
+    await page.goto("/compendio");
+    await page.waitForFunction(
+      () => !document.body.innerText.includes("Caricamento contenuti in corso"),
+    );
+    await page.getByRole("button", { name: "Oggetti magici" }).click();
+
+    await page.getByPlaceholder("Cerca (in inglese o italiano)…").fill("Acid Absorbing Tattoo");
+    const riga = page.getByText("Acid Absorbing Tattoo", { exact: true }).first();
+    await expect(riga).toBeVisible({ timeout: 15000 });
+    await riga.click();
+
+    const scheda = page.locator("div.card-elevated:has(h2.heading-ornate)").first();
+    await expect(scheda.getByText("Assorbimento dei Danni")).toBeVisible({ timeout: 20000 });
+    // Il valore di QUESTA voce dentro il testo comune: il tipo di danno e il colore.
+    await expect(scheda.getByText(/resistenza ai danni da acido/)).toBeVisible();
+    await expect(scheda.getByText(/\(verde\)/)).toBeVisible();
+    await expect(scheda).not.toContainText("{#itemEntry");
+    await expect(scheda).not.toContainText("{{");
+
+    await page.getByTitle("Inglese (originale)").click();
+    await expect(scheda.getByText("Damage Absorption")).toBeVisible({ timeout: 20000 });
+    await expect(scheda.getByText(/resistance to acid damage/)).toBeVisible();
+    await expect(scheda).not.toContainText("{#itemEntry");
+    await expect(scheda).not.toContainText("{{");
+  });
 });

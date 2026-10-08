@@ -23,6 +23,12 @@ const CONNETTIVI = new Set([
   "il", "lo", "la", "i", "gli", "le", "un", "uno", "una", "d", "l",
 ]);
 
+// L'articolo eliso si scrive attaccato alla parola che segue: «l'Ascia», «dall'Acqua», «d'Ombra».
+// Presa tutta insieme quella parola comincia in minuscolo e non è una particella, quindi
+// «Distruggere l'Ascia» e «Danneggiato dall'Acqua Corrente» non passavano per titoletti: un
+// centinaio di tratti restavano senza grassetto, o attaccati in coda al paragrafo precedente.
+const ELISIONE = /^(?:l|d|un|dell|all|nell|sull|dall|coll)['’](?=\p{Lu})/u;
+
 /** Vero se la frase ha la forma di un titoletto di tratto del manuale. */
 export function eTitoletto(frase: string): boolean {
   const testo = frase.trim();
@@ -33,7 +39,8 @@ export function eTitoletto(frase: string): boolean {
   if (parole.length === 0 || parole.length > PAROLE_MAX_TITOLETTO) return false;
   if (!/^[A-ZÀ-Ú]/.test(parole[0])) return false;
   return parole.every(
-    (p) => /^[A-ZÀ-Ú]/.test(p) || CONNETTIVI.has(p.toLowerCase().replace(/['’]/g, "")),
+    (p) =>
+      /^[A-ZÀ-Ú]/.test(p) || ELISIONE.test(p) || CONNETTIVI.has(p.toLowerCase().replace(/['’]/g, "")),
   );
 }
 

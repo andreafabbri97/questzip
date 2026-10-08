@@ -7,6 +7,7 @@ import {
   type RiferimentoCopia,
   type TemplateCreatura,
 } from "./risolvi-copia";
+import { haRimandiOggetto, indiceModelli, sciogliRimandiOggetto, type ModelloOggetto } from "./rimando-oggetto";
 import { risolviSegnapostoProfondo, valoriVariante } from "./segnaposto-variante";
 
 // Array (non solo il tipo) apposta: serve anche a runtime per validare un CompendiumKind che
@@ -386,9 +387,12 @@ interface MagicVariantsFile {
  * cercare "Lingua di Fiamme" non dava alcun risultato, e le ~47 voci italiane ufficiali
  * corrispondenti restavano scollegate perché la controparte inglese semplicemente non esisteva.
  */
-function normalizzaVariante(v: RawMagicVariant): RawItem | null {
+function normalizzaVariante(v: RawMagicVariant, modelli: ModelliOggetto): RawItem | null {
   const dati = v.inherits;
   if (!dati?.source) return null;
+  // L'Armatura di Resistenza è una variante il cui testo è un rimando al modello comune: va
+  // sciolto prima, perché i segnaposto `{=campo}` stanno dentro il testo che ne esce.
+  const entries = sciogliRimandiOggetto(dati.entries, dati as Record<string, unknown>, modelli);
   return {
     name: v.name,
     source: dati.source,
@@ -398,37 +402,75 @@ function normalizzaVariante(v: RawMagicVariant): RawItem | null {
     // I numeri di queste voci non stanno nel testo ma in campi accanto, richiamati con
     // `{=bonusWeaponAttack}` e simili. Senza scioglierli il Compendio stampava il rimando alla
     // lettera, cioe' proprio il valore che si cercava (vedi segnaposto-variante.ts).
-    entries: dati.entries
-      ? risolviSegnapostoProfondo(dati.entries, valoriVariante(v.name, dati))
-      : dati.entries,
+    entries: entries ? risolviSegnapostoProfondo(entries, valoriVariante(v.name, dati)) : entries,
   };
+}
+
+type ModelliOggetto = ReturnType<typeof indiceModelli>;
+
+interface BaseItemsFile {
+  baseitem: RawItem[];
+  /** I testi comuni alle famiglie di oggetti, richiamati con `{#itemEntry …}` (vedi rimando-oggetto.ts). */
+  itemEntry?: ModelloOggetto[];
+}
+
+/** Mette al posto dei rimandi il testo comune della famiglia, con i valori di questa voce. */
+function conTestoComune(item: RawItem, modelli: ModelliOggetto): RawItem {
+  if (!haRimandiOggetto(item.entries)) return item;
+  return {
+    ...item,
+    entries: sciogliRimandiOggetto(item.entries, item as unknown as Record<string, unknown>, modelli),
+  };
+}
+
+interface OggettiGrezzi {
+  /** Oggetti singoli e voci "di famiglia" di items.json. */
+  singoli: RawItem[];
+  /** Armi, armature e attrezzatura comune di items-base.json. */
+  comuni: RawItem[];
+  /** Le varianti generiche di magicvariants.json, già ridotte alla forma di un oggetto. */
+  varianti: RawItem[];
+}
+
+let oggettiGrezziPromise: Promise<OggettiGrezzi> | null = null;
+/**
+ * I tre file degli oggetti, scaricati una volta sola per entrambi gli elenchi (Compendio e
+ * Inventario). items-base.json serve anche a chi vuole solo gli oggetti magici: contiene i
+ * modelli con cui si sciolgono i rimandi, senza i quali 101 oggetti restavano senza descrizione.
+ */
+function loadOggettiGrezzi(): Promise<OggettiGrezzi> {
+  if (!oggettiGrezziPromise) {
+    oggettiGrezziPromise = Promise.all([
+      fetchJson<ItemsFile>(`${RAW_BASE}/items.json`),
+      fetchJson<BaseItemsFile>(`${RAW_BASE}/items-base.json`),
+      fetchJson<MagicVariantsFile>(`${RAW_BASE}/magicvariants.json`),
+    ]).then(([file, base, varianti]) => {
+      const modelli = indiceModelli(base?.itemEntry);
+      return {
+        // "item" sono gli oggetti singoli; "itemGroup" le famiglie che nel manuale hanno una voce
+        // sola con una tabella di varianti (Anello di Resistenza, Corno del Valhalla, Corazza di
+        // Scaglie di Drago, Pergamena Magica). Erano assenti dal Compendio quanto le varianti
+        // generiche, pur essendo voci a tutti gli effetti del Manuale del DM.
+        singoli: [...(file?.item ?? []), ...(file?.itemGroup ?? [])].map((item) => conTestoComune(item, modelli)),
+        comuni: (base?.baseitem ?? []).map((item) => conTestoComune(item, modelli)),
+        varianti: (varianti?.magicvariant ?? [])
+          .map((v) => normalizzaVariante(v, modelli))
+          .filter((v): v is RawItem => !!v),
+      };
+    });
+  }
+  return oggettiGrezziPromise;
 }
 
 let itemsPromise: Promise<RawItem[]> | null = null;
 /** Solo oggetti MAGICI (rarità reale) — usato dal tab "Oggetti magici" del Compendio. */
 export function loadItems(): Promise<RawItem[]> {
   if (!itemsPromise) {
-    itemsPromise = Promise.all([
-      // "item" sono gli oggetti singoli; "itemGroup" le famiglie che nel manuale hanno una voce
-      // sola con una tabella di varianti (Anello di Resistenza, Corno del Valhalla, Corazza di
-      // Scaglie di Drago, Pergamena Magica). Erano assenti dal Compendio quanto le varianti
-      // generiche, pur essendo voci a tutti gli effetti del Manuale del DM.
-      fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) => [
-        ...(file?.item ?? []),
-        ...(file?.itemGroup ?? []),
-      ]),
-      fetchJson<MagicVariantsFile>(`${RAW_BASE}/magicvariants.json`).then(
-        (file) => (file?.magicvariant ?? []).map(normalizzaVariante).filter((v): v is RawItem => !!v),
-      ),
-    ]).then(([items, varianti]) =>
-      [...items, ...varianti].filter((item) => item.rarity && item.rarity !== "none"),
+    itemsPromise = loadOggettiGrezzi().then(({ singoli, varianti }) =>
+      [...singoli, ...varianti].filter((item) => item.rarity && item.rarity !== "none"),
     );
   }
   return itemsPromise;
-}
-
-interface BaseItemsFile {
-  baseitem: RawItem[];
 }
 
 let inventoryItemsPromise: Promise<RawItem[]> | null = null;
@@ -441,18 +483,13 @@ let inventoryItemsPromise: Promise<RawItem[]> | null = null;
  */
 export function loadInventoryItems(): Promise<RawItem[]> {
   if (!inventoryItemsPromise) {
-    inventoryItemsPromise = Promise.all([
-      fetchJson<ItemsFile>(`${RAW_BASE}/items.json`).then((file) => [
-        ...(file?.item ?? []),
-        ...(file?.itemGroup ?? []),
-      ]),
-      fetchJson<BaseItemsFile>(`${RAW_BASE}/items-base.json`).then((file) => file?.baseitem ?? []),
-      // Stesse varianti generiche caricate da loadItems: senza, un personaggio non poteva mettere
-      // in inventario una Lingua di Fiamme o un'arma +1, fra gli oggetti magici più comuni in gioco.
-      fetchJson<MagicVariantsFile>(`${RAW_BASE}/magicvariants.json`).then(
-        (file) => (file?.magicvariant ?? []).map(normalizzaVariante).filter((v): v is RawItem => !!v),
-      ),
-    ]).then(([items, baseItems, varianti]) => [...items, ...baseItems, ...varianti]);
+    // Stesse varianti generiche caricate da loadItems: senza, un personaggio non poteva mettere
+    // in inventario una Lingua di Fiamme o un'arma +1, fra gli oggetti magici più comuni in gioco.
+    inventoryItemsPromise = loadOggettiGrezzi().then(({ singoli, comuni, varianti }) => [
+      ...singoli,
+      ...comuni,
+      ...varianti,
+    ]);
   }
   return inventoryItemsPromise;
 }

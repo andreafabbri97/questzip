@@ -5,6 +5,7 @@ import {
   pulisciTestoOcr,
   quotaIlleggibile,
   riparaDadiFraParentesi,
+  riparaDadiNelTesto,
   ripristinaAccentiPersi,
   ripristinaTestoOggettiMagici,
   togliColonnaCaratteristiche,
@@ -248,7 +249,50 @@ describe("togliColonnaCaratteristiche", () => {
   });
 });
 
+describe("riparaDadiNelTesto", () => {
+  // Tutti casi veri del bestiario, trovati confrontando i dadi con l'originale.
+  it("ripara i dadi spezzati in mezzo a una frase", () => {
+    expect(riparaDadiNelTesto("evoca magicamente l d4 lupi fatti di ghiaccio")).toBe(
+      "evoca magicamente 1d4 lupi fatti di ghiaccio",
+    );
+    expect(riparaDadiNelTesto("dall'attacco è ridotto di ldlO + 3.")).toBe("dall'attacco è ridotto di 1d10 + 3.");
+    expect(riparaDadiNelTesto("ore pari a l dl 2 + il punteggio")).toBe("ore pari a 1d12 + il punteggio");
+    expect(riparaDadiNelTesto("(massimo 1 0d6) e, se scende")).toBe("(massimo 10d6) e, se scende");
+    expect(riparaDadiNelTesto("dopo 1 d20 giorni si dissolve")).toBe("dopo 1d20 giorni si dissolve");
+  });
+
+  it("ripara anche dentro una parentesi che contiene parole", () => {
+    expect(riparaDadiNelTesto("Colpito: 15 (ldl2 + 4 più\n1 d8) danni taglienti.")).toBe(
+      "Colpito: 15 (1d12 + 4 più\n1d8) danni taglienti.",
+    );
+  });
+
+  it("lascia stare i dadi già giusti e ciò che non è un dado", () => {
+    for (const testo of [
+      "subisce 7 (2d6) danni e poi 1d4 + 1",
+      "entro 18 metri, CD 12",
+      "un dado da d8 o d10",
+      "l'idra ha 5 teste",
+      "1d7 non esiste",
+    ]) {
+      expect(riparaDadiNelTesto(testo)).toBe(testo);
+    }
+  });
+
+  // "I d6 extra" è italiano: l'articolo davanti ai dadi. Non deve diventare "1d6 extra".
+  it("non scambia l'articolo per una cifra", () => {
+    expect(riparaDadiNelTesto("I d6 extra si sommano al danno")).toBe("I d6 extra si sommano al danno");
+    expect(riparaDadiNelTesto("infligge Id6 danni")).toBe("infligge 1d6 danni");
+  });
+});
+
 describe("pulisciCorpoScheda", () => {
+  it("ripara la prima cifra del danno medio letta come elle", () => {
+    expect(pulisciCorpoScheda("Colpito: l3 (2d8 + 4) danni perforanti.")).toBe(
+      "Colpito: 13 (2d8 + 4) danni perforanti.",
+    );
+  });
+
   it("ricompone il danno medio spezzato davanti ai dadi", () => {
     expect(pulisciCorpoScheda("Colpo: 1 3 (3d6 + 3) danni perforanti.")).toBe(
       "Colpo: 13 (3d6 + 3) danni perforanti.",

@@ -84,6 +84,56 @@ describe("TestoStrutturato", () => {
     render(<TestoStrutturato testo={testoOcr} />);
     expect(screen.getByText(/PASSO DI VIAGGIO/)).toBeInTheDocument();
   });
+
+  // Regressione (08/10/2026): la scheda di un Background era una colonna di titoli — il nome
+  // ripetuto e poi «Caratteristiche: …», «Talento: Guaritore», uno sotto l'altro in grassetto
+  // (screenshot dell'utente su «Abitante della Magia Morta»). Le regole stanno in
+  // lib/testo-strutturato.ts e lì sono provate una per una; qui si guarda ciò che si vede.
+  const schedaBackground = [
+    "Abitante della Magia Morta",
+    "Caratteristiche: Forza, Costituzione, Saggezza",
+    "Talento: Guaritore",
+    "Competenze nelle Abilità: Medicina e Sopravvivenza",
+    "Equipaggiamento: Scegli A o B: (A) Bastone ferrato, utensili da conciatore, sacco a pelo; oppure (B) 50 mo",
+  ].join("\n\n");
+
+  it("la scheda di un background è fatta di righe «etichetta: valore», senza titoli", () => {
+    render(<TestoStrutturato testo={schedaBackground} nomiVoce={["Abitante della Magia Morta", "Dead Magic Dweller"]} />);
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    // Il nome sta già nel titolo della scheda: qui non si ripete.
+    expect(screen.queryByText("Abitante della Magia Morta")).not.toBeInTheDocument();
+
+    const etichetta = screen.getByText("Talento:");
+    expect(etichetta.tagName).toBe("SPAN");
+    expect(etichetta.className).toContain("font-bold");
+    expect(etichetta.parentElement).toHaveTextContent("Talento: Guaritore");
+    // Anche la riga lunga ha la stessa forma delle altre.
+    expect(screen.getByText("Equipaggiamento:").parentElement?.tagName).toBe("P");
+  });
+
+  it("toglie il nome in apertura anche se scritto diversamente, quando l'originale non ha un titolo", () => {
+    const testo = schedaBackground.replace("Abitante della Magia Morta", "Residente della Magia Morta");
+    render(
+      <TestoStrutturato
+        testo={testo}
+        nomiVoce={["Abitante della Magia Morta", "Dead Magic Dweller"]}
+        originaleApreConTitolo={false}
+      />,
+    );
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(screen.queryByText("Residente della Magia Morta")).not.toBeInTheDocument();
+  });
+
+  it("una frase che annuncia un elenco è un paragrafo, e le righe brevi dopo sono le sue voci", () => {
+    render(<TestoStrutturato testo={"Include:\n\nuno zaino\n\n2 giorni di razioni\n\nun otre."} />);
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(screen.getByText("Include:").tagName).toBe("P");
+    expect(screen.getAllByRole("listitem").map((voce) => voce.textContent)).toEqual([
+      "uno zaino",
+      "2 giorni di razioni",
+      "un otre.",
+    ]);
+  });
 });
 
 // Il testo ufficiale italiano è stato estratto dai manuali del 2014 (PHB/MM/DMG), ma il compendio

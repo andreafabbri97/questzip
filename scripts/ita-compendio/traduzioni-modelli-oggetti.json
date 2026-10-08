@@ -1,0 +1,154 @@
+{
+  "_nota": "Traduzione dei testi comuni alle famiglie di oggetti di 5etools (itemEntry, in items-base.json): gli Anelli di Resistenza, le Pietre Ioun, i Tatuaggi Assorbenti... Ogni voce della famiglia rimanda al testo comune con {#itemEntry Nome|FONTE} e cambia solo per un tipo di danno o un dettaglio. Qui il testo comune è tradotto una volta sola; ricomponi-oggetti-a-modello.mjs lo riempie con i valori di ciascuna voce e lo scrive nella cache delle traduzioni. Sono traduzioni fatte a mano, non testo dei manuali italiani: dove il manuale italiano esiste, nel Compendio vince quello.",
+  "danni": {
+    "acid": "da acido", "cold": "da freddo", "fire": "da fuoco", "force": "da forza", "lightning": "da fulmine",
+    "necrotic": "necrotici", "poison": "da veleno", "psychic": "psichici", "radiant": "radiosi", "thunder": "da tuono"
+  },
+  "danni2024": {
+    "acid": "da Acido", "cold": "da Freddo", "fire": "da Fuoco", "force": "da Forza", "lightning": "da Fulmine",
+    "necrotic": "Necrotici", "poison": "da Veleno", "psychic": "Psichici", "radiant": "Radiosi", "thunder": "da Tuono"
+  },
+  "aDanno": {
+    "acid": "all'Acido", "cold": "al Freddo", "fire": "al Fuoco", "force": "alla Forza", "lightning": "al Fulmine",
+    "necrotic": "Necrotica", "poison": "al Veleno", "psychic": "Psichica", "radiant": "Radiosa", "thunder": "al Tuono"
+  },
+  "tipoDanno": {
+    "acid": "Acido", "cold": "Freddo", "fire": "Fuoco", "force": "Forza", "lightning": "Fulmine",
+    "necrotic": "Necrotico", "poison": "Veleno", "psychic": "Psichico", "radiant": "Radioso", "thunder": "Tuono"
+  },
+  "modelli": {
+    "Ring of Resistance|DMG": {
+      "nome": "Anello di Resistenza {{aDanno}}",
+      "righe": ["Finché indossi questo anello, hai resistenza ai danni {{danni}}. La gemma incastonata nell'anello è {{detail1}}."],
+      "detail1": {
+        "pearl": "una perla", "tourmaline": "una tormalina", "garnet": "un granato", "sapphire": "uno zaffiro", "citrine": "un citrino",
+        "jet": "un giaietto", "amethyst": "un'ametista", "jade": "una giada", "topaz": "un topazio", "spinel": "uno spinello"
+      }
+    },
+    "Ring of Resistance|XDMG": {
+      "nome": "Anello di Resistenza {{aDanno}}",
+      "righe": ["Finché indossi questo anello, hai Resistenza ai danni {{danni2024}}. La gemma incastonata nell'anello è {{detail1}}."],
+      "detail1": {
+        "pearl": "una perla", "tourmaline": "una tormalina", "garnet": "un granato", "sapphire": "uno zaffiro", "citrine": "un citrino",
+        "jet": "un giaietto", "amethyst": "un'ametista", "jade": "una giada", "topaz": "un topazio", "spinel": "uno spinello"
+      }
+    },
+    "Potion of Resistance|DMG": {
+      "nome": "Pozione di Resistenza {{aDanno}}",
+      "righe": ["Quando bevi questa pozione, ottieni resistenza ai danni {{danni}} per 1 ora."]
+    },
+    "Potion of Resistance|XDMG": {
+      "nome": "Pozione di Resistenza {{aDanno}}",
+      "righe": ["Quando bevi questa pozione, hai Resistenza ai danni {{danni2024}} per 1 ora."]
+    },
+    "Armor of Resistance|DMG": {
+      "nome": "Armatura di Resistenza {{aDanno}}",
+      "righe": ["Finché indossi questa armatura, hai resistenza ai danni {{danni}}."]
+    },
+    "Armor of Resistance|XDMG": {
+      "nome": "Armatura di Resistenza {{aDanno}}",
+      "righe": ["Finché indossi questa armatura, hai Resistenza ai danni {{danni2024}}."]
+    },
+    "Grenade|DMG": {
+      "righe": ["Con un'azione, un personaggio può lanciare una granata in un punto situato entro 18 metri. Con un lanciagranate, il personaggio può scagliare la granata fino a 36 metri di distanza."],
+      "specifiche": {
+        "Concussion Grenade|QftIS": ["Questa granata esplode in una deflagrazione d'urto che riempie una sfera con raggio di 6 metri. Ogni creatura in quell'area deve effettuare un tiro salvezza su Destrezza con CD 15: se lo fallisce subisce 6d6 danni da forza, mentre se lo supera subisce la metà di quei danni."]
+      }
+    },
+    "Grenade|XDMG": {
+      "righe": ["Con un'azione, puoi lanciare una granata in un punto situato entro 18 metri, oppure usare un Lanciagranate per scagliarla in un punto situato entro 300 metri. La granata esplode in quel punto, creando un effetto particolare in una Sfera con raggio di 6 metri."]
+    },
+    "Absorbing Tattoo|TCE": {
+      "nome": "Tatuaggio Assorbente ({{tipoDanno}})",
+      "righe": [
+        "Prodotto da un ago speciale, questo tatuaggio magico presenta disegni in cui risalta un colore ({{detail1}}).",
+        "Sintonia del Tatuaggio",
+        "Per entrare in sintonia con questo oggetto, tieni l'ago sulla pelle nel punto in cui vuoi che compaia il tatuaggio, premendolo lì per tutta la durata del processo di sintonia. Quando la sintonia è completa, l'ago si trasforma nell'inchiostro che diventa il tatuaggio, che compare sulla pelle.",
+        "Se la tua sintonia con il tatuaggio termina, il tatuaggio svanisce e l'ago riappare nel tuo spazio.",
+        "Resistenza ai Danni",
+        "Finché il tatuaggio è sulla tua pelle, hai resistenza ai danni {{danni}}.",
+        "Assorbimento dei Danni",
+        "Quando subisci danni {{danni}}, puoi usare la tua reazione per ottenere immunità a quei danni in quell'occasione, e recuperi un numero di punti ferita pari alla metà dei danni che avresti subito. Una volta usata questa reazione, non puoi usarla di nuovo fino all'alba successiva."
+      ],
+      "detail1": {
+        "green": "verde", "blue": "blu", "red": "rosso", "white": "bianco", "yellow": "giallo",
+        "black": "nero", "violet": "viola", "silver": "argento", "gold": "oro", "orange": "arancione"
+      }
+    },
+    "Chromatic Rose|WBtW": {
+      "nomi": {
+        "Black Chromatic Rose": "Rosa Cromatica Nera", "Blue Chromatic Rose": "Rosa Cromatica Blu", "Green Chromatic Rose": "Rosa Cromatica Verde",
+        "Red Chromatic Rose": "Rosa Cromatica Rossa", "White Chromatic Rose": "Rosa Cromatica Bianca"
+      },
+      "righe": [
+        "Finché viene tenuta in mano, questa rosa {{detail1}}: è un effetto visivo innocuo.",
+        "Finché tieni la rosa per lo stelo, ottieni resistenza ai danni {{danni}}. Se dovessi subire più di 10 danni {{danni}} da un'unica fonte (dopo aver applicato la resistenza), la rosa si disintegra e tu non subisci alcun danno.",
+        "Con un'azione, puoi soffiare via i petali della rosa per produrre un cono di {{elemento}} di 6 metri. Ogni creatura nel cono deve effettuare un tiro salvezza su Costituzione con CD 15: se lo fallisce subisce 3d10 danni {{danni}}, mentre se lo supera subisce la metà di quei danni. Usare questa proprietà distrugge la rosa."
+      ],
+      "detail1": {
+        "drips acid": "stilla acido", "crackles with lightning": "crepita di fulmini", "issues green gas": "emette un gas verde",
+        "is wreathed in fire": "è avvolta dalle fiamme", "is covered in frost": "è coperta di brina"
+      },
+      "elemento": { "acid": "acido", "lightning": "fulmini", "poison": "veleno", "fire": "fuoco", "cold": "freddo" }
+    },
+    "Dragon Scale Mail|XDMG": {
+      "nomi": {
+        "Black Dragon Scale Mail": "Corazza di Scaglie di Drago Nero", "Blue Dragon Scale Mail": "Corazza di Scaglie di Drago Blu",
+        "Brass Dragon Scale Mail": "Corazza di Scaglie di Drago d'Ottone", "Bronze Dragon Scale Mail": "Corazza di Scaglie di Drago di Bronzo",
+        "Copper Dragon Scale Mail": "Corazza di Scaglie di Drago di Rame", "Gold Dragon Scale Mail": "Corazza di Scaglie di Drago d'Oro",
+        "Green Dragon Scale Mail": "Corazza di Scaglie di Drago Verde", "Red Dragon Scale Mail": "Corazza di Scaglie di Drago Rosso",
+        "Silver Dragon Scale Mail": "Corazza di Scaglie di Drago d'Argento", "White Dragon Scale Mail": "Corazza di Scaglie di Drago Bianco"
+      },
+      "righe": [
+        "La Corazza di Scaglie di Drago è fatta con le scaglie di un tipo di drago. A volte i draghi raccolgono le scaglie che hanno perso e le donano. Altre volte sono i cacciatori a conservare con cura la pelle di un drago morto. In entrambi i casi, la Corazza di Scaglie di Drago è molto apprezzata.",
+        "Finché indossi questa armatura, ottieni un bonus di +1 alla Classe Armatura, hai Vantaggio ai tiri salvezza contro le armi a soffio dei Draghi e hai Resistenza ai danni {{danni2024}}.",
+        "Inoltre, con un'azione Magia puoi concentrare i tuoi sensi per percepire la distanza e la direzione del drago {{detail1}} più vicino entro 45 chilometri da te. Questa azione non può essere usata di nuovo fino all'alba successiva."
+      ],
+      "detail1": {
+        "black": "nero", "blue": "blu", "brass": "d'ottone", "bronze": "di bronzo", "copper": "di rame",
+        "gold": "d'oro", "green": "verde", "red": "rosso", "silver": "d'argento", "white": "bianco"
+      }
+    },
+    "Ioun Stone|XDMG": {
+      "nomi": { "Ioun Stone": "Pietra Ioun" },
+      "righe": [
+        "Grandi più o meno quanto una biglia, le Pietre Ioun prendono il nome da Ioun, una divinità della conoscenza e della profezia venerata in alcuni mondi. Esistono molti tipi di Pietre Ioun, ognuno dei quali è una combinazione distinta di forma e colore.",
+        "Quando effettui un'azione Magia per lanciare in aria una Pietra Ioun, la pietra orbita attorno alla tua testa a una distanza di 1d3 × 30 centimetri, conferendoti il suo beneficio finché lo fa. Puoi avere fino a tre Pietre Ioun che orbitano attorno alla tua testa nello stesso momento.",
+        "Ogni Pietra Ioun che orbita attorno alla tua testa è considerata un oggetto che stai indossando. La pietra in orbita evita il contatto con le altre creature e gli altri oggetti, correggendo la propria orbita per evitare le collisioni e vanificando ogni tentativo delle altre creature di attaccarla o afferrarla.",
+        "Con un'azione Utilizzare, puoi afferrare e riporre un numero qualsiasi di Pietre Ioun che orbitano attorno alla tua testa. Se la tua Sintonia con una Pietra Ioun termina mentre questa orbita attorno alla tua testa, la pietra cade come se l'avessi lasciata cadere."
+      ],
+      "specifiche": {
+        "Ioun Stone|XDMG": ["Il tipo di pietra ne determina la rarità e gli effetti."]
+      }
+    },
+    "Scroll of Protection|XDMG": {
+      "righe": [
+        "Usare un'azione Magia per leggere la pergamena crea un'Emanazione di 1,5 metri che ha origine da te. Per 5 minuti, {{detail2}} non possono entrare nell'area né influenzare alcunché al suo interno. Tuttavia, se ti muovi in modo tale che {{detail1}} venga a trovarsi all'interno dell'area, l'effetto termina.",
+        "Con un'azione Magia, una creatura entro 1,5 metri dall'Emanazione può tentare di superarla: la creatura deve effettuare un tiro salvezza su Carisma con CD 15. Se lo supera, smette di essere influenzata dall'Emanazione."
+      ],
+      "detail1": {
+        "Aberration": "un'Aberrazione", "Beast": "una Bestia", "Celestial": "un Celestiale", "Construct": "un Costrutto", "Dragon": "un Drago",
+        "Elemental": "un Elementale", "Fey": "un Folletto", "Fiend": "un Immondo", "Giant": "un Gigante", "Humanoid": "un Umanoide",
+        "Monstrosity": "una Mostruosità", "Ooze": "una Melma", "Plant": "un Vegetale", "Undead": "un Non Morto"
+      },
+      "detail2": {
+        "Aberrations": "le Aberrazioni", "Beasts": "le Bestie", "Celestials": "i Celestiali", "Constructs": "i Costrutti", "Dragons": "i Draghi",
+        "Elementals": "gli Elementali", "Fey": "i Folletti", "Fiends": "gli Immondi", "Giants": "i Giganti", "Humanoids": "gli Umanoidi",
+        "Monstrosities": "le Mostruosità", "Oozes": "le Melme", "Plants": "i Vegetali", "Undead": "i Non Morti"
+      }
+    }
+  },
+  "nomiFuoriModello": {
+    "_nota": "Voci della stessa famiglia che nei dati hanno il testo per esteso (niente rimando), ma il cui nome in cache era sbagliato: «Bachetta di Scaglie di Drago Rosso», «Cotta di Maglia a Scaglie di Drago Nero».",
+    "Black Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago Nero",
+    "Blue Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago Blu",
+    "Brass Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago d'Ottone",
+    "Bronze Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago di Bronzo",
+    "Copper Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago di Rame",
+    "Gold Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago d'Oro",
+    "Green Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago Verde",
+    "Red Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago Rosso",
+    "Silver Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago d'Argento",
+    "White Dragon Scale Mail|DMG": "Corazza di Scaglie di Drago Bianco"
+  }
+}

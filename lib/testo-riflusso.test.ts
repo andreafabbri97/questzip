@@ -8,6 +8,20 @@ describe("eTitoletto", () => {
     expect(eTitoletto("Pregiati Animali da Guardia")).toBe(true);
   });
 
+  // «l'Ascia» comincia in minuscolo solo perché l'articolo è attaccato: il titoletto resta tale.
+  it("accetta l'articolo eliso davanti a una parola in maiuscolo", () => {
+    expect(eTitoletto("Distruggere l'Ascia")).toBe(true);
+    expect(eTitoletto("Danneggiato dall'Acqua Corrente")).toBe(true);
+    expect(eTitoletto("Furtività d'Ombra")).toBe(true);
+    expect(eTitoletto("Sempre all’Erta")).toBe(true);
+  });
+
+  it("non accetta l'elisione davanti a una minuscola, né in testa alla frase", () => {
+    expect(eTitoletto("Subisce l'effetto")).toBe(false);
+    // Un pezzo di frase rimasto dopo un punto, non un titoletto: «…i giganti. dell'Underdark.»
+    expect(eTitoletto("dell'Underdark")).toBe(false);
+  });
+
   it("non scambia una frase breve qualunque per un titoletto", () => {
     expect(eTitoletto("Poi risorge")).toBe(false);
     expect(eTitoletto("Colpito: 7 danni")).toBe(false);

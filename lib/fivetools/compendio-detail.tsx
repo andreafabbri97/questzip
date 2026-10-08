@@ -71,6 +71,7 @@ import {
 } from "@/lib/fivetools/format";
 import { abilityModifier, formatModifier, proficiencyBonus } from "@/lib/dnd";
 import { eTitoletto, riflussoTestoOcr } from "@/lib/testo-riflusso";
+import { classificaBlocchi, siApreConTitolo, type Blocco } from "@/lib/testo-strutturato";
 import { MentionModal } from "@/components/chat/mention-modal";
 import type { ParsedMentionToken } from "@/lib/fivetools/mention-token";
 import {
@@ -511,20 +512,34 @@ function EntriesBlockOrIa({
   entries,
   language,
   iaText,
+  nomiVoce,
 }: {
   entries: FiveEntry[] | undefined;
   language: Language;
   iaText?: string | null;
+  /** I nomi della voce (italiano e inglese): la traduzione in cache spesso si apre ripetendolo. */
+  nomiVoce?: (string | null | undefined)[];
 }) {
-  if (language === "it" && iaText) {
-    // La cache (compendio_traduzione_ia) separa nome/corpo di ogni tratto con un singolo "\n" (vedi
-    // scripts/ita-compendio/self-translate-fetch.mjs), MAI "\n\n" — trattarlo come un blocco unico
-    // (comportamento precedente) mostrava un intero muro di testo senza andare mai a capo, es. la
-    // razza Aasimar con "Età...Taglia...Scurovisione..." tutto incollato. Normalizzato a "\n\n" così
-    // TestoStrutturato (già usato per le Regole) riconosce ogni nome di tratto corto come sottotitolo
-    // e ogni corpo come paragrafo a sé — nessuna ritraduzione richiesta, è solo una riformattazione.
-    return <TestoStrutturato testo={iaText.split("\n").filter(Boolean).join("\n\n")} />;
-  }
+  const usaCache = language === "it" && Boolean(iaText);
+  // La cache (compendio_traduzione_ia) separa nome/corpo di ogni tratto con un singolo "\n" (vedi
+  // scripts/ita-compendio/self-translate-fetch.mjs), MAI "\n\n" — trattarlo come un blocco unico
+  // (comportamento precedente) mostrava un intero muro di testo senza andare mai a capo, es. la
+  // razza Aasimar con "Età...Taglia...Scurovisione..." tutto incollato. Normalizzato a "\n\n" così
+  // ogni nome di tratto corto è riconosciuto come sottotitolo e ogni corpo come paragrafo a sé —
+  // nessuna ritraduzione richiesta, è solo una riformattazione.
+  const testoCache = usaCache ? (iaText ?? "").split("\n").filter(Boolean).join("\n\n") : "";
+  // Come si apre l'originale: se non con un titolo, quello in cima alla traduzione è il nome
+  // della voce (spesso reso diversamente da quello mostrato sopra) e non va ripetuto.
+  const apertura = useMemo(() => {
+    if (!usaCache) return undefined;
+    const originale = flattenEntries(entries);
+    return originale.length > 0 ? siApreConTitolo(originale) : undefined;
+  }, [usaCache, entries]);
+  const blocchi = useBlocchiTesto(testoCache, nomiVoce, apertura);
+  // Se tolto il nome non resta niente, la cache conteneva SOLO il nome al posto della descrizione
+  // (128 voci, quasi tutte oggetti: un lotto di traduzione andato storto). Lì la traduzione al volo
+  // dà almeno il testo, mentre la cache dava un titolo in grassetto e nient'altro.
+  if (usaCache && blocchi.length > 0) return <BlocchiTesto blocchi={blocchi} />;
   return <EntriesBlock entries={entries} language={language} />;
 }
 
@@ -604,6 +619,7 @@ export function EntryDetail({
           entries={(entry as RawBackground | RawCondition).entries}
           language={language}
           iaText={iaGenerica?.descrizioneIta}
+          nomiVoce={[iaGenerica?.nomeIta, entry.name]}
         />
       )}
       {kind === "classi" && <ClassDetail cls={entry as RawClass} language={language} />}
@@ -772,118 +788,113 @@ export function ParagrafoConTitoletto({ testo, className }: { testo: string; cla
   return <p className={className}>{testo}</p>;
 }
 
-export function TestoStrutturato({ testo }: { testo: string }) {
-  // useMemo: senza, il parsing (split + regex per blocco) rigira da zero a ogni render del
-  // genitore, anche quando "testo" non è cambiato — inconsistente con lo stile già in uso nel
-  // resto di questo file. Trovato con una code review.
-  const blocks = useMemo(
-    // riflussoTestoOcr ricuce prima gli a-capo di fine colonna del PDF: senza, le fonti OCR non
-    // hanno righe vuote da riconoscere e finiscono tutte nel ramo "paragrafo semplice", cioè in
-    // un unico blocco con le righe spezzate a metà frase.
-    () => riflussoTestoOcr(testo).split(/\n{2,}/).map((b) => b.trim()).filter(Boolean),
-    [testo],
-  );
+export function TestoStrutturato({
+  testo,
+  nomiVoce,
+  originaleApreConTitolo,
+}: {
+  testo: string;
+  /** I nomi della voce: se il testo si apre ripetendone uno, quella riga non si mostra due volte. */
+  nomiVoce?: (string | null | undefined)[];
+  /** `false` se l'originale non si apre con un titolo: vedi OpzioniBlocchi in lib/testo-strutturato.ts. */
+  originaleApreConTitolo?: boolean;
+}) {
+  return <BlocchiTesto blocchi={useBlocchiTesto(testo, nomiVoce, originaleApreConTitolo)} />;
+}
 
+/**
+ * Il testo diviso in blocchi, ciascuno col suo tipo. È separato dal disegno perché chi mostra una
+ * traduzione in cache deve poter guardare il risultato prima di decidere se usarla.
+ */
+function useBlocchiTesto(
+  testo: string,
+  nomiVoce?: (string | null | undefined)[],
+  originaleApreConTitolo?: boolean,
+): Blocco[] {
+  // Elenco dei nomi ridotto a una stringa: come dipendenza di useMemo un array nuovo a ogni
+  // render farebbe rifare il calcolo ogni volta, cioè proprio ciò che useMemo deve evitare.
+  const chiaveNomi = (nomiVoce ?? []).filter(Boolean).join("\u0000");
+  // Che cosa è ciascun blocco (titolo, etichetta, elenco, tabella...) lo decide
+  // lib/testo-strutturato.ts, dove le regole si possono provare; qui si disegna soltanto.
+  return useMemo(
+    () =>
+      classificaBlocchi(
+        // riflussoTestoOcr ricuce prima gli a-capo di fine colonna del PDF: senza, le fonti OCR
+        // non hanno righe vuote da riconoscere e finiscono in un unico blocco con le righe
+        // spezzate a metà frase.
+        riflussoTestoOcr(testo).split(/\n{2,}/),
+        { nomiVoce: chiaveNomi ? chiaveNomi.split("\u0000") : [], originaleApreConTitolo },
+      ),
+    [testo, chiaveNomi, originaleApreConTitolo],
+  );
+}
+
+function BlocchiTesto({ blocchi }: { blocchi: Blocco[] }) {
   return (
     <div className="space-y-3">
-      {blocks.map((block, i) => {
-        const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
-
-        if (/^Tabella\b/.test(lines[0])) {
-          const [caption, ...rows] = lines;
-          return (
-            <div key={i} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-1.5">
-              <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">
-                {caption.replace(/^Tabella\s*[—-]\s*/, "").replace(/:$/, "")}
-              </p>
-              <div className="space-y-1 text-sm">
-                {rows.map((row, j) => {
-                  const cells = row.split(" — ");
-                  return (
+      {blocchi.map((blocco, i) => {
+        switch (blocco.tipo) {
+          case "tabella":
+            return (
+              <div key={i} className="rounded-lg border border-edge bg-surface-raised p-3 space-y-1.5">
+                <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">{blocco.titolo}</p>
+                <div className="space-y-1 text-sm">
+                  {blocco.righe.map((riga, j) => (
                     <p key={j} className="text-foreground leading-snug">
-                      {cells.length > 1 ? (
+                      {riga.etichetta !== null && (
                         <>
-                          <span className="font-bold">{cells[0]}</span>
+                          <span className="font-bold">{riga.etichetta}</span>
                           {" — "}
-                          {cells.slice(1).join(" — ")}
                         </>
-                      ) : (
-                        row
                       )}
+                      {riga.testo}
                     </p>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        }
-
-        // "bulletLines.length > 1" scartava per errore gli elenchi con un SOLO punto (comuni: molti
-        // talenti hanno un unico beneficio) — restava il trattino "- " visibile come testo semplice
-        // invece di un elenco puntato vero (es. il talento Allerta, verificato dal vivo). Un blocco
-        // con anche un solo "- " reale (il segnale non è ambiguo: nessuna frase italiana di regole
-        // inizia per caso con un trattino) va comunque trattato come elenco.
-        const bulletLines = lines.filter((l) => l.startsWith("- "));
-        if (bulletLines.length >= lines.length / 2 && bulletLines.length >= 1) {
-          return (
-            <ul key={i} className="list-disc pl-5 space-y-1 text-sm text-foreground leading-relaxed">
-              {lines.map((l, j) => (
-                <li key={j}>{l.replace(/^- /, "")}</li>
-              ))}
-            </ul>
-          );
-        }
-
-        // "Prerequisito: 5° livello", "Oggetto: un elmo (richiede sintonia)": sui manuali sono
-        // righe a sé sopra la descrizione, non titoli di sezione. Senza questo ramo finivano nel
-        // caso "sottotitolo" qui sotto, che le rende come un'intestazione di paragrafo.
-        const etichetta = lines.length === 1 ? lines[0].match(/^(Prerequisit[oi]|Oggetto):\s*(.+)$/) : null;
-        if (etichetta) {
-          return (
-            <p key={i} className="text-sm text-foreground leading-relaxed">
-              <span className="font-bold text-accent-strong">{etichetta[1]}:</span> {etichetta[2]}
-            </p>
-          );
-        }
-
-        if (lines.length === 1 && lines[0].length < 70 && !/[.!?]$/.test(lines[0])) {
-          return (
-            <h4 key={i} className="font-bold text-accent-strong pt-1">
-              {lines[0]}
-            </h4>
-          );
-        }
-
-        // Voce a definizione: "ATTACCO — Effettua uno o più attacchi…". È il formato di tutte le
-        // Regole principali (azioni in combattimento, condizioni, tipi di movimento), e finiva
-        // resa come paragrafo piatto: il termine si perdeva dentro la frase e per ritrovare
-        // "Schivata" in mezzo a venti paragrafi uguali bisognava rileggerli tutti. Il termine
-        // viene richiesto TUTTO MAIUSCOLO e corto, così una frase normale che contiene un trattino
-        // lungo non viene scambiata per una definizione.
-        const primaRiga = lines[0] ?? "";
-        const sep = primaRiga.indexOf(" \u2014 ");
-        const termine = sep > 1 && sep <= 40 ? primaRiga.slice(0, sep) : null;
-        if (termine && termine === termine.toUpperCase() && /[A-Z]/.test(termine)) {
-          const descrizione = block.slice(block.indexOf(" \u2014 ") + 3).trim();
-          return (
-            <div key={i} className="rounded-lg border border-edge bg-surface-raised px-3 py-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">
-                {termine.trim()}
+            );
+          case "elenco":
+            return (
+              <ul key={i} className="list-disc pl-5 space-y-1 text-sm text-foreground leading-relaxed">
+                {blocco.voci.map((voce, j) => (
+                  <li key={j}>{voce}</li>
+                ))}
+              </ul>
+            );
+          // "Prerequisito: 5° livello", "Talento: Guaritore": righe di una scheda, non titoli.
+          case "etichetta":
+            return (
+              <p key={i} className="text-sm text-foreground leading-relaxed">
+                <span className="font-bold text-accent-strong">{blocco.etichetta}:</span> {blocco.valore}
               </p>
-              <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-                {descrizione.trim()}
-              </p>
-            </div>
-          );
+            );
+          case "titolo":
+            return (
+              <h4 key={i} className="font-bold text-accent-strong pt-1">
+                {blocco.testo}
+              </h4>
+            );
+          // Voce a definizione delle Regole principali ("ATTACCO — Effettua uno o più attacchi…"):
+          // resa come paragrafo piatto il termine si perdeva dentro la frase, e per ritrovare
+          // "Schivata" in mezzo a venti paragrafi uguali bisognava rileggerli tutti.
+          case "definizione":
+            return (
+              <div key={i} className="rounded-lg border border-edge bg-surface-raised px-3 py-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-accent-strong">{blocco.termine}</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+                  {blocco.descrizione}
+                </p>
+              </div>
+            );
+          default:
+            return (
+              <ParagrafoConTitoletto
+                key={i}
+                testo={blocco.testo}
+                className="whitespace-pre-wrap text-sm text-foreground leading-relaxed"
+              />
+            );
         }
-
-        return (
-          <ParagrafoConTitoletto
-            key={i}
-            testo={block}
-            className="whitespace-pre-wrap text-sm text-foreground leading-relaxed"
-          />
-        );
       })}
     </div>
   );
@@ -979,7 +990,12 @@ function SpellDetail({ spell, language }: { spell: RawSpell; language: Language 
       {material && <p className="text-sm text-muted italic">Materiali: {translatedMaterial}</p>}
       <div className="border-t border-edge pt-3 space-y-2">
         <p className="text-xs uppercase tracking-widest text-muted">Descrizione</p>
-        <EntriesBlockOrIa entries={spell.entries} language={language} iaText={ia?.descrizioneIta} />
+        <EntriesBlockOrIa
+          entries={spell.entries}
+          language={language}
+          iaText={ia?.descrizioneIta}
+          nomiVoce={[ia?.nomeIta, spell.name]}
+        />
       </div>
       {spell.entriesHigherLevel && (
         <div>
@@ -1406,7 +1422,12 @@ function ItemDetail({ item, language }: { item: RawItem; language: Language }) {
           <Stat label="Furtività" value={item.stealth ? "Svantaggio" : undefined} />
         </div>
       )}
-      <EntriesBlockOrIa entries={item.entries} language={language} iaText={ia?.descrizioneIta} />
+      <EntriesBlockOrIa
+        entries={item.entries}
+        language={language}
+        iaText={ia?.descrizioneIta}
+        nomiVoce={[ia?.nomeIta, item.name]}
+      />
     </>
   );
 }
@@ -1482,7 +1503,12 @@ function RaceDetail({ race, language }: { race: RawRace; language: Language }) {
         />
       </div>
       <div className="border-t border-edge pt-3">
-        <EntriesBlockOrIa entries={race.entries} language={language} iaText={ia?.descrizioneIta} />
+        <EntriesBlockOrIa
+          entries={race.entries}
+          language={language}
+          iaText={ia?.descrizioneIta}
+          nomiVoce={[ia?.nomeIta, race.name]}
+        />
       </div>
     </>
   );
@@ -1536,7 +1562,12 @@ function FeatDetail({ feat, language }: { feat: RawFeat; language: Language }) {
         {feat.ability && <Stat label="Aumento caratteristiche" value={formatAbilityIncrease(feat.ability)} />}
       </div>
       <div className="border-t border-edge pt-3">
-        <EntriesBlockOrIa entries={feat.entries} language={language} iaText={ia?.descrizioneIta} />
+        <EntriesBlockOrIa
+          entries={feat.entries}
+          language={language}
+          iaText={ia?.descrizioneIta}
+          nomiVoce={[ia?.nomeIta, feat.name]}
+        />
       </div>
     </>
   );

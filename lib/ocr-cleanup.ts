@@ -160,11 +160,36 @@ export function togliColonnaCaratteristiche(testo: string): string {
 }
 
 /**
- * Pulizia del testo di tratti e azioni di una scheda di mostro: quella generale, più le due
+ * Ripara i dadi scritti nel testo corrente, fuori dalle parentesi: "evoca l d4 lupi", "15 (ldl2 +
+ * 4 più 1 d8)", "(massimo 1 0d6)", "pari a l dl 2 + il punteggio di Costituzione".
+ *
+ * riparaDadiFraParentesi vede solo la parentesi che contiene un dado e nient'altro; questi le
+ * sfuggono perché stanno in mezzo a una frase, o in una parentesi che contiene anche parole. Sono
+ * pochi (una quindicina in tutto il bestiario) ma sono proprio i numeri che servono al tavolo.
+ *
+ * Come là, il vincolo è che ne esca un dado che esiste: "l d4" non è italiano, "I d6 extra" sì
+ * (l'articolo davanti ai dadi), quindi la I maiuscola vale 1 solo se è attaccata alla d.
+ */
+export function riparaDadiNelTesto(testo: string): string {
+  const inCifre = (s: string) => s.replace(/[lI]/g, "1").replace(/O/g, "0").replace(/\s+/g, "");
+  return testo.replace(
+    /(?<![A-Za-zÀ-ÿ\d])([lI]|\d{1,2}|[1-9] 0)( ?)d ?([lI1] ?[O0] ?[O0]|[lI1] ?[O02]|2 ?[O0]|[468])(?![A-Za-zÀ-ÿ\d])/g,
+    (intero, quanti: string, spazio: string, facce: string) => {
+      if (quanti === "I" && spazio) return intero;
+      const numeroFacce = inCifre(facce);
+      return FACCE_DI_DADO.has(numeroFacce) ? `${inCifre(quanti)}d${numeroFacce}` : intero;
+    },
+  );
+}
+
+/**
+ * Pulizia del testo di tratti e azioni di una scheda di mostro: quella generale, più le
  * riparazioni che hanno senso solo dentro uno stat block.
  */
 export function pulisciCorpoScheda(testo: string): string {
-  const riparato = riparaDadiFraParentesi(pulisciTestoOcr(togliColonnaCaratteristiche(testo)))
+  const riparato = riparaDadiNelTesto(riparaDadiFraParentesi(pulisciTestoOcr(togliColonnaCaratteristiche(testo))))
+    // "Colpito: l3 (2d8 + 4)": la prima cifra del danno medio letta come elle.
+    .replace(/(?<![A-Za-zÀ-ÿ\d])[lI](\d)(?= \(\d+d\d+)/g, "1$1")
     // "Colpito: 1 3 (3d6 + 3) danni": il danno medio, spezzato in due dalla colonna stretta. Si
     // ricompone solo davanti alla parentesi dei dadi, dove due cifre staccate non possono essere
     // due numeri distinti.

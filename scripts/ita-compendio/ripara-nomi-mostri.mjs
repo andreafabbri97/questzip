@@ -8,7 +8,7 @@
 // sbagliato) ma CA e PF, che il parser non ha toccato: sono la stessa scheda, quindi combaciano.
 // Se una riga non trova esattamente un candidato, viene lasciata stare e segnalata.
 //
-// Uso: node --env-file=../../.env.local ripara-nomi-mostri.mjs [--applica]
+// Uso: node --env-file=../../.env.local ripara-nomi-mostri.mjs [--applica] [--elenco]
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -22,6 +22,7 @@ const LIBRI = ["multiverso", "bigby", "fizban", "mm", "dragonlance", "ravenloft"
 
 let rinominate = 0;
 const irrisolte = [];
+const scartate = [];
 
 for (const libro of LIBRI) {
   const parsed = JSON.parse(
@@ -53,6 +54,16 @@ for (const libro of LIBRI) {
       continue;
     }
     const nuovo = candidati[0].nome;
+    // Lo script ripara i titoli TRONCATI: il nome nuovo deve contenere quello vecchio e
+    // completarlo. Senza questo controllo, rilanciato mesi dopo proponeva 42 rinomine tutte al
+    // contrario — i nomi nel database nel frattempo erano stati corretti a mano o dalla pulizia
+    // OCR, e venivano riportati a quelli grezzi del parser («DRETCH» -> «DEMONP», «ZARIEL» ->
+    // «ZARI EL», «UFFICIALE DELL'ARMATA DEL DRAGO» -> «UFFICIALE DELLYRMATA DEL DRAGO»).
+    const completa = nuovo.length > riga.nome.length && nuovo.toUpperCase().includes(riga.nome.toUpperCase());
+    if (!completa) {
+      scartate.push(`${riga.nome} [${libro}] (il parser dice «${nuovo}»: non è un completamento)`);
+      continue;
+    }
     console.log(`${riga.nome} [${libro}] -> ${nuovo}`);
     if (applica) {
       await sql.query("UPDATE compendio_ita_mostro SET nome = $1 WHERE id = $2", [nuovo, riga.id]);
@@ -66,3 +77,5 @@ for (const libro of LIBRI) {
 console.log(`\n${applica ? "" : "[PROVA] "}righe rinominate: ${rinominate}`);
 console.log(`non risolte: ${irrisolte.length}`);
 for (const x of irrisolte) console.log("  -", x);
+console.log(`scartate perché non completano il nome: ${scartate.length}`);
+if (process.argv.includes("--elenco")) for (const x of scartate) console.log("  -", x);

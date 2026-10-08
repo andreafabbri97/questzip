@@ -56,4 +56,33 @@ test.describe("Compendio: impaginazione dei testi OCR", () => {
     // "danni perforan ti" era spezzato dall'OCR
     expect(testo).not.toMatch(/perforan ti/);
   });
+
+  // La scheda di un Background era una colonna di titoli: il nome ripetuto sotto il titolo vero,
+  // poi «Caratteristiche: …», «Talento: Guaritore», «Competenze nelle Abilità: …» uno sotto
+  // l'altro in grassetto, e solo «Equipaggiamento» come testo normale (segnalato dall'utente con
+  // uno screenshot proprio su questa voce). Le regole sono in lib/testo-strutturato.ts.
+  test("la scheda di un background è fatta di righe a etichetta, senza titoli e senza il nome ripetuto", async ({
+    page,
+  }) => {
+    await page.goto("/compendio");
+    await page.waitForFunction(
+      () => !document.body.innerText.includes("Caricamento contenuti in corso"),
+    );
+    await page.getByRole("button", { name: "Background" }).click();
+
+    const search = page.getByPlaceholder("Cerca (in inglese o italiano)…");
+    await search.fill("Dead Magic Dweller");
+    await page.getByText("Dead Magic Dweller", { exact: true }).first().click();
+
+    const scheda = page.locator("div.card-elevated:has(h2.heading-ornate)").first();
+    const righe = scheda.locator("p > span.font-bold.text-accent-strong");
+    await expect(righe.filter({ hasText: "Talento:" })).toBeVisible({ timeout: 20000 });
+    // Tutte le righe della scheda hanno la stessa forma, anche quella lunga dell'equipaggiamento.
+    await expect(righe.filter({ hasText: "Equipaggiamento:" })).toBeVisible();
+    expect(await righe.count()).toBeGreaterThanOrEqual(4);
+
+    await expect(scheda.locator("h4")).toHaveCount(0);
+    // Il nome compare una volta sola: nel titolo della scheda.
+    await expect(scheda.getByText("Abitante della Magia Morta", { exact: true })).toHaveCount(1);
+  });
 });

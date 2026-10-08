@@ -113,12 +113,17 @@ function schedeDi(libro) {
 // quelle rigenerate, che si portano dietro righe di rumore. A parità di dadi il criterio "più
 // lungo è meglio" le avrebbe sovrascritte alla prima esecuzione successiva.
 const trascritteAMano = new Set();
+// Le schede i cui numeri sono diversi dall'originale perche' cosi' e' stampato sul manuale italiano.
+const differenzeVerificate = new Set();
 for (const file of readdirSync(path.join(__dirname, "parsed")).filter((f) => /^trascritti-mostri-.*\.json$/.test(f))) {
   const { fonte, voci } = JSON.parse(readFileSync(path.join(__dirname, "parsed", file), "utf-8"));
-  for (const voce of voci ?? []) trascritteAMano.add(`${voce.nome}|${fonte}`);
+  for (const voce of voci ?? []) {
+    trascritteAMano.add(`${voce.nome}|${fonte}`);
+    if (voce._differenze_verificate) differenzeVerificate.add(`${voce.nome}|${fonte}`);
+  }
 }
 
-const esito = { sostituite: 0, ripulite: 0, intatte: 0, protette: 0, senzaScheda: [], scartate: [], ancoraDiverse: [] };
+const esito = { sostituite: 0, ripulite: 0, intatte: 0, protette: 0, verificate: 0, senzaScheda: [], scartate: [], ancoraDiverse: [] };
 let dadiRecuperati = 0;
 
 for (const r of righe) {
@@ -167,7 +172,8 @@ for (const r of righe) {
   const testoScelto = Object.values(scelto).join("\n");
   if (eng) {
     const residuo = scarto(dadi(testoScelto), dadiEng);
-    if (residuo > 0) esito.ancoraDiverse.push([residuo, `${r.nome} [${r.fonte}] (${testoScelto.length} car / ${lunghezzaEng} orig.)`]);
+    if (residuo > 0 && differenzeVerificate.has(`${r.nome}|${r.fonte}`)) esito.verificate++;
+    else if (residuo > 0) esito.ancoraDiverse.push([residuo, `${r.nome} [${r.fonte}] (${testoScelto.length} car / ${lunghezzaEng} orig.)`]);
   }
 
   const cambiate = SEZIONI.map(([colonna]) => colonna).filter((c) => scelto[c] !== (r[c] ?? ""));
@@ -192,6 +198,7 @@ console.log(`trascritte a mano, lasciate come sono: ${esito.protette}`);
 console.log(`senza una scheda rigenerata da confrontare: ${esito.senzaScheda.length}`);
 console.log(`testo nuovo scartato perché troppo lungo rispetto all'originale: ${esito.scartate.length}`);
 console.log(`dadi ancora diversi dall'originale: ${esito.ancoraDiverse.length} schede`);
+console.log(`diversi dall'originale perché così è stampato sul manuale (verificate sulla pagina): ${esito.verificate}`);
 if (elenco) {
   for (const s of esito.scartate) console.log(`  scartata: ${s}`);
   for (const s of esito.senzaScheda) console.log(`  senza scheda: ${s}`);
